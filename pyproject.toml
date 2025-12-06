@@ -1,0 +1,39 @@
+[project]
+name = "financial-analyst-system"
+version = "0.1.0"
+description = "A system to analyze the financial data and articulate a memo for the user."
+authors = [
+    { name = "Nilesh Auradkar", email = "nilesh.auradkar.0599@gmail.com" },
+]
+readme = "README.md"
+requires-python = "^3.12"
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "langchain-ollama>=0.2.0",
+    "chromadb>=0.5.0",
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+    "yfinance>=0.2.40",
+    "tavily-python>=0.5.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "httpx>=0.27.0",
+    "langsmith>=0.1.0",
+    "loguru>=0.7.0",
+    "python-dotenv>=1.0.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "rich>=13.0.0",
+]
+
+[tool.poetry]
+packages = [{ include = "financial_analyst_system", from = "src" }]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
