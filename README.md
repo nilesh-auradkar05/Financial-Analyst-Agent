@@ -22,18 +22,18 @@
 
 ---
 
-## ✨ Features
+## Features
 
 <table>
 <tr>
 <td width="50%">
 
-### 🔍 Multi-Source Research
+### Multi-Source Research
 - **News Search** via Tavily (LLM-optimized)
 - **Stock Data** via YFinance (real-time quotes)
 - **SEC Filings** via EDGAR API (10-K, 10-Q)
 
-### 🧠 Advanced Analysis
+### Advanced Analysis
 - **RAG Pipeline** for intelligent filing retrieval
 - **FinBERT Sentiment** analysis on news
 - **Vision Support** for charts/tables (Qwen3-VL)
@@ -41,12 +41,12 @@
 </td>
 <td width="50%">
 
-### 📝 Professional Output
+### Professional Output
 - **Investment Memos** with structured sections
 - **Verifiable Citations** for every claim
 - **Executive Summaries** for quick review
 
-### 🚀 Production Ready
+### Production Ready
 - **FastAPI** with async job support
 - **Health Checks** for all components
 - **Graceful Degradation** on partial failures
@@ -58,19 +58,13 @@
 ---
 
 ## Architecture
-```
-
 ![System Architecture](assets/images/architecture.jpg)
-```
 
 ### Agent Workflow
-```
+
 ![Agent Wrokflow](assets/images/agent-workflow.jpg)
-```
 
----
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -127,7 +121,7 @@ curl -X POST http://localhost:8000/analyze \
 http://localhost:8000
 ```
 
-<!-- ### Endpoints
+### Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -138,7 +132,7 @@ http://localhost:8000
 | `GET` | `/ingest/{ticker}` | Check if filings are indexed |
 | `GET` | `/health` | Health check for all components |
 | `GET` | `/stats` | System statistics |
-| `GET` | `/docs` | Interactive API documentation | -->
+| `GET` | `/docs` | Interactive API documentation |
 
 ### Example: Async Analysis
 ```bash
@@ -180,7 +174,7 @@ curl http://localhost:8000/jobs/$JOB_ID | jq
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 All settings are managed via environment variables or `.env` file:
 
@@ -244,7 +238,7 @@ alpha-analyst/
 - [x] RAG pipeline for SEC filings
 - [x] Sentiment analysis
 - [x] Investment memo generation
-- [] FastAPI service
+- [X] FastAPI service
 
 ### Phase 2: Enhanced Analysis
 - [ ] Multi-company comparison
@@ -265,16 +259,3 @@ alpha-analyst/
 - [ ] Docker compose setup
 - [ ] Kubernetes manifests
 - [ ] Cloud deployment guides
-
----
-
-## Acknowledgments
-
-- [LangChain](https://github.com/langchain-ai/langchain) & [LangGraph](https://github.com/langchain-ai/langgraph) for the agent framework
-- [Ollama](https://ollama.ai/) for local LLM inference
-- [ChromaDB](https://www.trychroma.com/) for vector storage
-- [FinBERT](https://huggingface.co/ProsusAI/finbert) for financial sentiment analysis
-- [Tavily](https://tavily.com/) for LLM-optimized search
-- [SEC EDGAR](https://www.sec.gov/edgar) for financial filings
-
-```
