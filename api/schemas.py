@@ -4,10 +4,6 @@ API Schemas
 This module defines the Pydantic models for the API request/response validation.
 """
 
-from email.policy import default
-from optparse import Option
-from re import S
-from turtle import st
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, timezone

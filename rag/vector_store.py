@@ -441,7 +441,7 @@ class ChromaDBVectorStore:
             return RetrievedChunk(
                 id=results["ids"][0],
                 text=results["documents"][0] if results["documents"][0] else "",
-                metada=results["metadatas"][0] if results["metadatas"][0] else {},
+                metadata=results["metadatas"][0] if results["metadatas"][0] else {},
                 distance=0.0,
             )
 

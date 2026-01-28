@@ -1,39 +1,95 @@
-[project]
-name = "financial-analyst-system"
-version = "0.1.0"
-description = "A system to analyze the financial data and articulate a memo for the user."
-authors = [
-    { name = "Nilesh Auradkar", email = "nilesh.auradkar.0599@gmail.com" },
-]
+[tool.poetry]
+name = "alpha-analyst"
+version = "1.0.0"
+description = "AI-powered financial analysis agent"
+authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-requires-python = "^3.12"
-dependencies = [
-    "langgraph>=0.2.0",
-    "langchain-core>=0.3.0",
-    "langchain-ollama>=0.2.0",
-    "chromadb>=0.5.0",
-    "transformers>=4.40.0",
-    "torch>=2.0.0",
-    "yfinance>=0.2.40",
-    "tavily-python>=0.5.0",
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "httpx>=0.27.0",
-    "langsmith>=0.1.0",
-    "loguru>=0.7.0",
-    "python-dotenv>=1.0.0",
-    "beautifulsoup4>=4.12.0",
-    "lxml>=5.0.0",
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "rich>=13.0.0",
+packages = [{include = "agent"}, {include = "api"}, {include = "models"}, {include = "rag"}, {include = "tools"}, {include = "observability"}, {include = "evaluation"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.15"
+
+# Core
+pydantic = "^2.0"
+pydantic-settings = "^2.0"
+python-dotenv = "^1.0"
+loguru = "^0.7"
+
+# LangChain ecosystem
+langchain = "^1.2"
+langchain-ollama = "^1.0"
+langchain-community = "^0.4"
+langchain-text-splitters = "^1.1"
+langgraph = "^1.0"
+langsmith = "^0.6"
+
+# Vector store
+chromadb = "^1.4"
+
+# ML models
+transformers = "^4.40"
+torch = "^2.10"
+
+# Data tools
+yfinance = "^1.0"
+httpx = "^0.28"
+
+# API
+fastapi = "^0.128"
+uvicorn = {extras = ["standard"], version = "^0.40"}
+
+# Observability
+prometheus-client = "^0.24"
+
+# Optional: Tavily search
+tavily-python = {version = "^0.7", optional = true}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0"
+pytest-asyncio = "^1.3"
+pytest-cov = "^7.0"
+ruff = "^0.14"
+mypy = "^1.11"
+httpx = "^0.28"
+
+[tool.poetry.group.eval.dependencies]
+# Evaluation frameworks (optional, require API keys)
+ragas = {version = "^0.4", optional = true}
+deepeval = {version = "^3.8", optional = true}
+datasets = "^4.5"
+
+[tool.poetry.extras]
+search = ["tavily-python"]
+eval = ["ragas", "deepeval"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]
 
-[tool.poetry]
-packages = [{ include = "financial_analyst_system", from = "src" }]
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+alpha-analyst = "api.main:app"
+evaluate = "evaluation.runner:_main"

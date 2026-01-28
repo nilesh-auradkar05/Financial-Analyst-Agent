@@ -22,6 +22,36 @@
 
 ---
 
+## Roadmap
+
+### Phase 1: Core Agent (Done)
+- [x] Multi-source data gathering
+- [x] RAG pipeline for SEC filings
+- [x] Sentiment analysis
+- [x] Investment memo generation
+- [X] FastAPI service
+
+### Phase 2: Enhanced Analysis
+- [ ] Multi-company comparison
+- [ ] Historical trend analysis
+- [ ] Competitor identification
+- [ ] Custom analysis templates
+
+### Phase 3: Advanced Features
+- [ ] LangSmith observability
+- [ ] Streaming responses
+- [ ] PDF report generation
+- [ ] Scheduled analysis jobs
+- [ ] Webhook notifications
+
+### Phase 4: Scale & Deploy
+- [ ] Redis job queue
+- [ ] PostgreSQL persistence
+- [ ] Docker compose setup
+- [ ] Kubernetes manifests
+- [ ] Cloud deployment guides
+
+---
 ## Features
 
 <table>
@@ -230,32 +260,3 @@ alpha-analyst/
 ```
 
 ---
-
-## Roadmap
-
-### Phase 1: Core Agent (Done)
-- [x] Multi-source data gathering
-- [x] RAG pipeline for SEC filings
-- [x] Sentiment analysis
-- [x] Investment memo generation
-- [X] FastAPI service
-
-### Phase 2: Enhanced Analysis
-- [ ] Multi-company comparison
-- [ ] Historical trend analysis
-- [ ] Competitor identification
-- [ ] Custom analysis templates
-
-### Phase 3: Advanced Features
-- [ ] LangSmith observability
-- [ ] Streaming responses
-- [ ] PDF report generation
-- [ ] Scheduled analysis jobs
-- [ ] Webhook notifications
-
-### Phase 4: Scale & Deploy
-- [ ] Redis job queue
-- [ ] PostgreSQL persistence
-- [ ] Docker compose setup
-- [ ] Kubernetes manifests
-- [ ] Cloud deployment guides

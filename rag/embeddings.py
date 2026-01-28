@@ -18,9 +18,8 @@ Usage:
 """
 
 import asyncio
-import httpx
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional
 from pathlib import Path
 from loguru import logger
 
@@ -98,11 +97,11 @@ def get_embeddings(
         base_url=base_url,
     )
 
-# Direct Ollama API client
+# Async embedding helper
 
 class EmbeddingsClient:
     """
-    Direct Client for Ollama's embeddings API.
+    Async wrapper around OllamaEmbeddings.
 
     Example:
     ----------------------
@@ -132,31 +131,21 @@ class EmbeddingsClient:
         self.base_url = (base_url or settings.ollama.base_url).rstrip("/")
         self.timeout = timeout or settings.ollama.timeout
 
-        self._client: Optional[httpx.AsyncClient] = None
+        self._embeddings = OllamaEmbeddings(
+            model=self.model,
+            base_url=self.base_url,
+        )
         self._dimensions: Optional[int] = None
         
         logger.info(f"EmbeddingsClient initialized (model={self.model})")
 
     async def __aenter__(self):
-        """Async context manage entry"""
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=httpx.Timeout(self.timeout),
-        )
+        """Async context manage entry."""
         return self
 
     async def __aexit__(self, exc_type, exc_value, exc_tb):
         """Async context manager exit."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-
-    @property
-    def client(self) -> httpx.AsyncClient:
-        """Get HHTP client, raising if not initialized."""
-        if self._client is None:
-            raise RuntimeError("Client not initialized. Use 'async with EmbeddingsClient() as client:")
-        return self._client
+        return None
 
     async def embed_single(self, text: str) -> list[float]:
         """
@@ -169,11 +158,9 @@ class EmbeddingsClient:
             Embedding vector as list of floats
         """
         result = await self.embed_texts([text])
-
         if result.success:
             return result.vectors[0]
-        else:
-            raise RuntimeError(f"Embedding failed: {result.error}")
+        raise RuntimeError(f"Embedding failed: {result.error}")
 
     async def embed_texts(
         self,
@@ -199,15 +186,17 @@ class EmbeddingsClient:
             )
         logger.info(f"Embedding {len(texts)} texts with {self.model}")
 
-        all_vectors = []
+        all_vectors: list[list[float]] = []
 
         try:
             for i in range(0, len(texts), batch_size):
-                batch = texts[i:i+batch_size]
-                batch_vectors = await self._embed_batch(batch)
+                batch = texts[i:i + batch_size]
+                batch_vectors = await asyncio.to_thread(
+                    self._embeddings.embed_documents,
+                    batch,
+                )
                 all_vectors.extend(batch_vectors)
 
-            # Get dimensions from first vector
             dimensions = len(all_vectors[0]) if all_vectors else 0
             self._dimensions = dimensions
 
@@ -227,41 +216,6 @@ class EmbeddingsClient:
                 dimensions=0,
                 error=str(e),
             )
-
-    async def _embed_batch(
-        self,
-        texts: list[str]
-    ) -> list[list[float]]:
-
-        """
-        Embed a batch of texts with Ollama API.
-
-        Args:
-            texts: Batch of texts
-
-        Returns:
-            List of embedding vectors
-        """
-
-        vectors = []
-
-        for text in texts:
-            # Ollama's API expects one text a time
-            payload = {
-                "model": self.model,
-                "input": text,
-            }
-
-            response = await self.client.post("/api/embed", json=payload)
-            response.raise_for_status()
-
-            data = response.json()
-
-            # Response format: {"embedding": [[vector]]}
-            embedding = data.get("embeddings", [[]])[0]
-            vectors.append(embedding)
-
-        return vectors
     async def embed_query(
         self,
         query: str
@@ -275,7 +229,7 @@ class EmbeddingsClient:
         Returns:
             Embedding vector as a list of float values.
         """
-        return await self.embed_single(query)
+        return await asyncio.to_thread(self._embeddings.embed_query, query)
 
     @property
     def dimensions(self) -> int:

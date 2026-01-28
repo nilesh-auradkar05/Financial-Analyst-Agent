@@ -1,0 +1,133 @@
+# Financial Analyst Agent System - Docker Compose
+
+# Usage:
+  # docker compose up -d         # Start all services
+  # docker compose logs -f api   # view API logs
+  # docker compose down          # Stop all services
+services:
+  # Main API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: financial-analyst-agent-system-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Ollama connection
+      # Host Ollama (override here if needed)
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_LLM_MODEL=${OLLAMA_LLM_MODEL:-qwen3-vl:8b}
+      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-600}
+      - OLLAMA_TEMPERATURE=${OLLAMA_TEMPERATURE:-0.7}
+
+      # Tavily
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+
+      # ChromaDB
+      - CHROMA_PERSIST_DIR=/app/data/chroma
+      - CHROMA_COLLECTION_NAME=${CHROMA_COLLECTION_NAME:-sec_filings}
+      
+      # SEC
+      - SEC_USER_AGENT=${SEC_USER_AGENT:-AlphaAnalyst/1.0 (contact@example.com)}
+      
+      # LangSmith (optional)
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-alpha-analyst}
+
+    volumes:
+      # Persist data between restarts
+      - chroma-data:/app/data/chroma
+      - filings-data:/app/data/filings
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - financial-analyst-network
+    # For Mac/Windows to access host's ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Ollama Service (Optional if want to add ollama in docker)
+  # =========================================================================
+  # Uncomment this if you want to run Ollama in Docker instead of on host
+  # Note: Requires GPU passthrough for good performance
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: financial-analyst-agent-system-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+    # For GPU support (NVIDIA), re-enable the deploy block below
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    # networks:
+    #   - financial-analyst-network
+  # =========================================================================
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: financial-analyst-agent-system-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    restart: unless-stopped
+    networks:
+      - financial-analyst-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: financial-analyst-agent-system-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+    networks:
+      - financial-analyst-network
+    depends_on:
+      - prometheus
+
+volumes:
+  chroma-data:
+    name: financial-analyst-chroma
+  filings-data:
+    name: financial-analyst-filings
+  prometheus-data:
+    name: financial-analyst-prometheus
+  grafana-data:
+    name: financial-analyst-grafana
+  # ollama-data:
+  #   name: financial-analyst-ollama
+
+networks:
+  financial-analyst-network:
+    name: financial-analyst-network
+    driver: bridge
