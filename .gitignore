@@ -215,3 +215,5 @@ agents/__pycache__/
 configs/__pycache__/
 rag/__pycache__/
 tests/__pycache__/
+
+agents/crew_agents.py

@@ -1,76 +1,84 @@
 [tool.poetry]
 name = "alpha-analyst"
-version = "1.0.0"
+version = "1.1.0"
 description = "AI-powered financial analysis agent"
-authors = ["Your Name <you@example.com>"]
+authors = ["Nilesh Auradkar nilesh.auradkar14@gmail.com"]
 readme = "README.md"
-packages = [{include = "agent"}, {include = "api"}, {include = "models"}, {include = "rag"}, {include = "tools"}, {include = "observability"}, {include = "evaluation"}]
+packages = [{include = "agent"}, {include = "api"}, {include = "models"}, {include = "rag"}, {include = "tools"}]
 
+# ------------------------------------------------------------------
+# GROUP: BASE (Core dependencies needed for the app to run)
+# ------------------------------------------------------------------
 [tool.poetry.dependencies]
-python = ">=3.12,<3.15"
+python = ">=3.10,<3.14"
 
-# Core
-pydantic = "^2.0"
-pydantic-settings = "^2.0"
-python-dotenv = "^1.0"
+# Configuration & Logging
+python-dotenv = ">=1.1"
 loguru = "^0.7"
+pydantic = ">=2.11"
+pydantic-settings = ">2.10"
 
-# LangChain ecosystem
-langchain = "^1.2"
-langchain-ollama = "^1.0"
-langchain-community = "^0.4"
-langchain-text-splitters = "^1.1"
-langgraph = "^1.0"
-langsmith = "^0.6"
+# AI & LLM Ecosystem
+langchain = ">=1.2"
+langchain-community = ">=0.4"
+langchain-text-splitters = ">=1.1"
+langgraph = ">=1.0"
+crewai = ">=1.9.1" 
 
-# Vector store
-chromadb = "^1.4"
+protobuf = ">=5.0"
+tokenizers = ">=0.20"
 
-# ML models
-transformers = "^4.40"
-torch = "^2.10"
+# Vector Store
+chromadb = ">=1.1"
 
-# Data tools
-yfinance = "^1.0"
-httpx = "^0.28"
+# Data Tools
+yfinance = ">=1.1"
+httpx = ">=0.28"
+tavily-python = ">=0.7"
 
-# API
-fastapi = "^0.128"
-uvicorn = {extras = ["standard"], version = "^0.40"}
+# ML Utilities
+torch = ">=2.2"
+transformers = ">=4.0"
 
-# Observability
-prometheus-client = "^0.24"
+# ------------------------------------------------------------------
+# GROUP: API (Dependencies for serving the application)
+# ------------------------------------------------------------------
+[tool.poetry.group.api.dependencies]
+fastapi = ">=0.128"
+uvicorn = {extras = ["standard"], version = ">=0.40"}
+prometheus-client = ">=0.24"
 
-# Optional: Tavily search
-tavily-python = {version = "^0.7", optional = true}
-
+# ------------------------------------------------------------------
+# GROUP: DEV (Testing, Linting, Typing - Not needed in Prod)
+# ------------------------------------------------------------------
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0"
-pytest-asyncio = "^1.3"
-pytest-cov = "^7.0"
-ruff = "^0.14"
-mypy = "^1.11"
-httpx = "^0.28"
+pytest = ">=9.0"
+pytest-asyncio = ">=1.3"
+pytest-cov = ">=7.0"
+ruff = ">=0.14"
+mypy = "^1.9"
 
+# ------------------------------------------------------------------
+# GROUP: EVAL (RAG Evaluation frameworks)
+# ------------------------------------------------------------------
 [tool.poetry.group.eval.dependencies]
-# Evaluation frameworks (optional, require API keys)
-ragas = {version = "^0.4", optional = true}
-deepeval = {version = "^3.8", optional = true}
-datasets = "^4.5"
+deepeval = ">=3.8"
+datasets = ">=4.5"
 
-[tool.poetry.extras]
-search = ["tavily-python"]
-eval = ["ragas", "deepeval"]
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+alpha-analyst = "api.main:app"
+evaluate = "evaluation.runner:_main"
+
+# --- Tool Configs (Ruff, Pytest, etc.) ---
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-]
-filterwarnings = [
-    "ignore::DeprecationWarning",
-]
+filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.ruff]
 line-length = 100
@@ -83,13 +91,4 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
-warn_unused_ignores = true
 ignore_missing_imports = true
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-alpha-analyst = "api.main:app"
-evaluate = "evaluation.runner:_main"

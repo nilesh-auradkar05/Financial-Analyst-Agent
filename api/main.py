@@ -31,52 +31,51 @@ Usage:
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
 """
 
+import sys
 import uuid
-from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from typing import Optional
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Local Imports
+from agents.graph import run_agent
+from agents.state import AgentState
+from api.run_store import FileBackedRunStore
 from api.schemas import (
     AnalysisRequest,
     AnalysisResponse,
-    IngestionRequest,
-    IngestionResponse,
-    JobStatusResponse,
-    HealthResponse,
-    JobStatus,
-    NewsArticleResponse,
-    StockDataResponse,
-    SentimentResponse,
     CitationResponse,
     ErrorDetail,
+    HealthResponse,
+    IngestionRequest,
+    IngestionResponse,
+    JobStatus,
+    JobStatusResponse,
+    NewsArticleResponse,
+    SentimentResponse,
+    StockDataResponse,
 )
-
-from agents.graph import run_agent
+from configs.config import settings, validate_settings
 from models.llm import check_ollama_health
-from rag.vector_store import get_vector_store
-from rag.ingestion import ingest_10k_for_ticker
-from observability.langsmith import setup_langsmith_env, check_langsmith_connection
+from observability.langsmith import check_langsmith_connection, setup_langsmith_env
 from observability.metrics import (
-    track_request,
-    track_agent_run,
     get_metrics,
     get_metrics_content_type,
+    track_agent_run,
+    track_request,
 )
+from rag.ingestion import ingest_10k_for_ticker
+from rag.vector_store import get_vector_store
 
-from agents.state import AgentState
-from configs.config import settings, validate_settings
-
-# Job store (in-memory for dev)
-jobs: dict[str, dict] = {}
+RUN_STORE_PATH = Path(".runtime/run_store.json")
+run_store = FileBackedRunStore(RUN_STORE_PATH)
 
 
 # =============================================================================
@@ -88,30 +87,31 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     logger.info("Starting Financial Analyst Agent System API...")
-    
+
     # Validate settings
     warnings = validate_settings()
     for w in warnings:
         logger.warning(w)
-    
+
     # Setup LangSmith
     setup_langsmith_env()
-    
+
     # Check Ollama
     ollama_ok = await check_ollama_health()
     if ollama_ok:
         logger.info(f"Ollama connected ({settings.ollama.llm_model})")
     else:
         logger.warning("Ollama not available")
-    
+
     # Initialize vector store
     store = get_vector_store()
+    logger.info(f"Run store: {RUN_STORE_PATH}")
     logger.info(f"Vector store: {store.count} documents")
-    
+
     logger.info("Financial Analyst Agent System API ready!")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down...")
 
@@ -157,14 +157,14 @@ async def root():
 async def health():
     """Health check endpoint."""
     ollama_ok = await check_ollama_health()
-    
+
     store = get_vector_store()
     vector_ok = store.count >= 0
-    
+
     langsmith_status = await check_langsmith_connection()
-    
+
     all_ok = ollama_ok and vector_ok
-    
+
     return HealthResponse(
         status="healthy" if all_ok else "degraded",
         version="1.0.2",
@@ -190,8 +190,10 @@ async def metrics():
 async def stats():
     """Vector store statistics."""
     store = get_vector_store()
-    return store.get_stats()
-
+    return {
+        "vector_store": store.get_stats(),
+        "run_store": run_store.get_stats(),
+    }
 
 # =============================================================================
 # ANALYSIS ENDPOINTS
@@ -202,19 +204,19 @@ async def stats():
 async def analyze(request: AnalysisRequest):
     """
     Run synchronous stock analysis.
-    
+
     Blocks until analysis is complete (may take 1-3 minutes).
     """
     ticker = request.ticker.upper()
-    
+
     logger.info(f"Starting sync analysis for {ticker}")
-    
+
     with track_request("POST", "/analyze"):
         with track_agent_run(ticker):
             try:
                 result = await run_agent(ticker, request.company_name)
                 return _format_response(result)
-                
+
             except Exception as e:
                 logger.error(f"Analysis failed: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
@@ -224,69 +226,61 @@ async def analyze(request: AnalysisRequest):
 async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTasks):
     """
     Start async stock analysis.
-    
+
     Returns immediately with job_id. Poll /jobs/{job_id} for status.
     """
     ticker = request.ticker.upper()
     job_id = str(uuid.uuid4())
-    
+
     # Create job
-    jobs[job_id] = {
-        "status": JobStatus.PENDING,
-        "ticker": ticker,
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "result": None,
-        "error": None,
-    }
-    
+    record = run_store.create_run(
+        job_id=job_id,
+        ticker=ticker,
+        company_name=request.company_name,
+    )
+
     # Start background task
     background_tasks.add_task(_run_analysis_job, job_id, ticker, request.company_name)
-    
     logger.info(f"Started async job {job_id} for {ticker}")
-    
+
     return JobStatusResponse(
-        job_id=job_id,
-        status=JobStatus.PENDING,
-        ticker=ticker,
-        started_at=jobs[job_id]["started_at"],
+        job_id=record.job_id,
+        status=record.status,
+        ticker=record.ticker,
+        started_at=record.started_at,
+        error=record.error,
     )
 
 
 @app.get("/jobs/{job_id}", response_model=JobStatusResponse, tags=["Analysis"])
 async def get_job_status(job_id: str):
     """Get async job status."""
-    if job_id not in jobs:
+    record = run_store.get_run(job_id)
+    if record is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    job = jobs[job_id]
-    
+
     return JobStatusResponse(
-        job_id=job_id,
-        status=job["status"],
-        ticker=job["ticker"],
-        started_at=job["started_at"],
-        error=job.get("error"),
+        job_id=record.job_id,
+        status=record.status,
+        ticker=record.ticker,
+        started_at=record.started_at,
+        error=record.error,
     )
 
 
 async def _run_analysis_job(job_id: str, ticker: str, company_name: Optional[str]):
     """Background task for async analysis."""
-    jobs[job_id]["status"] = JobStatus.RUNNING
-    
+    run_store.mark_running(job_id)
+
     try:
         with track_agent_run(ticker):
             result = await run_agent(ticker, company_name)
-        
-        jobs[job_id]["status"] = JobStatus.COMPLETED
-        jobs[job_id]["result"] = _format_response(result)
-        jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
-        
+
+            formatted = _format_response(result).model_dump()
+            run_store.mark_completed(job_id, result=formatted)
     except Exception as e:
         logger.error(f"Job {job_id} failed: {e}")
-        jobs[job_id]["status"] = JobStatus.FAILED
-        jobs[job_id]["error"] = str(e)
-        jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
-
+        run_store.mark_failed(job_id, error=str(e))
 
 def _format_response(state: AgentState) -> AnalysisResponse:
     """Format agent state as API response."""
@@ -319,7 +313,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
             market_cap_formatted = f"${market_cap / 1_000_000_000:.2f}B"
         else:
             market_cap_formatted = f"${market_cap / 1_000_000:.2f}M"
-    
+
     return AnalysisResponse(
         ticker=state.get("ticker", ""),
         company_name=state.get("company_name", ""),
@@ -385,13 +379,13 @@ def _format_response(state: AgentState) -> AnalysisResponse:
 async def ingest_filing(request: IngestionRequest):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
-    
+
     logger.info(f"Ingesting {request.filing_type} for {ticker}")
-    
+
     with track_request("POST", "/ingest"):
         try:
             result = await ingest_10k_for_ticker(ticker)
-            
+
             return IngestionResponse(
                 ticker=ticker,
                 filing_type=request.filing_type,
@@ -401,7 +395,7 @@ async def ingest_filing(request: IngestionRequest):
                 filing_date=result.filing_date,
                 error=result.error,
             )
-            
+
         except Exception as e:
             logger.error(f"Ingestion failed: {e}")
             return IngestionResponse(
@@ -416,10 +410,10 @@ async def ingest_filing(request: IngestionRequest):
 async def check_ingestion(ticker: str):
     """Check if a ticker has been ingested."""
     ticker = ticker.upper()
-    
+
     store = get_vector_store()
     result = store.search_by_ticker("business", ticker, n_results=1)
-    
+
     return {
         "ticker": ticker,
         "indexed": result.has_results,
