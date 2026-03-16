@@ -43,6 +43,7 @@ transformers = ">=4.0"
 # ------------------------------------------------------------------
 # GROUP: API (Dependencies for serving the application)
 # ------------------------------------------------------------------
+pytest = "^9.0.2"
 [tool.poetry.group.api.dependencies]
 fastapi = ">=0.128"
 uvicorn = {extras = ["standard"], version = ">=0.40"}

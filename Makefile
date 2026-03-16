@@ -62,6 +62,9 @@ test-fast:
 test-cov:
 	poetry run pytest tests/ -v --cov=. --cov-report=html --cov-report=term
 
+smoke-test:
+	poetry run python scripts/smoke_test_live_pipeline.py --ticker AAPL
+
 lint:
 	poetry run ruff check .
 

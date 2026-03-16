@@ -27,7 +27,7 @@ class FileBackedRunStore:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        slef._lock = RLock()
+        self._lock = RLock()
         if not self.path.exists():
             self._write_all({})
 
@@ -47,7 +47,7 @@ class FileBackedRunStore:
         return record
 
     def mark_running(self, job_id: str) -> RunRecord:
-        retunr self._update(job_id, status="running")
+        return self._update(job_id, status="running")
 
     def mark_completed(self, job_id: str, result: Optional[dict[str, Any]] = None) -> RunRecord:
         return self._update(

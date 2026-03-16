@@ -1,0 +1,105 @@
+{
+  "10357e77-10f9-4215-ba38-1cfc14d160f0": {
+    "company_name": null,
+    "completed_at": "2026-03-16T23:04:02.558341+00:00",
+    "error": null,
+    "job_id": "10357e77-10f9-4215-ba38-1cfc14d160f0",
+    "result": {
+      "citations": [],
+      "company_name": "Apple Inc.",
+      "completed_at": null,
+      "errors": [
+        {
+          "message": "model requires more system memory (4.4 GiB) than is available (3.0 GiB) (status code: 500)",
+          "recoverable": false,
+          "step": "draft_memo",
+          "timestamp": "2026-03-16T23:04:02.557485+00:00"
+        }
+      ],
+      "execution_time_ms": 2640.044,
+      "executive_summary": "",
+      "investment_memo": "",
+      "job_id": null,
+      "news_articles": [
+        {
+          "published_date": null,
+          "relevance_score": 0.0,
+          "sentiment": null,
+          "sentiment_confidence": null,
+          "snippet": "AAPL is rated \"Buy\" with a 12-month target price of $295.44, a \u200e18.12% upside from the current price of $250.12. See more. Strong SellSellHoldBuyStrong Buy.",
+          "source": "Msn",
+          "title": "APPLE INC. (AAPL) Stock, Price, News, Quotes, Forecast and Insights",
+          "url": "https://www.msn.com/en-us/money/stockdetails/aapl-us-stock/fi-a1mou2"
+        },
+        {
+          "published_date": null,
+          "relevance_score": 0.0,
+          "sentiment": null,
+          "sentiment_confidence": null,
+          "snippet": "Data is currently not available. Please try using other words for your search or explore other sections of the website for relevant information. ### We\u2019re sorry, we are currently experiencing some issues, please try again later. ### AAPL. ## Latest AAPL News. This data feed is not available at this time. Data is currently not available. Data is currently not available. Data is currently not available. now or see the quotes that matter to you, anywhere on Nasdaq.com. Start browsing Stocks, Funds,",
+          "source": "Nasdaq",
+          "title": "Apple (AAPL) News Headlines - Nasdaq",
+          "url": "https://www.nasdaq.com/market-activity/stocks/aapl/news-headlines"
+        },
+        {
+          "published_date": null,
+          "relevance_score": 0.0,
+          "sentiment": null,
+          "sentiment_confidence": null,
+          "snippet": "# Apple(NASDAQ: AAPL). **The Motley Fool Investing Philosophy:** We generally recommend investors buy shares of at least 25 stocks and hold them for at least 5 years. ### Is Apple Stock Back to Being a Market Leader? TimothyGreen|Mar 10, 2026### Is Apple Stock a Buy Now? MattFrankel|Mar 9, 2026### Apple's Latest Move Is a Brilliant One, and It Could Be a Game Changer for the Stock. | Free Cash Flow | $51.55B | 91.0% |. Motley Fool Staff\u00a0\u00a0|\u00a0\u00a0Mar 12, 2026### Apple's Headset Strategy and Tesla's EV",
+          "source": "Fool",
+          "title": "Apple - AAPL - Stock Price & News | The Motley Fool",
+          "url": "https://www.fool.com/quote/nasdaq/aapl/"
+        },
+        {
+          "published_date": null,
+          "relevance_score": 0.0,
+          "sentiment": null,
+          "sentiment_confidence": null,
+          "snippet": "M&A News: Apple (AAPL) Expands Creator Studio with MotionVFX Acquisition. 7 minutes ago on TipRanks.com. Better Stock to Buy Right Now: Amazon",
+          "source": "Marketwatch",
+          "title": "Apple Inc. Stock Quote (U.S.: Nasdaq) - AAPL - MarketWatch",
+          "url": "https://www.marketwatch.com/investing/stock/aapl?gaa_at=eafs&gaa_n=AWEtsqfLK2X44Ateya0ynYj-vNYbAhvfUOAaWCroHOlJMr_G3d98w8OB5l_W&gaa_ts=69b88fb5&gaa_sig=iUTBEtkA_kY6mDukARyWaxCroDktKR15pVw9xmiDZIJKE5BsiF4qiJKOfxzROvdq_1pbrEkaQWrRJrsYjPpejQ%3D%3D"
+        },
+        {
+          "published_date": null,
+          "relevance_score": 0.0,
+          "sentiment": null,
+          "sentiment_confidence": null,
+          "snippet": "Get Apple Inc (AAPL:NASDAQ) real-time stock quotes, news, price and financial information from CNBC.",
+          "source": "Cnbc",
+          "title": "AAPL: Apple Inc - Stock Price, Quote and News - CNBC",
+          "url": "https://www.cnbc.com/quotes/AAPL"
+        }
+      ],
+      "sentiment": {
+        "average_negative_score": 0.0,
+        "average_positive_score": 0.0,
+        "negative_count": 0,
+        "neutral_count": 4,
+        "overall_sentiment": "positive",
+        "positive_count": 1
+      },
+      "started_at": "2026-03-16T23:03:59.911480+00:00",
+      "status": "failed",
+      "stock_data": {
+        "company_name": "Apple Inc.",
+        "current_price": 252.82,
+        "fifty_two_week_high": 288.62,
+        "fifty_two_week_low": 169.21,
+        "industry": "Consumer Electronics",
+        "market_cap": 3715929735168,
+        "market_cap_formatted": "$3.72T",
+        "pe_ratio": 32.002533,
+        "price_change_percent": 1.0794867,
+        "sector": "Technology",
+        "target_price": null,
+        "ticker": "AAPL"
+      },
+      "ticker": "AAPL"
+    },
+    "started_at": "2026-03-16T23:03:59.910135+00:00",
+    "status": "completed",
+    "ticker": "AAPL"
+  }
+}
