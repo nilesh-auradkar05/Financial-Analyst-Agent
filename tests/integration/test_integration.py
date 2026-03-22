@@ -98,6 +98,12 @@ async def fake_ingest_10k_for_ticker(ticker: str):
     )
 
 def test_runtime_hardened_pipeline_end_to_end(tmp_path: Path, monkeypatch):
+    run_store_path = tmp_path / "run_store.json"
+    temp_store = FileBackedRunStore(run_store_path)
+
+    monkeypatch.setattr(main, "run_store", temp_store)
+    monkeypatch.setattr(main, "get_vector_store", lambda: FakeVectorStore())
+    monkeypatch.setattr(main, "run_agent", fake_run_agent)
     monkeypatch.setattr(main, "check_ollama_health", fake_check_ollama_health)
     monkeypatch.setattr(main, "check_langsmith_connection", fake_check_langsmith_connection)
     monkeypatch.setattr(main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
