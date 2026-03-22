@@ -75,7 +75,6 @@ class FileBackedRunStore:
     def list_runs(self) -> list[RunRecord]:
         with self._lock:
             data = self._read_all()
-            payload = data.get(job_id)
             return [RunRecord(**payload) for payload in data.values()]
 
     def get_stats(self) -> dict[str, Any]:

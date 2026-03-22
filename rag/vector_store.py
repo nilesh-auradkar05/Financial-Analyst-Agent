@@ -24,22 +24,57 @@ Usage:
     # Search
     results = store.search("supply chain risks", filter={"ticker": "AAPL"})
 """
+from __future__ import annotations
+
+import sys
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Optional, Protocol
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional, Any
-from pathlib import Path
 from loguru import logger
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.config import settings
 from rag.embeddings import get_embeddings
+from rag.evidence import EvidencePacket
 
 # DATA MODELS
+
+@dataclass(frozen=True, slots=True)
+class IndexDocument:
+    id: str
+    text: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+@dataclass(frozen=True, slots=True)
+class SearchFilters:
+    ticker: Optional[str] = None
+    filing_type: Optional[str] = None
+    section_name: Optional[str] = None
+    filing_date: Optional[str] = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def to_backend_filter(self) -> Optional[dict[str, Any]]:
+        where: dict[str, Any] = {}
+
+        if self.ticker:
+            where["ticker"] = self.ticker.upper()
+
+        if self.filing_type:
+            where["filing_type"] = self.filing_type
+        if self.section_name:
+            where["section"] = self.section_name
+        if self.filing_date:
+            where["filing_date"] = self.filing_date
+        if self.extra:
+            where.update(self.extra)
+
+        return where or None
 
 @dataclass
 class RetrievedChunk:
@@ -56,14 +91,14 @@ class RetrievedChunk:
 
     id: str
     text: str
-    metadata: dict[str, Any]
+    metadata: dict[str, Any] | Any
     distance: float
 
     @property
     def relevance_score(self) -> float:
         """
         Convert distance to relevance score (0-1)
-        
+
         ChromaDB uses L2 distance by default, where:
             - 0 = identical
             - Higher = less similar
@@ -80,7 +115,7 @@ class RetrievedChunk:
     @property
     def section(self) -> Optional[str]:
         """Get section name from metadata"""
-        return self.metadata.get("section")
+        return self.metadata.get("section_name") or self.metadata.get("section")
 
     @property
     def filing_date(self) -> Optional[str]:
@@ -127,10 +162,10 @@ class SearchResult:
 
     def to_context(self, max_chunks: int = 5) -> str:
         """Format top chunks as context for LLM.
-        
+
         Args:
             max_chunks: Maximum number of chunks to include
-        
+
         Returns:
             Formatted context string
         """
@@ -139,12 +174,50 @@ class SearchResult:
 
         context_parts = [f"Retrieved {len(self.chunks)} relevant chunks: \n"]
 
-        for i, chunk in enumerate(self.chunks[:max_chunks], 1):
+        for i, chunk in enumerate(self.chunks[:max_chunks], start=1):
             context_parts.append(f"--- Chunk {i} (relevance: {chunk.relevance_score:.2%}) ---")
             context_parts.append(chunk.to_context())
             context_parts.append("")
 
         return "\n".join(context_parts)
+
+    def to_evidence_packets(self, retrieval_method: str = "dense") -> list[EvidencePacket]:
+        return [
+            EvidencePacket.from_chunk(
+                chunk,
+                retrieval_method=retrieval_method,
+                rank=rank,
+            )
+            for rank, chunk in enumerate(self.chunks, start=1)
+        ]
+
+class RetrievalStore(Protocol):
+    def add_documents(self, documents: list[IndexDocument]) -> int:
+        ...
+
+    def search(
+        self,
+        query: str,
+        filters: Optional[SearchFilters] = None,
+        top_k: int = 5,
+    ) -> SearchResult:
+        ...
+
+    def search_sections(
+        self,
+        ticker: str,
+        sections: list[str],
+        top_k: int = 8,
+        query: Optional[str] = None,
+        filing_type: Optional[str] = None,
+    ) -> SearchResult:
+        ...
+
+    def delete_by_ticker(self, ticker: str) -> int:
+        ...
+
+    def get_stats(self) -> dict[str, Any]:
+        ...
 
 # Vector Store Implementation
 class ChromaDBVectorStore:
@@ -209,7 +282,7 @@ class ChromaDBVectorStore:
         else:
             self._client = chromadb.Client()
             logger.info("ChromaDB initialized (in-memory)")
-        
+
         # Get or create collection
         self._collection = self._client.get_or_create_collection(
             name=self.collection_name,
@@ -217,7 +290,7 @@ class ChromaDBVectorStore:
                 "description": "SEC Filings for Financial Analysis."
             },
         )
-        
+
         self._embeddings = get_embeddings()
 
         logger.info(
@@ -237,8 +310,10 @@ class ChromaDBVectorStore:
 
     def add_documents(
         self,
-        texts: list[str],
-        metadatas: Optional[list[dict]] = None,
+        documents: Optional[list[IndexDocument]] = None,
+        *,
+        texts: Optional[list[str]] = None,
+        metadatas: Optional[list[dict[str, Any]]] = None,
         ids: Optional[list[str]] = None,
     ) -> int:
 
@@ -262,43 +337,35 @@ class ChromaDBVectorStore:
                 ],
             )
         """
-        if not texts:
-            return 0
-
-        # Generate IDs if not provided
-        if ids is None:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-            ids = [f"doc_{timestamp}_{i}" for i in range(len(texts))]
-
-        # Default empty metadata if not provided
-        if metadatas is None:
-            metadatas = [{} for _ in texts]
-
-        # Validate lengths match
-        if len(texts) != len(metadatas) or len(texts) != len(ids):
-            raise ValueError("texts, metadatas, and ids must have same length")
-
-        logger.info(f"Adding {len(texts)} documents to collection")
-
-        # Generate embeddings
-        embeddings = self._embeddings.embed_documents(texts)
-
-        # Add to collection
-        self._collection.add(
-            ids=ids,
-            embeddings=embeddings,
-            documents=texts,
+        normalized_documents = self._normalize_documents(
+            documents=documents,
+            texts=texts,
             metadatas=metadatas,
+            ids=ids,
         )
 
-        logger.info(f"Added {len(texts)} documents (total: {self.count})")
+        if not normalized_documents:
+            return 0
 
-        return len(texts)
+        payload_ids = [doc.id for doc in normalized_documents]
+        payload_texts = [doc.text for doc in normalized_documents]
+        payload_metadatas = [doc.metadata for doc in normalized_documents]
+
+        embeddings = self._embeddings.embed_documents(payload_texts)
+        self._collection.add(
+            ids=payload_ids,
+            embeddings=embeddings,
+            documents=payload_texts,
+            metadatas=payload_metadatas,
+        )
+
+        logger.info(f"Added {len(normalized_documents)} documents (total: {self.count})")
+        return len(normalized_documents)
 
     def add_document(
         self,
         text: str,
-        metadata: Optional[dict] = None,
+        metadata: Optional[dict[str, Any]] = None,
         id: Optional[str] = None,
     ) -> str:
 
@@ -319,9 +386,7 @@ class ChromaDBVectorStore:
             id = f"doc_{timestamp}"
 
         self.add_documents(
-            texts=[text],
-            metadatas=[metadata or {}],
-            ids=[id],
+            documents=[IndexDocument(id=id, text=text, metadata=metadata or {})],
         )
 
         return id
@@ -329,8 +394,8 @@ class ChromaDBVectorStore:
     def search(
         self,
         query: str,
+        filters: Optional[SearchFilters] = None,
         n_results: int = 5,
-        filter: Optional[dict] = None,
     ) -> SearchResult:
 
         """
@@ -340,7 +405,7 @@ class ChromaDBVectorStore:
             query: Search query text
             n_results: Maximum number of results to return
             filter: Metadata filter (e.g: {"ticker": "AAPL"})
-        
+
         Returns:
             SearchResult with retrieved chunks
 
@@ -351,35 +416,35 @@ class ChromaDBVectorStore:
             # searcg with filter
             results = store.search("supply chain risks", filter={"ticker": "AAPL"})
         """
-        import time
         start_time = time.time()
+        backend_filter = filters.to_backend_filter() if filters else None
 
-        logger.info(f"Searching: '{query}..' (n={n_results}, filter={filter})")
+        logger.info(f"Searching: '{query}..' (top_k={n_results}, filter={backend_filter})")
 
         # Generate query embedding
         query_embedding = self._embeddings.embed_query(query)
 
         # Build query Kwargs
-        query_kwargs = {
+        query_kwargs: dict[str, Any] = {
             "query_embeddings": [query_embedding],
             "n_results": n_results,
             "include": ["documents", "metadatas", "distances"],
         }
 
-        if filter:
-            query_kwargs["where"] = filter
+        if backend_filter:
+            query_kwargs["where"] = backend_filter
 
         results = self._collection.query(**query_kwargs)
 
-        chunks = []
+        chunks: list[RetrievedChunk] = []
 
-        if results["ids"] and results["ids"][0]:
+        if results.get("ids") and results["ids"][0]:
             for i, doc_id in enumerate(results["ids"][0]):
                 chunks.append(RetrievedChunk(
                     id=doc_id,
                     text=results["documents"][0][i],
-                    metadata=results["metadatas"][0][i] if results["metadatas"][0][i] else {},
-                    distance=results["distances"][0][i] if results["distances"] else 0.0,
+                    metadata=results["metadatas"][0][i] or {},
+                    distance=results["distances"][0][i] if results.get("distances") else 0.0,
                 ))
 
         search_time = (time.time() - start_time) * 1000
@@ -391,7 +456,53 @@ class ChromaDBVectorStore:
             chunks=chunks,
             total_results=len(chunks),
             search_time_ms=search_time,
-            filter_used=filter,
+            filter_used=backend_filter,
+        )
+
+    def search_sections(
+        self,
+        ticker: str,
+        sections: list[str],
+        n_results: int = 8,
+        query: Optional[str] = None,
+        filing_type: Optional[str] = None,
+    ) -> SearchResult:
+        all_chunks: list[RetrievedChunk] = []
+        seen_ids: set[str] = set()
+        total_search_time_ms = 0.0
+
+        for section_name in sections:
+            section_query = query or f"{ticker} {section_name}"
+            result = self.search(
+                query=section_query,
+                filters=SearchFilters(
+                    ticker=ticker,
+                    filing_type=filing_type,
+                    section_name=section_name,
+                ),
+                n_results=n_results,
+            )
+            total_search_time_ms += result.search_time_ms
+
+            for chunk in result.chunks:
+                if chunk.id in seen_ids:
+                    continue
+                seen_ids.add(chunk.id)
+                all_chunks.append(chunk)
+
+        all_chunks.sort(key=lambda chunk: chunk.relevance_score, reverse=True)
+        trimmed = all_chunks[:n_results]
+
+        return SearchResult(
+            query=query or f"{ticker} sections",
+            chunks=trimmed,
+            total_results=len(trimmed),
+            search_time_ms=total_search_time_ms,
+            filter_used={
+                "ticker": ticker.upper(),
+                "sections": sections,
+                "filing_type": filing_type,
+            },
         )
 
     def search_by_ticker(
@@ -416,11 +527,12 @@ class ChromaDBVectorStore:
         Returns:
             SearchResult with chunks from that company
         """
-        filter_dict = {"ticker": ticker.upper()}
 
-        if section:
-            filter_dict["section"] = section
-        return self.search(query, n_results=n_results, filter=filter_dict)
+        return self.search(
+            query=query,
+            filters=SearchFilters(ticker=ticker, section_name=section),
+            n_results=n_results,
+        )
 
     def get_by_id(self, id: str) -> Optional[RetrievedChunk]:
         """
@@ -437,16 +549,16 @@ class ChromaDBVectorStore:
             include=["documents", "metadatas"],
         )
 
-        if results["ids"]:
+        if results.get("ids"):
             return RetrievedChunk(
                 id=results["ids"][0],
-                text=results["documents"][0] if results["documents"][0] else "",
-                metadata=results["metadatas"][0] if results["metadatas"][0] else {},
+                text=results["documents"][0] if results.get("documents") else "",
+                metadata=results["metadatas"][0] if results.get("metadatas") else {},
                 distance=0.0,
             )
 
         return None
-    
+
     def delete_by_ticker(self, ticker: str) -> int:
         """
         Delete all documents for a specific ticker.
@@ -461,29 +573,54 @@ class ChromaDBVectorStore:
         """
 
         ticker = ticker.upper().strip()
-        
+
         # Get all ids for this ticker
         results = self._collection.get(
             where={"ticker": ticker},
             include=[],
         )
+        ids = results.get("ids") or []
 
-        if not results["ids"]:
+        if not ids:
             return 0
-
-        count = len(results["ids"])
 
         # Delete records
         self._collection.delete(ids=results["ids"])
 
-        logger.info(f"Deleted {count} documents for {ticker}")
+        logger.info(f"Deleted {len(ids)} documents for {ticker}")
 
-        return count
+        return len(ids)
 
     def delete_collection(self):
         """Delete the collection"""
-        self._collection.delete_collection(self.collection_name)
+        self._client.delete_collection(self.collection_name)
         logger.warning(f"Deleted collection: {self.collection_name}")
+
+    def _normalize_documents(
+        self,
+        *,
+        documents: Optional[list[IndexDocument]],
+        texts: Optional[list[str]],
+        metadatas: Optional[list[dict[str, Any]]],
+        ids: Optional[list[str]],
+    ) -> list[IndexDocument]:
+        if documents is not None:
+            return documents
+        if not texts:
+            return []
+
+        safe_metadatas = metadatas or [{} for _ in texts]
+        if ids is None:
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            ids = [f"doc_{timestamp}_{i}" for i in range(len(texts))]
+
+        if len(texts) != len(safe_metadatas) or len(texts) != len(ids):
+            raise ValueError("texts, metadatas, and ids must be of the same count.")
+
+        return [
+            IndexDocument(id=ids[i], text=texts[i], metadata=safe_metadatas[i])
+            for i in range(len(texts))
+        ]
 
     def get_stats(self) -> dict:
         """
@@ -531,15 +668,13 @@ def search_filings(query: str, ticker: Optional[str] = None, n_results: int = 5)
     store = get_vector_store()
 
     if ticker:
-        return store.search_by_ticker(query, ticker, n_results)
-    else:
-        return store.search(query, n_results)
+        return store.search_by_ticker(query, ticker, n_results=n_results)
+    return store.search(query, n_results=n_results)
 
 # Testing
 
 def _main():
     """Test the vector store"""
-    import sys
 
     print(f"\n{'='*60}")
     print("Vector Store - Testing")
@@ -561,7 +696,7 @@ def _main():
         "Competition in the smartphone market has intensified with new entrants from China.",
         "Currency fluctuations may materially impact our international revenue and profitability.",
     ]
-    
+
     sample_metadatas = [
         {"ticker": "AAPL", "section": "Risk Factors", "filing_date": "2024-10-31"},
         {"ticker": "AAPL", "section": "MD&A", "filing_date": "2024-10-31"},
@@ -586,7 +721,7 @@ def _main():
     ]
 
     for query, filter_dict in queries:
-        results = store.search(query, n_results=3, filter=filter_dict)
+        results = store.search(query, n_results=3, filters=SearchFilters(**filter_dict))
         print(f"\n    Query: '{query}' (filter: {filter_dict})")
         print(f"     Found: {results.total_results} results in {results.search_time_ms:.1f}ms")
 
@@ -596,7 +731,7 @@ def _main():
     # Test ticker search
     print("\n4. Testing ticker search....")
     results = store.search_by_ticker("risks", "AAPL", n_results=3)
-    print(f"    Query: 'risks' for AAPL")
+    print("     Query: 'risks' for AAPL")
     print(f"    Found: {results.total_results} results")
 
     # stats

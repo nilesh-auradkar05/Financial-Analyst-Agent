@@ -318,5 +318,10 @@ async def main():
         save_json(results, args.output)
 
 
+def cli() -> None:
+    """Console entrypoint for the `evaluate` script (see pyproject [project.scripts])."""
+    asyncio.run(main())
+
+
 if __name__ == "__main__":
     asyncio.run(main())

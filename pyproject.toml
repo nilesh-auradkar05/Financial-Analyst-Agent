@@ -1,78 +1,80 @@
-[tool.poetry]
+[project]
 name = "alpha-analyst"
 version = "1.1.0"
 description = "AI-powered financial analysis agent"
-authors = ["Nilesh Auradkar nilesh.auradkar14@gmail.com"]
+authors = [{ name = "Nilesh Auradkar", email = "nilesh.auradkar14@gmail.com" }]
+requires-python = ">=3.10,<3.14"
 readme = "README.md"
-packages = [{include = "agent"}, {include = "api"}, {include = "models"}, {include = "rag"}, {include = "tools"}]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "python-dotenv>=1.1",
+    "loguru>=0.7,<0.8",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.10,<3",
+    "langchain>=1.2",
+    "langchain-community>=0.4",
+    "langchain-text-splitters>=1.1",
+    "langgraph>=1.0",
+    "crewai>=1.9.1",
+    "protobuf>=5.0",
+    "tokenizers>=0.20",
+    "chromadb>=1.1",
+    "yfinance>=1.1",
+    "httpx>=0.28",
+    "tavily-python>=0.7",
+    "torch>=2.2",
+    "transformers>=4.0",
+    "pytest>=9.0.2",
+    "langchain-ollama>=1.0.1",
+]
 
-# ------------------------------------------------------------------
-# GROUP: BASE (Core dependencies needed for the app to run)
-# ------------------------------------------------------------------
-[tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+[project.scripts]
+alpha-analyst = "api.main:run_api"
+evaluate = "evaluation:cli"
 
-# Configuration & Logging
-python-dotenv = ">=1.1"
-loguru = "^0.7"
-pydantic = ">=2.11"
-pydantic-settings = ">2.10"
+[dependency-groups]
+api = [
+    "fastapi>=0.128",
+    "uvicorn[standard]>=0.40",
+    "prometheus-client>=0.24",
+]
+dev = [
+    "pytest>=9.0.2,<10",
+    "pytest-asyncio>=1.3",
+    "pytest-cov>=7.0",
+    "ruff>=0.14",
+    "mypy>=1.9,<2",
+]
+eval = [
+    "deepeval>=3.8",
+    "datasets>=4.5",
+]
 
-# AI & LLM Ecosystem
-langchain = ">=1.2"
-langchain-community = ">=0.4"
-langchain-text-splitters = ">=1.1"
-langgraph = ">=1.0"
-crewai = ">=1.9.1" 
 
-protobuf = ">=5.0"
-tokenizers = ">=0.20"
-
-# Vector Store
-chromadb = ">=1.1"
-
-# Data Tools
-yfinance = ">=1.1"
-httpx = ">=0.28"
-tavily-python = ">=0.7"
-
-# ML Utilities
-torch = ">=2.2"
-transformers = ">=4.0"
-
-# ------------------------------------------------------------------
-# GROUP: API (Dependencies for serving the application)
-# ------------------------------------------------------------------
-pytest = "^9.0.2"
-[tool.poetry.group.api.dependencies]
-fastapi = ">=0.128"
-uvicorn = {extras = ["standard"], version = ">=0.40"}
-prometheus-client = ">=0.24"
-
-# ------------------------------------------------------------------
-# GROUP: DEV (Testing, Linting, Typing - Not needed in Prod)
-# ------------------------------------------------------------------
-[tool.poetry.group.dev.dependencies]
-pytest = ">=9.0"
-pytest-asyncio = ">=1.3"
-pytest-cov = ">=7.0"
-ruff = ">=0.14"
-mypy = "^1.9"
-
-# ------------------------------------------------------------------
-# GROUP: EVAL (RAG Evaluation frameworks)
-# ------------------------------------------------------------------
-[tool.poetry.group.eval.dependencies]
-deepeval = ">=3.8"
-datasets = ">=4.5"
+[tool.uv]
+default-groups = ["api", "dev", "eval"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
-[tool.poetry.scripts]
-alpha-analyst = "api.main:app"
-evaluate = "evaluation.runner:_main"
+[tool.hatch.build.targets.wheel]
+packages = [
+    "agents",
+    "api",
+    "configs",
+    "evaluation",
+    "models",
+    "observability",
+    "rag",
+    "tools",
+]
 
 # --- Tool Configs (Ruff, Pytest, etc.) ---
 

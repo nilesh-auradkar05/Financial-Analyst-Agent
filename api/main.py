@@ -369,6 +369,30 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         execution_time_ms=state.get("execution_time_ms"),
     )
 
+def _normalize_sections_processed(value: object) -> list[str]:
+    """Normalize ingestion section metadata into the API contract shape.
+
+    Expected public shape: list[str]
+
+    We accept a few legacy/internal shapes defensively so that
+    integration tests and older ingestion stubs do not crash the API.
+    """
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(item) for item in value]
+
+    if isinstance(value, tuple | set):
+        return [str(item) for item in value]
+
+    if isinstance(value, int):
+        # Legacy/mocked shape: only a count is available.
+        # Keep the API stable without inventing fake section names.
+        return []
+
+    return [str(value)]
+
 
 # =============================================================================
 # INGESTION ENDPOINTS
@@ -379,21 +403,23 @@ def _format_response(state: AgentState) -> AnalysisResponse:
 async def ingest_filing(request: IngestionRequest):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
-
     logger.info(f"Ingesting {request.filing_type} for {ticker}")
 
     with track_request("POST", "/ingest"):
         try:
             result = await ingest_10k_for_ticker(ticker)
+            sections_processed = _normalize_sections_processed(
+                getattr(result, "sections_processed", None)
+            )
 
             return IngestionResponse(
                 ticker=ticker,
                 filing_type=request.filing_type,
                 status="success" if result.success else "failed",
-                chunks_created=result.total_chunks,
-                sections_processed=result.sections_processed,
-                filing_date=result.filing_date,
-                error=result.error,
+                chunks_created=getattr(result, "total_chunks", 0),
+                sections_processed=sections_processed,
+                filing_date=getattr(result, "filing_date", None),
+                error=getattr(result, "error", None),
             )
 
         except Exception as e:
@@ -402,6 +428,8 @@ async def ingest_filing(request: IngestionRequest):
                 ticker=ticker,
                 filing_type=request.filing_type,
                 status="failed",
+                chunks_created=0,
+                sections_processed=[],
                 error=str(e),
             )
 
@@ -426,6 +454,12 @@ async def check_ingestion(ticker: str):
 # =============================================================================
 
 
-if __name__ == "__main__":
+def run_api() -> None:
+    """Console entrypoint for the `alpha-analyst` script (see pyproject [project.scripts])."""
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    run_api()
