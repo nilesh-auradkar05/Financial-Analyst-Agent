@@ -21,37 +21,6 @@
 </div>
 
 ---
-
-## Roadmap
-
-### Phase 1: Core Agent (Done)
-- [x] Multi-source data gathering
-- [x] RAG pipeline for SEC filings
-- [x] Sentiment analysis
-- [x] Investment memo generation
-- [X] FastAPI service
-
-### Phase 2: Enhanced Analysis
-- [ ] Multi-company comparison
-- [ ] Historical trend analysis
-- [ ] Competitor identification
-- [ ] Custom analysis templates
-
-### Phase 3: Advanced Features
-- [ ] LangSmith observability
-- [ ] Streaming responses
-- [ ] PDF report generation
-- [ ] Scheduled analysis jobs
-- [ ] Webhook notifications
-
-### Phase 4: Scale & Deploy
-- [ ] Redis job queue
-- [ ] PostgreSQL persistence
-- [ ] Docker compose setup
-- [ ] Kubernetes manifests
-- [ ] Cloud deployment guides
-
----
 ## Features
 
 <table>
@@ -102,46 +71,6 @@
 - [Ollama](https://ollama.ai/) running locally
 - [Tavily API Key](https://tavily.com/) (free tier available)
 
-### 1. Clone & Install
-```bash
-git clone https://github.com/yourusername/alpha-analyst.git
-cd alpha-analyst
-poetry install
-```
-
-### 2. Setup Models
-```bash
-# Pull required Ollama models
-ollama pull qwen3-vl:8b
-ollama pull nomic-embed-text
-```
-
-### 3. Configure Environment
-```bash
-cp .env.example .env
-# Edit .env with your API keys
-```
-```env
-TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
-OLLAMA_BASE_URL=http://localhost:11434
-```
-
-### 4. Index a Company
-```bash
-poetry run python rag/ingestion.py AAPL
-```
-
-### 5. Run Analysis
-```bash
-# Start API server
-poetry run python api/main.py
-
-# In another terminal
-curl -X POST http://localhost:8000/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"ticker": "AAPL"}'
-```
-
 ---
 
 ##  API Reference
@@ -164,42 +93,287 @@ http://localhost:8000
 | `GET` | `/stats` | System statistics |
 | `GET` | `/docs` | Interactive API documentation |
 
-### Example: Async Analysis
-```bash
-# 1. Start job
-JOB_ID=$(curl -s -X POST http://localhost:8000/analyze/async \
-  -H "Content-Type: application/json" \
-  -d '{"ticker": "MSFT"}' | jq -r '.job_id')
+This project can:
 
-# 2. Poll for results
-curl http://localhost:8000/jobs/$JOB_ID | jq
+* ingest SEC filings for a ticker,
+* retrieve section-aware evidence from the vector store,
+* fetch market and news context,
+* run sentiment and structured analysis,
+* generate an investment memo,
+* expose the workflow through a FastAPI service.
+
+## Current Status
+
+**Single-agent financial analysis MVP** with:
+
+* FastAPI service endpoints for analysis, ingestion, health, metrics, and run status,
+* Chroma as the active vector backend,
+* section-aware SEC ingestion and metadata-rich retrieval,
+* evidence packet support for downstream grounding and citations,
+* file-backed async run tracking,
+* evaluation and observability scaffolding.
+
+## Current Features (Completed and Tested)
+
+* **Ticker analysis workflow**: synchronous and async analysis endpoints
+* **SEC ingestion**: filing ingestion with section tracking
+* **Retrieval**: Chroma-backed search with ticker / filing / section filtering
+* **Evidence packets**: normalized retrieval units for memo grounding
+* **Run tracking**: file-backed run store for async jobs
+* **Observability**: health, metrics, and stats endpoints
+* **Tests**: unit/integration coverage for the current API and run-store behavior
+
+## TO-DO
+
+* production-grade multi-agent system
+* Qdrant-backed retrieval service
+* hybrid dense+sparse retrieval stack
+* reranker-driven evidence pipeline
+* fully claim-verified citation engine
+* horizontally scalable job system
+
+Those are roadmap items, not current-state claims.
+
+## Architecture at a Glance
+
+```text
+Ticker Request
+  -> Market data + news collection
+  -> SEC filing retrieval
+  -> Section-aware chunk search
+  -> Evidence packet construction
+  -> Sentiment + structured analysis
+  -> Memo generation
+  -> API response
 ```
 
-### Response Schema
-```json
-{
-  "job_id": "abc123",
-  "ticker": "AAPL",
-  "company_name": "Apple Inc",
-  "status": "completed",
-  "executive_summary": "Apple demonstrates strong fundamentals...",
-  "investment_memo": "# Investment Memo: Apple Inc\n\n...",
-  "stock_data": {
-    "current_price": 185.50,
-    "market_cap_formatted": "$2.85T",
-    "pe_ratio": 28.5
-  },
-  "sentiment": {
-    "overall_sentiment": "positive",
-    "positive_count": 3,
-    "negative_count": 1,
-    "neutral_count": 1
-  },
-  "citations": [
-    {"index": 1, "source_type": "news", "title": "...", "url": "..."}
-  ],
-  "execution_time_ms": 45230
-}
+## Repository Layout
+
+```text
+Financial-Analyst-Agent/
+├── agents/
+├── api/
+│   ├── main.py
+│   ├── run_store.py
+│   └── schemas.py
+├── configs/
+├── evaluation/
+├── models/
+├── observability/
+├── rag/
+│   ├── embeddings.py
+│   ├── evidence.py
+│   ├── ingestion.py
+│   └── vector_store.py
+├── scripts/
+├── tests/
+│   ├── eval/
+│   ├── integration/
+│   ├── unit/
+│   ├── test_api_integration.py
+│   ├── test_eval.py
+│   └── test_run_store.py
+├── tools/
+├── Dockerfile
+├── Makefile
+├── docker-compose.yml
+└── pyproject.toml
+```
+
+## Requirements
+
+* Python 3.10+
+* Ollama running locally
+* Tavily API key for web/news search
+* Local write access for Chroma persistence and file-backed run storage
+
+## Local Setup
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/nilesh-auradkar05/Financial-Analyst-Agent.git
+cd Financial-Analyst-Agent
+```
+
+### 2. Install dependencies
+
+Use the existing local workflow already used in this repo:
+
+```bash
+poetry install
+```
+
+If you want the full local stack helpers as well:
+
+```bash
+make install
+```
+
+### 3. Pull Ollama models
+
+```bash
+ollama pull qwen3-vl:8b
+ollama pull nomic-embed-text
+```
+
+### 4. Configure environment
+
+Create a `.env` file with at least:
+
+```bash
+TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
+OLLAMA_BASE_URL=http://localhost:11434
+CHROMA_PERSIST_DIR=./data/chroma
+SEC_USER_AGENT=your-name your-email@example.com
+```
+
+Add any other environment variables required by your local setup.
+
+## Running the API
+
+### Development server
+
+```bash
+make serve
+```
+
+Equivalent direct command:
+
+```bash
+poetry run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Production-style local run
+
+```bash
+make serve-prod
+```
+
+## Core API Endpoints
+
+* `GET /` — basic API info
+* `GET /health` — component health
+* `GET /metrics` — Prometheus metrics
+* `GET /stats` — vector store + run-store stats
+* `POST /analyze` — synchronous analysis
+* `POST /analyze/async` — async analysis
+* `GET /jobs/{job_id}` — async job status
+* `POST /ingest` — ingest SEC filing data
+* `GET /ingest/{ticker}` — check whether a ticker is indexed
+* `GET /docs` — Swagger UI
+
+## Example Usage
+
+### Ingest a ticker
+
+```bash
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL", "filing_type": "10-K"}'
+```
+
+### Run synchronous analysis
+
+```bash
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL"}'
+```
+
+### Run async analysis
+
+```bash
+curl -X POST http://localhost:8000/analyze/async \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "MSFT"}'
+```
+
+Then poll:
+
+```bash
+curl http://localhost:8000/jobs/<job_id>
+```
+
+## Retrieval and Ingestion Notes
+
+The current retrieval path is centered on **Chroma** and a backend-agnostic retrieval contract inside `rag/vector_store.py`.
+
+The repo already includes support for:
+
+* metadata-rich `IndexDocument` objects,
+* `SearchFilters` for ticker / filing / section filtering,
+* section-focused retrieval helpers,
+* `delete_by_ticker(...)` and collection stats,
+* `EvidencePacket` as the atomic retrieval unit for downstream grounding.
+
+The current ingestion path is section-aware and tracks fields such as:
+
+* filing date,
+* total chunks,
+* sections requested,
+* sections found,
+* sections skipped,
+* documents written.
+
+## Async Run State
+
+Async runs are tracked through a **file-backed run store** in `api/run_store.py`.
+
+That is better than ephemeral in-memory state, but it is still an MVP persistence layer and not the final long-term service-grade storage approach.
+
+## Testing
+
+### Run the focused API/run-store tests
+
+```bash
+poetry run pytest tests/test_run_store.py tests/test_api_integration.py
+```
+
+### Run the full test suite
+
+```bash
+make test
+```
+
+Equivalent direct command:
+
+```bash
+poetry run pytest tests/ -v
+```
+
+## Evaluation
+
+Evaluation scaffolding exists in the repo and can be invoked through the Makefile.
+
+```bash
+make eval
+```
+
+```bash
+make eval-single
+```
+
+At this stage, evaluation should be treated as **baseline infrastructure** rather than a finished retrieval-quality harness.
+
+## Docker and Local Stack
+
+Bring up the stack with:
+
+```bash
+make docker-up
+```
+
+Stop it with:
+
+```bash
+make docker-down
+```
+
+View logs with:
+
+```bash
+make docker-logs
 ```
 
 ---
@@ -260,3 +434,17 @@ alpha-analyst/
 ```
 
 ---
+
+## Roadmap Direction
+
+The near-term priority is:
+
+1. keep the current single-agent path stable,
+2. tighten evidence and retrieval contracts,
+3. improve retrieval evaluation,
+4. then migrate the vector layer cleanly,
+5. only later consider multi-agent specialization.
+
+## Recommended Repo Status Statement
+
+> Financial Analyst Agent is currently a single-agent financial analysis MVP built around LangGraph, FastAPI, SEC/news/market-data tools, local-first inference, and Chroma-backed retrieval. The next milestone is production hardening through better evidence grounding, retrieval evaluation, and retrieval-interface cleanup before any larger vector-backend or multi-agent expansion.
