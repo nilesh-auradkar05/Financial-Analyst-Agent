@@ -20,7 +20,7 @@ class TestSettings:
         """Ollama should have sensible defaults."""
         assert settings.ollama.base_url == "http://localhost:11434"
         assert settings.ollama.llm_model == "qwen3-vl:8b"
-        assert settings.ollama.embed_model == "nomic-embed-text"
+        assert settings.ollama.embed_model == "qwen3-embedding:4b"
 
     def test_chroma_persist_dir(self):
         """ChromaDB persist directory should be a Path."""

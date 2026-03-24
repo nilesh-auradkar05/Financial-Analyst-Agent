@@ -34,6 +34,7 @@ Usage:
 """
 
 import asyncio
+import html
 import re
 import sys
 import warnings
@@ -263,13 +264,12 @@ class SECClient:
 
     def _parse_sections(self, text: str) -> dict[str, FilingSection]:
         """Extract sections from filing HTML/text."""
-        # Remove HTML tags
         clean = re.sub(r'<[^>]+>', ' ', text)
+        clean = html.unescape(clean)
         clean = re.sub(r'\s+', ' ', clean)
 
-        sections = {}
+        sections: dict[str, FilingSection] = {}
 
-        # Section patterns for 10-K
         patterns = {
             "Business": r"Item\s*1[.\s]+Business",
             "Risk Factors": r"Item\s*1A[.\s]+Risk\s*Factors",
@@ -277,26 +277,25 @@ class SECClient:
             "Market Risk": r"Item\s*7A[.\s]+Quantitative",
         }
 
+        all_starts: list[tuple[str, int]] = []
         for name, pattern in patterns.items():
-            match = re.search(pattern, clean, re.IGNORECASE)
-            if match:
-                start = match.start()
+            for m in re.finditer(pattern, clean, re.IGNORECASE):
+                all_starts.append((name, m.start()))
 
-                # Find next section
-                end = len(clean)
-                for other_pattern in patterns.values():
-                    if other_pattern != pattern:
-                        other = re.search(other_pattern, clean[start + 100:], re.IGNORECASE)
-                        if other:
-                            end = min(end, start + 100 + other.start())
+        all_starts.sort(key=lambda t: t[1])
 
-                content = clean[start:end].strip()
+        for idx, (name, start) in enumerate(all_starts):
+            end = all_starts[idx + 1][1] if idx + 1 < len(all_starts) else len(clean)
+            content = clean[start:end].strip()
 
-                if len(content) > 500:  # Meaningful content
-                    sections[name] = FilingSection(
-                        name=name,
-                        content=content[:50000],  # Limit size
-                    )
+            if len(content) <= 500:
+                continue
+
+            if name not in sections or len(content) > len(sections[name].content):
+                sections[name] = FilingSection(
+                    name=name,
+                    content=content[:50000],
+                )
 
         return sections
 

@@ -210,7 +210,7 @@ def mock_ollama_response():
 
 @pytest.fixture
 def mock_embedding_vector():
-    """Mock embedding vector (384 dimensions for nomic-embed-text)."""
+    """Mock embedding vector (4096 dimensions for qwen3-embedding:4b)."""
     import random
     random.seed(42)
-    return [random.random() for _ in range(384)]
+    return [random.random() for _ in range(4096)]

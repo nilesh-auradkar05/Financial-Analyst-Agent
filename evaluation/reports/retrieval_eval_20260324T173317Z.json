@@ -1,0 +1,108 @@
+{
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "pass_rate": 0.0,
+    "avg_latency_ms": 0.0,
+    "avg_section_recall_at_k": 0.0,
+    "avg_keyword_hit_rate": 0.0
+  },
+  "results": [
+    {
+      "case_id": "aapl_risk_supply_chain",
+      "ticker": "AAPL",
+      "query": "What does Apple say about supply chain risks?",
+      "mode": "query",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 0,
+        "latency_ms": 0.0,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 0.0,
+        "first_relevant_rank": null,
+        "pass_at_k": false
+      },
+      "issues": [
+        "evaluation crashed"
+      ],
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "retrieved_sections": [],
+      "expected_keywords": [
+        "supply chain",
+        "supplier",
+        "manufacturing"
+      ],
+      "matched_keywords": [],
+      "evidence_packets": [],
+      "error": "Expected where to have exactly one operator, got {'ticker': 'AAPL', 'filing_type': '10-K'} in query."
+    },
+    {
+      "case_id": "msft_mda_ai_growth",
+      "ticker": "MSFT",
+      "query": "How does Microsoft describe AI-driven growth and cloud demand?",
+      "mode": "query",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 0,
+        "latency_ms": 0.0,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 0.0,
+        "first_relevant_rank": null,
+        "pass_at_k": false
+      },
+      "issues": [
+        "evaluation crashed"
+      ],
+      "expected_sections": [
+        "md&a"
+      ],
+      "retrieved_sections": [],
+      "expected_keywords": [
+        "azure",
+        "demand",
+        "growth"
+      ],
+      "matched_keywords": [],
+      "evidence_packets": [],
+      "error": "Expected where to have exactly one operator, got {'ticker': 'MSFT', 'filing_type': '10-K'} in query."
+    },
+    {
+      "case_id": "nvda_business_competition",
+      "ticker": "NVDA",
+      "query": "Which section should contain NVIDIA's discussion of products and competition?",
+      "mode": "sections",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 0,
+        "latency_ms": 0.0,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 0.0,
+        "first_relevant_rank": null,
+        "pass_at_k": false
+      },
+      "issues": [
+        "evaluation crashed"
+      ],
+      "expected_sections": [
+        "business"
+      ],
+      "retrieved_sections": [],
+      "expected_keywords": [
+        "gpu",
+        "competition",
+        "products"
+      ],
+      "matched_keywords": [],
+      "evidence_packets": [],
+      "error": "Expected where to have exactly one operator, got {'ticker': 'NVDA', 'filing_type': '10-K', 'section_key': 'business'} in query."
+    }
+  ]
+}

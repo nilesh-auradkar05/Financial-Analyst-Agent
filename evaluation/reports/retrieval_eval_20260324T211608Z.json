@@ -1,0 +1,557 @@
+{
+  "summary": {
+    "total": 3,
+    "passed": 2,
+    "pass_rate": 0.6666666666666666,
+    "avg_latency_ms": 83.24249585469563,
+    "avg_section_recall_at_k": 0.6666666666666666,
+    "avg_keyword_hit_rate": 0.6666666666666666
+  },
+  "results": [
+    {
+      "case_id": "aapl_risk_supply_chain",
+      "ticker": "AAPL",
+      "query": "What does Apple say about supply chain risks?",
+      "mode": "query",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 5,
+        "latency_ms": 97.01323509216309,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 0.6666666666666666,
+        "first_relevant_rank": 2,
+        "pass_at_k": false
+      },
+      "issues": [
+        "No expected sections found in top-k"
+      ],
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "retrieved_sections": [
+        "Market Risk"
+      ],
+      "expected_keywords": [
+        "supply chain",
+        "supplier",
+        "manufacturing"
+      ],
+      "matched_keywords": [
+        "supplier",
+        "manufacturing"
+      ],
+      "evidence_packets": [
+        {
+          "ticker": "AAPL",
+          "company_name": "Apple Inc.",
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": "0000320193-25-000079",
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Forward-looking statements are not guarantees of future performance and the Company&#8217;s actual results may differ significantly from the results discussed in the forward-looking statements. Factors that might cause such differences include, but are not limited to, those discussed in Part I, Item 1A of this Form 10-K under the heading &#8220;Risk Factors.&#8221; The Company assumes no obligation to revise or update any forward-looking statements for any reason, except as required by law. Unless otherwise stated, all information presented herein is based on the Company&#8217;s fiscal calendar, and references to particular years, quarters, months or periods refer to the Company&#8217;s fiscal years ended in September and the associated quarters, months and periods of those fiscal years. Each of the terms the &#8220;Company&#8221; and &#8220;Apple&#8221; as used herein refers collectively to Apple Inc. and its wholly owned subsidiaries, unless otherwise stated",
+          "chunk_id": "AAPL_10-K_2025-10-31_market_risk_003",
+          "retrieval_score": 0.5771335391108804,
+          "retrieval_method": "eval:query",
+          "rank": 1,
+          "metadata": {
+            "filing_date": "2025-10-31",
+            "section_name": "Market Risk",
+            "parent_section_id": "AAPL_10-K_2025-10-31:market_risk",
+            "section": "Market Risk",
+            "chunk_id": "AAPL_10-K_2025-10-31_market_risk_003",
+            "source_section_name": "Market Risk",
+            "company_name": "Apple Inc.",
+            "section_key": "market_risk",
+            "filing_type": "10-K",
+            "accession_number": "0000320193-25-000079",
+            "chunk_index": 3,
+            "ticker": "AAPL",
+            "document_id": "AAPL_10-K_2025-10-31"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": "Apple Inc.",
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": "0000320193-25-000079",
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". In addition, component suppliers may fail, be subject to consolidation within a particular industry, or decide to concentrate on the production of common components instead of components customized to meet the Company&#8217;s requirements, further limiting the Company&#8217;s ability to obtain sufficient quantities of components on commercially reasonable terms, or at all. Therefore, the Company remains subject to significant risks of supply shortages and price increases that can materially adversely affect its business, results of operations, financial condition and stock price. Apple Inc. | 2025 Form 10-K | 8 The Company&#8217;s products and services may be affected from time to time by design and manufacturing defects that could materially adversely affect the Company&#8217;s business and result in harm to the Company&#8217;s reputation. The Company offers complex hardware and software products and services that can be affected by design and manufacturing defects",
+          "chunk_id": "AAPL_10-K_2025-10-31_market_risk_051",
+          "retrieval_score": 0.5745542818211886,
+          "retrieval_method": "eval:query",
+          "rank": 2,
+          "metadata": {
+            "section_name": "Market Risk",
+            "filing_type": "10-K",
+            "chunk_index": 51,
+            "company_name": "Apple Inc.",
+            "document_id": "AAPL_10-K_2025-10-31",
+            "section_key": "market_risk",
+            "ticker": "AAPL",
+            "chunk_id": "AAPL_10-K_2025-10-31_market_risk_051",
+            "source_section_name": "Market Risk",
+            "filing_date": "2025-10-31",
+            "section": "Market Risk",
+            "parent_section_id": "AAPL_10-K_2025-10-31:market_risk",
+            "accession_number": "0000320193-25-000079"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": "Apple Inc.",
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": "0000320193-25-000079",
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". The Company periodically provides certain information for investors on its corporate website, www.apple.com, and its investor relations website, investor.apple.com. This includes press releases and other information about financial performance, information on corporate governance, and details related to the Company&#8217;s annual meeting of shareholders. The information contained on the websites referenced in this Form 10-K is not incorporated by reference into this filing. Further, the Company&#8217;s references to website URLs are intended to be inactive textual references only. Apple Inc. | 2025 Form 10-K | 4 Item 1A.&#160;&#160;&#160;&#160;Risk Factors The following summarizes factors that could have a material adverse effect on the Company&#8217;s business, reputation, results of operations, financial condition and stock price. The Company may not be able to accurately predict, control or mitigate these risks",
+          "chunk_id": "AAPL_10-K_2025-10-31_market_risk_024",
+          "retrieval_score": 0.5567266526906637,
+          "retrieval_method": "eval:query",
+          "rank": 3,
+          "metadata": {
+            "accession_number": "0000320193-25-000079",
+            "filing_type": "10-K",
+            "parent_section_id": "AAPL_10-K_2025-10-31:market_risk",
+            "chunk_index": 24,
+            "filing_date": "2025-10-31",
+            "section_name": "Market Risk",
+            "chunk_id": "AAPL_10-K_2025-10-31_market_risk_024",
+            "section": "Market Risk",
+            "company_name": "Apple Inc.",
+            "ticker": "AAPL",
+            "section_key": "market_risk",
+            "document_id": "AAPL_10-K_2025-10-31",
+            "source_section_name": "Market Risk"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": "Apple Inc.",
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": "0000320193-25-000079",
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Potential outcomes include financial instability; inability to obtain credit to finance business operations; and insolvency. Adverse economic conditions can also lead to increased credit and collectibility risk on the Company&#8217;s trade receivables; the failure of derivative counterparties and other financial institutions; limitations on the Company&#8217;s ability to issue new debt; reduced liquidity; and declines in the fair values of the Company&#8217;s financial instruments. These and other impacts can materially adversely affect the Company&#8217;s business, results of operations, financial condition and stock price. Apple Inc. | 2025 Form 10-K | 5 The Company&#8217;s business can be impacted by political events, trade and other international disputes, geopolitical tensions, conflict, terrorism, natural disasters, public health issues, industrial accidents and other business interruptions",
+          "chunk_id": "AAPL_10-K_2025-10-31_market_risk_028",
+          "retrieval_score": 0.5351986943833731,
+          "retrieval_method": "eval:query",
+          "rank": 4,
+          "metadata": {
+            "section": "Market Risk",
+            "section_key": "market_risk",
+            "source_section_name": "Market Risk",
+            "parent_section_id": "AAPL_10-K_2025-10-31:market_risk",
+            "filing_type": "10-K",
+            "accession_number": "0000320193-25-000079",
+            "chunk_id": "AAPL_10-K_2025-10-31_market_risk_028",
+            "document_id": "AAPL_10-K_2025-10-31",
+            "filing_date": "2025-10-31",
+            "ticker": "AAPL",
+            "section_name": "Market Risk",
+            "chunk_index": 28,
+            "company_name": "Apple Inc."
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": "Apple Inc.",
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": "0000320193-25-000079",
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Future operating results depend upon the Company&#8217;s ability to obtain components in sufficient quantities on commercially reasonable terms. Because the Company currently obtains certain components from single or limited sources, the Company is subject to significant supply and pricing risks. Many components, including those that are available from multiple sources, are at times subject to industry-wide shortages and significant commodity pricing fluctuations that can materially adversely affect the Company&#8217;s business, results of operations, financial condition and stock price. For example, the global semiconductor industry has in the past experienced high demand and shortages of supply, which adversely affected the Company&#8217;s ability to obtain sufficient quantities of components and products on commercially reasonable terms, or at all. Such disruptions could occur in the future",
+          "chunk_id": "AAPL_10-K_2025-10-31_market_risk_049",
+          "retrieval_score": 0.5266016242360813,
+          "retrieval_method": "eval:query",
+          "rank": 5,
+          "metadata": {
+            "company_name": "Apple Inc.",
+            "chunk_id": "AAPL_10-K_2025-10-31_market_risk_049",
+            "filing_date": "2025-10-31",
+            "chunk_index": 49,
+            "parent_section_id": "AAPL_10-K_2025-10-31:market_risk",
+            "accession_number": "0000320193-25-000079",
+            "ticker": "AAPL",
+            "section_key": "market_risk",
+            "section": "Market Risk",
+            "section_name": "Market Risk",
+            "filing_type": "10-K",
+            "document_id": "AAPL_10-K_2025-10-31",
+            "source_section_name": "Market Risk"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "case_id": "msft_mda_ai_growth",
+      "ticker": "MSFT",
+      "query": "How does Microsoft describe AI-driven growth and cloud demand?",
+      "mode": "query",
+      "top_k": 5,
+      "passed": true,
+      "metrics": {
+        "retrieved_count": 5,
+        "latency_ms": 73.85516166687012,
+        "section_hit_at_k": true,
+        "section_recall_at_k": 1.0,
+        "keyword_hit_rate": 0.6666666666666666,
+        "first_relevant_rank": 1,
+        "pass_at_k": true
+      },
+      "issues": [],
+      "expected_sections": [
+        "md&a"
+      ],
+      "retrieved_sections": [
+        "MD&A"
+      ],
+      "expected_keywords": [
+        "azure",
+        "demand",
+        "growth"
+      ],
+      "matched_keywords": [
+        "azure",
+        "growth"
+      ],
+      "evidence_packets": [
+        {
+          "ticker": "MSFT",
+          "company_name": "MICROSOFT CORP",
+          "filing_type": "10-K",
+          "filing_date": "2025-07-30",
+          "accession_number": "0000950170-25-100235",
+          "section_name": "MD&A",
+          "source_url": null,
+          "text": ". We create platforms and tools, powered by AI, that deliver innovative solutions that meet the evolving needs of our customers. We generate revenue by offering a wide range of cloud-based solutions, content, and other services to people and businesses; licensing and supporting an array of software products; delivering relevant online advertising to a global audience; and designing and selling devices. Our most significant expenses are related to compensating employees; supporting and investing in our cloud-based services, including datacenter operations; designing, manufacturing, marketing, and selling our other products and services; and income taxes. Highlights from fiscal year 2025 compared with fiscal year 2024 included: &#8226; Microsoft Cloud revenue increased 23% to $168.9 billion. &#8226; Microsoft 365 Commercial products and cloud services revenue increased 14% driven by Microsoft 365 Commercial cloud revenue growth of 15%",
+          "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_002",
+          "retrieval_score": 0.5941690585231457,
+          "retrieval_method": "eval:query",
+          "rank": 1,
+          "metadata": {
+            "document_id": "MSFT_10-K_2025-07-30",
+            "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_002",
+            "section_key": "md&a",
+            "ticker": "MSFT",
+            "company_name": "MICROSOFT CORP",
+            "chunk_index": 2,
+            "accession_number": "0000950170-25-100235",
+            "parent_section_id": "MSFT_10-K_2025-07-30:md_and_a",
+            "section_name": "MD&A",
+            "filing_type": "10-K",
+            "source_section_name": "MD&A",
+            "section": "MD&A",
+            "filing_date": "2025-07-30"
+          }
+        },
+        {
+          "ticker": "MSFT",
+          "company_name": "MICROSOFT CORP",
+          "filing_type": "10-K",
+          "filing_date": "2025-07-30",
+          "accession_number": "0000950170-25-100235",
+          "section_name": "MD&A",
+          "source_url": null,
+          "text": ". Intelligent Cloud revenue increased driven by Azure. Productivity and Business Processes revenue increased driven by Microsoft 365 Commercial cloud. More Personal Computing revenue increased driven by Gaming and Search and news advertising. Cost of revenue increased $13.7 billion or 19% driven by growth in Microsoft Cloud. Gross margin increased $22.9 billion or 13% with growth across each of our segments. &#8226; Gross margin percentage decreased slightly driven by Intelligent Cloud, offset in part by More Personal Computing. &#8226; Microsoft Cloud gross margin percentage decreased to 69% driven by the impact of scaling our AI infrastructure, offset in part by efficiency gains in Azure. Operating expenses increased $3.8 billion or 6% driven by investments in cloud and AI engineering and Gaming, including the impact of the Activision Blizzard acquisition. Operating income increased $19.1 billion or 17% with growth across each of our segments",
+          "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_018",
+          "retrieval_score": 0.590883736131915,
+          "retrieval_method": "eval:query",
+          "rank": 2,
+          "metadata": {
+            "ticker": "MSFT",
+            "parent_section_id": "MSFT_10-K_2025-07-30:md_and_a",
+            "accession_number": "0000950170-25-100235",
+            "filing_date": "2025-07-30",
+            "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_018",
+            "document_id": "MSFT_10-K_2025-07-30",
+            "section_key": "md&a",
+            "filing_type": "10-K",
+            "section_name": "MD&A",
+            "source_section_name": "MD&A",
+            "chunk_index": 18,
+            "company_name": "MICROSOFT CORP",
+            "section": "MD&A"
+          }
+        },
+        {
+          "ticker": "MSFT",
+          "company_name": "MICROSOFT CORP",
+          "filing_type": "10-K",
+          "filing_date": "2025-07-30",
+          "accession_number": "0000950170-25-100235",
+          "section_name": "MD&A",
+          "source_url": null,
+          "text": ". &#8226; Microsoft 365 Commercial products and cloud services revenue increased $10.8 billion or 14%. Microsoft 365 Commercial cloud revenue grew 15% with Microsoft 365 Commercial seat growth of 6% driven by small and medium businesses and frontline worker offerings, as well as growth in revenue per user. Microsoft 365 Commercial products revenue grew 7% driven by the Windows Commercial on-premises components of Microsoft 365 suite sales and an increase in Office transactional purchasing with the launch of Office 2024. &#8226; Microsoft 365 Consumer products and cloud services revenue increased $756 million or 11%. Microsoft 365 Consumer cloud revenue grew 11% driven by Microsoft 365 Consumer subscriber growth of 8% to 89.0 million, as well as growth in revenue per user from the price increase announced in January 2025. &#8226; LinkedIn revenue increased $1.4 billion or 9% with growth across all lines of business",
+          "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_024",
+          "retrieval_score": 0.5728530493950924,
+          "retrieval_method": "eval:query",
+          "rank": 3,
+          "metadata": {
+            "filing_date": "2025-07-30",
+            "section_key": "md&a",
+            "accession_number": "0000950170-25-100235",
+            "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_024",
+            "document_id": "MSFT_10-K_2025-07-30",
+            "parent_section_id": "MSFT_10-K_2025-07-30:md_and_a",
+            "ticker": "MSFT",
+            "section": "MD&A",
+            "source_section_name": "MD&A",
+            "company_name": "MICROSOFT CORP",
+            "filing_type": "10-K",
+            "section_name": "MD&A",
+            "chunk_index": 24
+          }
+        },
+        {
+          "ticker": "MSFT",
+          "company_name": "MICROSOFT CORP",
+          "filing_type": "10-K",
+          "filing_date": "2025-07-30",
+          "accession_number": "0000950170-25-100235",
+          "section_name": "MD&A",
+          "source_url": null,
+          "text": ". &#8226; Microsoft 365 Commercial products and cloud services revenue increased 14% driven by Microsoft 365 Commercial cloud revenue growth of 15%. &#8226; Microsoft 365 Consumer products and cloud services revenue increased 11% driven by Microsoft 365 Consumer cloud revenue growth of 11%. &#8226; LinkedIn revenue increased 9%. &#8226; Dynamics products and cloud services revenue increased 15% driven by Dynamics 365 revenue growth of 19%. &#8226; Server products and cloud services revenue increased 23% driven by Azure and other cloud services revenue growth of 34%. &#8226; Windows OEM and Devices revenue increased 3%. &#8226; Xbox content and services revenue increased 16%. &#8226; Search and news advertising revenue excluding traffic acquisition costs increased 20%. Industry Trends and Opportunities Our industry is dynamic and highly competitive, with frequent changes in both technologies and business models",
+          "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_003",
+          "retrieval_score": 0.5697839678161957,
+          "retrieval_method": "eval:query",
+          "rank": 4,
+          "metadata": {
+            "filing_type": "10-K",
+            "filing_date": "2025-07-30",
+            "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_003",
+            "parent_section_id": "MSFT_10-K_2025-07-30:md_and_a",
+            "source_section_name": "MD&A",
+            "ticker": "MSFT",
+            "chunk_index": 3,
+            "section": "MD&A",
+            "section_name": "MD&A",
+            "section_key": "md&a",
+            "document_id": "MSFT_10-K_2025-07-30",
+            "accession_number": "0000950170-25-100235",
+            "company_name": "MICROSOFT CORP"
+          }
+        },
+        {
+          "ticker": "MSFT",
+          "company_name": "MICROSOFT CORP",
+          "filing_type": "10-K",
+          "filing_date": "2025-07-30",
+          "accession_number": "0000950170-25-100235",
+          "section_name": "MD&A",
+          "source_url": null,
+          "text": ". These changes align our metrics with how we manage and monitor certain businesses. The key change was bringing the commercial components of Microsoft 365 together and creating a new Microsoft 365 Commercial cloud revenue growth metric. Other changes include combining Windows OEM and Devices into a single revenue growth metric that brings revenue from PC market-driven businesses together, as well as elevating our cloud revenue growth metrics to align to our strategic focus on cloud growth. Commercial Our commercial business primarily consists of Server products and cloud services, Microsoft 365 Commercial products and cloud services, the commercial portion of LinkedIn, Dynamics products and cloud services, and Enterprise and partner services. Our commercial metrics allow management and investors to assess the overall health of our commercial business and include leading indicators of future performance",
+          "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_012",
+          "retrieval_score": 0.5665092243546194,
+          "retrieval_method": "eval:query",
+          "rank": 5,
+          "metadata": {
+            "section_name": "MD&A",
+            "section_key": "md&a",
+            "accession_number": "0000950170-25-100235",
+            "ticker": "MSFT",
+            "chunk_id": "MSFT_10-K_2025-07-30_md_and_a_012",
+            "source_section_name": "MD&A",
+            "section": "MD&A",
+            "company_name": "MICROSOFT CORP",
+            "chunk_index": 12,
+            "filing_date": "2025-07-30",
+            "filing_type": "10-K",
+            "document_id": "MSFT_10-K_2025-07-30",
+            "parent_section_id": "MSFT_10-K_2025-07-30:md_and_a"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "case_id": "nvda_business_competition",
+      "ticker": "NVDA",
+      "query": "Which section should contain NVIDIA's discussion of products and competition?",
+      "mode": "sections",
+      "top_k": 5,
+      "passed": true,
+      "metrics": {
+        "retrieved_count": 5,
+        "latency_ms": 78.85909080505371,
+        "section_hit_at_k": true,
+        "section_recall_at_k": 1.0,
+        "keyword_hit_rate": 0.6666666666666666,
+        "first_relevant_rank": 1,
+        "pass_at_k": true
+      },
+      "issues": [],
+      "expected_sections": [
+        "business"
+      ],
+      "retrieved_sections": [
+        "Business"
+      ],
+      "expected_keywords": [
+        "gpu",
+        "competition",
+        "products"
+      ],
+      "matched_keywords": [
+        "gpu",
+        "products"
+      ],
+      "evidence_packets": [
+        {
+          "ticker": "NVDA",
+          "company_name": "NVIDIA CORP",
+          "filing_type": "10-K",
+          "filing_date": "2026-02-25",
+          "accession_number": "0001045810-26-000021",
+          "section_name": "Business",
+          "source_url": null,
+          "text": ". NVIDIA has a platform strategy, bringing together hardware, systems, software, algorithms, libraries, AI models and training data sets, and services to create unique value for the markets we serve. While the computing requirements of these end markets are diverse, we address them with a unified underlying programmable architecture allowing us to support several multi-billion-dollar end markets with the same underlying technology by using a variety of software stacks developed either internally or by third-party developers and partners. The large and growing number of developers and installed base across our platforms strengthens our ecosystem and increases the value of our platform for our customers. Innovation is at our core. We have invested over $76.7&#160;billion in research and development since our inception, yielding inventions that are essential to modern computing. Our invention of the GPU in 1999 sparked the growth of the PC gaming market and redefined computer graphics",
+          "chunk_id": "NVDA_10-K_2026-02-25_business_003",
+          "retrieval_score": 0.5207824182493568,
+          "retrieval_method": "eval:sections",
+          "rank": 1,
+          "metadata": {
+            "ticker": "NVDA",
+            "filing_type": "10-K",
+            "parent_section_id": "NVDA_10-K_2026-02-25:business",
+            "filing_date": "2026-02-25",
+            "accession_number": "0001045810-26-000021",
+            "chunk_id": "NVDA_10-K_2026-02-25_business_003",
+            "section": "Business",
+            "document_id": "NVDA_10-K_2026-02-25",
+            "section_key": "business",
+            "source_section_name": "Business",
+            "chunk_index": 3,
+            "company_name": "NVIDIA CORP",
+            "section_name": "Business"
+          }
+        },
+        {
+          "ticker": "NVDA",
+          "company_name": "NVIDIA CORP",
+          "filing_type": "10-K",
+          "filing_date": "2026-02-25",
+          "accession_number": "0001045810-26-000021",
+          "section_name": "Business",
+          "source_url": null,
+          "text": ". In addition, generative and agentic AI is expanding the market for our workstation-class GPUs, as more enterprise customers develop and deploy AI applications with their data on-premises. Headquartered in Santa Clara, California, NVIDIA was incorporated in California in April 1993 and reincorporated in Delaware in April 1998. Our Businesses We report our business results in two segments. The Compute &amp; Networking segment includes our Data Center accelerated computing and networking platforms and AI solutions and software, and Automotive platforms and autonomous and electric vehicle solutions including software. The Graphics segment includes GeForce GPUs for gaming and PCs, and Quadro/NVIDIA RTX GPUs for enterprise workstation graphics. Our Markets We specialize in markets where our computing and AI infrastructure platforms can provide tremendous acceleration for applications",
+          "chunk_id": "NVDA_10-K_2026-02-25_business_010",
+          "retrieval_score": 0.5106085729396949,
+          "retrieval_method": "eval:sections",
+          "rank": 2,
+          "metadata": {
+            "document_id": "NVDA_10-K_2026-02-25",
+            "company_name": "NVIDIA CORP",
+            "accession_number": "0001045810-26-000021",
+            "source_section_name": "Business",
+            "section": "Business",
+            "section_name": "Business",
+            "filing_type": "10-K",
+            "chunk_id": "NVDA_10-K_2026-02-25_business_010",
+            "section_key": "business",
+            "chunk_index": 10,
+            "ticker": "NVDA",
+            "filing_date": "2026-02-25",
+            "parent_section_id": "NVDA_10-K_2026-02-25:business"
+          }
+        },
+        {
+          "ticker": "NVDA",
+          "company_name": "NVIDIA CORP",
+          "filing_type": "10-K",
+          "filing_date": "2026-02-25",
+          "accession_number": "0001045810-26-000021",
+          "section_name": "Business",
+          "source_url": null,
+          "text": ". This platform consists of development infrastructure, high-performance, energy efficient DRIVE AGX computing hardware 6 Table of Contents running an in-vehicle operating system (DRIVE OS), a reference sensor set that supports full self-driving capability as well as an open, modular DRIVE software platform for autonomous driving, mapping, and parking services, and intelligent in-vehicle experiences. Business Strategies NVIDIA&#8217;s key strategies that shape our overall business approach include: Advancing the NVIDIA accelerated computing platform. Our accelerated computing platform can solve complex problems in significantly less time and with lower power consumption than alternative computational approaches. It can help solve problems that were previously deemed unsolvable. We work to deliver continued performance leaps that outpace Moore&#8217;s Law by leveraging innovation across the architecture, chip design, system, interconnect, algorithm, and software layers",
+          "chunk_id": "NVDA_10-K_2026-02-25_business_020",
+          "retrieval_score": 0.5020485062925076,
+          "retrieval_method": "eval:sections",
+          "rank": 3,
+          "metadata": {
+            "chunk_id": "NVDA_10-K_2026-02-25_business_020",
+            "parent_section_id": "NVDA_10-K_2026-02-25:business",
+            "chunk_index": 20,
+            "section": "Business",
+            "source_section_name": "Business",
+            "filing_type": "10-K",
+            "ticker": "NVDA",
+            "section_key": "business",
+            "document_id": "NVDA_10-K_2026-02-25",
+            "company_name": "NVIDIA CORP",
+            "accession_number": "0001045810-26-000021",
+            "section_name": "Business",
+            "filing_date": "2026-02-25"
+          }
+        },
+        {
+          "ticker": "NVDA",
+          "company_name": "NVIDIA CORP",
+          "filing_type": "10-K",
+          "filing_date": "2026-02-25",
+          "accession_number": "0001045810-26-000021",
+          "section_name": "Business",
+          "source_url": null,
+          "text": ". We also have partnerships in automotive, healthcare, financial services, manufacturing, retail, and technology among others, to accelerate the adoption of AI. At the foundation of the NVIDIA accelerated computing platform are our GPUs, which excel at parallel workloads such as the training and inferencing of neural networks. These Data Center systems are extreme co-designed with the GPU, CPU, NVLink switch, DPU, NIC, and scale-out networking along with software stacks and algorithms to deliver data center-scale computing solutions. While our approach starts with powerful chips, what makes it a full-stack computing platform is our large body of software, including the CUDA development platform, the CUDA-X collection of acceleration libraries, AI models and training data sets, APIs, SDKs, and domain-specific application frameworks",
+          "chunk_id": "NVDA_10-K_2026-02-25_business_014",
+          "retrieval_score": 0.5008691731158551,
+          "retrieval_method": "eval:sections",
+          "rank": 4,
+          "metadata": {
+            "company_name": "NVIDIA CORP",
+            "filing_date": "2026-02-25",
+            "document_id": "NVDA_10-K_2026-02-25",
+            "section_name": "Business",
+            "section": "Business",
+            "filing_type": "10-K",
+            "ticker": "NVDA",
+            "accession_number": "0001045810-26-000021",
+            "chunk_id": "NVDA_10-K_2026-02-25_business_014",
+            "section_key": "business",
+            "parent_section_id": "NVDA_10-K_2026-02-25:business",
+            "chunk_index": 14,
+            "source_section_name": "Business"
+          }
+        },
+        {
+          "ticker": "NVDA",
+          "company_name": "NVIDIA CORP",
+          "filing_type": "10-K",
+          "filing_date": "2026-02-25",
+          "accession_number": "0001045810-26-000021",
+          "section_name": "Business",
+          "source_url": null,
+          "text": ". Our products for the gaming market include GeForce RTX GPUs for gaming desktop and laptop PCs, GeForce NOW cloud gaming service, as well as SoCs and development services for game consoles. Our gaming platforms leverage our GPUs and sophisticated software to enhance the gaming experience with smoother, higher quality graphics. NVIDIA RTX features ray tracing technology for real-time, cinematic-quality rendering, and deep learning super sampling, or NVIDIA DLSS, our AI technology that boosts frame rates while generating high-quality images for games. RTX GPUs also feature NVIDIA tensor core technology making them well suited to accelerate a new generation of on-device AI applications. In fiscal year 2025, we announced the NVIDIA Blackwell GeForce RTX 50 Series family of desktop and laptop GPUs",
+          "chunk_id": "NVDA_10-K_2026-02-25_business_017",
+          "retrieval_score": 0.49899390537517513,
+          "retrieval_method": "eval:sections",
+          "rank": 5,
+          "metadata": {
+            "section": "Business",
+            "ticker": "NVDA",
+            "company_name": "NVIDIA CORP",
+            "document_id": "NVDA_10-K_2026-02-25",
+            "parent_section_id": "NVDA_10-K_2026-02-25:business",
+            "accession_number": "0001045810-26-000021",
+            "section_key": "business",
+            "filing_date": "2026-02-25",
+            "filing_type": "10-K",
+            "section_name": "Business",
+            "source_section_name": "Business",
+            "chunk_index": 17,
+            "chunk_id": "NVDA_10-K_2026-02-25_business_017"
+          }
+        }
+      ],
+      "error": null
+    }
+  ]
+}

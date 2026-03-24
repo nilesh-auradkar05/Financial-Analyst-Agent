@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import rag.vector_store as vector_store
-from rag.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from rag.vector_store import (
+    ChromaDBVectorStore,
+    IndexDocument,
+    RetrievedChunk,
+    SearchFilters,
+    SearchResult,
+)
 
 
 def _make_chunk(chunk_id: str, section_name: str = "Risk Factors") -> RetrievedChunk:
@@ -152,3 +158,33 @@ def test_search_by_ticker_uses_section_fallback_path(monkeypatch):
     assert result.total_results == 1
     assert calls[0].section_key == "business"
     assert calls[0].ticker == "AAPL"
+
+def test_add_documents_strips_none_metadata_values():
+    store = ChromaDBVectorStore(collection_name="test_sec_filings", persist_directory=None)
+
+    docs = [
+        IndexDocument(
+            id="doc1",
+            text="sample text",
+            metadata={
+                "ticker": "AAPL",
+                "section": "Risk Factors",
+                "company_name": None,
+                "source_url": None,
+                "chunk_index": 0,
+            },
+        )
+    ]
+
+    normalized = store._normalize_documents(
+        documents=docs,
+        texts=None,
+        metadatas=None,
+        ids=None,
+    )
+
+    assert normalized[0].metadata == {
+        "ticker": "AAPL",
+        "section": "Risk Factors",
+        "chunk_index": 0,
+    }

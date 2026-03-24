@@ -98,22 +98,29 @@ class SearchFilters:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_backend_filter(self) -> Optional[dict[str, Any]]:
-        where: dict[str, Any] = {}
+        clauses: list[dict[str, Any]] = []
 
         if self.ticker:
-            where["ticker"] = self.ticker.upper()
+            clauses.append({"ticker": self.ticker.upper()})
         if self.filing_type:
-            where["filing_type"] = self.filing_type
+            clauses.append({"filing_type": self.filing_type})
         if self.section_key:
-            where["section_key"] = self.section_key
+            clauses.append({"section_key": self.section_key})
         elif self.section_name:
-            where["section"] = self.section_name
+            clauses.append({"section": self.section_name})
         if self.filing_date:
-            where["filing_date"] = self.filing_date
+            clauses.append({"filing_date": self.filing_date})
         if self.extra:
-            where.update(self.extra)
+            for k, v in self.extra.items():
+                clauses.append({k: v})
 
-        return where or None
+        if not clauses:
+            return None
+
+        if len(clauses) == 1:
+            return clauses[0]
+
+        return {"$and": clauses}
 
 @dataclass
 class RetrievedChunk:
@@ -286,6 +293,23 @@ def canonical_section_display_name(section_name: Optional[str]) -> Optional[str]
 
     return CANONICAL_SECTION_DISPLAY_NAMES[key]
 
+def _sanitize_metadata_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+def _sanitize_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    if not metadata:
+        return {}
+    cleaned: dict[str, Any] = {}
+    for key, value in metadata.items():
+        sanitized = _sanitize_metadata_value(value)
+        if sanitized is not None:
+            cleaned[key] = sanitized
+    return cleaned
+
 
 # Vector Store Implementation
 class ChromaDBVectorStore:
@@ -417,7 +441,10 @@ class ChromaDBVectorStore:
 
         payload_ids = [doc.id for doc in normalized_documents]
         payload_texts = [doc.text for doc in normalized_documents]
-        payload_metadatas = [doc.metadata for doc in normalized_documents]
+        payload_metadatas = [
+            {k: v for k, v in doc.metadata.items() if v is not None}
+            for doc in normalized_documents
+        ]
 
         embeddings = self._embeddings.embed_documents(payload_texts)
         self._collection.add(
@@ -486,33 +513,47 @@ class ChromaDBVectorStore:
         """
         start_time = time.time()
         backend_filter = filters.to_backend_filter() if filters else None
-
         logger.info(f"Searching: '{query}..' (top_k={n_results}, filter={backend_filter})")
 
-        # Generate query embedding
-        query_embedding = self._embeddings.embed_query(query)
+        try:
+            # Generate query embedding
+            query_embedding = self._embeddings.embed_query(query)
 
-        # Build query Kwargs
-        query_kwargs: dict[str, Any] = {
-            "query_embeddings": [query_embedding],
-            "n_results": n_results,
-            "include": ["documents", "metadatas", "distances"],
-        }
+            # Build query Kwargs
+            query_kwargs: dict[str, Any] = {
+                "query_embeddings": [query_embedding],
+                "n_results": n_results,
+                "include": ["documents", "metadatas", "distances"],
+            }
 
-        if backend_filter:
-            query_kwargs["where"] = backend_filter
+            if backend_filter:
+                query_kwargs["where"] = backend_filter
 
-        results = self._collection.query(**query_kwargs)
+            results = self._collection.query(**query_kwargs)
+
+        except Exception as exc:
+            logger.exception(
+                "Vector search failed | query={!r} | filter={} | collection={} | persist_dir={}",
+                query,
+                backend_filter,
+                self.collection_name,
+                self.persist_directory,
+            )
+            raise RuntimeError(
+                f"Vector search failed for query={query!r} | filter={backend_filter}: {type(exc).__name__}: {exc}"
+            ) from exc
 
         chunks: list[RetrievedChunk] = []
         if results.get("ids") and results["ids"][0]:
             for i, doc_id in enumerate(results["ids"][0]):
-                chunks.append(RetrievedChunk(
-                    id=doc_id,
-                    text=results["documents"][0][i],
-                    metadata=results["metadatas"][0][i] or {},
-                    distance=results["distances"][0][i] if results.get("distances") else 0.0,
-                ))
+                chunks.append(
+                    RetrievedChunk(
+                        id=doc_id,
+                        text=results["documents"][0][i],
+                        metadata=results["metadatas"][0][i] or {},
+                        distance=results["distances"][0][i] if results.get("distances") else 0.0,
+                    )
+                )
 
         search_time = (time.time() - start_time) * 1000
         logger.info(f"Found {len(chunks)} results in {search_time:.1f}ms")
@@ -736,7 +777,14 @@ class ChromaDBVectorStore:
         ids: Optional[list[str]],
     ) -> list[IndexDocument]:
         if documents is not None:
-            return documents
+            return [
+                IndexDocument(
+                    id=doc.id,
+                    text=doc.text,
+                    metadata=_sanitize_metadata(doc.metadata)
+                )
+                for doc in documents
+            ]
         if not texts:
             return []
 
@@ -749,7 +797,7 @@ class ChromaDBVectorStore:
             raise ValueError("texts, metadatas, and ids must be of the same count.")
 
         return [
-            IndexDocument(id=ids[i], text=texts[i], metadata=safe_metadatas[i])
+            IndexDocument(id=ids[i], text=texts[i], metadata=_sanitize_metadata(safe_metadatas[i]))
             for i in range(len(texts))
         ]
 

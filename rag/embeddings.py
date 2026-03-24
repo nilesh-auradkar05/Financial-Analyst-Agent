@@ -4,7 +4,7 @@ RAG Embeddings Module
 
 This module provides text embeddings using the ollama's embedding model.
 
-Model used nomic-embed-text model.
+Model used qwen3-embedding:4b model.
 
 Usage:
     from rag.embeddings import get_embeddings, embed_texts, embed_query
@@ -18,14 +18,14 @@ Usage:
 """
 
 import asyncio
+import sys
 from dataclasses import dataclass
-from typing import Optional
 from pathlib import Path
-from loguru import logger
+from typing import Optional
 
 from langchain_ollama import OllamaEmbeddings
+from loguru import logger
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.config import settings
@@ -136,7 +136,7 @@ class EmbeddingsClient:
             base_url=self.base_url,
         )
         self._dimensions: Optional[int] = None
-        
+
         logger.info(f"EmbeddingsClient initialized (model={self.model})")
 
     async def __aenter__(self):
@@ -165,7 +165,7 @@ class EmbeddingsClient:
     async def embed_texts(
         self,
         texts: list[str],
-        batch_size: int = 32,
+        batch_size: Optional[int] = None,
     ) -> EmbeddingResult:
 
         """
@@ -178,6 +178,7 @@ class EmbeddingsClient:
         Returns:
             EmbeddingResult with vectors
         """
+        batch_size = batch_size or settings.ollama.embed_batch_size
         if not texts:
             return EmbeddingResult(
                 vectors=[],
@@ -234,7 +235,7 @@ class EmbeddingsClient:
     @property
     def dimensions(self) -> int:
         """Get vector dimensions
-        
+
         Returns dimesions from last embedding operation, or default for known models.
         """
 
@@ -247,6 +248,9 @@ class EmbeddingsClient:
             "mxbai-embed-large": 1024,
             "all-minilm": 384,
             "snowflake-arctic-embed": 1024,
+            "qwen3-embedding:0.6b": 1024,
+            "qwen3-embedding:4b": 2560,
+            "qwen3-embedding:8b": 4096,
         }
 
         for model_name, dims in known_dims.items():
@@ -288,7 +292,7 @@ def embed_query(query: str) -> list[float]:
 async def embed_texts_async(texts: list[str]) -> EmbeddingResult:
     """
     Embed multiple texts asynchronously. (Wrapper convenience function)
-    
+
     Args:
         texts: List of texts to embed
 
@@ -304,7 +308,7 @@ async def embed_query_async(query: str) -> list[float]:
 
     Args:
         query: search query
-    
+
     Returns:
         Query embedding vector
     """
@@ -315,7 +319,6 @@ async def embed_query_async(query: str) -> list[float]:
 
 async def _main():
     """Test the embeddings module."""
-    import sys
 
     print(f"\n{'='*60}")
     print("Embeddings Module - Testing")

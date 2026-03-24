@@ -37,15 +37,15 @@ help:
 # =============================================================================
 
 install:
-	poetry install
+	uv install
 	@echo ""
 	@echo "✅ Dependencies installed!"
 	@echo ""
 	@echo "Optional: Install evaluation dependencies:"
-	@echo "  poetry install --with eval"
+	@echo "  uv install --with eval"
 
 install-all:
-	poetry install --all-extras --with dev,eval
+	uv install --all-extras --with dev,eval
 	@echo ""
 	@echo "✅ All dependencies installed!"
 
@@ -54,43 +54,49 @@ install-all:
 # =============================================================================
 
 test:
-	poetry run pytest tests/ -v
+	uv run pytest tests/ -v
 
 test-fast:
-	poetry run pytest tests/ -v -m "not slow"
+	uv run pytest tests/ -v -m "not slow"
 
 test-cov:
-	poetry run pytest tests/ -v --cov=. --cov-report=html --cov-report=term
+	uv run pytest tests/ -v --cov=. --cov-report=html --cov-report=term
 
 smoke-test:
-	poetry run python scripts/smoke_test_live_pipeline.py --ticker AAPL
+	uv run python scripts/smoke_test_live_pipeline.py --ticker AAPL
 
 lint:
-	poetry run ruff check .
+	uv run ruff check .
 
 format:
-	poetry run ruff format .
-	poetry run ruff check --fix .
+	uv run ruff format .
+	uv run ruff check --fix .
 
 typecheck:
-	poetry run mypy .
+	uv run mypy .
 
 # =============================================================================
 # EVALUATION
 # =============================================================================
 
 eval:
-	poetry run python -m evaluation.runner
+	uv run python3 -m evaluation.runner
 
 eval-single:
-	poetry run python -m evaluation.runner AAPL
+	uv run python3 -m evaluation.runner AAPL
 
 eval-full:
-	poetry run python -m evaluation.runner --full
+	uv run python3 -m evaluation.runner --full
 
 eval-report:
 	@echo "Generating report from latest results..."
-	poetry run python -m evaluation.report evaluation/reports/*.json
+	uv run python3 -m evaluation.report evaluation/reports/*.json
+
+eval-retrieval:
+	uv run python3 -m evaluation.retrieval_main evaluation/fixtures/retrieval_baseline.json
+
+eval-retrieval-single:
+	uv run python3 -m evaluation.retrieval_main evaluation/fixtures/retrieval_baseline.json --case appl_risk_supply_chain
 
 # =============================================================================
 # DOCKER
@@ -121,10 +127,10 @@ docker-build:
 # =============================================================================
 
 serve:
-	poetry run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+	uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 
 serve-prod:
-	poetry run uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
+	uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 # =============================================================================
 # UTILITIES

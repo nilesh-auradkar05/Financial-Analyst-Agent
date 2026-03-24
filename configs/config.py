@@ -3,10 +3,11 @@ This file contains the configuration for the Financial Analyst Agent.
 """
 
 from email.policy import default
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 """ PATHS CONFIGURATION """
 
@@ -56,7 +57,12 @@ class OllamaSettings(BaseSettings):
     )
 
     embed_model: str = Field(
-        default="nomic-embed-text", description="Ollama model for embeddings"
+        default="qwen3-embedding:4b", description="Ollama model for embeddings"
+    )
+
+    embed_batch_size: int = Field(
+        default=8,
+        description="Batch size for embedding requests",
     )
 
     timeout: int = Field(default=600, description="Request timeout in seconds (10 minutes)")

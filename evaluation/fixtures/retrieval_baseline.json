@@ -1,0 +1,35 @@
+[
+    {
+      "id": "aapl_risk_supply_chain",
+      "ticker": "AAPL",
+      "query": "What does Apple say about supply chain risks?",
+      "filing_type": "10-K",
+      "expected_sections": ["risk_factors"],
+      "expected_keywords": ["supply chain", "supplier", "manufacturing"],
+      "top_k": 5,
+      "mode": "query",
+      "notes": "Baseline risk-factor retrieval check"
+    },
+    {
+      "id": "msft_mda_ai_growth",
+      "ticker": "MSFT",
+      "query": "How does Microsoft describe AI-driven growth and cloud demand?",
+      "filing_type": "10-K",
+      "expected_sections": ["md&a"],
+      "expected_keywords": ["azure", "demand", "growth"],
+      "top_k": 5,
+      "mode": "query",
+      "notes": "MD&A retrieval sanity check"
+    },
+    {
+      "id": "nvda_business_competition",
+      "ticker": "NVDA",
+      "query": "Which section should contain NVIDIA's discussion of products and competition?",
+      "filing_type": "10-K",
+      "expected_sections": ["business"],
+      "expected_keywords": ["gpu", "competition", "products"],
+      "top_k": 5,
+      "mode": "sections",
+      "notes": "Section-targeted business retrieval check"
+    }
+]

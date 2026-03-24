@@ -201,7 +201,7 @@ cd Financial-Analyst-Agent
 Use the existing local workflow already used in this repo:
 
 ```bash
-poetry install
+uv install
 ```
 
 If you want the full local stack helpers as well:
@@ -214,7 +214,7 @@ make install
 
 ```bash
 ollama pull qwen3-vl:8b
-ollama pull nomic-embed-text
+ollama pull qwen3-embedding:4b
 ```
 
 ### 4. Configure environment
@@ -241,7 +241,7 @@ make serve
 Equivalent direct command:
 
 ```bash
-poetry run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Production-style local run
@@ -327,7 +327,7 @@ That is better than ephemeral in-memory state, but it is still an MVP persistenc
 ### Run the focused API/run-store tests
 
 ```bash
-poetry run pytest tests/test_run_store.py tests/test_api_integration.py
+uv run pytest tests/test_run_store.py tests/test_api_integration.py
 ```
 
 ### Run the full test suite
@@ -339,7 +339,7 @@ make test
 Equivalent direct command:
 
 ```bash
-poetry run pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 ## Evaluation
@@ -386,7 +386,7 @@ All settings are managed via environment variables or `.env` file:
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 | `OLLAMA_LLM_MODEL` | `qwen3-vl:8b` | LLM model for generation |
-| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Embedding model |
+| `OLLAMA_EMBED_MODEL` | `qwen3-embedding:4b` | Embedding model |
 | `TAVILY_API_KEY` | - | Tavily API key (required) |
 | `CHROMA_PERSIST_DIR` | `./data/chroma` | Vector store location |
 | `SEC_USER_AGENT` | - | User agent for SEC API |
@@ -398,10 +398,10 @@ See [`.env.example`](.env.example) for all options.
 ## Testing
 ```bash
 # Run unit tests
-poetry run pytest tests/unit -v
+uv run pytest tests/unit -v
 
 # Run integration tests (requires API keys)
-poetry run pytest tests/integration -v --run-integration
+uv run pytest tests/integration -v --run-integration
 ```
 
 ---

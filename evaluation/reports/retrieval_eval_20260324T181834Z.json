@@ -1,0 +1,222 @@
+{
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "pass_rate": 0.0,
+    "avg_latency_ms": 486.2804412841797,
+    "avg_section_recall_at_k": 0.0,
+    "avg_keyword_hit_rate": 0.3333333333333333
+  },
+  "results": [
+    {
+      "case_id": "aapl_risk_supply_chain",
+      "ticker": "AAPL",
+      "query": "What does Apple say about supply chain risks?",
+      "mode": "query",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 5,
+        "latency_ms": 1242.9430484771729,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 1.0,
+        "first_relevant_rank": 1,
+        "pass_at_k": false
+      },
+      "issues": [
+        "No expected sections found in top-k"
+      ],
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "retrieved_sections": [
+        "Market Risk"
+      ],
+      "expected_keywords": [
+        "supply chain",
+        "supplier",
+        "manufacturing"
+      ],
+      "matched_keywords": [
+        "supply chain",
+        "supplier",
+        "manufacturing"
+      ],
+      "evidence_packets": [
+        {
+          "ticker": "AAPL",
+          "company_name": null,
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": null,
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Such events can make it difficult or impossible for the Company to manufacture and deliver products to its customers, create delays and inefficiencies in the Company&#8217;s supply and manufacturing chain, result in slowdowns and outages to the Company&#8217;s service offerings, increase the Company&#8217;s costs, and negatively impact consumer spending and demand in affected areas. The Company&#8217;s operations are also subject to the risks of industrial accidents at its suppliers and contract manufacturers. While the Company&#8217;s suppliers are required to maintain safe working environments and operations, an industrial accident could occur and could result in serious injuries or loss of life, disruption to the Company&#8217;s business, and harm to the Company&#8217;s reputation",
+          "chunk_id": "AAPL_10-K_Market_Risk_035",
+          "retrieval_score": 0.6335261641766619,
+          "retrieval_method": "eval:query",
+          "rank": 1,
+          "metadata": {
+            "ticker": "AAPL",
+            "chunk_index": 35,
+            "filing_type": "10-K",
+            "section": "Market Risk",
+            "filing_date": "2025-10-31"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": null,
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": null,
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". The Company may not be able to accurately predict, control or mitigate these risks. Statements in this section are based on the Company&#8217;s beliefs and opinions regarding matters that could materially adversely affect the Company in the future and are not representations as to whether such matters have or have not occurred previously. The risks and uncertainties described below are not exhaustive and should not be considered a complete statement of all potential risks or uncertainties that the Company faces or may face in the future. This section should be read in conjunction with Part II, Item 7, &#8220;Management&#8217;s Discussion and Analysis of Financial Condition and Results of Operations&#8221; and the consolidated financial statements and accompanying notes in Part II, Item 8, &#8220;Financial Statements and Supplementary Data&#8221; of this Form 10-K",
+          "chunk_id": "AAPL_10-K_Market_Risk_025",
+          "retrieval_score": 0.6040576003650007,
+          "retrieval_method": "eval:query",
+          "rank": 2,
+          "metadata": {
+            "ticker": "AAPL",
+            "chunk_index": 25,
+            "filing_type": "10-K",
+            "filing_date": "2025-10-31",
+            "section": "Market Risk"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": null,
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": null,
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Restrictions on international trade, such as tariffs and other controls on imports or exports of goods, technology or data, can materially adversely affect the Company&#8217;s business and supply chain. The impact can be particularly significant if these restrictive measures apply to countries and regions where the Company derives a significant portion of its revenues and/or has significant supply chain operations. Restrictive measures can increase the cost or limit the availability of the Company&#8217;s products and the components and rare earths and other raw materials that go into them. Restrictive measures can also require the Company to change suppliers, restructure business relationships and operations, refrain from offering and distributing or cease to offer and distribute affected products, services and third-party applications to its customers, and increase the prices of its products and services",
+          "chunk_id": "AAPL_10-K_Market_Risk_030",
+          "retrieval_score": 0.601209010486567,
+          "retrieval_method": "eval:query",
+          "rank": 3,
+          "metadata": {
+            "ticker": "AAPL",
+            "filing_type": "10-K",
+            "chunk_index": 30,
+            "section": "Market Risk",
+            "filing_date": "2025-10-31"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": null,
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": null,
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Although arrangements with these partners may contain provisions for product defect expense reimbursement, the Company generally remains responsible to the consumer for warranty and out-of-warranty service in the event of product defects and experiences unanticipated product defect liabilities from time to time. While the Company relies on its partners to adhere to its supplier code of conduct, violations of the supplier code of conduct occur from time to time and can materially adversely affect the Company&#8217;s business, reputation, results of operations, financial condition and stock price. Changes or additions to the Company&#8217;s supply chain require considerable time and resources and involve significant risks and uncertainties, including exposure to additional regulatory and operational risks. Future operating results depend upon the Company&#8217;s ability to obtain components in sufficient quantities on commercially reasonable terms",
+          "chunk_id": "AAPL_10-K_Market_Risk_048",
+          "retrieval_score": 0.5970815094205594,
+          "retrieval_method": "eval:query",
+          "rank": 4,
+          "metadata": {
+            "chunk_index": 48,
+            "filing_type": "10-K",
+            "ticker": "AAPL",
+            "section": "Market Risk",
+            "filing_date": "2025-10-31"
+          }
+        },
+        {
+          "ticker": "AAPL",
+          "company_name": null,
+          "filing_type": "10-K",
+          "filing_date": "2025-10-31",
+          "accession_number": null,
+          "section_name": "Market Risk",
+          "source_url": null,
+          "text": ". Changing the Company&#8217;s business and supply chain in accordance with new or changed restrictions on international trade can be expensive, time-consuming and disruptive to the Company&#8217;s business and results of operations. Trade and other international disputes can also have an adverse impact on the overall macroeconomic environment and result in shifts and reductions in consumer spending and negative consumer sentiment for the Company&#8217;s products and services, all of which can further adversely affect the Company&#8217;s business and results of operations. Such restrictions can be announced with little or no advance notice, which can create uncertainty, and the Company may not be able to effectively mitigate any or all adverse impacts from such measures. Global supply chains can be highly concentrated, and an escalation of geopolitical tensions or conflict could result in significant disruptions",
+          "chunk_id": "AAPL_10-K_Market_Risk_031",
+          "retrieval_score": 0.5928769946085534,
+          "retrieval_method": "eval:query",
+          "rank": 5,
+          "metadata": {
+            "ticker": "AAPL",
+            "chunk_index": 31,
+            "filing_type": "10-K",
+            "filing_date": "2025-10-31",
+            "section": "Market Risk"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "case_id": "msft_mda_ai_growth",
+      "ticker": "MSFT",
+      "query": "How does Microsoft describe AI-driven growth and cloud demand?",
+      "mode": "query",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 0,
+        "latency_ms": 65.47045707702637,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 0.0,
+        "first_relevant_rank": null,
+        "pass_at_k": false
+      },
+      "issues": [
+        "No expected sections found in top-k",
+        "No chunks retrieved"
+      ],
+      "expected_sections": [
+        "md&a"
+      ],
+      "retrieved_sections": [],
+      "expected_keywords": [
+        "azure",
+        "demand",
+        "growth"
+      ],
+      "matched_keywords": [],
+      "evidence_packets": [],
+      "error": null
+    },
+    {
+      "case_id": "nvda_business_competition",
+      "ticker": "NVDA",
+      "query": "Which section should contain NVIDIA's discussion of products and competition?",
+      "mode": "sections",
+      "top_k": 5,
+      "passed": false,
+      "metrics": {
+        "retrieved_count": 0,
+        "latency_ms": 150.42781829833984,
+        "section_hit_at_k": false,
+        "section_recall_at_k": 0.0,
+        "keyword_hit_rate": 0.0,
+        "first_relevant_rank": null,
+        "pass_at_k": false
+      },
+      "issues": [
+        "No expected sections found in top-k",
+        "No chunks retrieved"
+      ],
+      "expected_sections": [
+        "business"
+      ],
+      "retrieved_sections": [],
+      "expected_keywords": [
+        "gpu",
+        "competition",
+        "products"
+      ],
+      "matched_keywords": [],
+      "evidence_packets": [],
+      "error": null
+    }
+  ]
+}

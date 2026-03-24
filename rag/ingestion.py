@@ -270,6 +270,7 @@ def build_index_documents(
                 "parent_section_id": parent_section_id,
                 "document_id": document_id,
             }
+            metadata = {k: v for k, v in metadata.items() if v is not None}
             documents.append(
                 IndexDocument(
                     id=chunk_id,
