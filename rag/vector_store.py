@@ -26,6 +26,7 @@ Usage:
 """
 from __future__ import annotations
 
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -45,6 +46,42 @@ from rag.evidence import EvidencePacket
 
 # DATA MODELS
 
+CANONICAL_SECTION_DISPLAY_NAMES: dict[str, str] = {
+    "business": "Business",
+    "risk_factors": "Risk Factors",
+    "md&a": "MD&A",
+    "market_risk": "Market Risk",
+}
+
+SECTION_ALIASES: dict[str, tuple[str, ...]] = {
+    "business": (
+        "business",
+        "item 1",
+        "item1",
+        "company business",
+    ),
+    "risk_factors": (
+        "risk factors",
+        "risk factor",
+        "item 1a",
+        "item1a",
+    ),
+    "md&a": (
+        "md&a",
+        "management discussion and analysis",
+        "managements discussion and analysis",
+        "management discussion & analysis",
+        "item 7",
+        "item7",
+    ),
+    "market_risk": (
+        "market risk",
+        "quantitative and qualitative disclosures about market risk",
+        "item 7a",
+        "item7a",
+    ),
+}
+
 @dataclass(frozen=True, slots=True)
 class IndexDocument:
     id: str
@@ -56,6 +93,7 @@ class SearchFilters:
     ticker: Optional[str] = None
     filing_type: Optional[str] = None
     section_name: Optional[str] = None
+    section_key: Optional[str] = None
     filing_date: Optional[str] = None
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -64,10 +102,11 @@ class SearchFilters:
 
         if self.ticker:
             where["ticker"] = self.ticker.upper()
-
         if self.filing_type:
             where["filing_type"] = self.filing_type
-        if self.section_name:
+        if self.section_key:
+            where["section_key"] = self.section_key
+        elif self.section_name:
             where["section"] = self.section_name
         if self.filing_date:
             where["filing_date"] = self.filing_date
@@ -218,6 +257,35 @@ class RetrievalStore(Protocol):
 
     def get_stats(self) -> dict[str, Any]:
         ...
+
+def _normalize_section_token(value: str) -> str:
+    token = value.strip().lower()
+    token = token.replace("&", " and ")
+    token = token.replace("’", "")
+    token = token.replace("'", "")
+    token = re.sub(r"[^a-z0-9]+", " ", token)
+    return re.sub(r"\s+", " ", token).strip()
+
+def canonical_section_key(section_name: Optional[str]) -> Optional[str]:
+    if not section_name:
+        return None
+
+    normalized = _normalize_section_token(section_name)
+    for section_key, aliases in SECTION_ALIASES.items():
+        for alias in aliases:
+            alias_token = _normalize_section_token(alias)
+            if normalized == alias_token or normalized.startswith(f"{alias_token} "):
+                return section_key
+
+    return None
+
+def canonical_section_display_name(section_name: Optional[str]) -> Optional[str]:
+    key = canonical_section_key(section_name)
+    if key is None:
+        return None
+
+    return CANONICAL_SECTION_DISPLAY_NAMES[key]
+
 
 # Vector Store Implementation
 class ChromaDBVectorStore:
@@ -437,7 +505,6 @@ class ChromaDBVectorStore:
         results = self._collection.query(**query_kwargs)
 
         chunks: list[RetrievedChunk] = []
-
         if results.get("ids") and results["ids"][0]:
             for i, doc_id in enumerate(results["ids"][0]):
                 chunks.append(RetrievedChunk(
@@ -448,7 +515,6 @@ class ChromaDBVectorStore:
                 ))
 
         search_time = (time.time() - start_time) * 1000
-
         logger.info(f"Found {len(chunks)} results in {search_time:.1f}ms")
 
         return SearchResult(
@@ -458,6 +524,63 @@ class ChromaDBVectorStore:
             search_time_ms=search_time,
             filter_used=backend_filter,
         )
+
+    def _search_section_with_fallback(
+        self,
+        *,
+        ticker: str,
+        section_name: str,
+        query: str,
+        n_results: int,
+        filing_type: Optional[str] = None,
+    ) -> tuple[SearchResult, float]:
+        total_search_time_ms = 0.0
+        section_key = canonical_section_key(section_name)
+        legacy_section_name = canonical_section_display_name(section_name) or section_name
+
+        primary_result = self.search(
+            query=query,
+            filters=SearchFilters(
+                ticker=ticker,
+                filing_type=filing_type,
+                section_key=section_key,
+            ) if section_key else SearchFilters(
+                ticker=ticker,
+                filing_type=filing_type,
+                section_name=legacy_section_name,
+            ),
+            n_results=n_results,
+        )
+        total_search_time_ms += primary_result.search_time_ms
+
+        if primary_result.has_results or not section_key:
+            return primary_result, total_search_time_ms
+
+        fallback_candidates = [legacy_section_name]
+        if section_name not in fallback_candidates:
+            fallback_candidates.append(section_name)
+
+        seen_filter_names: set[str] = set()
+        for candidate in fallback_candidates:
+            if candidate in seen_filter_names:
+                continue
+            seen_filter_names.add(candidate)
+
+            fallback_result = self.search(
+                query=query,
+                filters=SearchFilters(
+                    ticker=ticker,
+                    filing_type=filing_type,
+                    section_name=candidate,
+                ),
+                n_results=n_results,
+            )
+            total_search_time_ms += fallback_result.search_time_ms
+
+            if fallback_result.has_results:
+                return fallback_result, total_search_time_ms
+
+        return primary_result, total_search_time_ms
 
     def search_sections(
         self,
@@ -473,16 +596,14 @@ class ChromaDBVectorStore:
 
         for section_name in sections:
             section_query = query or f"{ticker} {section_name}"
-            result = self.search(
+            result, section_search_time_ms = self._search_section_with_fallback(
+                ticker=ticker,
+                section_name=section_name,
                 query=section_query,
-                filters=SearchFilters(
-                    ticker=ticker,
-                    filing_type=filing_type,
-                    section_name=section_name,
-                ),
                 n_results=n_results,
+                filing_type=filing_type,
             )
-            total_search_time_ms += result.search_time_ms
+            total_search_time_ms += section_search_time_ms
 
             for chunk in result.chunks:
                 if chunk.id in seen_ids:
@@ -528,11 +649,21 @@ class ChromaDBVectorStore:
             SearchResult with chunks from that company
         """
 
-        return self.search(
+        if not section:
+            return self.search(
+                query=query,
+                filters=SearchFilters(ticker=ticker),
+                n_results=n_results,
+            )
+
+        result, _ = self._search_section_with_fallback(
+            ticker=ticker,
+            section_name=section,
             query=query,
-            filters=SearchFilters(ticker=ticker, section_name=section),
             n_results=n_results,
         )
+
+        return result
 
     def get_by_id(self, id: str) -> Optional[RetrievedChunk]:
         """
