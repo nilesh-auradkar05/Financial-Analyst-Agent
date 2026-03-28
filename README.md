@@ -42,7 +42,7 @@
 
 ### Professional Output
 - **Investment Memos** with structured sections
-- **Verifiable Citations** for every claim
+- **Source-linked citations** in API responses and generated memo flow
 - **Executive Summaries** for quick review
 
 ### Production Ready
@@ -86,7 +86,7 @@ http://localhost:8000
 |--------|----------|-------------|
 | `POST` | `/analyze` | Run analysis (sync, blocks until complete) |
 | `POST` | `/analyze/async` | Start analysis job (returns immediately) |
-| `GET` | `/jobs/{job_id}` | Get job status and results |
+| `GET` | `/jobs/{job_id}` | Async job status and completed result payload |
 | `POST` | `/ingest` | Index SEC filings for a company |
 | `GET` | `/ingest/{ticker}` | Check if filings are indexed |
 | `GET` | `/health` | Health check for all components |
@@ -258,7 +258,7 @@ make serve-prod
 * `GET /stats` — vector store + run-store stats
 * `POST /analyze` — synchronous analysis
 * `POST /analyze/async` — async analysis
-* `GET /jobs/{job_id}` — async job status
+* `GET /jobs/{job_id}` — async job status and completed result payload
 * `POST /ingest` — ingest SEC filing data
 * `GET /ingest/{ticker}` — check whether a ticker is indexed
 * `GET /docs` — Swagger UI
@@ -270,7 +270,7 @@ make serve-prod
 ```bash
 curl -X POST http://localhost:8000/ingest \
   -H "Content-Type: application/json" \
-  -d '{"ticker": "AAPL", "filing_type": "10-K"}'
+  -d '{"ticker": "AAPL"'
 ```
 
 ### Run synchronous analysis

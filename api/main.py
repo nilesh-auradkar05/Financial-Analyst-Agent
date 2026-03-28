@@ -16,7 +16,7 @@ Endpoints:
 
 POST /analyze            - Run analysis (sync, blocks until complete)
 POST /analyze/async      - Start analysis job
-GET /jobs/{job_id}       - Get job status and results
+GET /jobs/{job_id}       - Get job status and completed result
 POST /ingest             - Ingest SEC filings for a company
 GET /health              - Health check
 GET /stats               - System statistics
@@ -56,8 +56,9 @@ from api.schemas import (
     HealthResponse,
     IngestionRequest,
     IngestionResponse,
+    JobAcceptedResponse,
+    JobPollResponse,
     JobStatus,
-    JobStatusResponse,
     NewsArticleResponse,
     SentimentResponse,
     StockDataResponse,
@@ -222,7 +223,7 @@ async def analyze(request: AnalysisRequest):
                 raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/analyze/async", response_model=JobStatusResponse, tags=["Analysis"])
+@app.post("/analyze/async", response_model=JobAcceptedResponse, tags=["Analysis"])
 async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTasks):
     """
     Start async stock analysis.
@@ -243,7 +244,7 @@ async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTa
     background_tasks.add_task(_run_analysis_job, job_id, ticker, request.company_name)
     logger.info(f"Started async job {job_id} for {ticker}")
 
-    return JobStatusResponse(
+    return JobAcceptedResponse(
         job_id=record.job_id,
         status=record.status,
         ticker=record.ticker,
@@ -252,19 +253,23 @@ async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTa
     )
 
 
-@app.get("/jobs/{job_id}", response_model=JobStatusResponse, tags=["Analysis"])
+@app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"])
 async def get_job_status(job_id: str):
-    """Get async job status."""
+    """Get async job status and return completed result when available."""
     record = run_store.get_run(job_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    return JobStatusResponse(
+    result = AnalysisResponse.model_validate(record.result) if record.result else None
+
+    return JobPollResponse(
         job_id=record.job_id,
         status=record.status,
         ticker=record.ticker,
         started_at=record.started_at,
+        completed_at=record.completed_at,
         error=record.error,
+        result=result,
     )
 
 
@@ -403,7 +408,8 @@ def _normalize_sections_processed(value: object) -> list[str]:
 async def ingest_filing(request: IngestionRequest):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
-    logger.info(f"Ingesting {request.filing_type} for {ticker}")
+    logger.info(f"Ingesting 10-K for {ticker}")
+    filing_type = "10-K"
 
     with track_request("POST", "/ingest"):
         try:
@@ -414,7 +420,7 @@ async def ingest_filing(request: IngestionRequest):
 
             return IngestionResponse(
                 ticker=ticker,
-                filing_type=request.filing_type,
+                filing_type=filing_type,
                 status="success" if result.success else "failed",
                 chunks_created=getattr(result, "total_chunks", 0),
                 sections_processed=sections_processed,
@@ -426,7 +432,7 @@ async def ingest_filing(request: IngestionRequest):
             logger.error(f"Ingestion failed: {e}")
             return IngestionResponse(
                 ticker=ticker,
-                filing_type=request.filing_type,
+                filing_type=filing_type,
                 status="failed",
                 chunks_created=0,
                 sections_processed=[],

@@ -65,7 +65,6 @@ async def fake_run_agent(ticker: str, company_name: str | None):
         "AAPL": "Apple Inc.",
         "MSFT": "Microsoft Corp.",
     }.get(ticker, f"{ticker} Corp.")
-
     return {
         "ticker": ticker,
         "company_name": company,
@@ -121,21 +120,18 @@ async def fake_run_agent(ticker: str, company_name: str | None):
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     temp_store = FileBackedRunStore(tmp_path / "run_store.json")
-
     monkeypatch.setattr(api_main, "run_store", temp_store)
     monkeypatch.setattr(api_main, "get_vector_store", lambda: StubVectorStore())
     monkeypatch.setattr(api_main, "check_ollama_health", fake_check_ollama_health)
     monkeypatch.setattr(api_main, "check_langsmith_connection", fake_check_langsmith_connection)
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
-
     with TestClient(api_main.app) as test_client:
         yield test_client
 
 
 def test_health_endpoint_returns_component_statuses(client: TestClient):
     response = client.get("/health")
-
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "healthy"
@@ -145,14 +141,11 @@ def test_health_endpoint_returns_component_statuses(client: TestClient):
 
 
 def test_ingest_and_ingest_status_endpoints(client: TestClient):
-    ingest_response = client.post(
-        "/ingest",
-        json={"ticker": "AAPL", "filing_type": "10-K"},
-    )
-
+    ingest_response = client.post("/ingest", json={"ticker": "AAPL"})
     assert ingest_response.status_code == 200
     ingest_payload = ingest_response.json()
     assert ingest_payload["ticker"] == "AAPL"
+    assert ingest_payload["filing_type"] == "10-K"
     assert ingest_payload["status"] == "success"
     assert ingest_payload["chunks_created"] == 8
     assert ingest_payload["sections_processed"] == ["business", "risk_factors", "md&a"]
@@ -168,11 +161,7 @@ def test_ingest_and_ingest_status_endpoints(client: TestClient):
 
 
 def test_sync_analysis_endpoint_returns_full_analysis_payload(client: TestClient):
-    response = client.post(
-        "/analyze",
-        json={"ticker": "AAPL", "company_name": "Apple Inc."},
-    )
-
+    response = client.post("/analyze", json={"ticker": "AAPL", "company_name": "Apple Inc."})
     assert response.status_code == 200
     payload = response.json()
     assert payload["ticker"] == "AAPL"
@@ -187,12 +176,11 @@ def test_sync_analysis_endpoint_returns_full_analysis_payload(client: TestClient
     assert payload["errors"] == []
 
 
-def test_async_analysis_creates_job_and_persists_completed_result(client: TestClient):
+def test_async_analysis_poll_returns_completed_result_payload(client: TestClient):
     create_response = client.post(
         "/analyze/async",
         json={"ticker": "MSFT", "company_name": "Microsoft Corp."},
     )
-
     assert create_response.status_code == 200
     create_payload = create_response.json()
     assert create_payload["ticker"] == "MSFT"
@@ -202,16 +190,43 @@ def test_async_analysis_creates_job_and_persists_completed_result(client: TestCl
     status_response = client.get(f"/jobs/{job_id}")
     assert status_response.status_code == 200
     status_payload = status_response.json()
+
     assert status_payload["job_id"] == job_id
     assert status_payload["ticker"] == "MSFT"
     assert status_payload["status"] == "completed"
+    assert status_payload["result"] is not None
+    assert status_payload["result"]["ticker"] == "MSFT"
+    assert status_payload["result"]["investment_memo"].startswith("# Investment Memo")
 
     record = api_main.run_store.get_run(job_id)
     assert record is not None
     assert record.status == "completed"
     assert record.result is not None
-    assert record.result["ticker"] == "MSFT"
-    assert record.result["investment_memo"].startswith("# Investment Memo")
+
+
+def test_removed_analysis_fields_are_rejected(client: TestClient):
+    response = client.post(
+        "/analyze",
+        json={
+            "ticker": "AAPL",
+            "include_filing_analysis": True,
+            "include_news_sentiment": True,
+            "max_news_articles": 5,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_removed_ingestion_fields_are_rejected(client: TestClient):
+    response = client.post(
+        "/ingest",
+        json={
+            "ticker": "AAPL",
+            "filing_type": "10-K",
+            "force_refresh": False,
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_stats_endpoint_reports_vector_and_run_store_counts(client: TestClient):
@@ -224,7 +239,6 @@ def test_stats_endpoint_reports_vector_and_run_store_counts(client: TestClient):
     stats_response = client.get("/stats")
     assert stats_response.status_code == 200
     payload = stats_response.json()
-
     assert payload["vector_store"] == {
         "backend": "stub",
         "document_count": 7,

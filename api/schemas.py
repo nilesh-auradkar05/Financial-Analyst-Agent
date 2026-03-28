@@ -4,10 +4,11 @@ API Schemas
 This module defines the Pydantic models for the API request/response validation.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 # ENUMS
 
@@ -31,7 +32,7 @@ class SentimentLabel(str, Enum):
 
 class AnalysisRequest(BaseModel):
     """Request to analyze a company.
-    
+
     Attributes:
         - ticker: Stock ticker symbol (eg: AAPL)
         - company_name: Company name (Optional - Auto-fetched if not provided)
@@ -39,6 +40,16 @@ class AnalysisRequest(BaseModel):
         - include_news_analysis: Whether to include news sentiment.
         - max_news_articles: Maximum news articles to analyze
     """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "ticker": "AAPL",
+                "company_name": "Apple Inc.",
+            }
+        },
+    )
 
     ticker: str = Field(
         ...,
@@ -53,55 +64,19 @@ class AnalysisRequest(BaseModel):
         description="Company name (Optional, auto-fetched if not provided)",
     )
 
-    include_filing_analysis: bool = Field(
-        default=True,
-        description="Include SEC filing analysis in the memo.",
-    )
-
-    include_news_sentiment: bool = Field(
-        default=True,
-        description="Include news sentiment analysis.",
-    )
-
-    max_news_articles: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Maximum number of news articles to analyze.",
-    )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "ticker": "AAPL",
-                "company_name": "Apple Inc.",
-                "include_filing_analysis": True,
-                "include_news_sentiment": True,
-                "max_news_articles": 5,
-            }
-        }
-
 class IngestionRequest(BaseModel):
     """Request to ingest SEC filings for a company.
-    
+
     Must be done before analysis can include filing data.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     ticker: str = Field(
         ...,
         min_length=1,
         max_length=10,
         description="Stock ticker symbol",
-    )
-
-    filing_type: str = Field(
-        default="10-K",
-        description="Types of filing to ingest",
-    )
-
-    force_refresh: bool = Field(
-        default=False,
-        description="Re-download and re-index even if already ingested."
     )
 
 # RESPONSE MODELS
@@ -165,7 +140,7 @@ class ErrorDetail(BaseModel):
 
 class AnalysisResponse(BaseModel):
     """Complete analysis response.
-    
+
     Returned when analysis is complete for sync jobs or when fetching completed job results for async jobs.
     """
 
@@ -180,7 +155,7 @@ class AnalysisResponse(BaseModel):
     # Results
     executive_summary: Optional[str] = None
     investment_memo: Optional[str] = None
-    
+
     # Supporting data
     stock_data: Optional[StockDataResponse] = None
     sentiment: Optional[SentimentResponse] = None
@@ -208,20 +183,28 @@ class AnalysisResponse(BaseModel):
             }
         }
 
-class JobStatusResponse(BaseModel):
-    """Status of an analysis job.
+class JobAcceptedResponse(BaseModel):
+    """Immediate response for async job acceptance."""
 
-    Used for polling async job status.
+    job_id: str
+    ticker: str
+    status: JobStatus
+    started_at: str
+    error: Optional[str] = None
+
+class JobPollResponse(BaseModel):
+    """Polling response for async jobs.
+
+    Returns result once the job has completed.
     """
 
     job_id: str
     ticker: str
     status: JobStatus
-    current_step: Optional[str] = None
-    progress_percent: Optional[float] = None
     started_at: str
-    estimated_completion_time: Optional[str] = None
+    completed_at: Optional[str] = None
     error: Optional[str] = None
+    result: Optional[AnalysisResponse] = None
 
 class IngestionResponse(BaseModel):
     """Response for filing ingestion request."""
@@ -297,7 +280,8 @@ __all__ = [
 
     # Main responses
     "AnalysisResponse",
-    "JobStatusResponse",
+    "JobAcceptedResponse",
+    "JobPollResponse",
     "IngestionResponse",
     "HealthResponse",
     "StatsResponse",

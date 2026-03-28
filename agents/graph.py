@@ -536,7 +536,7 @@ async def _main():
         print("CITATIONS")
         print(f"{'─'*60}")
         for cite in citations[:5]:
-            print(f"  [{cite['index']}] ({cite['source_type']}) {cite['title']}")
+            print(f"  [{cite['index']}] ({cite['type']}) {cite['title']}")
 
     print(f"\n{'='*60}")
     print("Analysis complete!")

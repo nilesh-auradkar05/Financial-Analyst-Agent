@@ -9,13 +9,14 @@ from typing import Any, Optional
 
 from loguru import logger
 
+
 @dataclass
 class RunRecord:
     job_id: str
     ticker: str
     status: str
     started_at: str
-    completed_at: Optinal[str] = None
+    completed_at: Optional[str] = None
     company_name: Optional[str] = None
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
