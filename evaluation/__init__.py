@@ -17,6 +17,8 @@ from typing import Optional
 
 from loguru import logger
 
+from evaluation.grounding import GroundingCheckResult, evaluate_memo_grounding
+
 # ======================================================================
 # RESULT DATACLASS
 # ======================================================================
