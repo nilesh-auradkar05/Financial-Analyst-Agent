@@ -24,14 +24,14 @@ class TestBuildRegistry:
         registry = _build_citation_registry(state)
         assert len(registry) == 3
         assert registry[0]["index"] == 1
-        assert registry[0]["type"] == "news"
+        assert registry[0]["source_type"] == "news"
         assert registry[2]["index"] == 3
 
     def test_filings_only(self, sample_filing_chunks):
         state = {"news_articles": [], "filing_chunks": sample_filing_chunks}
         registry = _build_citation_registry(state)
         assert len(registry) == 2
-        assert all(r["type"] == "sec_filing" for r in registry)
+        assert all(r["source_type"] == "sec_filing" for r in registry)
 
     def test_mixed_sources_numbered_sequentially(
         self, sample_news_articles, sample_filing_chunks,
@@ -92,7 +92,7 @@ class TestOrphanDetection:
         assert orphans == set()
 
     def test_orphan_detected(self):
-        registry = [{"index": 1, "type": "news", "title": "A"}]
+        registry = [{"index": 1, "source_type": "news", "title": "A"}]
         valid = {r["index"] for r in registry}
         used = _extract_used_citations("See [1] and [99].")
         orphans = used - valid

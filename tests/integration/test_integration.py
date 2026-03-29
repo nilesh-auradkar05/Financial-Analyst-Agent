@@ -76,8 +76,17 @@ def _fake_agent_state(ticker: str, company_name: str | None = None) -> dict:
         "execution_time_ms": 1000.0,
     }
 
-async def fake_run_agent(ticker: str, company_name: str | None = None):
-    return _fake_agent_state(ticker=ticker, company_name=company_name)
+async def fake_run_agent(
+    ticker: str,
+    company_name: str | None = None,
+    include_filing_analysis: bool = True,
+    include_news_sentiment: bool = True,
+    max_news_articles: int = 10,
+):
+    return _fake_agent_state(
+        ticker=ticker,
+        company_name=company_name
+    )
 
 
 async def fake_check_ollama_health() -> bool:

@@ -66,6 +66,9 @@ class AgentState(TypedDict, total=False):
     stock_data: dict
     filing_chunks: list[dict]
     sentiment_result: dict
+    include_filing_analysis: bool
+    include_news_sentiment: bool
+    max_news_articles: int
 
     # Output Fields
     investment_memo: str
@@ -91,6 +94,9 @@ def create_initial_state(
     return AgentState(
         ticker=ticker.upper(),
         company_name=company_name or "",
+        include_filing_analysis=True,
+        include_news_sentiment=True,
+        max_news_articles=10,
         news_articles=[],
         stock_data={},
         filing_chunks=[],

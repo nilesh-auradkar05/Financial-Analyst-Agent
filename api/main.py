@@ -211,7 +211,13 @@ async def analyze(request: AnalysisRequest):
     with track_request("POST", "/analyze"):
         with track_agent_run(ticker):
             try:
-                result = await run_agent(ticker, request.company_name)
+                result = await run_agent(
+                    ticker=ticker,
+                    company_name=request.company_name,
+                    include_filing_analysis=request.include_filing_analysis,
+                    include_news_sentiment=request.include_news_sentiment,
+                    max_news_articles=request.max_news_articles,
+                )
                 return _format_response(result)
 
             except Exception as e:
@@ -237,7 +243,15 @@ async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTa
     )
 
     # Start background task
-    background_tasks.add_task(_run_analysis_job, job_id, ticker, request.company_name)
+    background_tasks.add_task(
+        _run_analysis_job,
+        job_id,
+        ticker,
+        request.company_name,
+        request.include_filing_analysis,
+        request.include_news_sentiment,
+        request.max_news_articles,
+    )
     logger.info(f"Started async job {job_id} for {ticker}")
 
     return JobAcceptedResponse(
@@ -269,13 +283,26 @@ async def get_job_status(job_id: str):
     )
 
 
-async def _run_analysis_job(job_id: str, ticker: str, company_name: Optional[str]):
+async def _run_analysis_job(
+    job_id: str,
+    ticker: str,
+    company_name: Optional[str],
+    include_filing_analysis: bool = True,
+    include_news_sentiment: bool = True,
+    max_news_articles: int = 10,
+):
     """Background task for async analysis."""
     run_store.mark_running(job_id)
 
     try:
         with track_agent_run(ticker):
-            result = await run_agent(ticker, company_name)
+            result = await run_agent(
+                ticker,
+                company_name,
+                include_filing_analysis=include_filing_analysis,
+                include_news_sentiment=include_news_sentiment,
+                max_news_articles=max_news_articles,
+            )
             formatted = _format_response(result).model_dump()
             run_store.mark_completed(job_id, result=formatted)
     except Exception as e:
@@ -357,7 +384,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         citations=[
             CitationResponse(
                 index=citation.get("index", 0),
-                source_type=citation.get("source_type") or citation.get("type", ""),
+                source_type=citation.get("source_type", ""),
                 title=citation.get("title", ""),
                 url=citation.get("url"),
                 date=citation.get("date"),

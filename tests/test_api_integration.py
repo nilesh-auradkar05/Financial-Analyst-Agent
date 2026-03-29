@@ -60,11 +60,29 @@ async def fake_ingest_10k_for_ticker(ticker: str) -> StubIngestResult:
     return StubIngestResult()
 
 
-async def fake_run_agent(ticker: str, company_name: str | None):
+async def fake_run_agent(
+    ticker: str,
+    company_name: str | None,
+    include_filing_analysis: bool = True,
+    include_news_sentiment: bool = True,
+    max_news_articles: int = 10,
+):
     company = company_name or {
         "AAPL": "Apple Inc.",
         "MSFT": "Microsoft Corp.",
     }.get(ticker, f"{ticker} Corp.")
+
+    if not include_filing_analysis or not include_news_sentiment:
+        return {
+            "ticker": ticker,
+            "company_name": company,
+            "executive_summary": "",
+            "investment_memo": "",
+            "stock_data": {},
+            "sentiment_result": {},
+            "news_articles": [],
+        }
+
     return {
         "ticker": ticker,
         "company_name": company,

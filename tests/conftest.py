@@ -131,8 +131,8 @@ def sample_agent_state(
         "investment_memo": "# Memo\n\n## Executive Summary\nStrong [1] performance [2].",
         "executive_summary": "Strong performance across segments.",
         "citations": [
-            {"index": 1, "type": "news", "title": "Apple Q4 Earnings", "url": "https://example.com"},
-            {"index": 2, "type": "sec_filing", "title": "Risk Factors — 10-K"},
+            {"index": 1, "source_type": "news", "title": "Apple Q4 Earnings", "url": "https://example.com"},
+            {"index": 2, "source_type": "sec_filing", "title": "Risk Factors — 10-K"},
         ],
         "errors": [],
         "current_step": "complete",

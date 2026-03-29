@@ -68,7 +68,8 @@ async def research_news_node(state: AgentState) -> dict:
     try:
         # Search for news
         query = f"{company_name} {ticker} stock news"
-        articles = await search_company_news(query, max_results=5)
+        max_results = state.get("max_news_articles", 10)
+        articles = await search_company_news(query, max_results=max_results)
 
         news_articles = [
             {
@@ -162,6 +163,12 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
     company_name = state.get("company_name", ticker)
     logger.info(f"[retrieve_filings] Searching filings for {ticker}")
 
+    if not state.get("include_filing_analysis", True):
+        return {
+            "filing_chunks": [],
+            "current_step": AgentStep.RETRIEVE_FILINGS.value,
+        }
+
     try:
         store = get_vector_store()
 
@@ -229,6 +236,12 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
     articles = state.get("news_articles", [])
     logger.info(f"[{ticker}] Analyzing sentiments on {len(articles)} articles")
 
+    if not state.get("include_news_sentiment", True):
+        return {
+            "sentiment_result": {},
+            "current_step": AgentStep.ANALYZE_SENTIMENT.value,
+        }
+
     if not articles:
         return {
             "sentiment_result": {"overall_sentiment": "neutral"},
@@ -273,7 +286,7 @@ def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -
     Build an ordered list of citable sources from the state.
 
     Returns a list of dicts like:
-        {"index": 1, "type": "news", "title": "....", "url": "...."}
+        {"index": 1, "source_type": "news", "title": "....", "url": "...."}
     """
     registry: list[dict] = []
     idx = 1
@@ -285,7 +298,7 @@ def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -
 
         registry.append({
             "index": idx,
-            "type": "news",
+            "source_type": "news",
             "title": article.get("title", "Untitled"),
             "text": snippet,
             "url": article.get("url", ""),
@@ -303,7 +316,7 @@ def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -
         filing_type = chunk.get("filing_type", "10-K")
         registry.append({
             "index": idx,
-            "type": "sec_filing",
+            "source_type": "sec_filing",
             "title": f"{section} - {filing_type}",
             "text": text,
             "url": chunk.get("source_url"),
@@ -324,7 +337,7 @@ def _format_registry_for_prompt(registry: list[dict], *, max_chars_per_item: int
     lines = ["", "## Available Sources (use these citation numbers exactly)"]
     for entry in registry:
         meta_bits = [
-            entry.get("type"),
+            entry.get("source_type"),
             entry.get("source"),
             entry.get("date"),
         ]
@@ -345,7 +358,7 @@ def _build_api_citations(registry: list[dict]) -> list[dict]:
     return [
         {
             "index": entry["index"],
-            "type": entry.get("type", "unknown"),
+            "source_type": entry.get("source_type", "unknown"),
             "title": entry.get("title", "Untitled"),
             "url": entry.get("url"),
             "date": entry.get("date"),
@@ -511,7 +524,7 @@ async def verify_memo_node(state: AgentState) -> dict:
         errors.append(
             {
                 "step": "verify_memo",
-                "message": "No memo was available to verification.",
+                "message": "No memo was available for verification.",
                 "recoverable": True,
                 'timestamp': datetime.now(timezone.utc).isoformat(),
             }
@@ -581,7 +594,7 @@ def _route_after_node(next_node: str):
         if has_fatal_error(state):
             logger.warning(
                 "Fatal error - skipping to draft_memo"
-                f"(world have gone to {next_node})"
+                f"(would have gone to {next_node})"
             )
             return "draft_memo"
         return next_node
@@ -605,9 +618,11 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     workflow.add_node("retrieve_filings", retrieve_sec_filings_node)
     workflow.add_node("analyze_sentiment", analyze_sentiment_node)
     workflow.add_node("draft_memo", draft_memo_node)
+    workflow.add_node("verify_memo", verify_memo_node)
 
     # Define edges
     workflow.add_edge(START, "research_news")
+
     workflow.add_conditional_edges(
         "research_news",
         _route_after_node("fetch_stock"),
@@ -628,7 +643,8 @@ def create_agent() -> Runnable[AgentState, AgentState]:
         _route_after_node("draft_memo"),
         {"draft_memo": "draft_memo"},
     )
-    workflow.add_edge("draft_memo", END)
+    workflow.add_edge("draft_memo", "verify_memo")
+    workflow.add_edge("verify_memo", END)
 
     # Compile the graph
     agent = workflow.compile()
@@ -642,6 +658,9 @@ def create_agent() -> Runnable[AgentState, AgentState]:
 async def run_agent(
     ticker: str,
     company_name: Optional[str] = None,
+    include_filing_analysis: bool = True,
+    include_news_sentiment: bool = True,
+    max_news_articles: int = 10,
 ) -> AgentState:
     """
     Run the financial analyst agent for a given ticker.
