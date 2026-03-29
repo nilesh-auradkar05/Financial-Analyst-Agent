@@ -70,7 +70,9 @@ class AgentState(TypedDict, total=False):
     # Output Fields
     investment_memo: str
     citations: list[dict]
+    citation_evidence: list[dict]
     executive_summary: str
+    verification_result: dict
 
     # Metadata Fields
     current_step: str
@@ -96,6 +98,8 @@ def create_initial_state(
         investment_memo="",
         executive_summary="",
         citations=[],
+        citation_evidence=[],
+        verification_result={},
         current_step=AgentStep.RESEARCH_NEWS.value,
         errors=[],
         started_at=datetime.now(timezone.utc).isoformat(),
@@ -147,7 +151,6 @@ def get_data_availability(state: AgentState) -> dict[str, bool]:
 def get_context_for_llm(state: AgentState) -> str:
     """Compile all data into context string for LLM."""
     parts = []
-    citation_idx = 1
 
     # Stock data
     stock = state.get("stock_data", {})
@@ -166,11 +169,10 @@ def get_context_for_llm(state: AgentState) -> str:
     if articles:
         parts.append("## Recent News")
         for article in articles:
-            parts.append(f"[{citation_idx}] {article.get('title', 'Untitled')}")
-            parts.append(f"    Source: {article.get('source', 'Unknown')}")
-            parts.append(f"    {article.get('snippet', '')[:200]}")
+            parts.append(f"- {article.get('title', 'Untitled')}")
+            parts.append(f"  Source: {article.get('source', 'Unknown')}")
+            parts.append(f"  {article.get('snippet', '')[:200]}")
             parts.append("")
-            citation_idx += 1
 
     # Sentiment
     sentiment = state.get("sentiment_result", {})
@@ -186,9 +188,8 @@ def get_context_for_llm(state: AgentState) -> str:
     if chunks:
         parts.append("## SEC Filing Excerpts")
         for chunk in chunks[:5]:  # Limit to top 5
-            parts.append(f"[{citation_idx}] {chunk.get('section', 'Unknown Section')}")
-            parts.append(f"    {chunk.get('text', '')[:500]}")
+            parts.append(f"- {chunk.get('section', 'Unknown Section')}")
+            parts.append(f"  {chunk.get('text', '')[:500]}")
             parts.append("")
-            citation_idx += 1
 
     return "\n".join(parts)

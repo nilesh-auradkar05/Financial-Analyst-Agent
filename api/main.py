@@ -59,6 +59,8 @@ from api.schemas import (
     NewsArticleResponse,
     SentimentResponse,
     StockDataResponse,
+    VerificationClaimResponse,
+    VerificationResponse,
 )
 from configs.config import settings, validate_settings
 from models.llm import check_ollama_health
@@ -284,6 +286,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
     """Format agent state as API response."""
     stock = state.get("stock_data", {})
     sentiment = state.get("sentiment_result", {})
+    verification = state.get("verification_result", {})
 
     errors = [
         ErrorDetail(
@@ -361,6 +364,19 @@ def _format_response(state: AgentState) -> AnalysisResponse:
             )
             for citation in state.get("citations", [])
         ],
+        verification=VerificationResponse(
+            passed=verification.get("passed", False),
+            total_claims=verification.get("total_claims", 0),
+            cited_claims=verification.get("cited_claims", 0),
+            grounded_claims=verification.get("grounded_claims", 0),
+            citation_coverage_rate=verification.get("citation_coverage_rate", 0.0),
+            grounded_claim_rate=verification.get("grounded_claim_rate", 0.0),
+            orphan_citations=verification.get("orphan_citations", []),
+            claims=[
+                VerificationClaimResponse(**claim)
+                for claim in verification.get("claims", [])
+            ],
+        ) if verification else None,
         errors=errors,
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),

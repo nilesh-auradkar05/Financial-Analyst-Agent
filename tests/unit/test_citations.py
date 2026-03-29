@@ -49,14 +49,15 @@ class TestBuildRegistry:
 
 class TestFormatRegistryForPrompt:
     def test_empty_registry(self):
-        assert _format_registry_for_prompt([]) == ""
+        result = _format_registry_for_prompt([])
+        assert "No numbered evidence sources" in result
 
     def test_contains_source_labels(self, sample_news_articles):
         state = {"news_articles": sample_news_articles, "filing_chunks": []}
         registry = _build_citation_registry(state)
         text = _format_registry_for_prompt(registry)
         assert "[1]" in text
-        assert "(news)" in text
+        assert "(news |" in text
         assert "Available Sources" in text
 
 

@@ -110,6 +110,16 @@ async def fake_run_agent(ticker: str, company_name: str | None):
                 "date": "2026-03-15",
             }
         ],
+        "verification_result": {
+            "passed": True,
+            "total_claims": 2,
+            "cited_claims": 2,
+            "grounded_claims": 2,
+            "citation_coverage_rate": 1.0,
+            "grounded_claim_rate": 1.0,
+            "claims": [],
+            "orphan_citations": [],
+        },
         "errors": [],
         "started_at": "2026-03-15T12:00:00+00:00",
         "completed_at": "2026-03-15T12:00:02+00:00",
@@ -171,6 +181,11 @@ def test_sync_analysis_endpoint_returns_full_analysis_payload(client: TestClient
     assert payload["investment_memo"].startswith("# Investment Memo")
     assert payload["stock_data"]["market_cap_formatted"] == "$3.00T"
     assert payload["sentiment"]["overall_sentiment"] == "positive"
+    assert payload["verification"] is not None
+    assert payload["verification"]["passed"] is True
+    assert payload["verification"]["citation_coverage_rate"] == 1.0
+    assert payload["verification"]["grounded_claim_rate"] == 1.0
+    assert payload["verification"]["orphan_citations"] == []
     assert len(payload["news_articles"]) == 1
     assert len(payload["citations"]) == 1
     assert payload["errors"] == []
@@ -198,13 +213,16 @@ def test_async_analysis_poll_returns_completed_result_payload(client: TestClient
     assert status_payload["result"]["ticker"] == "MSFT"
     assert status_payload["result"]["investment_memo"].startswith("# Investment Memo")
 
+    assert status_payload["result"]["verification"] is not None
+    assert status_payload["result"]["verification"]["passed"] is True
+
     record = api_main.run_store.get_run(job_id)
     assert record is not None
     assert record.status == "completed"
     assert record.result is not None
 
 
-def test_removed_analysis_fields_are_rejected(client: TestClient):
+def test_analysis_request_accepts_optional_controls(client: TestClient):
     response = client.post(
         "/analyze",
         json={
@@ -214,10 +232,49 @@ def test_removed_analysis_fields_are_rejected(client: TestClient):
             "max_news_articles": 5,
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ticker"] == "AAPL"
+    assert payload["status"] == "completed"
+
+def test_analysis_request_controls_disable_filing_analysis(client: TestClient):
+    response = client.post(
+        "/analyze",
+        json={
+            "ticker": "AAPL",
+            "include_filing_analysis": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert all(c["source_type"] != "sec_filing" for c in payload["citations"])
+
+def test_analysis_request_controls_disable_news_sentiment(client: TestClient):
+    response = client.post(
+        "/analyze",
+        json={
+            "ticker": "AAPL",
+            "include_news_sentiment": False,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sentiment"] is None
+
+def test_analysis_request_controls_limit_news_articles(client: TestClient):
+    response = client.post(
+        "/analyze",
+        json={
+            "ticker": "AAPL",
+            "max_news_articles": 1,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["news_articles"]) <= 1
 
 
-def test_removed_ingestion_fields_are_rejected(client: TestClient):
+def test_ingestion_request_accepts_optional_controls(client: TestClient):
     response = client.post(
         "/ingest",
         json={
@@ -226,7 +283,11 @@ def test_removed_ingestion_fields_are_rejected(client: TestClient):
             "force_refresh": False,
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ticker"] == "AAPL"
+    assert payload["filing_type"] == "10-K"
+    assert payload["status"] == "success"
 
 
 def test_stats_endpoint_reports_vector_and_run_store_counts(client: TestClient):

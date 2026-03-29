@@ -6,7 +6,7 @@ decisions WITHOUT calling external services.
 """
 
 from agents.graph import _route_after_node
-from agents.state import AgentStep, add_error, create_initial_state
+from agents.state import AgentStep, add_error, create_initial_state, has_fatal_error
 
 
 class TestRouteAfterNode:
@@ -59,3 +59,11 @@ class TestRouteAfterNode:
         ]
         router = _route_after_node("analyze_sentiment")
         assert router(state) == "draft_memo"
+
+    def test_has_fatal_error_detects_non_recoverable_error(self):
+        state = create_initial_state("AAPL", "Apple Inc.")
+        updated = add_error(state, "research_news", "news fetch failed", recoverable=False)
+
+        merged = {**state, **updated}
+
+        assert has_fatal_error(merged) is True

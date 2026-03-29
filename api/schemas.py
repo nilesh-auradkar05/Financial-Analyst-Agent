@@ -150,6 +150,28 @@ class CitationResponse(BaseModel):
     url: Optional[str] = None
     date: Optional[str] = None
 
+class VerificationClaimResponse(BaseModel):
+    """Single claim verification detail."""
+
+    sentence: str
+    citations: list[int] = []
+    supported: bool
+    overlap_score: float
+    missing_citation: bool = False
+    reason: Optional[str] = None
+
+class VerificationResponse(BaseModel):
+    """Memo grounding and citation coverage summary."""
+
+    passed: bool
+    total_claims: int = 0
+    cited_claims: int = 0
+    grounded_claims: int = 0
+    citation_coverage_rate: float = 0.0
+    grounded_claim_rate: float = 0.0
+    claims: list[VerificationClaimResponse] = Field(default_factory=list)
+    orphan_citations: list[int] = Field(default_factory=list)
+
 class ErrorDetail(BaseModel):
     """Error information."""
 
@@ -183,6 +205,7 @@ class AnalysisResponse(BaseModel):
     sentiment: Optional[SentimentResponse] = None
     news_articles: list[NewsArticleResponse] = []
     citations: list[CitationResponse] = []
+    verification: Optional[VerificationResponse] = None
 
     # Errors (for partial failures)
     errors: list[ErrorDetail] = []

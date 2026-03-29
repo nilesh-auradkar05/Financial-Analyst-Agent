@@ -38,6 +38,7 @@ from agents.state import (
     get_data_availability,
     has_fatal_error,
 )
+from evaluation.grounding import evaluate_memo_grounding
 from models.llm import ANALYST_SYSTEM_PROMPT, get_llm
 from models.sentiment import analyze_sentiment_batch
 from observability.langsmith import get_tracer
@@ -267,7 +268,7 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Sentiment analysis failed. Error: {e}")
         return add_error(state, "analyze_sentiment", str(e))
 
-def _build_citation_registry(state: AgentState) -> list[dict]:
+def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -> list[dict]:
     """
     Build an ordered list of citable sources from the state.
 
@@ -278,35 +279,79 @@ def _build_citation_registry(state: AgentState) -> list[dict]:
     idx = 1
 
     for article in state.get("news_articles", []):
+        snippet = (article.get("snippet") or "").strip()
+        if not snippet:
+            continue
+
         registry.append({
             "index": idx,
             "type": "news",
             "title": article.get("title", "Untitled"),
+            "text": snippet,
             "url": article.get("url", ""),
+            "date": article.get("published_date"),
+            "source": article.get("source", "Unknown"),
         })
         idx += 1
 
-    for chunk in state.get("filing_chunks", [])[:5]:
+    for chunk in state.get("filing_chunks", [])[:max_filing_chunks]:
+        text = (chunk.get("text") or "").strip()
+        if not text:
+            continue
+
         section = chunk.get("section", "Unknown")
         filing_type = chunk.get("filing_type", "10-K")
         registry.append({
             "index": idx,
             "type": "sec_filing",
             "title": f"{section} - {filing_type}",
+            "text": text,
+            "url": chunk.get("source_url"),
+            "date": chunk.get("filing_date"),
+            "chunk_id": chunk.get("chunk_id"),
+            "section": section,
+            "filing_type": filing_type,
         })
         idx += 1
 
     return registry
 
-def _format_registry_for_prompt(registry: list[dict]) -> str:
+def _format_registry_for_prompt(registry: list[dict], *, max_chars_per_item: int = 700) -> str:
     """Render the registry as a numbered list for the LLM prompt."""
     if not registry:
-        return ""
+        return "\n## Available Sources\nNo numbered evidence sources are available. Avoid unsupported factual claims."
+
     lines = ["", "## Available Sources (use these citation numbers exactly)"]
     for entry in registry:
-        label = entry.get("title", "")
-        lines.append(f"[{entry['index']}] ({entry['type']}) {label}")
+        meta_bits = [
+            entry.get("type"),
+            entry.get("source"),
+            entry.get("date"),
+        ]
+
+        meta = " | ".join(bit for bit in meta_bits if bit)
+
+        header = f"[{entry['index']}] {entry.get('title', 'Untitled')}"
+        if meta:
+            header += f" ({meta})"
+
+        lines.append(header)
+        lines.append((entry.get("text") or "")[:max_chars_per_item])
+        lines.append("")
     return "\n".join(lines)
+
+def _build_api_citations(registry: list[dict]) -> list[dict]:
+    """Convert evidence registry into the citation metadata exposed by the API."""
+    return [
+        {
+            "index": entry["index"],
+            "type": entry.get("type", "unknown"),
+            "title": entry.get("title", "Untitled"),
+            "url": entry.get("url"),
+            "date": entry.get("date"),
+        }
+        for entry in registry
+    ]
 
 def _extract_used_citations(memo: str) -> set[int]:
     """Pull citation indices like ``[1]``, ``[3]``, out of the memo text."""
@@ -341,6 +386,7 @@ async def draft_memo_node(state: AgentState) -> dict:
 
         # 2. Build citation registry BEFORE LLM call
         registry = _build_citation_registry(state)
+        api_citations = _build_api_citations(registry)
 
         # 3. Build context from accumulated data
         context = get_context_for_llm(state)
@@ -354,13 +400,12 @@ async def draft_memo_node(state: AgentState) -> dict:
             disclaimer = (
                 "\n\nIMPORTANT - these data sources were UNAVAILABLE: "
                 + ", ".join(missing)
-                + ". Do NOY fabricate information for them. "
+                + ". Do NOT fabricate information for them. "
                 "State explicitly that the data was unavailable."
             )
 
         user_prompt = (
-            f"Write a comprehensive investment memo for "
-            f"{company_name} ({ticker}).\n\n"
+            f"Write a comprehensive investment memo for {company_name} ({ticker}).\n\n"
             f"{context}"
             f"{registry_block}\n\n"
             "Structure:\n"
@@ -371,8 +416,11 @@ async def draft_memo_node(state: AgentState) -> dict:
             "5. Financial Highlights\n"
             "6. Investment Thesis (bullish and bearish cases)\n"
             "7. Conclusion with recommendation\n\n"
-            "Cite sources using ONLY the [N] numbers listed above. "
-            "Do not invent citation numbers."
+            "Use ONLY the numbered sources listed above for citations.\n"
+            "Every non-trivial factual claim should cite one or more sources like [1] or [2][3].\n"
+            "Do not invent citation numbers.\n"
+            "Do not cite sources that are not listed.\n"
+            "If support is weak or missing, explicitly state uncertainty."
             f"{disclaimer}"
         )
 
@@ -387,6 +435,21 @@ async def draft_memo_node(state: AgentState) -> dict:
 
         memo = getattr(response, "content", "")
 
+        used_citations = _extract_used_citations(memo)
+        valid_indices = {entry["index"] for entry in registry}
+        invalid_citations = sorted(used_citations - valid_indices)
+
+        errors = list(state.get("errors", []))
+        if invalid_citations:
+            errors.append(
+                {
+                    "step": "draft_memo",
+                    "message": f"Memo referenced non-existent_citations: {invalid_citations}",
+                    "recoverable": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
         # 5. Extract executive summary
         exec_summary = ""
         if "Executive Summary" in memo:
@@ -394,6 +457,10 @@ async def draft_memo_node(state: AgentState) -> dict:
             if len(parts) > 1:
                 summary = parts[1].split("\n\n")[0]
                 exec_summary = summary.strip().strip("#").strip()[:500]
+
+        logger.info(
+            f"[{ticker}] Memo generated ({len(memo)} chars, used_citations={sorted(used_citations)})"
+        )
 
         # 6. Verify citations
         used = _extract_used_citations(memo)
@@ -410,14 +477,102 @@ async def draft_memo_node(state: AgentState) -> dict:
             "executive_summary": (
                 exec_summary or f"Analysis completed for {company_name}"
             ),
-            "citations": registry,
-            "current_step": AgentStep.COMPLETE.value,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "citations": api_citations,
+            "citation_evidence": registry,
+            "errors": errors,
+            "current_step": AgentStep.DRAFT_MEMO.value,
         }
 
     except Exception as e:
         logger.error(f"[{ticker}] Memo generation failed. Error: {e}")
         return add_error(state, "draft_memo", str(e), recoverable=False)
+
+@traceable(name="verify_memo", run_type="chain", tags=["agent"])
+async def verify_memo_node(state: AgentState) -> dict:
+    """Run heuristic groundedness and citation coverage checks on the generated memo."""
+    ticker = state["ticker"]
+    memo = state.get("investment_memo", "")
+    registry = state.get("citation_evidence", [])
+
+    logger.info(f"[verify_memo] Verifying memo grounding for {ticker}")
+
+    if not memo.strip():
+        verification_result = {
+            "passed": False,
+            "total_claims": 0,
+            "cited_claims": 0,
+            "grounded_claims": 0,
+            "citation_coverage_rate": 0.0,
+            "grounded_claim_rate": 0.0,
+            "claims": [],
+            "orphan_citations": [],
+        }
+        errors = list(state.get("errors", []))
+        errors.append(
+            {
+                "step": "verify_memo",
+                "message": "No memo was available to verification.",
+                "recoverable": True,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {
+            "verification_result": verification_result,
+            "errors": errors,
+            "current_step": AgentStep.COMPLETE.value,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    used = _extract_used_citations(memo)
+    valid_indices = {entry["index"] for entry in registry}
+    orphan_indices = sorted(used - valid_indices)
+
+    grounding = evaluate_memo_grounding(memo, registry)
+    verification_result = grounding.to_dict()
+    verification_result["orphan_citations"] = orphan_indices
+
+    errors = list(state.get("errors", []))
+
+    if orphan_indices:
+        errors.append(
+            {
+                "step": "verify_memo",
+                "message": f"Memo referenced non-existent citations: {orphan_indices}",
+                "recoverable": True,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        verification_result["passed"] = False
+
+    if not verification_result["passed"]:
+        errors.append(
+            {
+                "step": "verify_memo",
+                "message": (
+                    "Memo verification failed "
+                    f"(citation_coverage={verification_result['citation_coverage_rate']:.2f}), "
+                    f"grounded_claim_rate={verification_result['grounded_claim_rate']:.2f}"
+                ),
+                "recoverable": True,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
+    logger.info(
+        "[%s] Verification: passed=%s coverage=%.2f grounded=%.2f orphan_citations=%s",
+        ticker,
+        verification_result["passed"],
+        verification_result["citation_coverage_rate"],
+        verification_result["grounded_claim_rate"],
+        orphan_indices,
+    )
+
+    return {
+        "verification_result": verification_result,
+        "errors": errors,
+        "current_step": AgentStep.COMPLETE.value,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 # Graph Construction
 

@@ -66,7 +66,7 @@ class TestAddError:
         assert len(update2["errors"]) == 2
 
 
-# Hard 
+# Hard
 
 class TestHasFatalError:
     def test_no_errors_returns_false(self):
@@ -133,7 +133,7 @@ class TestGetContextForLLM:
         assert "## Stock Data" in ctx
         assert "185" in ctx
 
-    def test_citation_indices_increment(self):
+    def test_context_lists_sources_without_numbering(self):
         state = create_initial_state("AAPL")
         state["news_articles"] = [
             {"title": "Article One", "source": "R", "snippet": "First"},
@@ -143,6 +143,9 @@ class TestGetContextForLLM:
             {"section": "Risk Factors", "text": "Risk text here"},
         ]
         ctx = get_context_for_llm(state)
-        assert "[1]" in ctx
-        assert "[2]" in ctx
-        assert "[3]" in ctx
+        assert "[1]" not in ctx
+        assert "[2]" not in ctx
+        assert "[3]" not in ctx
+        assert "- Article One" in ctx
+        assert "- Article Two" in ctx
+        assert "- Risk Factors" in ctx
