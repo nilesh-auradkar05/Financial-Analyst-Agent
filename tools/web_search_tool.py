@@ -13,9 +13,7 @@ Usage:
         print(f"    Published: {article.published_date}")
 """
 
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 from langsmith import traceable
@@ -28,10 +26,14 @@ except ImportError:
     AsyncTavilyClient = None
     TAVILY_AVAILABLE = False
 
-# Add project root to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from configs.config import settings
+
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential
+    TENACITY_AVAILABLE = True
+except ImportError:
+    TENACITY_AVAILABLE = False
+
 
 # =============================================================================
 # DATA MODEL
@@ -47,6 +49,21 @@ class NewsArticle:
     snippet: str
     published_date: Optional[str] = None
     relevance_score: float = 0.0
+
+
+def _tavily_retry(func):
+    """Apply retry decorator if tenacity is available."""
+    if not TENACITY_AVAILABLE:
+        return func
+    return retry(
+        stop=stop_after_attempt(settings.retry.max_attempts),
+        wait=wait_exponential(
+            multiplier=1,
+            min=settings.retry.min_wait_seconds,
+            max=settings.retry.max_wait_seconds,
+        ),
+        reraise=True,
+    )(func)
 
 
 # =============================================================================
@@ -79,14 +96,17 @@ async def search_company_news(
 
     logger.info(f"Searching: {query}")
 
-    try:
+    @_tavily_retry
+    async def _do_search():
         client = AsyncTavilyClient(api_key=settings.tavily.api_key)
-
-        response = await client.search(
+        return await client.search(
             query=query,
             max_results=max_results,
             search_depth="basic",
         )
+
+    try:
+        response = await _do_search()
 
         articles = []
         for result in response.get("results", []):
@@ -116,32 +136,3 @@ def _extract_source(url: str) -> str:
     except Exception:
         return "Unknown"
 
-
-# =============================================================================
-# CLI
-# =============================================================================
-
-
-async def _main():
-    """Test search."""
-    import sys
-
-    query = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "Apple AAPL stock news"
-
-    print(f"\nSearching: {query}\n")
-
-    articles = await search_company_news(query)
-
-    if articles:
-        for i, article in enumerate(articles, 1):
-            print(f"{i}. {article.title}")
-            print(f"   Source: {article.source} | URL: {article.url}")
-            print(f"   {article.snippet[:100]}...")
-            print()
-    else:
-        print("No results found")
-
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(_main())

@@ -45,10 +45,12 @@ def test_search_filters_prefer_section_key_when_present():
     )
 
     assert filters.to_backend_filter() == {
-        "ticker": "AAPL",
-        "filing_type": "10-K",
-        "section_key": "risk_factors",
-        "filing_date": "2025-09-28",
+        "$and": [
+            {"ticker": "AAPL"},
+            {"filing_type": "10-K"},
+            {"section_key": "risk_factors"},
+            {"filing_date": "2025-09-28"},
+        ]
     }
 
 def test_search_sections_prefers_canonical_section_key(monkeypatch):

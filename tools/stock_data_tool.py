@@ -21,16 +21,15 @@ Use:
     info = get_company_info("AAPL")
     print(f"Market Cap: $`info.market_cap:,`")
 """
-import sys
+
+import asyncio
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 from langsmith import traceable
 from loguru import logger
 
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+from configs.config import settings
 
 try:
     import yfinance as yf
@@ -38,6 +37,12 @@ try:
 except ImportError:
     yf = None
     YFINANCE_AVAILABLE = False
+
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential
+    TENACITY_AVAILABLE = True
+except ImportError:
+    TENACITY_AVAILABLE = False
 
 # =============================================================================
 # DATA MODEL
@@ -86,6 +91,32 @@ class StockInfo:
 
         return " | ".join(parts)
 
+def _yfinance_fetch_sync(ticker: str) -> dict:
+    """
+    Sync fetch - runs in a thread via asyncio.to_thread
+
+    yfinance is fully synchronous and makes HTTP calls internally.
+    We wrap it in a thread to avoid blocking the event loop.
+    """
+    if yf is None:
+        raise RuntimeError("yfinance not installed")
+    stock = yf.Ticker(ticker)
+    return dict(stock.info)
+
+def _with_retry(func):
+    """Apply tenacity retry if available."""
+    if not TENACITY_AVAILABLE:
+        return func
+
+    return retry(
+        stop=stop_after_attempt(settings.retry.max_attempts),
+        wait=wait_exponential(
+            multiplier=1,
+            min=settings.retry.min_wait_seconds,
+            max=settings.retry.max_wait_seconds,
+        ),
+        reraise=True,
+    )(func)
 
 # =============================================================================
 # STOCK DATA FUNCTION
@@ -113,8 +144,8 @@ async def get_stock_data(ticker: str) -> StockInfo:
     logger.info(f"Fetching stock data for {ticker}")
 
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        fetcher = _with_retry(_yfinance_fetch_sync)
+        info = await asyncio.to_thread(fetcher, ticker)
 
         stock_info = StockInfo(
             ticker=ticker.upper(),
@@ -133,39 +164,9 @@ async def get_stock_data(ticker: str) -> StockInfo:
             sector=info.get("sector"),
             industry=info.get("industry"),
         )
-
         logger.info(f"{ticker}: ${stock_info.current_price}")
         return stock_info
 
     except Exception as e:
         logger.error(f"Failed to fetch {ticker}: {e}")
         return StockInfo(ticker=ticker, company_name=ticker, error=str(e))
-
-
-# =============================================================================
-# CLI
-# =============================================================================
-
-
-async def _main():
-    """Test stock data fetching."""
-    import sys
-
-    ticker = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
-
-    print(f"\nFetching data for {ticker}...\n")
-
-    info = await get_stock_data(ticker)
-
-    if info.success:
-        print(info.to_summary())
-        print(f"\n52-Week Range: ${info.fifty_two_week_low} - ${info.fifty_two_week_high}")
-        print(f"Industry: {info.industry}")
-        print(f"Recommendation: {info.recommendation}")
-    else:
-        print(f"Error: {info.error}")
-
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(_main())

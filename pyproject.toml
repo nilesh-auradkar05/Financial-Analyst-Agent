@@ -33,6 +33,7 @@ dependencies = [
     "pytest>=9.0.2",
     "langchain-ollama>=1.0.1",
     "ragas>=0.4.3",
+    "tenacity>=9.1.4",
 ]
 
 [project.scripts]

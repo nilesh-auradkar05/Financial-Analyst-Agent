@@ -34,15 +34,12 @@ Usage:
 
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
 import torch
 from langsmith import traceable
 from loguru import logger
 from transformers import PreTrainedTokenizerBase
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.config import settings
 
@@ -287,36 +284,3 @@ def analyze_sentiment_batch(texts: list[str]) -> list[SentimentResult]:
         List of SentimentResult objects.
     """
     return _get_default_analyzer().analyze_batch(texts)
-
-
-# Testing
-def _main():
-    """Test the sentiment analysis module."""
-
-    import sys
-
-    texts = sys.argv[1:] if len(sys.argv) > 1 else [
-        "Apple reported record-breaking quarterly revenue, beating analyst expectations.",
-        "The company faces significant regulatory challenges and potential fines.",
-        "Stock price remained stable amid market volatility.",
-    ]
-
-    print(f"\nAnalyzing {len(texts)} texts...\n")
-
-    results = analyze_sentiment_batch(texts)
-
-    for result in results:
-        emoji = "📈" if result.is_positive else "📉" if result.is_negative else "➡️"
-        print(f"{emoji} {result.label.upper()} ({result.confidence:.0%})")
-        print(f"   {result.text[:80]}...")
-        print()
-
-if __name__ == "__main__":
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
-        level="INFO",
-    )
-
-    _main()

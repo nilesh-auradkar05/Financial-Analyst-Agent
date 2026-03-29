@@ -31,18 +31,15 @@ Usage:
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
 """
 
-import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Local Imports
 from agents.graph import run_agent
@@ -73,10 +70,14 @@ from observability.metrics import (
     track_request,
 )
 from rag.ingestion import ingest_10k_for_ticker
-from rag.vector_store import get_vector_store
+from rag.vector_store import ChromaDBVectorStore, get_vector_store
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
+
+def _get_store() -> ChromaDBVectorStore:
+    """FastAPI dependency: Override in tests via app.dependency_overrides"""
+    return get_vector_store()
 
 
 # =============================================================================
@@ -125,17 +126,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Financial Analyst Agent System",
     description="AI-powered financial analysis agent",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -149,26 +150,21 @@ async def root():
     """API information."""
     return {
         "name": "Financial Analyst Agent System",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "description": "AI-powered financial analysis",
     }
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Info"])
-async def health():
+async def health(store: ChromaDBVectorStore = Depends(_get_store)):
     """Health check endpoint."""
     ollama_ok = await check_ollama_health()
-
-    store = get_vector_store()
     vector_ok = store.count >= 0
-
     langsmith_status = await check_langsmith_connection()
 
-    all_ok = ollama_ok and vector_ok
-
     return HealthResponse(
-        status="healthy" if all_ok else "degraded",
-        version="1.0.2",
+        status="healthy" if (ollama_ok and vector_ok) else "degraded",
+        version="1.1.0",
         timestamp=datetime.now(timezone.utc).isoformat(),
         components={
             "ollama": {"ok": ollama_ok},
@@ -188,9 +184,8 @@ async def metrics():
 
 
 @app.get("/stats", tags=["Info"])
-async def stats():
+async def stats(store: ChromaDBVectorStore = Depends(_get_store)):
     """Vector store statistics."""
-    store = get_vector_store()
     return {
         "vector_store": store.get_stats(),
         "run_store": run_store.get_stats(),
@@ -209,7 +204,6 @@ async def analyze(request: AnalysisRequest):
     Blocks until analysis is complete (may take 1-3 minutes).
     """
     ticker = request.ticker.upper()
-
     logger.info(f"Starting sync analysis for {ticker}")
 
     with track_request("POST", "/analyze"):
@@ -280,7 +274,6 @@ async def _run_analysis_job(job_id: str, ticker: str, company_name: Optional[str
     try:
         with track_agent_run(ticker):
             result = await run_agent(ticker, company_name)
-
             formatted = _format_response(result).model_dump()
             run_store.mark_completed(job_id, result=formatted)
     except Exception as e:
@@ -305,7 +298,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
     if state.get("investment_memo"):
         status = JobStatus.COMPLETED
     elif errors:
-        status = JobStatus.FAILED if not any(error.recoverable for error in errors) else JobStatus.COMPLETED
+        status = (JobStatus.FAILED if not any(error.recoverable for error in errors) else JobStatus.COMPLETED)
     else:
         status = JobStatus.FAILED
 
@@ -441,11 +434,9 @@ async def ingest_filing(request: IngestionRequest):
 
 
 @app.get("/ingest/{ticker}", tags=["Ingestion"])
-async def check_ingestion(ticker: str):
+async def check_ingestion(ticker: str, store: ChromaDBVectorStore = Depends(_get_store)):
     """Check if a ticker has been ingested."""
     ticker = ticker.upper()
-
-    store = get_vector_store()
     result = store.search_by_ticker("business", ticker, n_results=1)
 
     return {

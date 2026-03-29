@@ -36,23 +36,26 @@ Usage:
 import asyncio
 import html
 import re
-import sys
 import warnings
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
 import httpx
 from bs4 import XMLParsedAsHTMLWarning
 from langsmith import traceable
 from loguru import logger
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from tenacity import wait_exponential
 
 from configs.config import settings
 
 # Suppress XMLParsedAsHTMLWarning from BeautifulSoup
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
+try:
+    from tenacity import retry, retry_if_exception_type, stop_after_attempt
+    TENACITY_AVAILABLE = True
+except ImportError:
+    TENACITY_AVAILABLE = False
 
 # Data Models
 
@@ -140,6 +143,24 @@ class Filing:
     def success(self) -> bool:
         return self.error is None and len(self.sections) > 0
 
+def _http_retry(func):
+    """Apply tenacity retry decorator to httpx calls if available."""
+    if not TENACITY_AVAILABLE:
+        return func
+
+    return retry(
+        stop=stop_after_attempt(settings.retry.max_attempts),
+        wait=wait_exponential(
+            multiplier=1,
+            min=settings.retry.min_wait_seconds,
+            max=settings.retry.max_wait_seconds,
+        ),
+        retry=retry_if_exception_type(
+            (httpx.TimeoutException, httpx.HTTPStatusError),
+        ),
+        reraise=True,
+    )(func)
+
 # Sec Client
 
 class SECClient:
@@ -149,12 +170,13 @@ class SECClient:
 
     def __init__(self):
         self.user_agent = settings.sec.user_agent
+        self._timeout = settings.retry.http_timeout_seconds
         self._client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self):
         self._client = httpx.AsyncClient(
             headers={"User-Agent": self.user_agent},
-            timeout=30.0,
+            timeout=self._timeout,
             follow_redirects=True
         )
         return self
@@ -170,6 +192,13 @@ class SECClient:
             raise RuntimeError("Use 'async with SECClient():'")
         return self._client
 
+    @_http_retry
+    async def _get(self, url: str) -> httpx.Response:
+        """Single HTTP GET with retry."""
+        resp = await self.client.get(url)
+        resp.raise_for_status()
+        return resp
+
     @traceable(name="sec_get_cik", run_type="tool", tags=["sec"])
     async def get_cik(self, ticker: str) -> Optional[str]:
         """Get CIK number for a ticker."""
@@ -183,7 +212,7 @@ class SECClient:
                 return str(response.json().get("cik", "")).zfill(10)
 
             # Fallback to ticker lookup
-            response = await self.client.get(
+            response = await self._get(
                 "https://www.sec.gov/files/company_tickers.json"
             )
             response.raise_for_status()
@@ -212,7 +241,7 @@ class SECClient:
             return []
 
         try:
-            response = await self.client.get(
+            response = await self._get(
                 f"{self.BASE_URL}/submissions/CIK{cik}.json"
             )
             response.raise_for_status()
@@ -220,10 +249,9 @@ class SECClient:
 
             company_name = data.get("name", ticker)
             filings = data.get("filings", {}).get("recent", {})
-
-            results = []
             forms = filings.get("form", [])
 
+            results = []
             for i, form in enumerate(forms):
                 if form == filing_type and len(results) < count:
                     results.append(FilingMetaData(
@@ -249,7 +277,7 @@ class SECClient:
         logger.info(f"Downloading {metadata.filing_type} for {metadata.ticker}")
 
         try:
-            response = await self.client.get(metadata.filing_url)
+            response = await self._get(metadata.filing_url)
             response.raise_for_status()
             raw_text = response.text
 
@@ -268,8 +296,6 @@ class SECClient:
         clean = html.unescape(clean)
         clean = re.sub(r'\s+', ' ', clean)
 
-        sections: dict[str, FilingSection] = {}
-
         patterns = {
             "Business": r"Item\s*1[.\s]+Business",
             "Risk Factors": r"Item\s*1A[.\s]+Risk\s*Factors",
@@ -281,9 +307,9 @@ class SECClient:
         for name, pattern in patterns.items():
             for m in re.finditer(pattern, clean, re.IGNORECASE):
                 all_starts.append((name, m.start()))
-
         all_starts.sort(key=lambda t: t[1])
 
+        sections: dict[str, FilingSection] = {}
         for idx, (name, start) in enumerate(all_starts):
             end = all_starts[idx + 1][1] if idx + 1 < len(all_starts) else len(clean)
             content = clean[start:end].strip()
@@ -331,43 +357,3 @@ async def get_latest_10k(
             return None
 
         return await client.download_filing(filings[0])
-
-# =============================================================================
-# CLI / TESTING
-# =============================================================================
-
-
-async def _main():
-    """Test the SEC filings tool."""
-    import sys
-
-    ticker = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
-
-    print(f"\nFetching 10-K for {ticker}...\n")
-
-    filing = await get_latest_10k(ticker)
-
-    if filing and filing.success:
-        print(f"Company: {filing.metadata.company_name}")
-        print(f"Filing Date: {filing.metadata.filing_date}")
-        print(f"Sections: {list(filing.sections.keys())}")
-
-        for name, section in filing.sections.items():
-            print(f"\n{name}: {section.word_count} words")
-            print(f"Preview: {section.content[:200]}...")
-    else:
-        error = filing.error if filing else "Filing not found"
-        print(f"Error: {error}")
-
-
-if __name__ == "__main__":
-    # Configure logging
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
-        level="INFO",
-    )
-
-    # Run async main
-    asyncio.run(_main())

@@ -26,28 +26,27 @@ from __future__ import annotations
 
 import asyncio
 import re
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langsmith import traceable
 from loguru import logger
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
+from rag.sections import (
+    CANONICAL_SECTIONS,
+    DEFAULT_SECTIONS,
+    SECTION_ALIASES,
+    CanonicalSection,
+    canonicalize_section_name,
+    fallback_section,
+    normalize_section_token,
+)
 from rag.vector_store import IndexDocument, get_vector_store
 from tools.sec_filings_tool import Filing, get_latest_10k
 
 # Data Models
-
-@dataclass(frozen=True, slots=True)
-class CanonicalSection:
-    key: str
-    display_name: str
-    slug: str
 
 @dataclass(slots=True)
 class BuildDocumentsResult:
@@ -95,93 +94,6 @@ text_splitter = RecursiveCharacterTextSplitter(
     length_function=len,
 )
 
-CANONICAL_SECTIONS: dict[str, CanonicalSection] = {
-    "business": CanonicalSection(
-        key="business",
-        display_name="Business",
-        slug="business",
-    ),
-    "risk_factors": CanonicalSection(
-        key="risk_factors",
-        display_name="Risk Factors",
-        slug="risk_factors",
-    ),
-    "md&a": CanonicalSection(
-        key="md&a",
-        display_name="MD&A",
-        slug="md_and_a",
-    ),
-    "market_risk": CanonicalSection(
-        key="market_risk",
-        display_name="Market Risk",
-        slug="market_risk",
-    ),
-}
-
-SECTION_ALIASES: dict[str, tuple[str, ...]] = {
-    "business": (
-        "business",
-        "item 1",
-        "item1",
-        "company business",
-    ),
-    "risk_factors": (
-        "risk factors",
-        "risk factor",
-        "item 1a",
-        "item1a",
-    ),
-    "md&a": (
-        "md&a",
-        "management discussion and analysis",
-        "managements discussion and analysis",
-        "management discussion & analysis",
-        "item 7",
-        "item7",
-    ),
-    "market_risk": (
-        "market risk",
-        "quantitative and qualitative disclosures about market risk",
-        "item 7a",
-        "item7a",
-    ),
-}
-
-# Default sections to extract from 10-K filings
-DEFAULT_SECTIONS = [
-    "Business",
-    "Risk Factors",
-    "MD&A",
-    "Market Risk",
-]
-
-def _normalize_token(value: str) -> str:
-    token = value.strip().lower()
-    token = token.replace("&", " and ")
-    token = re.sub(r"[’'`]", "", token)
-    token = re.sub(r"[^a-z0-9]+", " ", token)
-    return re.sub(r"\s+", " ", token).strip()
-
-def canonicalize_section_name(section_name: str) -> CanonicalSection | None:
-    normalized = _normalize_token(section_name)
-
-    for section_key, aliases in SECTION_ALIASES.items():
-        for alias in aliases:
-            alias_token = _normalize_token(alias)
-            if normalized == alias_token or normalized.startswith(f"{alias_token} "):
-                return CANONICAL_SECTIONS[section_key]
-
-    return None
-
-def _fallback_section(section_name: str) -> CanonicalSection:
-    slug = re.sub(r"[^a-z0-9]+", "_", section_name.strip().lower()).strip("_")
-    key = slug or "unknown_section"
-    return CanonicalSection(
-        key=key,
-        display_name=section_name.strip() or "Unknown Section",
-        slug=key,
-    )
-
 def _clean_section_text(text: str) -> str:
     cleaned = text.replace("\r\n", "\n")
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
@@ -219,7 +131,7 @@ def build_index_documents(
 
     for section_name in requested_section_names:
         requested_descriptors.append(
-            canonicalize_section_name(section_name) or _fallback_section(section_name)
+            canonicalize_section_name(section_name) or fallback_section(section_name)
         )
 
     requested_keys = [descriptor.key for descriptor in requested_descriptors]
@@ -446,32 +358,3 @@ def get_ingestion_stats() -> dict:
     """
     store = get_vector_store()
     return store.get_stats()
-
-# Testing
-async def _main():
-    """Test the ingestion pipeline."""
-
-    ticker = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
-
-    print(f"\nIngesting 10-K for {ticker}...\n")
-
-    result = await ingest_10k_for_ticker(ticker)
-
-    if result.success:
-        print(" Success!")
-        print(f"   Chunks: {result.total_chunks}")
-        print(f"   Sections Found: {', '.join(result.sections_found)}")
-        print(f"   Sections Skipped: {', '.join(result.sections_skipped)}")
-        print(f"   Filing date: {result.filing_date}")
-    else:
-        print(f"Failed to ingest 10-K for {ticker}: {result.error}")
-
-if __name__ == "__main__":
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
-        level="INFO",
-    )
-
-    asyncio.run(_main())

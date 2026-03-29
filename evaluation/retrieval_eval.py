@@ -8,7 +8,7 @@ from typing import Any, Optional
 from loguru import logger
 
 from rag.evidence import EvidencePacket
-from rag.vector_store import SearchFilters, SearchResult, get_vector_store, canonical_section_key
+from rag.vector_store import SearchFilters, SearchResult, canonical_section_key, get_vector_store
 
 # FIXTURE / RESULT MODELS
 

@@ -13,12 +13,15 @@ def test_search_filters_map_section_name_to_existing_collection_key():
 
     where = filters.to_backend_filter()
 
+    # Multiple clauses → ChromaDB requires $and wrapping
     assert where == {
-        "ticker": "AAPL",
-        "filing_type": "10-K",
-        "section": "Risk Factors",
-        "filing_date": "2025-11-01",
-        "custom": "value",
+        "$and": [
+            {"ticker": "AAPL"},
+            {"filing_type": "10-K"},
+            {"section": "Risk Factors"},
+            {"filing_date": "2025-11-01"},
+            {"custom": "value"},
+        ]
     }
 
 

@@ -27,7 +27,6 @@ Usage:
 from __future__ import annotations
 
 import re
-import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -38,49 +37,18 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from loguru import logger
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from configs.config import settings
 from rag.embeddings import get_embeddings
 from rag.evidence import EvidencePacket
+from rag.sections import (
+    CANONICAL_SECTION_DISPLAY_NAMES,
+    SECTION_ALIASES,
+    canonical_section_display_name,
+    canonical_section_key,
+    normalize_section_token,
+)
 
 # DATA MODELS
-
-CANONICAL_SECTION_DISPLAY_NAMES: dict[str, str] = {
-    "business": "Business",
-    "risk_factors": "Risk Factors",
-    "md&a": "MD&A",
-    "market_risk": "Market Risk",
-}
-
-SECTION_ALIASES: dict[str, tuple[str, ...]] = {
-    "business": (
-        "business",
-        "item 1",
-        "item1",
-        "company business",
-    ),
-    "risk_factors": (
-        "risk factors",
-        "risk factor",
-        "item 1a",
-        "item1a",
-    ),
-    "md&a": (
-        "md&a",
-        "management discussion and analysis",
-        "managements discussion and analysis",
-        "management discussion & analysis",
-        "item 7",
-        "item7",
-    ),
-    "market_risk": (
-        "market risk",
-        "quantitative and qualitative disclosures about market risk",
-        "item 7a",
-        "item7a",
-    ),
-}
 
 @dataclass(frozen=True, slots=True)
 class IndexDocument:
@@ -272,26 +240,6 @@ def _normalize_section_token(value: str) -> str:
     token = token.replace("'", "")
     token = re.sub(r"[^a-z0-9]+", " ", token)
     return re.sub(r"\s+", " ", token).strip()
-
-def canonical_section_key(section_name: Optional[str]) -> Optional[str]:
-    if not section_name:
-        return None
-
-    normalized = _normalize_section_token(section_name)
-    for section_key, aliases in SECTION_ALIASES.items():
-        for alias in aliases:
-            alias_token = _normalize_section_token(alias)
-            if normalized == alias_token or normalized.startswith(f"{alias_token} "):
-                return section_key
-
-    return None
-
-def canonical_section_display_name(section_name: Optional[str]) -> Optional[str]:
-    key = canonical_section_key(section_name)
-    if key is None:
-        return None
-
-    return CANONICAL_SECTION_DISPLAY_NAMES[key]
 
 def _sanitize_metadata_value(value: Any) -> Any:
     if value is None:
@@ -849,86 +797,3 @@ def search_filings(query: str, ticker: Optional[str] = None, n_results: int = 5)
     if ticker:
         return store.search_by_ticker(query, ticker, n_results=n_results)
     return store.search(query, n_results=n_results)
-
-# Testing
-
-def _main():
-    """Test the vector store"""
-
-    print(f"\n{'='*60}")
-    print("Vector Store - Testing")
-    print(f"{'='*60}\n")
-
-    # Create vector store
-    print("1. Creating vector store....")
-    store = ChromaDBVectorStore()
-    print(f"    Collection: {store.collection_name}")
-    print(f"    Documents: {store.count}\n")
-
-    # Add sample documents
-    print("2. Adding Sample documents....")
-
-    sample_texts = [
-        "The company faces significant supply chain risks due to concentration of manufacturing in Asia.",
-        "Revenue grew 25% year-over-year driven by strong iPhone sales in emerging markets.",
-        "We are subject to risks associated with changes in tax laws and regulations globally.",
-        "Competition in the smartphone market has intensified with new entrants from China.",
-        "Currency fluctuations may materially impact our international revenue and profitability.",
-    ]
-
-    sample_metadatas = [
-        {"ticker": "AAPL", "section": "Risk Factors", "filing_date": "2024-10-31"},
-        {"ticker": "AAPL", "section": "MD&A", "filing_date": "2024-10-31"},
-        {"ticker": "AAPL", "section": "Risk Factors", "filing_date": "2024-10-31"},
-        {"ticker": "AAPL", "section": "Risk Factors", "filing_date": "2024-10-31"},
-        {"ticker": "AAPL", "section": "Risk Factors", "filing_date": "2024-10-31"},
-    ]
-
-    count = store.add_documents(
-        texts=sample_texts,
-        metadatas=sample_metadatas,
-    )
-    print(f"    Added {count} documents\n")
-
-    # Test Search
-    print("3. Testing search....")
-
-    queries = [
-        ("supply chain", None),
-        ("revenue growth", None),
-        ("tax risks", {"section": "Risk Factors"}),
-    ]
-
-    for query, filter_dict in queries:
-        results = store.search(query, n_results=3, filters=SearchFilters(**filter_dict))
-        print(f"\n    Query: '{query}' (filter: {filter_dict})")
-        print(f"     Found: {results.total_results} results in {results.search_time_ms:.1f}ms")
-
-        for chunk in results.chunks[:2]:
-            print(f"     - [{chunk.relevance_score:.2%}] {chunk.text[:60]}...")
-
-    # Test ticker search
-    print("\n4. Testing ticker search....")
-    results = store.search_by_ticker("risks", "AAPL", n_results=3)
-    print("     Query: 'risks' for AAPL")
-    print(f"    Found: {results.total_results} results")
-
-    # stats
-    print("\n5. Testing Ticker search....")
-    stats = store.get_stats()
-    for key, value in stats.items():
-        print(f"    {key}: {value}")
-
-    print(f"{'='*60}")
-    print("All tests completed!")
-    print(f"{'='*60}")
-
-if __name__ == "__main__":
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
-        level="INFO",
-    )
-
-    _main()

@@ -2,6 +2,9 @@
 Financial Analyst Agent Workflow Graph
 
 This module defines the LangGraph workflow for the Financial Analyst Agent.
+Design Pattern:
+    - Conditional routing after each node for graceful degradation
+    - Citation registry built *before* LLM call so indices are gounded
 
 Usage:
 ---------------
@@ -17,9 +20,8 @@ Usage:
 
 import asyncio
 import hashlib
-import sys
+import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -27,14 +29,14 @@ from langgraph.graph import END, START, StateGraph
 from langsmith import traceable
 from loguru import logger
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from agents.state import (
     AgentState,
     AgentStep,
     add_error,
     create_initial_state,
     get_context_for_llm,
+    get_data_availability,
+    has_fatal_error,
 )
 from models.llm import ANALYST_SYSTEM_PROMPT, get_llm
 from models.sentiment import analyze_sentiment_batch
@@ -60,7 +62,6 @@ async def research_news_node(state: AgentState) -> dict:
     """
     ticker = state["ticker"]
     company_name = state.get("company_name", ticker)
-
     logger.info(f"[research_news] Searching news for {ticker}")
 
     try:
@@ -106,8 +107,8 @@ async def fetch_stock_node(state: AgentState) -> dict:
     """
 
     ticker = state["ticker"]
-
     logger.info(f"[fetch_stock] Fetching data for {ticker}")
+
     try:
         # Get stock data
         data = await get_stock_data(ticker)
@@ -130,9 +131,7 @@ async def fetch_stock_node(state: AgentState) -> dict:
 
         # Update company name if not set
         company_name = state.get("company_name") or data.company_name
-
-        logger.info(f"[fetch_stock] Got data for {company_name}")
-        logger.info(f"[{ticker}] Price: ${data.current_price}")
+        logger.info(f"[fetch_stock] {company_name} `[{ticker}]` Price: ${data.current_price}")
 
         return {
             "stock_data": stock_data,
@@ -160,7 +159,6 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
     """
     ticker = state["ticker"]
     company_name = state.get("company_name", ticker)
-
     logger.info(f"[retrieve_filings] Searching filings for {ticker}")
 
     try:
@@ -175,7 +173,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         ]
 
         all_chunks = []
-        seen_texts = set()
+        seen_texts: set[str] = set()
 
         for query in queries:
             result = store.search_by_ticker(query, ticker=ticker, n_results=3)
@@ -201,7 +199,6 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
             }
             for c in top_chunks
         ]
-
         logger.info(f"[retrieve_filings] Retrieved {len(filing_chunks)} chunks")
 
         return {
@@ -229,8 +226,7 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
     """
     ticker = state["ticker"]
     articles = state.get("news_articles", [])
-
-    logger.info(f"[{ticker}] Analyzing articles sentiment....")
+    logger.info(f"[{ticker}] Analyzing sentiments on {len(articles)} articles")
 
     if not articles:
         return {
@@ -260,7 +256,6 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
             "negative_count": negative,
             "neutral_count": neutral,
         }
-
         logger.info(f"[{ticker}] Sentiment: {overall} ({positive}+/{negative}-)")
 
         return {
@@ -272,6 +267,51 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Sentiment analysis failed. Error: {e}")
         return add_error(state, "analyze_sentiment", str(e))
 
+def _build_citation_registry(state: AgentState) -> list[dict]:
+    """
+    Build an ordered list of citable sources from the state.
+
+    Returns a list of dicts like:
+        {"index": 1, "type": "news", "title": "....", "url": "...."}
+    """
+    registry: list[dict] = []
+    idx = 1
+
+    for article in state.get("news_articles", []):
+        registry.append({
+            "index": idx,
+            "type": "news",
+            "title": article.get("title", "Untitled"),
+            "url": article.get("url", ""),
+        })
+        idx += 1
+
+    for chunk in state.get("filing_chunks", [])[:5]:
+        section = chunk.get("section", "Unknown")
+        filing_type = chunk.get("filing_type", "10-K")
+        registry.append({
+            "index": idx,
+            "type": "sec_filing",
+            "title": f"{section} - {filing_type}",
+        })
+        idx += 1
+
+    return registry
+
+def _format_registry_for_prompt(registry: list[dict]) -> str:
+    """Render the registry as a numbered list for the LLM prompt."""
+    if not registry:
+        return ""
+    lines = ["", "## Available Sources (use these citation numbers exactly)"]
+    for entry in registry:
+        label = entry.get("title", "")
+        lines.append(f"[{entry['index']}] ({entry['type']}) {label}")
+    return "\n".join(lines)
+
+def _extract_used_citations(memo: str) -> set[int]:
+    """Pull citation indices like ``[1]``, ``[3]``, out of the memo text."""
+    return {int(m) for m in re.findall(r"\[(\d+)\]", memo)}
+
 @traceable(name="draft_memo", run_type="llm", tags=["agent"])
 async def draft_memo_node(state: AgentState) -> dict:
     """
@@ -279,6 +319,9 @@ async def draft_memo_node(state: AgentState) -> dict:
 
     Compiles all gathered data into context and prompts
     Qwen3-VL to generate a comprehensive investment memo.
+
+    Handles partial data: if sources are missing, the LLM is instructed
+    not to fabricate information for those gaps.
 
     Args:
         state: Current agent state
@@ -289,29 +332,49 @@ async def draft_memo_node(state: AgentState) -> dict:
 
     ticker = state["ticker"]
     company_name = state.get("company_name", ticker)
-
     logger.info(f"[draft_memo] Drafting memo for {ticker}")
 
     try:
-        # Build context from accumulated data
+        # 1. Data-availability check
+        availability = get_data_availability(state)
+        missing = [k.replace("has_", "") for k, v in availability.items() if not v]
+
+        # 2. Build citation registry BEFORE LLM call
+        registry = _build_citation_registry(state)
+
+        # 3. Build context from accumulated data
         context = get_context_for_llm(state)
-        logger.debug(f"[{ticker}] Context length: {len(context)} chars")
+        registry_block = _format_registry_for_prompt(registry)
+        logger.debug(f"[{ticker}] Context length: {len(context)} chars, "
+                     f"Citations: {len(registry)}, Missing: {missing}")
 
-        user_prompt = f"""Based on the following research, write a comprehensive investment memo for {company_name} ({ticker}).
+        # 4. Build prompt with data-gap awareness
+        disclaimer = ""
+        if missing:
+            disclaimer = (
+                "\n\nIMPORTANT - these data sources were UNAVAILABLE: "
+                + ", ".join(missing)
+                + ". Do NOY fabricate information for them. "
+                "State explicitly that the data was unavailable."
+            )
 
-        {context}
-
-        Your memo should include:
-            1. Executive Summary (2-3 sentences)
-            2. Company Overview
-            3. Recent News & Market Sentiment
-            4. Key Risk Factors (from SEC filings)
-            5. Financial Highlights
-            6. Investment Thesis (bullish and bearish cases)
-            7. Conclusion with recommendation
-
-        Format the memo in markdown. Include citation numbers [1], [2], etc. for claims.
-        Be objective and data-driven. Acknowledge uncertainties."""
+        user_prompt = (
+            f"Write a comprehensive investment memo for "
+            f"{company_name} ({ticker}).\n\n"
+            f"{context}"
+            f"{registry_block}\n\n"
+            "Structure:\n"
+            "1. Executive Summary (2-3 sentences)\n"
+            "2. Company Overview\n"
+            "3. Recent News & Market Sentiment\n"
+            "4. Key Risk Factors (from SEC filings)\n"
+            "5. Financial Highlights\n"
+            "6. Investment Thesis (bullish and bearish cases)\n"
+            "7. Conclusion with recommendation\n\n"
+            "Cite sources using ONLY the [N] numbers listed above. "
+            "Do not invent citation numbers."
+            f"{disclaimer}"
+        )
 
         llm = get_llm(temperature=0.7)
         logger.info(f"[{ticker}] Invoking LLM for memo generation...")
@@ -324,7 +387,7 @@ async def draft_memo_node(state: AgentState) -> dict:
 
         memo = getattr(response, "content", "")
 
-        # Extract executive summary
+        # 5. Extract executive summary
         exec_summary = ""
         if "Executive Summary" in memo:
             parts = memo.split("Executive Summary")
@@ -332,37 +395,22 @@ async def draft_memo_node(state: AgentState) -> dict:
                 summary = parts[1].split("\n\n")[0]
                 exec_summary = summary.strip().strip("#").strip()[:500]
 
-        # Build citations list
-        citations = []
-        citation_idx = 1
-
-        # Add news citations
-        for article in state.get("news_articles", []):
-            citations.append({
-                "index": citation_idx,
-                "type": "news",
-                "title": article.get("title", "Untitled"),
-                "url": article.get("url", ""),
-            })
-            citation_idx += 1
-
-        # Add filing citations
-        for chunk in state.get("filing_chunks", [])[:3]:
-            section = chunk.get("section", "")
-            filing_type = chunk.get("filing_type", "10-K")
-            citations.append({
-                "index": citation_idx,
-                "type": "sec_filing",
-                "title": f"{section} - {filing_type}",
-            })
-            citation_idx += 1
-
-        logger.info(f"[{ticker}] Memo generated ({len(memo)} chars)")
+        # 6. Verify citations
+        used = _extract_used_citations(memo)
+        valid_indices = {e["index"] for e in registry}
+        orphan_indices = used - valid_indices
+        if orphan_indices:
+            logger.warning(
+                f"[{ticker}] Memo references non-existent citations: "
+                f"citations used: {sorted(used)}, missing data: {missing}"
+            )
 
         return {
             "investment_memo": memo,
-            "executive_summary": exec_summary or f"Analysis complete for {company_name}",
-            "citations": citations,
+            "executive_summary": (
+                exec_summary or f"Analysis completed for {company_name}"
+            ),
+            "citations": registry,
             "current_step": AgentStep.COMPLETE.value,
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -372,6 +420,17 @@ async def draft_memo_node(state: AgentState) -> dict:
         return add_error(state, "draft_memo", str(e), recoverable=False)
 
 # Graph Construction
+
+def _route_after_node(next_node: str):
+    def router(state: AgentState) -> str:
+        if has_fatal_error(state):
+            logger.warning(
+                "Fatal error - skipping to draft_memo"
+                f"(world have gone to {next_node})"
+            )
+            return "draft_memo"
+        return next_node
+    return router
 
 def create_agent() -> Runnable[AgentState, AgentState]:
     """
@@ -394,16 +453,31 @@ def create_agent() -> Runnable[AgentState, AgentState]:
 
     # Define edges
     workflow.add_edge(START, "research_news")
-    workflow.add_edge("research_news", "fetch_stock")
-    workflow.add_edge("fetch_stock", "retrieve_filings")
-    workflow.add_edge("retrieve_filings", "analyze_sentiment")
-    workflow.add_edge("analyze_sentiment", "draft_memo")
+    workflow.add_conditional_edges(
+        "research_news",
+        _route_after_node("fetch_stock"),
+        {"fetch_stock": "fetch_stock", "draft_memo": "draft_memo"},
+    )
+    workflow.add_conditional_edges(
+        "fetch_stock",
+        _route_after_node("retrieve_filings"),
+        {"retrieve_filings": "retrieve_filings", "draft_memo": "draft_memo"},
+    )
+    workflow.add_conditional_edges(
+        "retrieve_filings",
+        _route_after_node("analyze_sentiment"),
+        {"analyze_sentiment": "analyze_sentiment", "draft_memo": "draft_memo"},
+    )
+    workflow.add_conditional_edges(
+        "analyze_sentiment",
+        _route_after_node("draft_memo"),
+        {"draft_memo": "draft_memo"},
+    )
     workflow.add_edge("draft_memo", END)
 
     # Compile the graph
     agent = workflow.compile()
-
-    logger.info("Agent Created Successfully")
+    logger.info("Agent Created with Conditional error routing Successfully")
 
     return agent
 
@@ -450,7 +524,6 @@ async def run_agent(
     # Calculate execution time
     exec_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
     final_state["execution_time_ms"] = exec_time
-
     logger.info(f"Analysis complete for {ticker} in ({exec_time:.0f}ms)")
 
     return final_state
@@ -470,84 +543,3 @@ def run_agent_sync(
         Final agent state
     """
     return asyncio.run(run_agent(ticker, company_name))
-
-# Testing
-async def _main():
-    """Test the agent."""
-    import sys
-
-    print(f"\n{'='*60}")
-    print("Financial Analyst Agent - Testing")
-    print(f"{'='*60}\n")
-
-    # Get ticker from args
-    ticker = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
-
-    print(f"Analyzing: {ticker}")
-    print("This may take a few minutes...\n")
-
-    # Run the agent
-    result = await run_agent(ticker)
-
-    # Print results
-    print(f"\n{'='*60}")
-    print("RESULTS")
-    print(f"{'='*60}\n")
-
-    print(f"Company: {result.get('company_name', 'N/A')}")
-    print(f"Status: {result.get('current_step')}")
-    print(f"Execution Time: {result.get('execution_time_ms', 0):.0f}ms")
-    print(f"Errors: {len(result.get('errors', []))}")
-
-    # Print errors if any
-    errors = result.get("errors", [])
-    if errors:
-        print("\nErrors encountered:")
-        for error in errors:
-            print(f"  - [{error['step']}] {error['message']}")
-
-    # Print data gathered
-    print("\nData Gathered:")
-    print(f"  - News Articles: {len(result.get('news_articles', []))}")
-    print(f"  - Filing Chunks: {len(result.get('filing_chunks', []))}")
-    print(f"  - Stock Data: {'Yes' if result.get('stock_data') else 'No'}")
-    print(f"  - Sentiment: {result.get('sentiment_result', {}).get('overall_sentiment', 'N/A')}")
-
-    # Print executive summary
-    exec_summary = result.get("executive_summary", "")
-    if exec_summary:
-        print(f"\n{'─'*60}")
-        print("EXECUTIVE SUMMARY")
-        print(f"{'─'*60}")
-        print(exec_summary[:500] + "..." if len(exec_summary) > 500 else exec_summary)
-
-    # Print memo preview
-    memo = result.get("investment_memo", "")
-    if memo:
-        print(f"\n{'─'*60}")
-        print("INVESTMENT MEMO (Preview)")
-        print(f"{'─'*60}")
-        print(memo[:1000] + "..." if len(memo) > 1000 else memo)
-
-    # Print citations
-    citations = result.get("citations", [])
-    if citations:
-        print(f"\n{'─'*60}")
-        print("CITATIONS")
-        print(f"{'─'*60}")
-        for cite in citations[:5]:
-            print(f"  [{cite['index']}] ({cite['type']}) {cite['title']}")
-
-    print(f"\n{'='*60}")
-    print("Analysis complete!")
-    print(f"{'='*60}")
-
-if __name__ == "__main__":
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{message}</cyan>",
-        level="INFO",
-    )
-
-    asyncio.run(_main())

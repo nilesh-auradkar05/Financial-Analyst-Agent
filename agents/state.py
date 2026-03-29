@@ -4,13 +4,9 @@ Agent State Management Module
 This module defines the state that flows through the LangGraph agent.
 """
 
-import sys
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Optional, Required, TypedDict
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # ENUMS
 
@@ -25,6 +21,7 @@ class AgentStep(str, Enum):
     RETRIEVE_FILINGS = "retrieve_filings"
     ANALYZE_SENTIMENT = "analyze_sentiment"
     DRAFT_MEMO = "draft_memo"
+    VERIFY_MEMO = "verify_memo"
     COMPLETE = "complete"
     ERROR = "error"
 
@@ -124,6 +121,29 @@ def add_error(
         "current_step": AgentStep.ERROR.value if not recoverable else state.get("current_step"),
     }
 
+def has_fatal_error(state: AgentState) -> bool:
+    """True when any non-recoverable error has been recorded."""
+    return any(
+        not e.get("recoverable", True)
+        for e in state.get("errors", [])
+    )
+
+def get_data_availability(state: AgentState) -> dict[str, bool]:
+    """
+    Summarize which data sources succeeded.
+
+    Used by `draft_memo_node` to acknowledge gaps
+    instead of generating text that looks complete but isn't.
+    """
+    return {
+        "has_stock_data": bool(state.get("stock_data")),
+        "has_news": bool(state.get("news_articles")),
+        "has_filings": bool(state.get("filing_chunks")),
+        "has_sentiment": bool(
+            state.get("sentiment_result", {}).get("overall_sentiment")
+        ),
+    }
+
 def get_context_for_llm(state: AgentState) -> str:
     """Compile all data into context string for LLM."""
     parts = []
@@ -135,7 +155,7 @@ def get_context_for_llm(state: AgentState) -> str:
         parts.append("## Stock Data")
         parts.append(f"Company: {stock.get('company_name', 'N/A')}")
         parts.append(f"Price: ${stock.get('current_price', 'N/A')}")
-        parts.append(f"Market Cap: ${stock.get('market_cap', 'N/A'):,}" if stock.get('market_cap') else "")
+        parts.append(f"Market Cap: ${stock.get('market_cap', 'N/A'):,}" if stock.get('market_cap') else "N/A")
         parts.append(f"P/E Ratio: {stock.get('pe_ratio', 'N/A')}")
         parts.append(f"Sector: {stock.get('sector', 'N/A')}")
         parts.append(f"52-Week Range: ${stock.get('fifty_two_week_low', 'N/A')} - ${stock.get('fifty_two_week_high', 'N/A')}")

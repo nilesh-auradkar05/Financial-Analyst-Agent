@@ -24,14 +24,8 @@ Usage:
 
 """
 
-import asyncio
-import sys
-from pathlib import Path
-
 import httpx
 from langchain_ollama import ChatOllama
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.config import settings
 
@@ -99,18 +93,21 @@ async def check_ollama_health() -> bool:
 # =============================================================================
 
 
-ANALYST_SYSTEM_PROMPT = """You are a senior financial analyst at a top-tier investment firm.
+ANALYST_SYSTEM_PROMPT = """\
+You are a senior financial analyst at a top-tier investment firm.
 Your role is to provide comprehensive, data-driven analysis of companies.
 
 Guidelines:
 - Be specific and use actual numbers from the provided data
-- Cite sources using [N] notation
+- Cite sources using [N] notation matching the source registry provided
 - Present balanced analysis including both opportunities and risks
 - Use professional, clear language
 - Structure your analysis with clear sections"""
 
 
-MEMO_TEMPLATE = """Based on the following research data, write a comprehensive investment memo for {company_name} ({ticker}).
+MEMO_TEMPLATE = """\
+Based on the following research data, write a comprehensive investment \
+memo for {company_name} ({ticker}).
 
 {context}
 
@@ -124,32 +121,3 @@ Structure your memo with these sections:
 7. Conclusion
 
 Use [N] citations when referencing specific data points."""
-
-
-# =============================================================================
-# CLI TEST
-# =============================================================================
-
-
-async def _main():
-    """Test LLM connection."""
-    print("Checking Ollama health...")
-
-    healthy = await check_ollama_health()
-
-    if healthy:
-        print(f"Ollama is running with model: {settings.ollama.llm_model}")
-
-        print("\nTesting generation...")
-        llm = get_llm()
-        response = await llm.ainvoke("Say 'Hello, Alpha Analyst!' in exactly those words.")
-        print(f"Response: {response.content}")
-    else:
-        print(" Ollama not available")
-        print(f"   Expected model: {settings.ollama.llm_model}")
-        print(f"   URL: {settings.ollama.base_url}")
-
-
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(_main())

@@ -63,6 +63,20 @@ class AnalysisRequest(BaseModel):
         default=None,
         description="Company name (Optional, auto-fetched if not provided)",
     )
+    include_filing_analysis: bool = Field(
+        default=True,
+        description="Include SEC filing analysis in the report",
+    )
+    include_news_sentiment: bool = Field(
+        default=True,
+        description="Include news sentiment analysis",
+    )
+    max_news_articles: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum news articles to analyze",
+    )
 
 class IngestionRequest(BaseModel):
     """Request to ingest SEC filings for a company.
@@ -77,6 +91,14 @@ class IngestionRequest(BaseModel):
         min_length=1,
         max_length=10,
         description="Stock ticker symbol",
+    )
+    filing_type: str = Field(
+        default="10-K",
+        description="SEC filing type to ingest",
+    )
+    force_refresh: bool = Field(
+        default=False,
+        description="Re-ingest even if data already exists",
     )
 
 # RESPONSE MODELS

@@ -1,78 +1,48 @@
 """
-Financial Analyst Agent System Test Configuration
-"""
+Shared test configuration and fixtures.
 
-import sys
-from pathlib import Path
+No sys.path hacks — relies on ``pip install -e .`` (item 12).
+"""
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-
-# =============================================================================
-# CLI OPTIONS
-# =============================================================================
+# ── CLI options & markers ───────────────────────────────────────────────
 
 def pytest_addoption(parser):
-    """Add custom CLI options."""
-    parser.addoption(
-        "--run-slow",
-        action="store_true",
-        default=False,
-        help="Run slow tests that execute the agent",
-    )
-    parser.addoption(
-        "--run-integration",
-        action="store_true",
-        default=False,
-        help="Run integration tests requiring external services",
-    )
+    parser.addoption("--run-slow", action="store_true", default=False, help="Run slow tests")
+    parser.addoption("--run-integration", action="store_true", default=False, help="Run integration tests")
 
 
 def pytest_configure(config):
-    """Add custom markers."""
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (requires --run-slow)"
-    )
-    config.addinivalue_line(
-        "markers", "integration: marks tests requiring external services"
-    )
+    config.addinivalue_line("markers", "slow: marks tests as slow (requires --run-slow)")
+    config.addinivalue_line("markers", "integration: marks tests requiring external services")
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip marked tests unless explicitly enabled."""
-    # Skip slow tests
     if not config.getoption("--run-slow"):
-        skip_slow = pytest.mark.skip(reason="Need --run-slow option")
+        skip = pytest.mark.skip(reason="Need --run-slow option")
         for item in items:
             if "slow" in item.keywords:
-                item.add_marker(skip_slow)
-    
-    # Skip integration tests
+                item.add_marker(skip)
     if not config.getoption("--run-integration"):
-        skip_integration = pytest.mark.skip(reason="Need --run-integration option")
+        skip = pytest.mark.skip(reason="Need --run-integration option")
         for item in items:
             if "integration" in item.keywords:
-                item.add_marker(skip_integration)
+                item.add_marker(skip)
 
 
-# =============================================================================
-# SHARED FIXTURES
-# =============================================================================
-
+# ── Shared fixtures ─────────────────────────────────────────────────────
 
 @pytest.fixture
 def sample_ticker():
-    """Default test ticker."""
     return "AAPL"
 
 
 @pytest.fixture
 def sample_stock_data():
-    """Sample stock data fixture."""
     return {
         "ticker": "AAPL",
+        "company_name": "Apple Inc.",
         "current_price": 185.50,
         "previous_close": 184.25,
         "market_cap": 2900000000000,
@@ -81,31 +51,31 @@ def sample_stock_data():
         "fifty_two_week_high": 199.62,
         "fifty_two_week_low": 164.08,
         "volume": 54000000,
-        "average_volume": 58000000,
+        "sector": "Technology",
+        "industry": "Consumer Electronics",
     }
 
 
 @pytest.fixture
 def sample_news_articles():
-    """Sample news articles fixture."""
     return [
         {
             "title": "Apple Reports Record Q4 Earnings",
-            "snippet": "Apple Inc. reported record quarterly revenue...",
+            "snippet": "Apple Inc. reported record quarterly revenue of $94.8B.",
             "url": "https://example.com/apple-q4",
             "source": "Reuters",
             "published_date": "2024-01-15",
         },
         {
             "title": "iPhone 16 Sales Exceed Expectations",
-            "snippet": "The latest iPhone models are selling faster...",
+            "snippet": "The latest iPhone models are selling faster than prior launches.",
             "url": "https://example.com/iphone-sales",
             "source": "Bloomberg",
             "published_date": "2024-01-14",
         },
         {
             "title": "Apple Services Revenue Hits New High",
-            "snippet": "Apple's services segment continues to grow...",
+            "snippet": "Apple's services segment reached $23B in quarterly revenue.",
             "url": "https://example.com/services",
             "source": "CNBC",
             "published_date": "2024-01-13",
@@ -115,94 +85,65 @@ def sample_news_articles():
 
 @pytest.fixture
 def sample_filing_chunks():
-    """Sample SEC filing chunks fixture."""
     return [
         {
-            "text": "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories.",
+            "text": "Apple Inc. designs, manufactures, and markets smartphones.",
             "section": "Business",
             "ticker": "AAPL",
             "filing_type": "10-K",
+            "filing_date": "2024-10-31",
+            "relevance_score": 0.92,
         },
         {
-            "text": "The Company's products include iPhone, Mac, iPad, and Wearables, Home and Accessories.",
-            "section": "Business",
-            "ticker": "AAPL",
-            "filing_type": "10-K",
-        },
-        {
-            "text": "Global and regional economic conditions could materially adversely affect the Company.",
+            "text": "Global economic conditions could adversely affect the Company.",
             "section": "Risk Factors",
             "ticker": "AAPL",
             "filing_type": "10-K",
+            "filing_date": "2024-10-31",
+            "relevance_score": 0.88,
         },
     ]
 
 
 @pytest.fixture
 def sample_sentiment_result():
-    """Sample sentiment analysis result fixture."""
     return {
-        "label": "positive",
-        "confidence": 0.85,
-        "scores": {
-            "positive": 0.85,
-            "negative": 0.05,
-            "neutral": 0.10,
-        },
+        "overall_sentiment": "positive",
+        "positive_count": 2,
+        "negative_count": 0,
+        "neutral_count": 1,
     }
 
 
 @pytest.fixture
 def sample_agent_state(
-    sample_ticker,
-    sample_stock_data,
-    sample_news_articles,
-    sample_filing_chunks,
-    sample_sentiment_result,
+    sample_ticker, sample_stock_data, sample_news_articles,
+    sample_filing_chunks, sample_sentiment_result,
 ):
-    """Complete sample agent state fixture."""
+    """A fully-populated agent state for testing downstream consumers."""
     return {
         "ticker": sample_ticker,
+        "company_name": "Apple Inc.",
         "stock_data": sample_stock_data,
         "news_articles": sample_news_articles,
         "filing_chunks": sample_filing_chunks,
         "sentiment_result": sample_sentiment_result,
-        "executive_summary": "Apple demonstrates strong fundamentals...",
-        "investment_memo": """
-# Investment Memo: AAPL
-
-## Executive Summary
-Apple Inc. (AAPL) continues to demonstrate market leadership...
-
-## Company Overview
-Apple designs and sells consumer electronics...
-
-## Financial Analysis
-Revenue of $394B with 44% gross margin...
-
-## Risk Factors
-Supply chain and regulatory risks...
-
-## Conclusion
-Rating: BUY [1][2][3]
-        """,
+        "investment_memo": "# Memo\n\n## Executive Summary\nStrong [1] performance [2].",
+        "executive_summary": "Strong performance across segments.",
         "citations": [
-            {"id": 1, "source": "SEC 10-K", "text": "Official filing"},
-            {"id": 2, "source": "Reuters", "text": "News article"},
-            {"id": 3, "source": "YFinance", "text": "Stock data"},
+            {"index": 1, "type": "news", "title": "Apple Q4 Earnings", "url": "https://example.com"},
+            {"index": 2, "type": "sec_filing", "title": "Risk Factors — 10-K"},
         ],
         "errors": [],
+        "current_step": "complete",
+        "started_at": "2024-01-15T10:00:00Z",
+        "completed_at": "2024-01-15T10:01:30Z",
+        "execution_time_ms": 90000.0,
     }
-
-
-# =============================================================================
-# MOCK FIXTURES
-# =============================================================================
 
 
 @pytest.fixture
 def mock_ollama_response():
-    """Mock Ollama LLM response."""
     class MockResponse:
         content = "This is a mock LLM response for testing."
     return MockResponse()
@@ -210,7 +151,6 @@ def mock_ollama_response():
 
 @pytest.fixture
 def mock_embedding_vector():
-    """Mock embedding vector (4096 dimensions for qwen3-embedding:4b)."""
     import random
     random.seed(42)
-    return [random.random() for _ in range(4096)]
+    return [random.random() for _ in range(2560)]

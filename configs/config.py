@@ -2,7 +2,6 @@
 This file contains the configuration for the Financial Analyst Agent.
 """
 
-from email.policy import default
 from pathlib import Path
 from typing import Optional
 
@@ -211,6 +210,25 @@ class SECSettings(BaseSettings):
         default=0.1, description="Delay between SEC requests (seconds)"
     )
 
+class RetrySettings(BaseSettings):
+    """Retry/timeout policy for external service calls.
+
+    Applied to SEC EDGAR, Tavily, and yfinance via `tenancity`.
+    """
+    model_config = SettingsConfigDict(
+        env_prefix="RETRY_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    max_attempts: int = Field(default=3, description="Max retry attempts")
+    min_wait_seconds: float = Field(default=1.0, description="Initial Backoff")
+    max_wait_seconds: float = Field(default=10.0, description="Max backoff")
+    http_timeout_seconds: float = Field(
+        default=30.0, description="Default httpx timeout",
+    )
+
 
 """ MAIN Settings Class"""
 
@@ -243,11 +261,22 @@ class Settings(BaseSettings):
     chroma: ChromaDBSettings = Field(default_factory=ChromaDBSettings)
     finbert: FinBERTSettings = Field(default_factory=FinBERTSettings)
     sec: SECSettings = Field(default_factory=SECSettings)
+    retry: RetrySettings = Field(default_factory=RetrySettings)
 
     # Application-level settings
     debug: bool = Field(default=True, description="Enable debug mode")
-
     log_level: str = Field(default="INFO", description="Logging level")
+    cors_allow_origins: list[str] = Field(
+        default=[
+            "https://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8000",
+        ],
+        description=(
+            "Allowed CORS origins. Override via CORS_ALLOWED_ORIGINS "
+            "as a JSON list or comma-seperated string."
+        ),
+    )
 
 
 settings = Settings()
@@ -260,8 +289,7 @@ def validate_settings() -> list[str]:
     Returns:
         List of warning messages for missing/invalid configuration.
     """
-    warnings = []
-
+    warnings: list[str] = []
     if not settings.tavily.api_key:
         warnings.append(
             "TAVILY_API_KEY not set. Web Search will not wark."
