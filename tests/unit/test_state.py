@@ -35,6 +35,23 @@ class TestCreateInitialState:
         state = create_initial_state("GOOG", company_name="Alphabet Inc.")
         assert state["company_name"] == "Alphabet Inc."
 
+    def test_analysis_controls_default(self):
+        state = create_initial_state("AAPL")
+        assert state["include_filing_analysis"] is True
+        assert state["include_news_sentiment"] is True
+        assert state["max_news_articles"] == 10
+
+    def test_analysis_controls_override(self):
+        state = create_initial_state(
+            "AAPL",
+            include_filing_analysis=False,
+            include_news_sentiment=False,
+            max_news_articles=3,
+        )
+        assert state["include_filing_analysis"] is False
+        assert state["include_news_sentiment"] is False
+        assert state["max_news_articles"] == 3
+
 
 # Medium 
 

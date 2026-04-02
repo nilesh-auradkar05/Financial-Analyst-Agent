@@ -89,14 +89,18 @@ class AgentState(TypedDict, total=False):
 def create_initial_state(
     ticker: str,
     company_name: Optional[str] = None,
+    *,
+    include_filing_analysis: bool = True,
+    include_news_sentiment: bool = True,
+    max_news_articles: int = 10,
 ) -> AgentState:
     """Create initial state for agent run."""
     return AgentState(
         ticker=ticker.upper(),
         company_name=company_name or "",
-        include_filing_analysis=True,
-        include_news_sentiment=True,
-        max_news_articles=10,
+        include_filing_analysis=include_filing_analysis,
+        include_news_sentiment=include_news_sentiment,
+        max_news_articles=max_news_articles,
         news_articles=[],
         stock_data={},
         filing_chunks=[],

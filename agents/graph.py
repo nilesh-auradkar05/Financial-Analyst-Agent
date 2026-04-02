@@ -682,7 +682,13 @@ async def run_agent(
     logger.info(f"Starting analysis for {ticker}")
 
     # Create initial state
-    state = create_initial_state(ticker, company_name)
+    state = create_initial_state(
+        ticker,
+        company_name,
+        include_filing_analysis=include_filing_analysis,
+        include_news_sentiment=include_news_sentiment,
+        max_news_articles=max_news_articles,
+    )
 
     # Create agent
     agent = create_agent()
