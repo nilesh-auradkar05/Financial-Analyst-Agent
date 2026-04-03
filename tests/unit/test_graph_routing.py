@@ -6,7 +6,7 @@ decisions WITHOUT calling external services.
 """
 
 from agents.graph import _route_after_node
-from agents.state import AgentStep, add_error, create_initial_state, has_fatal_error
+from agents.state import add_error, create_initial_state, has_fatal_error
 
 
 class TestRouteAfterNode:

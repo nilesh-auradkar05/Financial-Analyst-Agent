@@ -69,7 +69,7 @@ class TestValidation:
 
     def test_missing_api_keys_produce_warnings(self):
         """Without API keys set, we should get warnings."""
-        s = Settings(
+        _ = Settings(
             tavily={"api_key": None},
             langsmith={"api_key": None},
         )

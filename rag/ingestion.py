@@ -24,7 +24,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,13 +34,10 @@ from langsmith import traceable
 from loguru import logger
 
 from rag.sections import (
-    CANONICAL_SECTIONS,
     DEFAULT_SECTIONS,
-    SECTION_ALIASES,
     CanonicalSection,
     canonicalize_section_name,
     fallback_section,
-    normalize_section_token,
 )
 from rag.vector_store import IndexDocument, get_vector_store
 from tools.sec_filings_tool import Filing, get_latest_10k

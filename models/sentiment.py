@@ -32,7 +32,6 @@ Usage:
     analyzed = analyze_articles(articles)
 """
 
-import sys
 from dataclasses import dataclass, field
 from typing import Optional
 

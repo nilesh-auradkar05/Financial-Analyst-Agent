@@ -1,1 +1,2 @@
-from evaluation.grounding import GroundingCheckResult, evaluate_memo_grounding
+from evaluation.grounding import GroundingCheckResult as GroundingCheckResult
+from evaluation.grounding import evaluate_memo_grounding as evaluate_memo_grounding

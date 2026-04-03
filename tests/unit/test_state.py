@@ -4,7 +4,6 @@ Replaces the inline test logic that was in graph.py's old _main() block.
 """
 
 from agents.state import (
-    AgentState,
     AgentStep,
     add_error,
     create_initial_state,
@@ -13,7 +12,7 @@ from agents.state import (
     has_fatal_error,
 )
 
-# Easy 
+# Easy
 
 class TestCreateInitialState:
     def test_ticker_uppercased(self):
@@ -53,7 +52,7 @@ class TestCreateInitialState:
         assert state["max_news_articles"] == 3
 
 
-# Medium 
+# Medium
 
 class TestAddError:
     def test_appends_error(self):

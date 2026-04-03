@@ -46,24 +46,24 @@ class TestHealthCheck:
             "models": [{"name": "qwen3-vl:8b"}],
         }
 
-        with patch("models.llm.httpx.AsyncClient") as MockClient:
+        with patch("models.llm.httpx.AsyncClient") as mockclient:
             # The key: __aenter__ must return the SAME instance
             # we configure, otherwise async-with creates a new one
             instance = AsyncMock()
             instance.get = AsyncMock(return_value=mock_resp)
             instance.__aenter__.return_value = instance
-            MockClient.return_value = instance
+            mockclient.return_value = instance
 
             result = await check_ollama_health()
             assert result is True
 
     @pytest.mark.asyncio
     async def test_unhealthy_server(self):
-        with patch("models.llm.httpx.AsyncClient") as MockClient:
+        with patch("models.llm.httpx.AsyncClient") as mockclient:
             instance = AsyncMock()
             instance.get = AsyncMock(side_effect=Exception("connection refused"))
             instance.__aenter__.return_value = instance
-            MockClient.return_value = instance
+            mockclient.return_value = instance
 
             result = await check_ollama_health()
             assert result is False
@@ -77,11 +77,11 @@ class TestHealthCheck:
             "models": [{"name": "llama2:7b"}],
         }
 
-        with patch("models.llm.httpx.AsyncClient") as MockClient:
+        with patch("models.llm.httpx.AsyncClient") as mockclient:
             instance = AsyncMock()
             instance.get = AsyncMock(return_value=mock_resp)
             instance.__aenter__.return_value = instance
-            MockClient.return_value = instance
+            mockclient.return_value = instance
 
             result = await check_ollama_health()
             assert result is False

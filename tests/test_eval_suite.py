@@ -297,7 +297,7 @@ async def main():
         print("  Ragas: ❌ (pip install ragas)")
 
     try:
-        from deepeval import evaluate
+        from deepeval import evaluate  # noqa: F401
         print("  DeepEval: ✅")
     except ImportError:
         print("  DeepEval: ❌ (pip install deepeval)")

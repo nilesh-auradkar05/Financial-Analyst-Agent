@@ -33,7 +33,6 @@ Usage:
     print(f"Sections: list(filing.sections.keys())")
 """
 
-import asyncio
 import html
 import re
 import warnings

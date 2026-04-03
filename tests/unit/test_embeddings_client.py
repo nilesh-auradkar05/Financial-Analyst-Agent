@@ -11,9 +11,7 @@ from rag.embeddings import (
     EmbeddingResult,
     EmbeddingsClient,
     embed_query,
-    embed_query_async,
     embed_texts,
-    embed_texts_async,
     get_embeddings,
 )
 

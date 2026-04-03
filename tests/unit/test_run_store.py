@@ -1,8 +1,5 @@
 """Tests for api.run_store — persistent job state."""
 
-import json
-from pathlib import Path
-
 import pytest
 
 from api.run_store import FileBackedRunStore, RunRecord
@@ -96,7 +93,7 @@ class TestEdgeCases:
         assert record.ticker == "AAPL"
 
     def test_company_name_stored(self, tmp_store):
-        record = tmp_store.create_run("j1", "AAPL", company_name="Apple Inc.")
+        _ = tmp_store.create_run("j1", "AAPL", company_name="Apple Inc.")
         fetched = tmp_store.get_run("j1")
         assert fetched.company_name == "Apple Inc."
 

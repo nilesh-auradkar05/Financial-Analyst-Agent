@@ -3,8 +3,6 @@
 Uses FastAPI's TestClient — no live server needed.
 """
 
-from unittest.mock import MagicMock
-
 import pytest
 from fastapi.testclient import TestClient
 
