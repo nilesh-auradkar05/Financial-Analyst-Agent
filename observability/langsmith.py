@@ -4,7 +4,6 @@ FINANCIAL ANALYST AGENT SYSTEM - LANGSMITH INTEGRATION
 """
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -21,10 +20,6 @@ except ImportError:
     Client = None # type: ignore
     LangChainTracer = None # type: ignore
     LANGSMITH_AVAILABLE = False
-
-import sys
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from configs.config import settings
 

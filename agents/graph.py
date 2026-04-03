@@ -475,16 +475,6 @@ async def draft_memo_node(state: AgentState) -> dict:
             f"[{ticker}] Memo generated ({len(memo)} chars, used_citations={sorted(used_citations)})"
         )
 
-        # 6. Verify citations
-        used = _extract_used_citations(memo)
-        valid_indices = {e["index"] for e in registry}
-        orphan_indices = used - valid_indices
-        if orphan_indices:
-            logger.warning(
-                f"[{ticker}] Memo references non-existent citations: "
-                f"citations used: {sorted(used)}, missing data: {missing}"
-            )
-
         return {
             "investment_memo": memo,
             "executive_summary": (

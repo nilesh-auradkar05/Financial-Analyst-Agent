@@ -41,11 +41,8 @@ from configs.config import settings
 from rag.embeddings import get_embeddings
 from rag.evidence import EvidencePacket
 from rag.sections import (
-    CANONICAL_SECTION_DISPLAY_NAMES,
-    SECTION_ALIASES,
     canonical_section_display_name,
     canonical_section_key,
-    normalize_section_token,
 )
 
 # DATA MODELS
@@ -232,14 +229,6 @@ class RetrievalStore(Protocol):
 
     def get_stats(self) -> dict[str, Any]:
         ...
-
-def _normalize_section_token(value: str) -> str:
-    token = value.strip().lower()
-    token = token.replace("&", " and ")
-    token = token.replace("’", "")
-    token = token.replace("'", "")
-    token = re.sub(r"[^a-z0-9]+", " ", token)
-    return re.sub(r"\s+", " ", token).strip()
 
 def _sanitize_metadata_value(value: Any) -> Any:
     if value is None:
@@ -779,21 +768,3 @@ def get_vector_store() -> ChromaDBVectorStore:
         _default_store = ChromaDBVectorStore()
 
     return _default_store
-
-def search_filings(query: str, ticker: Optional[str] = None, n_results: int = 5) -> SearchResult:
-    """
-    Search SEC filings. (Wrapper convenience function)
-
-    Args:
-        query: Search query
-        ticker: Optional ticker filter
-        n_results: Maximum results
-
-    Returns:
-        SearchResult with matching chunks
-    """
-    store = get_vector_store()
-
-    if ticker:
-        return store.search_by_ticker(query, ticker, n_results=n_results)
-    return store.search(query, n_results=n_results)

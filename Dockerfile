@@ -22,21 +22,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install poetry==2.2.1
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml uv.lock ./
 
 # Install dependencies (no dev, no root package yet)
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-root --only main --no-interaction --no-ansi
+RUN uv sync --frozen --no-install-project --group api
 
 # Copy application code
 COPY . .
 
 # Install dependencies without packaging the app
-RUN poetry install --no-root --only main --no-interaction --no-ansi
+RUN uv sync --frozen --group api
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime
@@ -55,9 +53,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN groupadd --gid 1000 appgroup \
     && useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser
 
-# Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY --chown=appuser:appgroup . .
@@ -65,6 +62,9 @@ COPY --chown=appuser:appgroup . .
 # Create data directories
 RUN mkdir -p /app/data/chroma /app/data/filings \
     && chown -R appuser:appgroup /app/data
+
+# Put the venv on PATH
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Switch to non-root user
 USER appuser
@@ -78,4 +78,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the application
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-    
