@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, cast
 
 from langchain_ollama import OllamaEmbeddings
 from loguru import logger
@@ -279,7 +279,7 @@ async def embed_texts_async(texts: list[str]) -> EmbeddingResult:
         EmbeddingResult with vectors
     """
     async with EmbeddingsClient() as client:
-        return await client.embed_texts(texts)
+        return cast(EmbeddingResult, await client.embed_texts(texts))
 
 async def embed_query_async(query: str) -> list[float]:
     """
@@ -292,4 +292,4 @@ async def embed_query_async(query: str) -> list[float]:
         Query embedding vector
     """
     async with EmbeddingsClient() as client:
-        return await client.embed_query(query)
+        return cast(list[float], await client.embed_query(query))

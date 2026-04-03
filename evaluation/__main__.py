@@ -1,7 +1,6 @@
 """Allow running as: python -m evaluation"""
-import asyncio
 
-from evaluation import main
+from evaluation.retrieval_main import main
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

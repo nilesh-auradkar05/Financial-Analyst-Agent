@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -19,7 +20,7 @@ class StubCollection:
 class StubVectorStore:
     def __init__(self) -> None:
         self._collection = StubCollection()
-        self.documents = []
+        self.documents: list[Any] = []
         self.deleted_tickers: list[str] = []
 
     def add_documents(self, documents=None, *, texts=None, metadatas=None, ids=None):

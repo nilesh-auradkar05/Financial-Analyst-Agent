@@ -30,7 +30,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Protocol
+from typing import Any, Optional, Protocol, cast
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -385,9 +385,9 @@ class ChromaDBVectorStore:
         embeddings = self._embeddings.embed_documents(payload_texts)
         self._collection.add(
             ids=payload_ids,
-            embeddings=embeddings,
+            embeddings=cast(Any, embeddings),
             documents=payload_texts,
-            metadatas=payload_metadatas,
+            metadatas=cast(Any, payload_metadatas),
         )
 
         logger.info(f"Added {len(normalized_documents)} documents (total: {self.count})")
@@ -465,7 +465,7 @@ class ChromaDBVectorStore:
             if backend_filter:
                 query_kwargs["where"] = backend_filter
 
-            results = self._collection.query(**query_kwargs)
+            results = cast(dict[str, Any], self._collection.query(**query_kwargs))
 
         except Exception as exc:
             logger.exception(
@@ -480,14 +480,21 @@ class ChromaDBVectorStore:
             ) from exc
 
         chunks: list[RetrievedChunk] = []
-        if results.get("ids") and results["ids"][0]:
-            for i, doc_id in enumerate(results["ids"][0]):
+        ids_batch = results.get("ids")
+        if ids_batch and isinstance(ids_batch, list) and ids_batch[0]:
+            doc_batches = results.get("documents") or []
+            meta_batches = results.get("metadatas") or []
+            dist_batches = results.get("distances") or []
+            row_docs = doc_batches[0] if doc_batches else []
+            row_metas = meta_batches[0] if meta_batches else []
+            row_dists = dist_batches[0] if dist_batches else []
+            for i, doc_id in enumerate(ids_batch[0]):
                 chunks.append(
                     RetrievedChunk(
                         id=doc_id,
-                        text=results["documents"][0][i],
-                        metadata=results["metadatas"][0][i] or {},
-                        distance=results["distances"][0][i] if results.get("distances") else 0.0,
+                        text=row_docs[i] if i < len(row_docs) else "",
+                        metadata=row_metas[i] if i < len(row_metas) else {},
+                        distance=row_dists[i] if i < len(row_dists) else 0.0,
                     )
                 )
 
@@ -652,16 +659,24 @@ class ChromaDBVectorStore:
         Returns:
             RetrievedChunk or None if not found
         """
-        results = self._collection.get(
-            ids=[id],
-            include=["documents", "metadatas"],
+        results = cast(
+            dict[str, Any],
+            self._collection.get(
+                ids=[id],
+                include=["documents", "metadatas"],
+            ),
         )
 
-        if results.get("ids"):
+        ids_out = results.get("ids")
+        if isinstance(ids_out, list) and ids_out:
+            docs_out = results.get("documents")
+            metas_out = results.get("metadatas")
+            doc0 = docs_out[0] if isinstance(docs_out, list) and docs_out else ""
+            meta0 = metas_out[0] if isinstance(metas_out, list) and metas_out else {}
             return RetrievedChunk(
-                id=results["ids"][0],
-                text=results["documents"][0] if results.get("documents") else "",
-                metadata=results["metadatas"][0] if results.get("metadatas") else {},
+                id=ids_out[0],
+                text=doc0,
+                metadata=meta0,
                 distance=0.0,
             )
 

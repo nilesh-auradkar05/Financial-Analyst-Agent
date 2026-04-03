@@ -256,7 +256,7 @@ async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTa
 
     return JobAcceptedResponse(
         job_id=record.job_id,
-        status=record.status,
+        status=JobStatus(record.status),
         ticker=record.ticker,
         started_at=record.started_at,
         error=record.error,
@@ -274,7 +274,7 @@ async def get_job_status(job_id: str):
 
     return JobPollResponse(
         job_id=record.job_id,
-        status=record.status,
+        status=JobStatus(record.status),
         ticker=record.ticker,
         started_at=record.started_at,
         completed_at=record.completed_at,

@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langsmith import traceable
@@ -207,12 +207,15 @@ def _write_documents(store: Any, documents: list[IndexDocument]) -> int:
         return 0
 
     try:
-        return store.add_documents(documents)
+        return cast(int, store.add_documents(documents))
     except TypeError:
-        return store.add_documents(
-            texts=[doc.text for doc in documents],
-            metadatas=[doc.metadata for doc in documents],
-            ids=[doc.id for doc in documents],
+        return cast(
+            int,
+            store.add_documents(
+                texts=[doc.text for doc in documents],
+                metadatas=[doc.metadata for doc in documents],
+                ids=[doc.id for doc in documents],
+            ),
         )
 
 # Ingestion functions

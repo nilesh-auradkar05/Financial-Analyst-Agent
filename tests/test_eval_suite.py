@@ -13,7 +13,7 @@ import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from loguru import logger
 
@@ -115,7 +115,7 @@ def run_ragas(question: str, answer: str, contexts: list[str]) -> dict:
             "contexts": [contexts],
         })
 
-        result = evaluate(ds, metrics=[faithfulness, answer_relevancy])
+        result: Any = evaluate(ds, metrics=[faithfulness, answer_relevancy])
 
         return {
             "faithfulness": result.get("faithfulness"),
@@ -223,7 +223,7 @@ async def evaluate_ticker(ticker: str, run_full: bool = False) -> EvalResult:
     r.time_ms = (time.time() - start) * 1000
     return r
 
-async def evaluate_all(tickers: list[str] = None, run_full: bool = False) -> list[EvalResult]:
+async def evaluate_all(tickers: Optional[list[str]] = None, run_full: bool = False) -> list[EvalResult]:
     """Evaluate multiple tickers"""
     tickers = tickers or ["AAPL", "MSFT", "GOOG", "NVDA", "INTC"]
     results = []

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from loguru import logger
 
@@ -117,27 +117,33 @@ def _dedupe_keep_order(values: list[str]) -> list[str]:
 def _search(store: Any, case: RetrievalEvalCase) -> SearchResult:
     if case.mode == "sections":
         try:
-            return store.search_sections(
-                ticker=case.ticker,
-                sections=case.expected_sections,
-                top_k=case.top_k,
-                query=case.query,
-                filing_type=case.filing_type,
+            return cast(
+                SearchResult,
+                store.search_sections(
+                    ticker=case.ticker,
+                    sections=case.expected_sections,
+                    top_k=case.top_k,
+                    query=case.query,
+                    filing_type=case.filing_type,
+                ),
             )
         except TypeError:
-            return store.search_sections(
-                ticker=case.ticker,
-                sections=case.expected_sections,
-                n_results=case.top_k,
-                query=case.query,
-                filing_type=case.filing_type,
+            return cast(
+                SearchResult,
+                store.search_sections(
+                    ticker=case.ticker,
+                    sections=case.expected_sections,
+                    n_results=case.top_k,
+                    query=case.query,
+                    filing_type=case.filing_type,
+                ),
             )
 
     filters = SearchFilters(ticker=case.ticker, filing_type=case.filing_type)
     try:
-        return store.search(case.query, filters=filters, top_k=case.top_k)
+        return cast(SearchResult, store.search(case.query, filters=filters, top_k=case.top_k))
     except TypeError:
-        return store.search(case.query, filters=filters, n_results=case.top_k)
+        return cast(SearchResult, store.search(case.query, filters=filters, n_results=case.top_k))
 
 def _packet_sections(packets: list[EvidencePacket]) -> list[str]:
     return _dedupe_keep_order(

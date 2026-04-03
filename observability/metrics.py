@@ -6,30 +6,24 @@ import time
 from contextlib import contextmanager
 from typing import Any, Callable
 
-try:
-    from prometheus_client import (
-        CONTENT_TYPE_LATEST as PROM_CONTENT_TYPE_LATEST,
-    )
-    from prometheus_client import (
-        Counter as PromCounter,
-    )
-    from prometheus_client import (
-        Gauge as PromGauge,
-    )
-    from prometheus_client import (
-        Histogram as PromHistogram,
-    )
-    from prometheus_client import (
-        generate_latest as prom_generate_latest,
-    )
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
-    PROM_CONTENT_TYPE_LATEST = None
-    PromCounter = None
-    PromGauge = None
-    PromHistogram = None
-    prom_generate_latest = None
+
+def _try_import_prometheus() -> tuple[bool, Any, Any, Any, Any, Any]:
+    """Load prometheus_client or return placeholders (all Any-typed for mypy)."""
+    try:
+        from prometheus_client import CONTENT_TYPE_LATEST as ct  # noqa: N811
+        from prometheus_client import Counter as ctr  # noqa: N813
+        from prometheus_client import Gauge as gge  # noqa: N813
+        from prometheus_client import Histogram as hgm  # noqa: N813
+        from prometheus_client import generate_latest as gen
+
+        return True, ct, ctr, gge, hgm, gen
+    except ImportError:
+        return False, None, None, None, None, None
+
+
+PROMETHEUS_AVAILABLE, PROM_CONTENT_TYPE_LATEST, PromCounter, PromGauge, PromHistogram, prom_generate_latest = (
+    _try_import_prometheus()
+)
 
 CONTENT_TYPE_LATEST: str
 Counter: Any

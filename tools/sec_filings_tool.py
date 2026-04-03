@@ -37,7 +37,7 @@ import html
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, cast
 
 import httpx
 from bs4 import XMLParsedAsHTMLWarning
@@ -250,7 +250,7 @@ class SECClient:
             filings = data.get("filings", {}).get("recent", {})
             forms = filings.get("form", [])
 
-            results = []
+            results: list[FilingMetaData] = []
             for i, form in enumerate(forms):
                 if form == filing_type and len(results) < count:
                     results.append(FilingMetaData(
@@ -355,4 +355,4 @@ async def get_latest_10k(
             logger.warning(f"No 10-K filings found for {ticker}")
             return None
 
-        return await client.download_filing(filings[0])
+        return cast(Optional[Filing], await client.download_filing(filings[0]))

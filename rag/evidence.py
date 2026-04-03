@@ -31,6 +31,8 @@ class EvidencePacket:
         rank: int = 0,
     ) -> "EvidencePacket":
         metadata = dict(getattr(chunk, "metadata", {}) or {})
+        chunk_id_raw = metadata.get("chunk_id") or getattr(chunk, "id", "")
+        chunk_id = str(chunk_id_raw) if chunk_id_raw is not None else ""
 
         return cls(
             ticker=(metadata.get("ticker") or "").upper(),
@@ -41,7 +43,7 @@ class EvidencePacket:
             section_name=metadata.get("section_name") or metadata.get("section"),
             source_url=metadata.get("source_url"),
             text=getattr(chunk, "text", ""),
-            chunk_id=metadata.get("chunk_id") or getattr(chunk, "id", ""),
+            chunk_id=chunk_id,
             retrieval_score=float(getattr(chunk, "relevance_score", 0.0)),
             retrieval_method=retrieval_method,
             rank=rank,

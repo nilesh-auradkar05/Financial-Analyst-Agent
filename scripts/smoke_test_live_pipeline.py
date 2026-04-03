@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -25,7 +25,7 @@ def require_ok(response: httpx.Response, step: str) -> dict:
         raise SystemExit(1) from exc
 
     try:
-        return response.json()
+        return cast(dict[Any, Any], response.json())
     except Exception as exc:
         print(f"\n[{step}] did not return JSON")
         print(response.text)

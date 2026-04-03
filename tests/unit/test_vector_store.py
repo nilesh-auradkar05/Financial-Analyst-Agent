@@ -55,7 +55,7 @@ def test_search_filters_prefer_section_key_when_present():
 
 def test_search_sections_prefers_canonical_section_key(monkeypatch):
     store = object.__new__(vector_store.ChromaDBVectorStore)
-    calls: list[SearchFilters] = []
+    calls: list[SearchFilters | None] = []
 
     def fake_search(*, query: str, filters: SearchFilters | None = None, n_results: int = 5):
         calls.append(filters)
@@ -80,6 +80,7 @@ def test_search_sections_prefers_canonical_section_key(monkeypatch):
 
     assert result.total_results == 1
     assert len(calls) == 1
+    assert calls[0] is not None
     assert calls[0].ticker == "AAPL"
     assert calls[0].filing_type == "10-K"
     assert calls[0].section_key == "risk_factors"
@@ -87,7 +88,7 @@ def test_search_sections_prefers_canonical_section_key(monkeypatch):
 
 def test_search_sections_fall_back_to_legacy_section_name(monkeypatch):
     store = object.__new__(vector_store.ChromaDBVectorStore)
-    calls: list[SearchFilters] = []
+    calls: list[SearchFilters | None] = []
 
     def fake_search(*, query: str, filters: SearchFilters | None = None, n_results: int = 5):
         calls.append(filters)
@@ -130,12 +131,13 @@ def test_search_sections_fall_back_to_legacy_section_name(monkeypatch):
     )
 
     assert result.total_results == 1
-    assert [call.section_key for call in calls] == ["risk_factors", None]
+    assert [call.section_key if call else None for call in calls] == ["risk_factors", None]
+    assert calls[1] is not None
     assert calls[1].section_name == "Risk Factors"
 
 def test_search_by_ticker_uses_section_fallback_path(monkeypatch):
     store = object.__new__(vector_store.ChromaDBVectorStore)
-    calls: list[SearchFilters] = []
+    calls: list[SearchFilters | None] = []
 
     def fake_search(*, query: str, filters: SearchFilters | None = None, n_results: int = 5):
         calls.append(filters)
@@ -158,6 +160,7 @@ def test_search_by_ticker_uses_section_fallback_path(monkeypatch):
     )
 
     assert result.total_results == 1
+    assert calls[0] is not None
     assert calls[0].section_key == "business"
     assert calls[0].ticker == "AAPL"
 
