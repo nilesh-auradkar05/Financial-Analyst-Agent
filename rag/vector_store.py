@@ -140,7 +140,7 @@ class RetrievedChunk:
         if self.section:
             header_parts.append(f"Section: {self.section}")
         if self.filing_date:
-            header_parts.append(f"Field: {self.filing_date}")
+            header_parts.append(f"Filing: {self.filing_date}")
 
         header = " | ".join(header_parts) if header_parts else "Document Chunk"
 
@@ -163,7 +163,7 @@ class SearchResult:
     chunks: list[RetrievedChunk]
     total_results: int = 0
     search_time_ms: float = 0.0
-    filter_used: Optional[dict] = None
+    filter_used: Optional[dict[str, Any]] = None
 
     @property
     def has_results(self) -> bool:
@@ -182,7 +182,7 @@ class SearchResult:
         if not self.chunks:
             return "No relevant documents found."
 
-        context_parts = [f"Retrieved {len(self.chunks)} relevant chunks: \n"]
+        context_parts = [f"Retrieved {len(self.chunks)} relevant chunks:\n"]
 
         for i, chunk in enumerate(self.chunks[:max_chunks], start=1):
             context_parts.append(f"--- Chunk {i} (relevance: {chunk.relevance_score:.2%}) ---")
@@ -209,7 +209,7 @@ class RetrievalStore(Protocol):
         self,
         query: str,
         filters: Optional[SearchFilters] = None,
-        top_k: int = 5,
+        n_results: int = 5,
     ) -> SearchResult:
         ...
 
@@ -217,13 +217,16 @@ class RetrievalStore(Protocol):
         self,
         ticker: str,
         sections: list[str],
-        top_k: int = 8,
+        n_results: int = 8,
         query: Optional[str] = None,
         filing_type: Optional[str] = None,
     ) -> SearchResult:
         ...
 
     def delete_by_ticker(self, ticker: str) -> int:
+        ...
+
+    def count_documents(self, filters: Optional[SearchFilters] = None) -> int:
         ...
 
     def get_stats(self) -> dict[str, Any]:
@@ -378,8 +381,7 @@ class ChromaDBVectorStore:
         payload_ids = [doc.id for doc in normalized_documents]
         payload_texts = [doc.text for doc in normalized_documents]
         payload_metadatas = [
-            {k: v for k, v in doc.metadata.items() if v is not None}
-            for doc in normalized_documents
+            doc.metadata for doc in normalized_documents
         ]
 
         embeddings = self._embeddings.embed_documents(payload_texts)
@@ -476,7 +478,7 @@ class ChromaDBVectorStore:
                 self.persist_directory,
             )
             raise RuntimeError(
-                f"Vector search failed for query={query!r} | filter={backend_filter}: {type(exc).__name__}: {exc}"
+                f"Vector search failed for query={query!r} | filter={backend_filter}: \n{type(exc).__name__}: {exc}"
             ) from exc
 
         chunks: list[RetrievedChunk] = []
@@ -698,9 +700,9 @@ class ChromaDBVectorStore:
         ticker = ticker.upper().strip()
 
         # Get all ids for this ticker
-        results = self._collection.get(
-            where={"ticker": ticker},
-            include=[],
+        results = cast(
+            dict[str, Any],
+            self._collection.get(where={"ticker": ticker}, include=[]),
         )
         ids = results.get("ids") or []
 
@@ -708,13 +710,38 @@ class ChromaDBVectorStore:
             return 0
 
         # Delete records
-        self._collection.delete(ids=results["ids"])
+        self._collection.delete(ids=ids)
 
         logger.info(f"Deleted {len(ids)} documents for {ticker}")
 
         return len(ids)
 
-    def delete_collection(self):
+    def count_documents(self, filters: Optional[SearchFilters] = None) -> int:
+        """
+        Count documents using the retrieval-store contract.
+        """
+        backend_filter = filters.to_backend_filter() if filters else None
+        if backend_filter is None:
+            return self.count
+
+        try:
+            results = cast(
+                dict[str, Any],
+                self._collection.get(where=backend_filter, include=[]),
+            )
+        except Exception as exc:
+            logger.exception(
+                f"Vector count failed | filter={backend_filter} | collection={self.collection_name} | persist_dir={self.persist_directory}",
+            )
+            raise RuntimeError(
+                f"Vector count failed for filter={backend_filter}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+
+        ids = results.get("ids") or []
+        return len(ids)
+
+    def delete_collection(self) -> None:
         """Delete the collection"""
         self._client.delete_collection(self.collection_name)
         logger.warning(f"Deleted collection: {self.collection_name}")
@@ -732,7 +759,7 @@ class ChromaDBVectorStore:
                 IndexDocument(
                     id=doc.id,
                     text=doc.text,
-                    metadata=_sanitize_metadata(doc.metadata)
+                    metadata=_sanitize_metadata(doc.metadata),
                 )
                 for doc in documents
             ]
@@ -745,14 +772,14 @@ class ChromaDBVectorStore:
             ids = [f"doc_{timestamp}_{i}" for i in range(len(texts))]
 
         if len(texts) != len(safe_metadatas) or len(texts) != len(ids):
-            raise ValueError("texts, metadatas, and ids must be of the same count.")
+            raise ValueError("texts, metadatas, and ids must have same count.")
 
         return [
-            IndexDocument(id=ids[i], text=texts[i], metadata=_sanitize_metadata(safe_metadatas[i]))
+            IndexDocument(id=ids[i], text=texts[i], metadata=_sanitize_metadata(safe_metadatas[i]),)
             for i in range(len(texts))
         ]
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get statistics about the collection.
 

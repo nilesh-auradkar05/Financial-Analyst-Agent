@@ -154,7 +154,7 @@ class VerificationClaimResponse(BaseModel):
     """Single claim verification detail."""
 
     sentence: str
-    citations: list[int] = []
+    citations: list[int] = Field(default_factory=list)
     supported: bool
     overlap_score: float
     missing_citation: bool = False
@@ -203,19 +203,19 @@ class AnalysisResponse(BaseModel):
     # Supporting data
     stock_data: Optional[StockDataResponse] = None
     sentiment: Optional[SentimentResponse] = None
-    news_articles: list[NewsArticleResponse] = []
-    citations: list[CitationResponse] = []
+    news_articles: list[NewsArticleResponse] = Field(default_factory=list)
+    citations: list[CitationResponse] = Field(default_factory=list)
     verification: Optional[VerificationResponse] = None
 
     # Errors (for partial failures)
-    errors: list[ErrorDetail] = []
+    errors: list[ErrorDetail] = Field(default_factory=list)
 
     # Metadata
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     execution_time_ms: Optional[float] = None
 
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "job_id": "abc123",
@@ -226,7 +226,8 @@ class AnalysisResponse(BaseModel):
                 "investment_memo": "# Investment Memo: Apple Inc...",
                 "execution_time_ms": 45000,
             }
-        }
+        },
+    )
 
 class JobAcceptedResponse(BaseModel):
     """Immediate response for async job acceptance."""
@@ -258,7 +259,7 @@ class IngestionResponse(BaseModel):
     filing_type: str
     status: str
     chunks_created: int = 0
-    sections_processed: list[str] = []
+    sections_processed: list[str] = Field(default_factory=list)
     filing_date: Optional[str] = None
     error: Optional[str] = None
 
@@ -288,7 +289,7 @@ class ErrorResponse(BaseModel):
     status_code: int
     timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "error": "Analysis failed",
@@ -296,7 +297,8 @@ class ErrorResponse(BaseModel):
                 "status_code": 500,
                 "timestamp": "2025-01-01T10:32:00Z",
             }
-        }
+        },
+    )
 
 class ValidationErrorResponse(BaseModel):
     """Validation error response."""
@@ -321,6 +323,8 @@ __all__ = [
     "StockDataResponse",
     "SentimentResponse",
     "CitationResponse",
+    "VerificationClaimResponse",
+    "VerificationResponse",
     "ErrorDetail",
 
     # Main responses

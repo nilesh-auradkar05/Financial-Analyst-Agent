@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langsmith import traceable
@@ -39,7 +39,7 @@ from rag.sections import (
     canonicalize_section_name,
     fallback_section,
 )
-from rag.vector_store import IndexDocument, get_vector_store
+from rag.vector_store import IndexDocument, RetrievalStore, SearchFilters, get_vector_store
 from tools.sec_filings_tool import Filing, get_latest_10k
 
 # Data Models
@@ -194,29 +194,14 @@ def build_index_documents(
         sections_skipped=sections_skipped,
     )
 
-def _count_existing_documents(store: Any, ticker: str) -> int:
-    collection = getattr(store, "_collection", None)
-    if collection is None:
-        return 0
+def _count_existing_documents(store: RetrievalStore, ticker: str) -> int:
+    return store.count_documents(SearchFilters(ticker=ticker))
 
-    existing = collection.get(where={"ticker": ticker.upper()}, include=[])
-    return len(existing.get("ids", []))
-
-def _write_documents(store: Any, documents: list[IndexDocument]) -> int:
+def _write_documents(store: RetrievalStore, documents: list[IndexDocument]) -> int:
     if not documents:
         return 0
 
-    try:
-        return cast(int, store.add_documents(documents))
-    except TypeError:
-        return cast(
-            int,
-            store.add_documents(
-                texts=[doc.text for doc in documents],
-                metadatas=[doc.metadata for doc in documents],
-                ids=[doc.id for doc in documents],
-            ),
-        )
+    return store.add_documents(documents)
 
 # Ingestion functions
 
@@ -241,6 +226,7 @@ def ingest_filing(
 
     ticker: str = (filing.metadata.ticker or "").upper()
     filing_type = filing.metadata.filing_type
+    filing_date = getattr(filing.metadata, "filing_date", None)
 
     logger.info(f"Ingesting {filing_type} for {ticker}")
 
@@ -253,7 +239,7 @@ def ingest_filing(
             return IngestionResult(
                 ticker=ticker,
                 filing_type=filing_type,
-                filing_date=getattr(filing.metadata, "filing_date", None),
+                filing_date=filing_date,
                 total_chunks=existing_count,
                 sections_processed=[],
                 sections_requested=[],
@@ -274,7 +260,7 @@ def ingest_filing(
         return IngestionResult(
             ticker=ticker,
             filing_type=filing_type,
-            filing_date=getattr(filing.metadata, "filing_date", None),
+            filing_date=filing_date,
             error="No content found in requested sections",
             sections_requested=build_result.sections_requested,
             sections_found=build_result.sections_found,
@@ -295,7 +281,7 @@ def ingest_filing(
     return IngestionResult(
         ticker=ticker,
         filing_type=filing_type,
-        filing_date=getattr(filing.metadata, "filing_date", None),
+        filing_date=filing_date,
         total_chunks=documents_written,
         sections_processed=build_result.sections_found,
         sections_requested=build_result.sections_requested,
@@ -308,6 +294,7 @@ def ingest_filing(
 async def ingest_10k_for_ticker(
     ticker: str,
     sections: Optional[list[str]] = None,
+    replace_existing: bool = False,
 ) -> IngestionResult:
 
     """
@@ -328,32 +315,19 @@ async def ingest_10k_for_ticker(
     """
     logger.info(f"Starting 10-K ingestion for {ticker}")
 
-    # Download filing
-    filing = await get_latest_10k(ticker)
-
-    if not filing:
-        return IngestionResult(
-            ticker=ticker,
-            filing_type="10-K",
-            error="Filing not found",
+    normalized_ticker = ticker.upper().strip()
+    try:
+        filing = await get_latest_10k(normalized_ticker)
+        return ingest_filing(
+            filing=filing,
+            sections=sections,
+            replace_existing=replace_existing,
         )
+    except Exception as exc:
+        logger.exception(f"Failed to ingest 10-K for {normalized_ticker}")
 
-    if not filing.success:
         return IngestionResult(
-            ticker=ticker,
+            ticker=normalized_ticker,
             filing_type="10-K",
-            error=filing.error or "Failed to download filing",
+            error=f"{type(exc).__name__}: {exc}",
         )
-
-    # Ingest
-    return ingest_filing(filing, sections=sections)
-
-def get_ingestion_stats() -> dict:
-    """
-    Get statistics about the ingested documents.
-
-    Returns:
-        Dict with ingestion statistics.
-    """
-    store = get_vector_store()
-    return store.get_stats()

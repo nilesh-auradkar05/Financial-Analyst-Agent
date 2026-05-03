@@ -27,7 +27,12 @@ class StubVectorStore:
             "tickers": ["AAPL", "MSFT"],
         }
 
-    def search_by_ticker(self, query: str, ticker: str, n_results: int = 1) -> StubSearchResult:
+    def search_by_ticker(
+        self,
+        query: str,
+        ticker: str,
+        n_results: int = 1,
+    ) -> StubSearchResult:
         return StubSearchResult(
             has_results=True,
             chunks=[
@@ -81,6 +86,8 @@ async def fake_run_agent(
             "stock_data": {},
             "sentiment_result": {},
             "news_articles": [],
+            "citations": [],
+            "errors": [],
         }
 
     return {
@@ -154,12 +161,14 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(api_main, "check_langsmith_connection", fake_check_langsmith_connection)
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
+
     with TestClient(api_main.app) as test_client:
         yield test_client
 
 
 def test_health_endpoint_returns_component_statuses(client: TestClient):
     response = client.get("/health")
+
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "healthy"
@@ -170,6 +179,7 @@ def test_health_endpoint_returns_component_statuses(client: TestClient):
 
 def test_ingest_and_ingest_status_endpoints(client: TestClient):
     ingest_response = client.post("/ingest", json={"ticker": "AAPL"})
+
     assert ingest_response.status_code == 200
     ingest_payload = ingest_response.json()
     assert ingest_payload["ticker"] == "AAPL"
@@ -179,9 +189,9 @@ def test_ingest_and_ingest_status_endpoints(client: TestClient):
     assert ingest_payload["sections_processed"] == ["business", "risk_factors", "md&a"]
 
     status_response = client.get("/ingest/AAPL")
+
     assert status_response.status_code == 200
-    status_payload = status_response.json()
-    assert status_payload == {
+    assert status_response.json() == {
         "ticker": "AAPL",
         "indexed": True,
         "document_count": 1,
@@ -189,7 +199,11 @@ def test_ingest_and_ingest_status_endpoints(client: TestClient):
 
 
 def test_sync_analysis_endpoint_returns_full_analysis_payload(client: TestClient):
-    response = client.post("/analyze", json={"ticker": "AAPL", "company_name": "Apple Inc."})
+    response = client.post(
+        "/analyze",
+        json={"ticker": "AAPL", "company_name": "Apple Inc."},
+    )
+
     assert response.status_code == 200
     payload = response.json()
     assert payload["ticker"] == "AAPL"
@@ -214,6 +228,7 @@ def test_async_analysis_poll_returns_completed_result_payload(client: TestClient
         "/analyze/async",
         json={"ticker": "MSFT", "company_name": "Microsoft Corp."},
     )
+
     assert create_response.status_code == 200
     create_payload = create_response.json()
     assert create_payload["ticker"] == "MSFT"
@@ -221,16 +236,15 @@ def test_async_analysis_poll_returns_completed_result_payload(client: TestClient
 
     job_id = create_payload["job_id"]
     status_response = client.get(f"/jobs/{job_id}")
+
     assert status_response.status_code == 200
     status_payload = status_response.json()
-
     assert status_payload["job_id"] == job_id
     assert status_payload["ticker"] == "MSFT"
     assert status_payload["status"] == "completed"
     assert status_payload["result"] is not None
     assert status_payload["result"]["ticker"] == "MSFT"
     assert status_payload["result"]["investment_memo"].startswith("# Investment Memo")
-
     assert status_payload["result"]["verification"] is not None
     assert status_payload["result"]["verification"]["passed"] is True
 
@@ -250,43 +264,41 @@ def test_analysis_request_accepts_optional_controls(client: TestClient):
             "max_news_articles": 5,
         },
     )
+
     assert response.status_code == 200
     payload = response.json()
     assert payload["ticker"] == "AAPL"
     assert payload["status"] == "completed"
 
+
 def test_analysis_request_controls_disable_filing_analysis(client: TestClient):
     response = client.post(
         "/analyze",
-        json={
-            "ticker": "AAPL",
-            "include_filing_analysis": False,
-        },
+        json={"ticker": "AAPL", "include_filing_analysis": False},
     )
+
     assert response.status_code == 200
     payload = response.json()
     assert all(c["source_type"] != "sec_filing" for c in payload["citations"])
 
+
 def test_analysis_request_controls_disable_news_sentiment(client: TestClient):
     response = client.post(
         "/analyze",
-        json={
-            "ticker": "AAPL",
-            "include_news_sentiment": False,
-        },
+        json={"ticker": "AAPL", "include_news_sentiment": False},
     )
+
     assert response.status_code == 200
     payload = response.json()
     assert payload["sentiment"] is None
 
+
 def test_analysis_request_controls_limit_news_articles(client: TestClient):
     response = client.post(
         "/analyze",
-        json={
-            "ticker": "AAPL",
-            "max_news_articles": 1,
-        },
+        json={"ticker": "AAPL", "max_news_articles": 1},
     )
+
     assert response.status_code == 200
     payload = response.json()
     assert len(payload["news_articles"]) <= 1
@@ -295,12 +307,9 @@ def test_analysis_request_controls_limit_news_articles(client: TestClient):
 def test_ingestion_request_accepts_optional_controls(client: TestClient):
     response = client.post(
         "/ingest",
-        json={
-            "ticker": "AAPL",
-            "filing_type": "10-K",
-            "force_refresh": False,
-        },
+        json={"ticker": "AAPL", "filing_type": "10-K", "force_refresh": False},
     )
+
     assert response.status_code == 200
     payload = response.json()
     assert payload["ticker"] == "AAPL"
@@ -316,6 +325,7 @@ def test_stats_endpoint_reports_vector_and_run_store_counts(client: TestClient):
     assert response.status_code == 200
 
     stats_response = client.get("/stats")
+
     assert stats_response.status_code == 200
     payload = stats_response.json()
     assert payload["vector_store"] == {
@@ -326,3 +336,22 @@ def test_stats_endpoint_reports_vector_and_run_store_counts(client: TestClient):
     assert payload["run_store"]["total_runs"] == 1
     assert payload["run_store"]["completed"] == 1
     assert payload["run_store"]["failed"] == 0
+
+
+def test_sync_analysis_failure_returns_stable_public_error(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def failing_run_agent(*args, **kwargs):
+        raise RuntimeError("secret provider token exploded")
+
+    monkeypatch.setattr(api_main, "run_agent", failing_run_agent)
+
+    response = client.post("/analyze", json={"ticker": "AAPL"})
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert detail["code"] == "analysis_failed"
+    assert detail["message"] == "Analysis failed."
+    assert detail["error_id"]
+    assert "secret provider token exploded" not in str(detail)

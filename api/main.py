@@ -31,11 +31,13 @@ Usage:
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
 """
 
+from __future__ import annotations
+
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,13 +80,41 @@ RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
 
 def _get_store() -> ChromaDBVectorStore:
-    """FastAPI dependency: Override in tests via app.dependency_overrides"""
+    """FastAPI dependency. Override in tests via app.dependency_overrides"""
     return get_vector_store()
+
+def _new_error_id() -> str:
+    return str(uuid.uuid4())
+
+def _public_error_detail(code: str, message: str, error_id: str) -> dict[str, str]:
+    return {
+        "code": code,
+        "message": message,
+        "error_id": error_id,
+    }
+
+def _public_failure_message(message: str, error_id: str) -> str:
+    return f"{message}. error_id={error_id}"
+
+def _raise_internal_error(
+    *,
+    code: str,
+    message: str,
+    operation: str,
+    exc: Exception,
+) -> NoReturn:
+    error_id = _new_error_id()
+    logger.exception(f"{operation} failed | error_id={error_id}")
+    raise HTTPException(
+        status_code=500,
+        detail=_public_error_detail(code, message, error_id),
+    ) from exc
 
 
 # =============================================================================
 # LIFESPAN
 # =============================================================================
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -172,7 +202,7 @@ async def health(store: ChromaDBVectorStore = Depends(_get_store)):
             "ollama": {"ok": ollama_ok},
             "vector_store": {"ok": vector_ok},
             "langsmith": {"connected": langsmith_status.get("connected", False)},
-        }
+        },
     )
 
 
@@ -187,7 +217,7 @@ async def metrics():
 
 @app.get("/stats", tags=["Info"])
 async def stats(store: ChromaDBVectorStore = Depends(_get_store)):
-    """Vector store statistics."""
+    """Vector store and run-store statistics."""
     return {
         "vector_store": store.get_stats(),
         "run_store": run_store.get_stats(),
@@ -203,7 +233,7 @@ async def analyze(request: AnalysisRequest):
     """
     Run synchronous stock analysis.
 
-    Blocks until analysis is complete (may take 1-3 minutes).
+    Blocks until analysis is complete.
     """
     ticker = request.ticker.upper()
     logger.info(f"Starting sync analysis for {ticker}")
@@ -220,9 +250,13 @@ async def analyze(request: AnalysisRequest):
                 )
                 return _format_response(result)
 
-            except Exception as e:
-                logger.error(f"Analysis failed: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception as exc:
+                _raise_internal_error(
+                    code="analysis_failed",
+                    message="Analysis failed.",
+                    operation=f"sync analysis for {ticker}",
+                    exc=exc,
+                )
 
 
 @app.post("/analyze/async", response_model=JobAcceptedResponse, tags=["Analysis"])
@@ -290,7 +324,7 @@ async def _run_analysis_job(
     include_filing_analysis: bool = True,
     include_news_sentiment: bool = True,
     max_news_articles: int = 10,
-):
+) -> None:
     """Background task for async analysis."""
     run_store.mark_running(job_id)
 
@@ -305,9 +339,15 @@ async def _run_analysis_job(
             )
             formatted = _format_response(result).model_dump()
             run_store.mark_completed(job_id, result=formatted)
-    except Exception as e:
-        logger.error(f"Job {job_id} failed: {e}")
-        run_store.mark_failed(job_id, error=str(e))
+    except Exception:
+        error_id = _new_error_id()
+        logger.exception(
+            f"Async analysis job failed | job_id={job_id} | ticker={ticker} | error_id={error_id}"
+        )
+        run_store.mark_failed(
+            job_id,
+            error=_public_failure_message(message="Analysis job failed", error_id=error_id),
+        )
 
 def _format_response(state: AgentState) -> AnalysisResponse:
     """Format agent state as API response."""
@@ -328,7 +368,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
     if state.get("investment_memo"):
         status = JobStatus.COMPLETED
     elif errors:
-        status = (JobStatus.FAILED if not any(error.recoverable for error in errors) else JobStatus.COMPLETED)
+        status = JobStatus.FAILED if not any(error.recoverable for error in errors) else JobStatus.COMPLETED
     else:
         status = JobStatus.FAILED
 
@@ -372,14 +412,14 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         ) if sentiment else None,
         news_articles=[
             NewsArticleResponse(
-                title=a.get("title", ""),
-                url=a.get("url", ""),
-                source=a.get("source", "Unknown"),
-                snippet=a.get("snippet", ""),
-                published_date=a.get("published_date"),
-                relevance_score=a.get("relevance_score", 0.0),
+                title=article.get("title", ""),
+                url=article.get("url", ""),
+                source=article.get("source", "Unknown"),
+                snippet=article.get("snippet", ""),
+                published_date=article.get("published_date"),
+                relevance_score=article.get("relevance_score", 0.0),
             )
-            for a in state.get("news_articles", [])
+            for article in state.get("news_articles", [])
         ],
         citations=[
             CitationResponse(
@@ -464,15 +504,18 @@ async def ingest_filing(request: IngestionRequest):
                 error=getattr(result, "error", None),
             )
 
-        except Exception as e:
-            logger.error(f"Ingestion failed: {e}")
+        except Exception:
+            error_id = _new_error_id()
+            logger.exception(
+                f"Ingestion failed | ticker={ticker} | error_id={error_id}",
+            )
             return IngestionResponse(
                 ticker=ticker,
                 filing_type=filing_type,
                 status="failed",
                 chunks_created=0,
                 sections_processed=[],
-                error=str(e),
+                error=_public_failure_message("Ingestion failed", error_id),
             )
 
 
@@ -495,7 +538,7 @@ async def check_ingestion(ticker: str, store: ChromaDBVectorStore = Depends(_get
 
 
 def run_api() -> None:
-    """Console entrypoint for the `alpha-analyst` script (see pyproject [project.scripts])."""
+    """Console entrypoint for the `financial-analyst-agent-system` script."""
     import uvicorn
 
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000)
