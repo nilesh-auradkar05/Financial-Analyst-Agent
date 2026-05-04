@@ -9,6 +9,8 @@ from typing import Any, Optional, cast
 from loguru import logger
 
 from rag.evidence import EvidencePacket
+from rag.hybrid_retrieve import search_langchain_hybrid
+from rag.reranked_hybrid_retrieve import search_reranked_hybrid
 from rag.section_aware_search import search_section_aware
 from rag.vector_store import SearchFilters, SearchResult, canonical_section_key, get_vector_store
 
@@ -225,6 +227,24 @@ def _ndcg_at_k(relevance_flags: list[bool], *, k: int = RANKING_K) -> float:
 def _search(store: Any, case: RetrievalEvalCase) -> SearchResult:
     if case.mode in {"section_aware", "section-aware"}:
         return search_section_aware(
+            store,
+            query=case.query,
+            ticker=case.ticker,
+            filing_type=case.filing_type,
+            top_k=case.top_k,
+        )
+
+    if case.mode in {"hybrid", "langchain_hybrid", "lc_hybrid"}:
+        return search_langchain_hybrid(
+            store,
+            query=case.query,
+            ticker=case.ticker,
+            filing_type=case.filing_type,
+            top_k=case.top_k,
+        )
+
+    if case.mode in {"reranked_hybrid", "rerank_hybrid", "cross_encoder_hybrid"}:
+        return search_reranked_hybrid(
             store,
             query=case.query,
             ticker=case.ticker,

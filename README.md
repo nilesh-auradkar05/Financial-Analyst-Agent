@@ -56,12 +56,29 @@
 
 ---
 
-## Architecture
+## High-level System Architecture
 ![System Architecture](assets/images/architecture.jpg)
 
-### Agent Workflow
 
-![Agent Wrokflow](assets/images/agent-workflow.jpg)
+## LangGraph Agent Workflow
+![LangGraph Workflow](assets/images/lang-graph_agent.png)
+
+## Evidence Pipeline
+![Evidence Pipeline](assets/images/evidence-pipeline.png)
+
+## Retrieval Architecture
+![Retrieval Architecture](assets/images/retriever-arch.png)
+
+## Memo Generation Flow
+![Memo Generation](assets/images/memo-generation.png)
+
+## Verification Flow
+![Verification Flow](assets/images/verification-flow.png)
+
+## Evaluation Architecture
+![Evaluation Architecture](assets/images/evaluation-arch.png)
+
+
 
 ## Quick Start
 
@@ -147,7 +164,36 @@ Ticker Request
   -> API response
 ```
 
-## Repository Layout
+---
+
+## Project Structure
+```
+alpha-analyst/
+├── agent/
+│   ├── state.py          # TypedDict state definition
+│   └── graph.py          # LangGraph workflow
+├── api/
+│   ├── main.py           # FastAPI application
+│   └── schemas.py        # Pydantic models
+├── models/
+│   ├── llm.py            # Ollama integration
+│   └── sentiment.py      # FinBERT classifier
+├── rag/
+│   ├── embeddings.py     # Embedding generation
+│   ├── vector_store.py   # ChromaDB wrapper
+│   └── ingestion.py      # Document processing
+├── tools/
+│   ├── web_search.py     # Tavily integration
+│   ├── stock_data.py     # YFinance integration
+│   └── sec_filings.py    # SEC EDGAR integration
+├── tests/
+│   ├── unit/
+│   └── integration/
+├── config.py             # Settings management
+└── pyproject.toml        # Dependencies
+```
+
+<!-- ## Repository Layout
 
 ```text
 Financial-Analyst-Agent/
@@ -178,7 +224,7 @@ Financial-Analyst-Agent/
 ├── Makefile
 ├── docker-compose.yml
 └── pyproject.toml
-```
+``` -->
 
 ## Requirements
 
@@ -406,35 +452,6 @@ uv run pytest tests/integration -v --run-integration
 
 ---
 
-## Project Structure
-```
-alpha-analyst/
-├── agent/
-│   ├── state.py          # TypedDict state definition
-│   └── graph.py          # LangGraph workflow
-├── api/
-│   ├── main.py           # FastAPI application
-│   └── schemas.py        # Pydantic models
-├── models/
-│   ├── llm.py            # Ollama integration
-│   └── sentiment.py      # FinBERT classifier
-├── rag/
-│   ├── embeddings.py     # Embedding generation
-│   ├── vector_store.py   # ChromaDB wrapper
-│   └── ingestion.py      # Document processing
-├── tools/
-│   ├── web_search.py     # Tavily integration
-│   ├── stock_data.py     # YFinance integration
-│   └── sec_filings.py    # SEC EDGAR integration
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── config.py             # Settings management
-└── pyproject.toml        # Dependencies
-```
-
----
-
 ## Roadmap Direction
 
 The near-term priority is:
@@ -445,6 +462,6 @@ The near-term priority is:
 4. then migrate the vector layer cleanly,
 5. only later consider multi-agent specialization.
 
-## Recommended Repo Status Statement
+## Repo Status
 
 > Financial Analyst Agent is currently a single-agent financial analysis MVP built around LangGraph, FastAPI, SEC/news/market-data tools, local-first inference, and Chroma-backed retrieval. The next milestone is production hardening through better evidence grounding, retrieval evaluation, and retrieval-interface cleanup before any larger vector-backend or multi-agent expansion.
