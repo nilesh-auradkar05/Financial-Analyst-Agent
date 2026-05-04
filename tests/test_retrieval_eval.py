@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from evaluation.retrieval_eval import (
     RetrievalEvalCase,
     SearchFilters,
@@ -85,14 +87,14 @@ def test_load_retrieval_cases(tmp_path: Path):
             ]
         )
     )
-
     cases = load_retrieval_cases(fixture_path)
+
     assert len(cases) == 1
     assert cases[0].ticker == "AAPL"
     assert cases[0].expected_sections == ["risk_factors"]
 
 
-def test_query_mode_reports_section_and_keyword_hits():
+def test_query_mode_reports_section_keyword_and_ranking_hits():
     case = RetrievalEvalCase(
         id="aapl-risk",
         ticker="AAPL",
@@ -102,7 +104,6 @@ def test_query_mode_reports_section_and_keyword_hits():
         top_k=5,
         mode="query",
     )
-
     store = StubStore()
     result = evaluate_retrieval_case(case, store=store)
 
@@ -112,6 +113,10 @@ def test_query_mode_reports_section_and_keyword_hits():
     assert result.metrics.section_recall_at_k == 1.0
     assert result.metrics.keyword_hit_rate == 1.0
     assert result.metrics.first_relevant_rank == 2
+    assert result.metrics.precision_at_5 == 0.2
+    assert result.metrics.recall_at_5 == 1.0
+    assert result.metrics.mrr_at_5 == 0.5
+    assert result.metrics.ndcg_at_5 == pytest.approx(0.6309, rel=1e-3)
     assert result.retrieved_sections == ["business", "risk_factors"]
 
 
@@ -125,13 +130,16 @@ def test_sections_mode_uses_search_sections():
         top_k=3,
         mode="sections",
     )
-
     store = StubStore()
     result = evaluate_retrieval_case(case, store=store)
 
     assert store.search_sections_called is True
     assert result.passed is True
     assert result.metrics.first_relevant_rank == 1
+    assert result.metrics.precision_at_5 == 0.2
+    assert result.metrics.recall_at_5 == 1.0
+    assert result.metrics.mrr_at_5 == 1.0
+    assert result.metrics.ndcg_at_5 == 1.0
 
 
 def test_suite_summary_is_aggregated_cleanly():
@@ -161,14 +169,18 @@ def test_suite_summary_is_aggregated_cleanly():
     assert summary["passed"] == 2
     assert summary["pass_rate"] == 1.0
     assert summary["avg_latency_ms"] > 0
+    assert summary["avg_precision_at_5"] == 0.2
+    assert summary["avg_recall_at_5"] == 1.0
+    assert summary["avg_mrr_at_5"] == 0.75
+    assert summary["avg_ndcg_at_5"] == pytest.approx(0.8154, rel=1e-3)
 
-    def test_search_filters_backend_filter_with_section_key():
-        f = SearchFilters(ticker="aapl", filing_type="10-K", section_key="risk_factors")
-        assert f.to_backend_filter() == {
-            "$and": [
-                {"ticker": "AAPL"},
-                {"filing_type": "10-K"},
-                {"section_key": "risk_factors"},
-            ]
-        }
 
+def test_search_filters_backend_filter_with_section_key():
+    f = SearchFilters(ticker="aapl", filing_type="10-K", section_key="risk_factors")
+    assert f.to_backend_filter() == {
+        "$and": [
+            {"ticker": "AAPL"},
+            {"filing_type": "10-K"},
+            {"section_key": "risk_factors"},
+        ]
+    }

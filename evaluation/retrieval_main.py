@@ -36,8 +36,8 @@ def main() -> None:
     cases = load_retrieval_cases(args.fixtures)
     if args.case:
         cases = [case for case in cases if case.id == args.case]
-        if not cases:
-            raise SystemExit(f"Unknown case id: {args.case}")
+    if not cases:
+        raise SystemExit(f"Unknown case id: {args.case}")
 
     results = evaluate_retrieval_cases(cases)
     summary = summarize_retrieval_results(results)
@@ -52,6 +52,10 @@ def main() -> None:
             f"section_hit={str(result.metrics.section_hit_at_k):5} | "
             f"section_recall={result.metrics.section_recall_at_k:6.2f} | "
             f"keyword_hit_rate={result.metrics.keyword_hit_rate:.2f} | "
+            f"p@5={result.metrics.precision_at_5:.2f} | "
+            f"r@5={result.metrics.recall_at_5:.2f} | "
+            f"mrr@5={result.metrics.mrr_at_5:.2f} | "
+            f"ndcg@5={result.metrics.ndcg_at_5:.2f} | "
             f"first_rank={result.metrics.first_relevant_rank}"
         )
         if result.issues:
@@ -62,7 +66,11 @@ def main() -> None:
         f"pass_rate={summary['pass_rate']:.2f} | "
         f"avg_latency_ms={summary['avg_latency_ms']:.1f} | "
         f"avg_section_recall@k={summary['avg_section_recall_at_k']:.2f} | "
-        f"avg_keyword_hit_rate={summary['avg_keyword_hit_rate']:.2f}"
+        f"avg_keyword_hit_rate={summary['avg_keyword_hit_rate']:.2f} | "
+        f"avg_precision@5={summary['avg_precision_at_5']:.2f} | "
+        f"avg_recall@5={summary['avg_recall_at_5']:.2f} | "
+        f"avg_mrr@5={summary['avg_mrr_at_5']:.2f} | "
+        f"avg_ndcg@5={summary['avg_ndcg_at_5']:.2f}"
     )
 
     report_path = save_retrieval_results(results, args.output)
