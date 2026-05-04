@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 import api.main as api_main
 from api.run_store import FileBackedRunStore
+from rag.vector_store import SearchFilters
 
 
 class StubSearchResult:
@@ -19,13 +20,23 @@ class StubSearchResult:
 class StubVectorStore:
     def __init__(self) -> None:
         self.count = 7
+        self.tickers = {"AAPL", "MSFT"}
 
     def get_stats(self) -> dict[str, Any]:
         return {
             "backend": "stub",
             "document_count": self.count,
-            "tickers": ["AAPL", "MSFT"],
+            "tickers": sorted(self.tickers),
         }
+
+    def count_documents(self, filters: SearchFilters | None = None) -> int:
+        if filters is None:
+            return self.count
+
+        if filters.ticker and filters.ticker.upper() not in self.tickers:
+            return 0
+
+        return self.count
 
     def search_by_ticker(
         self,
@@ -165,7 +176,6 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     with TestClient(api_main.app) as test_client:
         yield test_client
 
-
 def test_health_endpoint_returns_component_statuses(client: TestClient):
     response = client.get("/health")
 
@@ -194,7 +204,7 @@ def test_ingest_and_ingest_status_endpoints(client: TestClient):
     assert status_response.json() == {
         "ticker": "AAPL",
         "indexed": True,
-        "document_count": 1,
+        "document_count": 7,
     }
 
 

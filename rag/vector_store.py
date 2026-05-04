@@ -26,11 +26,12 @@ Usage:
 """
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Protocol, cast
+from typing import Any, Literal, Optional, Protocol, cast
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -201,7 +202,13 @@ class SearchResult:
             for rank, chunk in enumerate(self.chunks, start=1)
         ]
 
+VectorBackend = Literal["chroma", "qdrant"]
+
 class RetrievalStore(Protocol):
+    @property
+    def count(self) -> int:
+        ...
+
     def add_documents(self, documents: list[IndexDocument]) -> int:
         ...
 
@@ -220,6 +227,15 @@ class RetrievalStore(Protocol):
         n_results: int = 8,
         query: Optional[str] = None,
         filing_type: Optional[str] = None,
+    ) -> SearchResult:
+        ...
+
+    def search_by_ticker(
+        self,
+        query: str,
+        ticker: str,
+        n_results: int = 5,
+        section: Optional[str] = None,
     ) -> SearchResult:
         ...
 
@@ -775,7 +791,11 @@ class ChromaDBVectorStore:
             raise ValueError("texts, metadatas, and ids must have same count.")
 
         return [
-            IndexDocument(id=ids[i], text=texts[i], metadata=_sanitize_metadata(safe_metadatas[i]),)
+            IndexDocument(
+                id=ids[i],
+                text=texts[i],
+                metadata=_sanitize_metadata(safe_metadatas[i]),
+            )
             for i in range(len(texts))
         ]
 
@@ -795,17 +815,48 @@ class ChromaDBVectorStore:
 # Wrapper convenience functions
 
 # Module level singleton
-_default_store: Optional[ChromaDBVectorStore] = None
+_default_store: Optional[RetrievalStore] = None
+_default_backend: Optional[VectorBackend] = None
 
-def get_vector_store() -> ChromaDBVectorStore:
+def _get_vector_backend() -> VectorBackend:
+    backend = os.getenv("VECTOR_BACKEND", "qdrant").strip().lower()
+    if backend not in {"chroma", "qdrant"}:
+        raise ValueError(
+            f"Unsupported VECTOR_BACKEND: {backend!r}. Expected 'chroma' or 'qdrant'."
+        )
+    return cast(VectorBackend, backend)
+
+def reset_vector_store() -> None:
+    """Reset the process-local vector store singleton
+
+    For testing only.
     """
-    Get the default vector store instance.
+    global _default_store, _default_backend
+    _default_store = None
+    _default_backend = None
 
+
+def get_vector_store() -> RetrievalStore:
+    """
+    Get the configured vector store instance.
+
+    VECTOR_BACKEND defaults to `qdrant`.
     Returns:
-        ChromaDBVectorStore instance
+        RetrievalStore instance
     """
-    global _default_store
-    if _default_store is None:
+
+    global _default_store, _default_backend
+
+    backend = _get_vector_backend()
+    if _default_store is not None and _default_backend == backend:
+        return _default_store
+
+    if backend == "qdrant":
+        from rag.qdrant_store import QdrantVectorStore
+
+        _default_store = QdrantVectorStore()
+    else:
         _default_store = ChromaDBVectorStore()
 
+    _default_backend = backend
     return _default_store

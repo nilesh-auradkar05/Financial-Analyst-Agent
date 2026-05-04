@@ -74,12 +74,12 @@ from observability.metrics import (
     track_request,
 )
 from rag.ingestion import ingest_10k_for_ticker
-from rag.vector_store import ChromaDBVectorStore, get_vector_store
+from rag.vector_store import RetrievalStore, SearchFilters, get_vector_store
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
 
-def _get_store() -> ChromaDBVectorStore:
+def _get_store() -> RetrievalStore:
     """FastAPI dependency. Override in tests via app.dependency_overrides"""
     return get_vector_store()
 
@@ -188,7 +188,7 @@ async def root():
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Info"])
-async def health(store: ChromaDBVectorStore = Depends(_get_store)):
+async def health(store: RetrievalStore = Depends(_get_store)):
     """Health check endpoint."""
     ollama_ok = await check_ollama_health()
     vector_ok = store.count >= 0
@@ -216,7 +216,7 @@ async def metrics():
 
 
 @app.get("/stats", tags=["Info"])
-async def stats(store: ChromaDBVectorStore = Depends(_get_store)):
+async def stats(store: RetrievalStore = Depends(_get_store)):
     """Vector store and run-store statistics."""
     return {
         "vector_store": store.get_stats(),
@@ -520,15 +520,15 @@ async def ingest_filing(request: IngestionRequest):
 
 
 @app.get("/ingest/{ticker}", tags=["Ingestion"])
-async def check_ingestion(ticker: str, store: ChromaDBVectorStore = Depends(_get_store)):
+async def check_ingestion(ticker: str, store: RetrievalStore = Depends(_get_store)):
     """Check if a ticker has been ingested."""
     ticker = ticker.upper()
-    result = store.search_by_ticker("business", ticker, n_results=1)
+    document_count = store.count_documents(SearchFilters(ticker=ticker))
 
     return {
         "ticker": ticker,
-        "indexed": result.has_results,
-        "document_count": len(result.chunks) if result.has_results else 0,
+        "indexed": document_count > 0,
+        "document_count": document_count,
     }
 
 
