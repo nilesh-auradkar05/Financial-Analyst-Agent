@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from rag.vector_store import IndexDocument, SearchFilters
+from app.components.retrieval.vector_store import IndexDocument, SearchFilters
 
 
 class FakeEmbeddings:
@@ -84,7 +84,7 @@ class FakeQdrantClient:
 
 @pytest.fixture
 def qdrant_store(monkeypatch: pytest.MonkeyPatch):
-    import rag.qdrant_store as module
+    import app.components.retrieval.qdrant_store as module
 
     client = FakeQdrantClient()
     monkeypatch.setattr(module, "QdrantClient", lambda *args, **kwargs: client)
@@ -164,7 +164,7 @@ def test_qdrant_count_uses_payload_filter(qdrant_store):
 
 
 def test_qdrant_point_id_mapping_is_deterministic_uuid_without_project_namespace_constant():
-    import rag.qdrant_store as module
+    import app.components.retrieval.qdrant_store as module
 
     first = module._to_point_id("AAPL_10-K_2025-10-31_business_000")
     second = module._to_point_id("AAPL_10-K_2025-10-31_business_000")

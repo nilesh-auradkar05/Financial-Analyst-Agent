@@ -1,12 +1,12 @@
-"""Tests for graceful-degradation routing in agents.graph (item 3).
+"""Tests for graceful-degradation routing in app.agents.graph (item 3).
 
 The ``_route_after_node`` factory generates routers that skip to
 draft_memo when a fatal error is present.  These tests verify routing
 decisions WITHOUT calling external services.
 """
 
-from agents.graph import _route_after_node
-from agents.state import add_error, create_initial_state, has_fatal_error
+from app.agents.graph import _route_after_node
+from app.agents.state import add_error, create_initial_state, has_fatal_error
 
 
 class TestRouteAfterNode:

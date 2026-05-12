@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from agents.graph import draft_memo_node, verify_memo_node
-from agents.state import create_initial_state
+from app.agents.graph import draft_memo_node, verify_memo_node
+from app.agents.state import create_initial_state
 
 
 class StubLLMResponse:
@@ -28,7 +28,7 @@ async def test_draft_and_verify_nodes_attach_passed_verification(monkeypatch):
         "Supply chain concentration in China remains a risk [2]."
     )
 
-    monkeypatch.setattr("agents.graph.get_llm", lambda temperature=0.7: StubLLM(memo))
+    monkeypatch.setattr("app.agents.graph.get_llm", lambda temperature=0.7: StubLLM(memo))
 
     state = create_initial_state("AAPL", "Apple Inc.")
     state["news_articles"] = [
@@ -71,7 +71,7 @@ async def test_verify_memo_flags_orphan_and_numeric_mismatch(monkeypatch):
         "A second unsupported statement cites [99]."
     )
 
-    monkeypatch.setattr("agents.graph.get_llm", lambda temperature=0.7: StubLLM(memo))
+    monkeypatch.setattr("app.agents.graph.get_llm", lambda temperature=0.7: StubLLM(memo))
 
     state = create_initial_state("AAPL", "Apple Inc.")
     state["news_articles"] = [

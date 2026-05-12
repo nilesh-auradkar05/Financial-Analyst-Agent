@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from rag.section_intent import infer_section_intent
+from app.components.retrieval.section_intent import infer_section_intent
 
 
 def test_infers_risk_factor_intent_for_supply_chain_risk_query():

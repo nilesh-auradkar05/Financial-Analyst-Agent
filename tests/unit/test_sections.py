@@ -1,11 +1,11 @@
-"""Tests for rag.sections — the shared canonical section registry.
+"""Tests for app.components.retrieval.sections — the shared canonical section registry.
 
 This module was extracted (item 11) so ingestion and vector_store share
 one source of truth.  These tests verify normalization, alias resolution,
 and fallback behavior.
 """
 
-from rag.sections import (
+from app.components.retrieval.sections import (
     CANONICAL_SECTION_DISPLAY_NAMES,
     CANONICAL_SECTIONS,
     DEFAULT_SECTIONS,

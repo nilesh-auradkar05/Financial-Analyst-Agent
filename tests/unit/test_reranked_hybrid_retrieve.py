@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-from rag.reranked_hybrid_retrieve import (
+from app.components.retrieval.reranked_hybrid_retrieve import (
     RerankedHybridSearchConfig,
     search_reranked_hybrid,
 )
-from rag.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 
 
 @dataclass

@@ -4,7 +4,7 @@ import argparse
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, SupportsFloat, SupportsIndex
 
 from evaluation.retrieval_eval import (
     RetrievalEvalCase,
@@ -82,17 +82,24 @@ def _print_result_row(result: RetrievalEvalResult) -> None:
         print(f"\terror: {result.error}")
 
 
+def _summary_float(summary: dict[str, object], key: str, default: float = 0.0) -> float:
+    value = summary.get(key, default)
+    if isinstance(value, (str, bytes, SupportsFloat, SupportsIndex)):
+        return float(value)
+    return default
+
+
 def _print_summary(summary: dict[str, object]) -> None:
     print("=" * 120)
     print(
-        f"pass_rate={float(summary['pass_rate']):.2f} | "
-        f"avg_latency_ms={float(summary['avg_latency_ms']):.1f} | "
-        f"avg_p@5={float(summary.get('avg_precision_at_5', 0.0)):.2f} | "
-        f"avg_r@5={float(summary.get('avg_recall_at_5', 0.0)):.2f} | "
-        f"avg_mrr@5={float(summary.get('avg_mrr_at_5', 0.0)):.2f} | "
-        f"avg_ndcg@5={float(summary.get('avg_ndcg_at_5', 0.0)):.2f} | "
-        f"avg_section_recall@k={float(summary['avg_section_recall_at_k']):.2f} | "
-        f"avg_keyword_hit_rate={float(summary['avg_keyword_hit_rate']):.2f}"
+        f"pass_rate={_summary_float(summary, 'pass_rate'):.2f} | "
+        f"avg_latency_ms={_summary_float(summary, 'avg_latency_ms'):.1f} | "
+        f"avg_p@5={_summary_float(summary, 'avg_precision_at_5'):.2f} | "
+        f"avg_r@5={_summary_float(summary, 'avg_recall_at_5'):.2f} | "
+        f"avg_mrr@5={_summary_float(summary, 'avg_mrr_at_5'):.2f} | "
+        f"avg_ndcg@5={_summary_float(summary, 'avg_ndcg_at_5'):.2f} | "
+        f"avg_section_recall@k={_summary_float(summary, 'avg_section_recall_at_k'):.2f} | "
+        f"avg_keyword_hit_rate={_summary_float(summary, 'avg_keyword_hit_rate'):.2f}"
     )
 
 

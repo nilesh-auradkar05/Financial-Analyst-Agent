@@ -6,8 +6,8 @@ Uses FastAPI's TestClient — no live server needed.
 import pytest
 from fastapi.testclient import TestClient
 
-from api.main import _get_store, app
-from rag.vector_store import ChromaDBVectorStore
+from app.main import _get_store, app
+from app.components.retrieval.vector_store import ChromaDBVectorStore
 
 
 @pytest.fixture

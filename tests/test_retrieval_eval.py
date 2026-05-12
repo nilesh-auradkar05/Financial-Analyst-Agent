@@ -12,7 +12,7 @@ from evaluation.retrieval_eval import (
     load_retrieval_cases,
     summarize_retrieval_results,
 )
-from rag.vector_store import RetrievedChunk, SearchResult
+from app.components.retrieval.vector_store import RetrievedChunk, SearchResult
 
 
 class StubStore:

@@ -208,13 +208,11 @@ __marimo__/
 
 # Custom files
 data/
-tools/__pycache__/
-models/__pycache__/
-api/__pycache__/
-agents/__pycache__/
-configs/__pycache__/
-rag/__pycache__/
+app/**/__pycache__/
 tests/__pycache__/
+evaluation/reports/
+evaluation/results/
+.deepeval/
 
 agents/crew_agents.py
 Alpha-Financial-Analyst.zip
@@ -222,3 +220,7 @@ old-readme.md
 README-new.md
 ALPHA_ANALYST_PROJECT_DOCUMENT_v4_STATUS_UPDATE.md
 ALPHA_ANALYST_PROJECT_DOCUMENT_v3_MVP_PLAN.md
+Nilesh_Auradkar_B01044448_CS-595-55_Project-Report.docx
+Nilesh_Auradkar_B01044448_CS-595-55_Project-Report.pdf
+Alpha_Analyst_Progressive_Project_Report_v2.docx
+.env.local

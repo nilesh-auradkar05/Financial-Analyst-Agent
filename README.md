@@ -169,62 +169,30 @@ Ticker Request
 ## Project Structure
 ```
 alpha-analyst/
-├── agent/
-│   ├── state.py          # TypedDict state definition
-│   └── graph.py          # LangGraph workflow
-├── api/
-│   ├── main.py           # FastAPI application
-│   └── schemas.py        # Pydantic models
-├── models/
-│   ├── llm.py            # Ollama integration
-│   └── sentiment.py      # FinBERT classifier
-├── rag/
-│   ├── embeddings.py     # Embedding generation
-│   ├── vector_store.py   # ChromaDB wrapper
-│   └── ingestion.py      # Document processing
-├── tools/
-│   ├── web_search.py     # Tavily integration
-│   ├── stock_data.py     # YFinance integration
-│   └── sec_filings.py    # SEC EDGAR integration
+├── app/
+│   ├── main.py                     # FastAPI application
+│   ├── models.py                   # Pydantic API models
+│   ├── config.py                   # Settings management
+│   ├── agents/
+│   │   ├── graph.py                # LangGraph workflow
+│   │   └── state.py                # TypedDict state definition
+│   ├── components/
+│   │   └── retrieval/              # Vector stores, ingestion, RAG modes
+│   ├── services/
+│   │   ├── llm.py                  # Ollama integration
+│   │   ├── sentiment.py            # FinBERT classifier
+│   │   ├── run_store.py            # File-backed async job state
+│   │   └── tools/                  # Tavily, YFinance, SEC clients
+│   ├── observability/              # Prometheus and LangSmith helpers
+│   └── prompts/                    # Prompt assets and templates
+├── evaluation/                     # Retrieval and RAG quality tooling
+├── monitoring/                     # Prometheus/Grafana local stack
+├── scripts/                        # Smoke and utility scripts
 ├── tests/
 │   ├── unit/
 │   └── integration/
-├── config.py             # Settings management
 └── pyproject.toml        # Dependencies
 ```
-
-<!-- ## Repository Layout
-
-```text
-Financial-Analyst-Agent/
-├── agents/
-├── api/
-│   ├── main.py
-│   ├── run_store.py
-│   └── schemas.py
-├── configs/
-├── evaluation/
-├── models/
-├── observability/
-├── rag/
-│   ├── embeddings.py
-│   ├── evidence.py
-│   ├── ingestion.py
-│   └── vector_store.py
-├── scripts/
-├── tests/
-│   ├── eval/
-│   ├── integration/
-│   ├── unit/
-│   ├── test_api_integration.py
-│   ├── test_eval.py
-│   └── test_run_store.py
-├── tools/
-├── Dockerfile
-├── Makefile
-├── docker-compose.yml
-└── pyproject.toml
-``` -->
 
 ## Requirements
 
@@ -287,7 +255,7 @@ make serve
 Equivalent direct command:
 
 ```bash
-uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Production-style local run
@@ -343,7 +311,7 @@ curl http://localhost:8000/jobs/<job_id>
 
 ## Retrieval and Ingestion Notes
 
-The current retrieval path is centered on **Chroma** and a backend-agnostic retrieval contract inside `rag/vector_store.py`.
+The current retrieval path is centered on **Chroma** and a backend-agnostic retrieval contract inside `app/components/retrieval/vector_store.py`.
 
 The repo already includes support for:
 
@@ -364,7 +332,7 @@ The current ingestion path is section-aware and tracks fields such as:
 
 ## Async Run State
 
-Async runs are tracked through a **file-backed run store** in `api/run_store.py`.
+Async runs are tracked through a **file-backed run store** in `app/run_store.py`.
 
 That is better than ephemeral in-memory state, but it is still an MVP persistence layer and not the final long-term service-grade storage approach.
 

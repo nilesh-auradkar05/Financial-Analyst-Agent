@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from rag.section_aware_search import search_section_aware
-from rag.vector_store import RetrievedChunk, SearchResult
+from app.components.retrieval.section_aware_search import search_section_aware
+from app.components.retrieval.vector_store import RetrievedChunk, SearchResult
 
 
 class SectionAwareStubStore:

@@ -1,4 +1,4 @@
-"""Tests for models.llm — replaces the old ``_main()`` smoke test.
+"""Tests for app.services.llm — replaces the old ``_main()`` smoke test.
 
 Mocks the Ollama server; no GPU needed for CI.
 """
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from models.llm import (
+from app.services.llm import (
     ANALYST_SYSTEM_PROMPT,
     MEMO_TEMPLATE,
     check_ollama_health,
@@ -46,7 +46,7 @@ class TestHealthCheck:
             "models": [{"name": "qwen3-vl:8b"}],
         }
 
-        with patch("models.llm.httpx.AsyncClient") as mockclient:
+        with patch("app.services.llm.httpx.AsyncClient") as mockclient:
             # The key: __aenter__ must return the SAME instance
             # we configure, otherwise async-with creates a new one
             instance = AsyncMock()
@@ -59,7 +59,7 @@ class TestHealthCheck:
 
     @pytest.mark.asyncio
     async def test_unhealthy_server(self):
-        with patch("models.llm.httpx.AsyncClient") as mockclient:
+        with patch("app.services.llm.httpx.AsyncClient") as mockclient:
             instance = AsyncMock()
             instance.get = AsyncMock(side_effect=Exception("connection refused"))
             instance.__aenter__.return_value = instance
@@ -77,7 +77,7 @@ class TestHealthCheck:
             "models": [{"name": "llama2:7b"}],
         }
 
-        with patch("models.llm.httpx.AsyncClient") as mockclient:
+        with patch("app.services.llm.httpx.AsyncClient") as mockclient:
             instance = AsyncMock()
             instance.get = AsyncMock(return_value=mock_resp)
             instance.__aenter__.return_value = instance

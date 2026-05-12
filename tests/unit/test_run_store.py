@@ -1,8 +1,8 @@
-"""Tests for api.run_store — persistent job state."""
+"""Tests for app.services.run_store — persistent job state."""
 
 import pytest
 
-from api.run_store import FileBackedRunStore, RunRecord
+from app.services.run_store import FileBackedRunStore, RunRecord
 
 
 @pytest.fixture

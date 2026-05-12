@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Optional
 
 from evaluation.retrieval_eval import RetrievalEvalCase, evaluate_retrieval_case
-from rag.vector_store import IndexDocument, RetrievedChunk, SearchFilters, SearchResult
+from app.components.retrieval.vector_store import IndexDocument, RetrievedChunk, SearchFilters, SearchResult
 
 
 class EvalHybridStubStore:

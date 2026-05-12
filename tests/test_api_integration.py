@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-import api.main as api_main
-from api.run_store import FileBackedRunStore
-from rag.vector_store import SearchFilters
+import app.main as api_main
+from app.services.run_store import FileBackedRunStore
+from app.components.retrieval.vector_store import SearchFilters
 
 
 class StubSearchResult:

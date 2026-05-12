@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from rag.evidence import EvidencePacket
+from app.components.retrieval.evidence import EvidencePacket
 
 
 @dataclass

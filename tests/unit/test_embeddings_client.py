@@ -1,4 +1,4 @@
-"""Tests for rag.embeddings — replaces the old ``_main()`` smoke test.
+"""Tests for app.components.retrieval.embeddings — replaces the old ``_main()`` smoke test.
 
 These tests mock the Ollama server so they run in CI without GPU.
 """
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rag.embeddings import (
+from app.components.retrieval.embeddings import (
     EmbeddingResult,
     EmbeddingsClient,
     embed_query,
@@ -31,7 +31,7 @@ class TestGetEmbeddings:
 # Medium: sync wrappers
 
 class TestSyncWrappers:
-    @patch("rag.embeddings.get_embeddings")
+    @patch("app.components.retrieval.embeddings.get_embeddings")
     def test_embed_texts(self, mock_get):
         mock_emb = MagicMock()
         mock_emb.embed_documents.return_value = [[0.1, 0.2], [0.3, 0.4]]
@@ -41,7 +41,7 @@ class TestSyncWrappers:
         assert len(result) == 2
         mock_emb.embed_documents.assert_called_once()
 
-    @patch("rag.embeddings.get_embeddings")
+    @patch("app.components.retrieval.embeddings.get_embeddings")
     def test_embed_query(self, mock_get):
         mock_emb = MagicMock()
         mock_emb.embed_query.return_value = [0.5, 0.6]

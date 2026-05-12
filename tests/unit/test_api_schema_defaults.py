@@ -1,4 +1,4 @@
-from api.schemas import (
+from app.models import (
     AnalysisResponse,
     CitationResponse,
     ErrorDetail,

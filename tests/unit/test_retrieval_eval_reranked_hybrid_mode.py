@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from evaluation.retrieval_eval import RetrievalEvalCase, _search
-from rag.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 
 
 class FakeStore:
@@ -29,7 +29,7 @@ class FakeReranker:
 
 
 def test_retrieval_eval_routes_reranked_hybrid_mode(monkeypatch) -> None:
-    import rag.reranked_hybrid_retrieve as module
+    import app.components.retrieval.reranked_hybrid_retrieve as module
 
     monkeypatch.setattr(module, "_get_cross_encoder", lambda model_name, device: FakeReranker())
 

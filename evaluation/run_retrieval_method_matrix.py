@@ -20,7 +20,7 @@ from evaluation.retrieval_eval import (
     load_retrieval_cases,
     save_retrieval_results,
 )
-from rag.vector_store import get_vector_store
+from app.components.retrieval.vector_store import get_vector_store
 
 DEFAULT_MODES = [
     "naive",

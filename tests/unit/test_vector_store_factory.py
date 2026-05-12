@@ -4,8 +4,8 @@ import pytest
 
 
 def test_vector_store_factory_defaults_to_qdrant(monkeypatch: pytest.MonkeyPatch):
-    import rag.qdrant_store as qdrant_module
-    import rag.vector_store as module
+    import app.components.retrieval.qdrant_store as qdrant_module
+    import app.components.retrieval.vector_store as module
 
     class FakeQdrant:
         pass
@@ -20,8 +20,8 @@ def test_vector_store_factory_defaults_to_qdrant(monkeypatch: pytest.MonkeyPatch
 
 
 def test_vector_store_factory_selects_qdrant(monkeypatch: pytest.MonkeyPatch):
-    import rag.qdrant_store as qdrant_module
-    import rag.vector_store as module
+    import app.components.retrieval.qdrant_store as qdrant_module
+    import app.components.retrieval.vector_store as module
 
     class FakeQdrant:
         pass
@@ -36,7 +36,7 @@ def test_vector_store_factory_selects_qdrant(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_vector_store_factory_rejects_unknown_backend(monkeypatch: pytest.MonkeyPatch):
-    import rag.vector_store as module
+    import app.components.retrieval.vector_store as module
 
     monkeypatch.setenv("VECTOR_BACKEND", "pinecone-for-some-reason")
     module.reset_vector_store()

@@ -5,8 +5,8 @@ from typing import Optional
 
 from langchain_core.documents import Document
 
-from rag.hybrid_retrieve import search_langchain_hybrid
-from rag.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from app.components.retrieval.hybrid_retrieve import search_langchain_hybrid
+from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 
 
 @dataclass

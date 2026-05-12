@@ -1,11 +1,11 @@
-"""Tests for the citation registry and verification in agents.graph.
+"""Tests for the citation registry and verification in app.agents.graph.
 
 Item 13: The old approach told the LLM "use [1]" then separately numbered
 sources — hoping they matched.  The registry pattern builds a numbered list
 BEFORE the LLM call and verifies used indices after.
 """
 
-from agents.graph import (
+from app.agents.graph import (
     _build_citation_registry,
     _extract_used_citations,
     _format_registry_for_prompt,

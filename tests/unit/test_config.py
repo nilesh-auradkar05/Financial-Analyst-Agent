@@ -1,6 +1,6 @@
-"""Tests for configs.config — covers defaults, custom values, validation, CORS, retry."""
+"""Tests for app.config — covers defaults, custom values, validation, CORS, retry."""
 
-from configs.config import (
+from app.config import (
     OllamaSettings,
     RetrySettings,
     Settings,

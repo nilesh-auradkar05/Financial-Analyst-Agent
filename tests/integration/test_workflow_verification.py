@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agents import graph as graph_mod
+from app.agents import graph as graph_mod
 
 
 class StubVectorStore:

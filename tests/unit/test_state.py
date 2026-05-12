@@ -1,9 +1,9 @@
-"""Tests for agents.state — state helpers, error tracking, data availability.
+"""Tests for app.agents.state — state helpers, error tracking, data availability.
 
 Replaces the inline test logic that was in graph.py's old _main() block.
 """
 
-from agents.state import (
+from app.agents.state import (
     AgentStep,
     add_error,
     create_initial_state,

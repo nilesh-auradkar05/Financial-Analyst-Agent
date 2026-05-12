@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-import rag.ingestion as ingestion
+import app.components.retrieval.ingestion as ingestion
 
 
 class StubVectorStore:

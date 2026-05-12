@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-import api.main as main
-from api.run_store import FileBackedRunStore
+import app.main as main
+from app.services.run_store import FileBackedRunStore
 
 
 class FakeVectorStore:

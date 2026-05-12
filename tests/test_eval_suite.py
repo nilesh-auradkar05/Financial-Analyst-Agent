@@ -160,7 +160,7 @@ async def evaluate_ticker(ticker: str, run_full: bool = False) -> EvalResult:
     start = time.time()
 
     try:
-        from agents.graph import run_agent
+        from app.agents.graph import run_agent
 
         logger.info(f"Evaluating {ticker}...")
         out = await run_agent(ticker)

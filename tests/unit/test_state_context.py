@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agents.state import create_initial_state, get_context_for_llm
+from app.agents.state import create_initial_state, get_context_for_llm
 
 
 def test_get_context_for_llm_does_not_number_sources():

@@ -1,0 +1,123 @@
+[
+    {
+      "id": "aapl_memo_grounding_core_business",
+      "ticker": "AAPL",
+      "input": "Generate a grounded analyst memo for Apple that explains core business drivers and cites retrieved filing/news evidence.",
+      "expected_output": "The memo should identify Apple's main business drivers, cite retrieved evidence for factual claims, avoid unsupported revenue or market-share claims, and clearly separate evidence-backed observations from investment judgment.",
+      "tags": ["memo", "business", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "aapl_memo_grounding_risk_factors",
+      "ticker": "AAPL",
+      "input": "Generate a grounded analyst memo for Apple focused on risk factors, supply-chain exposure, competition, and regulatory pressure.",
+      "expected_output": "The memo should discuss risk factors using retrieved evidence, cover supply-chain or manufacturing exposure when supported, mention competitive and regulatory risks only when evidence is present, and avoid invented citations.",
+      "tags": ["memo", "risk_factors", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "aapl_memo_grounding_financial_performance",
+      "ticker": "AAPL",
+      "input": "Generate a grounded analyst memo for Apple that explains financial-performance signals and connects them to evidence.",
+      "expected_output": "The memo should summarize financial-performance signals using cited evidence, avoid unsupported numeric claims, explain the investment relevance of the evidence, and include uncertainty where support is weak.",
+      "tags": ["memo", "md&a", "financial_performance"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "aapl_memo_grounding_market_risk",
+      "ticker": "AAPL",
+      "input": "Generate a grounded analyst memo for Apple that includes market-risk exposure and cites the retrieved context.",
+      "expected_output": "The memo should identify market-risk exposure only when supported by retrieved context, cite source numbers for factual claims, avoid generic finance filler, and state limitations when evidence is incomplete.",
+      "tags": ["memo", "market_risk", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "msft_memo_grounding_core_business",
+      "ticker": "MSFT",
+      "input": "Generate a grounded analyst memo for Microsoft that explains core business drivers and cites retrieved filing/news evidence.",
+      "expected_output": "The memo should identify Microsoft's main business drivers, cite retrieved evidence for factual claims, avoid unsupported segment claims, and clearly separate evidence-backed observations from investment judgment.",
+      "tags": ["memo", "business", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "msft_memo_grounding_risk_factors",
+      "ticker": "MSFT",
+      "input": "Generate a grounded analyst memo for Microsoft focused on risk factors, cloud demand, AI infrastructure, competition, and regulation.",
+      "expected_output": "The memo should discuss risk factors using retrieved evidence, cover cloud/AI infrastructure or competition only when supported, cite every material factual claim, and avoid invented citations.",
+      "tags": ["memo", "risk_factors", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "msft_memo_grounding_financial_performance",
+      "ticker": "MSFT",
+      "input": "Generate a grounded analyst memo for Microsoft that explains financial-performance signals and connects them to evidence.",
+      "expected_output": "The memo should summarize financial-performance signals using cited evidence, avoid unsupported numeric claims, explain the investment relevance of the evidence, and include uncertainty where support is weak.",
+      "tags": ["memo", "md&a", "financial_performance"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "msft_memo_grounding_market_risk",
+      "ticker": "MSFT",
+      "input": "Generate a grounded analyst memo for Microsoft that includes market-risk exposure and cites the retrieved context.",
+      "expected_output": "The memo should identify market-risk exposure only when supported by retrieved context, cite source numbers for factual claims, avoid generic finance filler, and state limitations when evidence is incomplete.",
+      "tags": ["memo", "market_risk", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "nvda_memo_grounding_core_business",
+      "ticker": "NVDA",
+      "input": "Generate a grounded analyst memo for NVIDIA that explains core business drivers and cites retrieved filing/news evidence.",
+      "expected_output": "The memo should identify NVIDIA's main business drivers, cite retrieved evidence for factual claims, avoid unsupported AI-demand or datacenter claims, and clearly separate evidence-backed observations from investment judgment.",
+      "tags": ["memo", "business", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "nvda_memo_grounding_risk_factors",
+      "ticker": "NVDA",
+      "input": "Generate a grounded analyst memo for NVIDIA focused on risk factors, demand concentration, supply constraints, competition, and export controls.",
+      "expected_output": "The memo should discuss risk factors using retrieved evidence, cover demand concentration, supply constraints, competition, or export controls only when supported, cite every material factual claim, and avoid invented citations.",
+      "tags": ["memo", "risk_factors", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "nvda_memo_grounding_financial_performance",
+      "ticker": "NVDA",
+      "input": "Generate a grounded analyst memo for NVIDIA that explains financial-performance signals and connects them to evidence.",
+      "expected_output": "The memo should summarize financial-performance signals using cited evidence, avoid unsupported numeric claims, explain the investment relevance of the evidence, and include uncertainty where support is weak.",
+      "tags": ["memo", "md&a", "financial_performance"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    },
+    {
+      "id": "nvda_memo_grounding_market_risk",
+      "ticker": "NVDA",
+      "input": "Generate a grounded analyst memo for NVIDIA that includes market-risk exposure and cites the retrieved context.",
+      "expected_output": "The memo should identify market-risk exposure only when supported by retrieved context, cite source numbers for factual claims, avoid generic finance filler, and state limitations when evidence is incomplete.",
+      "tags": ["memo", "market_risk", "grounding"],
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0
+    }
+  ]
+  

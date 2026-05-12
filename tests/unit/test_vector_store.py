@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import rag.vector_store as vector_store
-from rag.vector_store import (
+import app.components.retrieval.vector_store as vector_store
+from app.components.retrieval.vector_store import (
     ChromaDBVectorStore,
     IndexDocument,
     RetrievedChunk,

@@ -1,5 +1,5 @@
-from rag.evidence import EvidencePacket
-from rag.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from app.components.retrieval.evidence import EvidencePacket
+from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 
 
 def test_search_filters_map_section_name_to_existing_collection_key():
