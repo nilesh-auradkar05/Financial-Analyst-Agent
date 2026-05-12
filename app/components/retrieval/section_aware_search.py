@@ -9,7 +9,11 @@ from typing import Any, Optional, cast
 
 from pydantic import BaseModel, Field
 
-from app.components.retrieval.section_intent import SectionIntent, infer_section_intent, normalize_query_text
+from app.components.retrieval.section_intent import (
+    SectionIntent,
+    infer_section_intent,
+    normalize_query_text,
+)
 from app.components.retrieval.sections import canonical_section_key
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 

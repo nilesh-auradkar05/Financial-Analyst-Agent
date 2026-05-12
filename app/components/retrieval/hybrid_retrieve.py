@@ -32,7 +32,12 @@ try:
 except ImportError:
     from langchain.retrievers import EnsembleRetriever  # type: ignore[no-redef]
 
-from app.components.retrieval.vector_store import IndexDocument, RetrievedChunk, SearchFilters, SearchResult
+from app.components.retrieval.vector_store import (
+    IndexDocument,
+    RetrievedChunk,
+    SearchFilters,
+    SearchResult,
+)
 
 DEFAULT_DENSE_WEIGHT = 0.65
 DEFAULT_SPARSE_WEIGHT = 0.35

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.components.retrieval.vector_store import RetrievedChunk, SearchResult
 from evaluation.retrieval_eval import (
     RetrievalEvalCase,
     SearchFilters,
@@ -12,7 +13,6 @@ from evaluation.retrieval_eval import (
     load_retrieval_cases,
     summarize_retrieval_results,
 )
-from app.components.retrieval.vector_store import RetrievedChunk, SearchResult
 
 
 class StubStore:

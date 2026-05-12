@@ -16,7 +16,6 @@ from typing import Any, Optional, cast
 from loguru import logger
 from qdrant_client import QdrantClient, models
 
-from app.config import settings
 from app.components.retrieval.embeddings import get_embeddings
 from app.components.retrieval.vector_store import (
     IndexDocument,
@@ -28,6 +27,7 @@ from app.components.retrieval.vector_store import (
     canonical_section_display_name,
     canonical_section_key,
 )
+from app.config import settings
 
 DEFAULT_QDRANT_URL = "http://localhost:6333"
 DEFAULT_VECTOR_DISTANCE = models.Distance.COSINE

@@ -7,8 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.main as api_main
-from app.services.run_store import FileBackedRunStore
 from app.components.retrieval.vector_store import SearchFilters
+from app.services.run_store import FileBackedRunStore
 
 
 class StubSearchResult:

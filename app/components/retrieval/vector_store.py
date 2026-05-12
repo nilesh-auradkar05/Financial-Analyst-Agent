@@ -37,13 +37,13 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from loguru import logger
 
-from app.config import settings
 from app.components.retrieval.embeddings import get_embeddings
 from app.components.retrieval.evidence import EvidencePacket
 from app.components.retrieval.sections import (
     canonical_section_display_name,
     canonical_section_key,
 )
+from app.config import settings
 
 # DATA MODELS
 

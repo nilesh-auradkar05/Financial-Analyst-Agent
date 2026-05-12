@@ -36,7 +36,11 @@ from app.components.retrieval.hybrid_retrieve import (
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 
 try:
-    from app.components.retrieval.section_intent import SectionIntent, infer_section_intent, normalize_query_text
+    from app.components.retrieval.section_intent import (
+        SectionIntent,
+        infer_section_intent,
+        normalize_query_text,
+    )
 except ImportError:
     SectionIntent = Any  # type: ignore[misc, assignment]
 

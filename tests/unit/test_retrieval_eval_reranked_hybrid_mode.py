@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from evaluation.retrieval_eval import RetrievalEvalCase, _search
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from evaluation.retrieval_eval import RetrievalEvalCase, _search
 
 
 class FakeStore:

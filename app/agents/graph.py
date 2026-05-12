@@ -38,13 +38,13 @@ from app.agents.state import (
     get_data_availability,
     has_fatal_error,
 )
-from evaluation.grounding import evaluate_memo_grounding
+from app.components.retrieval.vector_store import get_vector_store
+from app.observability.langsmith import get_tracer
 from app.services.llm import ANALYST_SYSTEM_PROMPT, get_llm
 from app.services.sentiment import analyze_sentiment_batch
-from app.observability.langsmith import get_tracer
-from app.components.retrieval.vector_store import get_vector_store
 from app.services.tools.stock_data_tool import get_stock_data
 from app.services.tools.web_search_tool import search_company_news
+from evaluation.grounding import evaluate_memo_grounding
 
 # NODE FUNCTIONS
 

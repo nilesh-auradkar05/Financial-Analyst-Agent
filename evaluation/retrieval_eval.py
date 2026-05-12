@@ -12,7 +12,12 @@ from app.components.retrieval.evidence import EvidencePacket
 from app.components.retrieval.hybrid_retrieve import search_langchain_hybrid
 from app.components.retrieval.reranked_hybrid_retrieve import search_reranked_hybrid
 from app.components.retrieval.section_aware_search import search_section_aware
-from app.components.retrieval.vector_store import SearchFilters, SearchResult, canonical_section_key, get_vector_store
+from app.components.retrieval.vector_store import (
+    SearchFilters,
+    SearchResult,
+    canonical_section_key,
+    get_vector_store,
+)
 
 RANKING_K = 5
 

@@ -39,7 +39,12 @@ from app.components.retrieval.sections import (
     canonicalize_section_name,
     fallback_section,
 )
-from app.components.retrieval.vector_store import IndexDocument, RetrievalStore, SearchFilters, get_vector_store
+from app.components.retrieval.vector_store import (
+    IndexDocument,
+    RetrievalStore,
+    SearchFilters,
+    get_vector_store,
+)
 from app.services.tools.sec_filings_tool import Filing, get_latest_10k
 
 # Data Models

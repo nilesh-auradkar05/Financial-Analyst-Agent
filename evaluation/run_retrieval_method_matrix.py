@@ -14,13 +14,13 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Sequence
 
+from app.components.retrieval.vector_store import get_vector_store
 from evaluation.compare_retrieval_results import compare_payloads, load_payload
 from evaluation.retrieval_eval import (
     evaluate_retrieval_cases,
     load_retrieval_cases,
     save_retrieval_results,
 )
-from app.components.retrieval.vector_store import get_vector_store
 
 DEFAULT_MODES = [
     "naive",

@@ -3,8 +3,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Optional
 
+from app.components.retrieval.vector_store import (
+    IndexDocument,
+    RetrievedChunk,
+    SearchFilters,
+    SearchResult,
+)
 from evaluation.retrieval_eval import RetrievalEvalCase, evaluate_retrieval_case
-from app.components.retrieval.vector_store import IndexDocument, RetrievedChunk, SearchFilters, SearchResult
 
 
 class EvalHybridStubStore:

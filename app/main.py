@@ -46,7 +46,9 @@ from loguru import logger
 # Local Imports
 from app.agents.graph import run_agent
 from app.agents.state import AgentState
-from app.services.run_store import FileBackedRunStore
+from app.components.retrieval.ingestion import ingest_10k_for_ticker
+from app.components.retrieval.vector_store import RetrievalStore, SearchFilters, get_vector_store
+from app.config import settings, validate_settings
 from app.models import (
     AnalysisRequest,
     AnalysisResponse,
@@ -64,8 +66,6 @@ from app.models import (
     VerificationClaimResponse,
     VerificationResponse,
 )
-from app.config import settings, validate_settings
-from app.services.llm import check_ollama_health
 from app.observability.langsmith import check_langsmith_connection, setup_langsmith_env
 from app.observability.metrics import (
     get_metrics,
@@ -73,8 +73,8 @@ from app.observability.metrics import (
     track_agent_run,
     track_request,
 )
-from app.components.retrieval.ingestion import ingest_10k_for_ticker
-from app.components.retrieval.vector_store import RetrievalStore, SearchFilters, get_vector_store
+from app.services.llm import check_ollama_health
+from app.services.run_store import FileBackedRunStore
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
