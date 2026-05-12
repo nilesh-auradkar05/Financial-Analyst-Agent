@@ -20,7 +20,7 @@ def test_chat_nvidia_defaults_from_env(monkeypatch):
     assert config.model == "deepseek-ai/deepseek-v4-pro"
     assert config.top_p == 0.95
     assert config.max_tokens == 16384
-    assert config.extra_body == {"thinking_mode": False}
+    assert config.extra_body == {"chat_template_kwargs": {"thinking_mode": False}}
 
 
 def test_anthropic_defaults_from_env(monkeypatch):
