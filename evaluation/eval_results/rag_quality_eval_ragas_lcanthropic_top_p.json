@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-05-12T03:58:35.706917+00:00",
+  "sample_count": 1,
+  "judges": [
+    "ragas"
+  ],
+  "summary": {
+    "metric_averages": {
+      "ragas.AnswerRelevancy": 0.469912819201541,
+      "ragas.ContextPrecision": 0.9999999999666667,
+      "ragas.ContextRecall": 0.6,
+      "ragas.Faithfulness": 0.41379310344827586
+    },
+    "metric_counts": {
+      "ragas.AnswerRelevancy": 1,
+      "ragas.ContextPrecision": 1,
+      "ragas.ContextRecall": 1,
+      "ragas.Faithfulness": 1
+    },
+    "error_count": 0,
+    "judge_provider": "langchain_anthropic",
+    "judge_model": "claude-sonnet-4-6"
+  },
+  "scores": [
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "Faithfulness",
+      "score": 0.41379310344827586,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "AnswerRelevancy",
+      "score": 0.469912819201541,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextPrecision",
+      "score": 0.9999999999666667,
+      "passed": true,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextRecall",
+      "score": 0.6,
+      "passed": false,
+      "reason": null,
+      "error": null
+    }
+  ]
+}

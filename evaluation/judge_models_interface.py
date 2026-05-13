@@ -4,6 +4,7 @@ Provider-neutral judge model adapters for RAG quality evaluation.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from enum import StrEnum
@@ -14,12 +15,59 @@ from pydantic import BaseModel, Field, SecretStr, field_validator
 
 load_dotenv()
 
+def _error_text(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+def _is_async_sync_mismatch(exc: BaseException) -> bool:
+    """Detect async-call failures caused by sync-only model/client objects"""
+
+    text = _error_text(exc).lower()
+    fragments = (
+        "agenerate",
+        "async",
+        "sync object",
+        "does not support async",
+        "object cannot be used in 'await'",
+        "can't be used in 'await'",
+        "has no attribute 'ainvoke'",
+        "has no attribute 'agenerate'",
+    )
+
+    return any(fragment in text for fragment in fragments)
+
+def _invoke_model(model: Any, prompt: str) -> Any:
+    """Invoke a LangChain-like model synchronously."""
+
+    if hasattr(model, "invoke"):
+        return model.invoke(prompt)
+
+    raise TypeError(f"Model does not support sync invoke(): {type(model).__name__}")
+
+async def _ainvoke_or_thread(model: Any, prompt: str) -> Any:
+    """
+    Invoke a LangChain-like model asynchronously.
+
+    Falls back to running sync invoke() in a thread when the model/client
+    does not actually support async execution.
+    """
+
+    if hasattr(model, "ainvoke"):
+        try:
+            return await model.ainvoke(prompt)
+        except Exception as exc:
+            if not _is_async_sync_mismatch(exc):
+                raise
+
+    if hasattr(model, "invoke"):
+        return await asyncio.to_thread(model.invoke, prompt)
+
+    raise TypeError(f"Model does not support invoke() or ainvoke(): {type(model).__name__}")
+
 class JudgeProvider(StrEnum):
     """Supported judge model providers."""
 
     DEEPEVAL_DEFAULT = "deepeval_default"
     LANGCHAIN_ANTHROPIC = "langchain_anthropic"
-    CHAT_NVIDIA = "chat_nvidia"
 
 class JudgeModelConfig(BaseModel):
     """Runtime config for LLM-as-Judge providers"""
@@ -30,7 +78,6 @@ class JudgeModelConfig(BaseModel):
     temperature: float = Field(default=0.0, ge=0.0, le=1.0)
     top_p: float | None = Field(default=None, ge=0.0, le=1.0)
     max_tokens: int | None = Field(default=None, gt=0)
-    extra_body: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("model")
     @classmethod
@@ -47,7 +94,6 @@ def judge_config_from_env(
     temperature: float,
     top_p: float | None,
     max_tokens: int | None,
-    extra_body_json: str | None,
 ) -> JudgeModelConfig:
     """Build judge config from CLI values and env variables."""
 
@@ -58,31 +104,11 @@ def judge_config_from_env(
     )
     selected_model = model or os.getenv("RAG_EVAL_JUDGE_MODEL")
 
-    extra_body: dict[str, Any] = {}
-    raw_extra_body = extra_body_json or os.getenv("RAG_EVAL_JUDGE_EXTRA_BODY")
-    if raw_extra_body:
-        parsed = json.loads(raw_extra_body)
-        if not isinstance(parsed, dict):
-            raise ValueError("Judge extra body must be a JSON object.")
-        extra_body = parsed
-
     api_key: SecretStr | None = None
-    if selected_provider == JudgeProvider.CHAT_NVIDIA:
-        raw_key = os.getenv("NVIDIA_API_KEY")
-        api_key = SecretStr(raw_key) if raw_key else None
-        selected_model = selected_model or "deepseek-ai/deepseek-v4-pro"
-        max_tokens = max_tokens or 16384
-        top_p = top_p if top_p is not None else 0.95
-        if not extra_body:
-            extra_body = {
-                "chat_template_kwargs": {
-                    "thinking_mode": False
-                }
-            }
-    elif selected_provider == JudgeProvider.LANGCHAIN_ANTHROPIC:
+    if selected_provider == JudgeProvider.LANGCHAIN_ANTHROPIC:
         raw_key = os.getenv("ANTHROPIC_API_KEY")
         api_key = SecretStr(raw_key) if raw_key else None
-        selected_model = selected_model or "claude-haiku-4-5-20251001"
+        selected_model = selected_model or "claude-sonnet-4-6"
         max_tokens = max_tokens or 4096
 
     return JudgeModelConfig(
@@ -92,13 +118,20 @@ def judge_config_from_env(
         temperature=temperature,
         top_p=top_p,
         max_tokens=max_tokens,
-        extra_body=extra_body,
     )
 
 def _secret_value(secret: SecretStr | None) -> str | None:
     if secret is None:
         return None
     return secret.get_secret_value()
+
+
+def _env_bool(name: str, *, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
 
 def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
     """Create a LangChain chat model for RAGAS and custom DeepEval judges."""
@@ -108,30 +141,6 @@ def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
 
     if not config.model:
         raise ValueError(f"model is required for provider={config.provider}")
-
-    if config.provider == JudgeProvider.CHAT_NVIDIA:
-        try:
-            from langchain_nvidia_ai_endpoints import ChatNVIDIA
-        except ImportError as exc:
-            raise ImportError(
-                "Install langchain-nvidia-ai-endpoints"
-            ) from exc
-
-        kwargs: dict[str, Any] = {
-            "model": config.model,
-            "temperature": config.temperature,
-        }
-        api_key = _secret_value(config.api_key)
-        if api_key:
-            kwargs["api_key"] = api_key
-        if config.top_p is not None:
-            kwargs["top_p"] = config.top_p
-        if config.max_tokens is not None:
-            kwargs["max_tokens"] = config.max_tokens
-        if config.extra_body:
-            kwargs["extra_body"] = config.extra_body
-
-        return ChatNVIDIA(**kwargs)
 
     if config.provider == JudgeProvider.LANGCHAIN_ANTHROPIC:
         try:
@@ -236,8 +245,14 @@ def create_ragas_judge_embeddings(config: JudgeModelConfig) -> Any | None:
                 "Install sentence-transformers"
             ) from exc
 
-        model = os.getenv("RAGAS_EMBEDDINGS_model") or "sentence-transformers/all-MiniLM-L12-v2"
-        return HuggingFaceEmbeddings(model=model)
+        model = os.getenv("RAGAS_EMBEDDINGS_MODEL") or "sentence-transformers/all-MiniLM-L12-v2"
+        device = os.getenv("RAGAS_EMBEDDINGS_DEVICE") or "cpu"
+        local_files_only = _env_bool("RAGAS_EMBEDDINGS_LOCAL_FILES_ONLY", default=True)
+        return HuggingFaceEmbeddings(
+            model=model,
+            device=device,
+            local_files_only=local_files_only,
+        )
 
     raise ValueError(
         "Unsupported RAGAS_EMBEDDINGS_PROVIDER"
@@ -272,28 +287,39 @@ def create_deepeval_judge_model(config: JudgeModelConfig) -> Any | str | None:
 
         def generate(self, prompt: str, schema: type[BaseModel] | None = None) -> Any:
             model = self.load_model()
-            if schema is not None:
-                if hasattr(model, "with_structured_output"):
-                    structured_model = model.with_structured_output(schema)
-                    return _coerce_structured_output(structured_model.invoke(prompt), schema)
-                response = model.invoke(_schema_prompt(prompt, schema))
-                return _coerce_structured_output(response, schema)
 
-            return _content_from_message(model.invoke(prompt))
+            def _generate_once() -> Any:
+                if schema is not None:
+                    if hasattr(model, "with_structured_output"):
+                        structured_model = model.with_structured_output(schema)
+                        return _coerce_structured_output(
+                            _invoke_model(structured_model, prompt),
+                            schema,
+                        )
+                    response = _invoke_model(model, _schema_prompt(prompt, schema))
+                    return _coerce_structured_output(response, schema)
+
+                return _content_from_message(_invoke_model(model, prompt))
+
+            return _generate_once()
 
         async def a_generate(self, prompt: str, schema: type[BaseModel] | None = None) -> Any:
             model = self.load_model()
-            if schema is not None:
-                if hasattr(model, "with_structured_output"):
-                    structured_model = model.with_structured_output(schema)
-                    response = await structured_model.ainvoke(prompt)
+
+            async def _generate_once() -> Any:
+                if schema is not None:
+                    if hasattr(model, "with_structured_output"):
+                        structured_model = model.with_structured_output(schema)
+                        response = await _ainvoke_or_thread(structured_model, prompt)
+                        return _coerce_structured_output(response, schema)
+
+                    response = await _ainvoke_or_thread(model, _schema_prompt(prompt, schema))
                     return _coerce_structured_output(response, schema)
 
-                response = await model.ainvoke(_schema_prompt(prompt, schema))
-                return _coerce_structured_output(response, schema)
+                response = await _ainvoke_or_thread(model, prompt)
+                return _content_from_message(response)
 
-            response = await model.ainvoke(prompt)
-            return _content_from_message(response)
+            return await _generate_once()
 
         def get_model_name(self) -> str:
             return self.model_name
@@ -308,8 +334,6 @@ def _ragas_model_kwargs(config: JudgeModelConfig) -> dict[str, Any]:
         kwargs["top_p"] = config.top_p
     if config.max_tokens is not None:
         kwargs["max_tokens"] = config.max_tokens
-    if config.extra_body:
-        kwargs.update(config.extra_body)
     return kwargs
 
 def _create_ragas_default_llm(config: JudgeModelConfig) -> Any | None:
@@ -321,7 +345,7 @@ def _create_ragas_default_llm(config: JudgeModelConfig) -> Any | None:
         return None
 
     try:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
         from ragas.llms import llm_factory
     except ImportError as exc:
         raise ImportError(
@@ -334,11 +358,11 @@ def _create_ragas_default_llm(config: JudgeModelConfig) -> Any | None:
         raise ValueError(
             "OPENAI_API_KEY is required for RAGAS with deepeval_default + "
             "--judge-model. Use --judge-provider langchain_anthropic or "
-            "chat_nvidia instead."
+            "configure OPENAI_API_KEY."
         )
 
     kwargs = _ragas_model_kwargs(config)
-    client = OpenAI(api_key=api_key)
+    client = AsyncOpenAI(api_key=api_key)
     return llm_factory(config.model, provider="openai", client=client, **kwargs)
 
 
@@ -387,49 +411,6 @@ def _create_ragas_anthropic_llm(config: JudgeModelConfig) -> Any:
 
     return llm
 
-
-def _create_ragas_nvidia_llm(config: JudgeModelConfig) -> Any:
-    """Create a NVIDIA NIM/build.nvidia.com-backed RAGAS v0.4 judge."""
-
-    if not config.model:
-        raise ValueError("model is required for RAGAS provider=chat_nvidia")
-
-    try:
-        from litellm import OpenAI as LiteLLMOpenAI
-        from ragas.llms import llm_factory
-    except ImportError as exc:
-        raise ImportError(
-            "Install ragas litellm"
-        ) from exc
-
-    api_key = (
-        _secret_value(config.api_key)
-        or os.getenv("NVIDIA_NIM_API_KEY")
-        or os.getenv("NVIDIA_API_KEY")
-    )
-    if not api_key:
-        raise ValueError("NVIDIA_API_KEY or NVIDIA_NIM_API_KEY is required for RAGAS NVIDIA judging")
-
-    # LiteLLM expects NVIDIA_NIM_API_KEY for its nvidia_nim provider.
-    os.environ.setdefault("NVIDIA_NIM_API_KEY", api_key)
-
-    kwargs = _ragas_model_kwargs(config)
-
-    # LiteLLM routes NVIDIA NIM calls via the nvidia_nim/ prefix. Do not mutate
-    # config.model so DeepEval/ChatNVIDIA can still use the original name.
-    model = config.model
-    if not model.startswith("nvidia_nim/"):
-        model = f"nvidia_nim/{model}"
-
-    client = LiteLLMOpenAI(api_key=api_key)
-    return llm_factory(
-        model,
-        provider="litellm",
-        client=client,
-        adapter="litellm",
-        **kwargs,
-    )
-
 def create_ragas_judge_llm(config: JudgeModelConfig) -> Any | None:
     """Create a RAGAS v0.4+ compatible judge LLM."""
 
@@ -437,6 +418,4 @@ def create_ragas_judge_llm(config: JudgeModelConfig) -> Any | None:
         return _create_ragas_default_llm(config)
     if config.provider == JudgeProvider.LANGCHAIN_ANTHROPIC:
         return _create_ragas_anthropic_llm(config)
-    if config.provider == JudgeProvider.CHAT_NVIDIA:
-        return _create_ragas_nvidia_llm(config)
     raise ValueError(f"Unsupported RAGAS judge provider: {config.provider}")

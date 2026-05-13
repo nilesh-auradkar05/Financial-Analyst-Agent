@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-05-12T04:48:13.214653+00:00",
+  "sample_count": 1,
+  "judges": [
+    "deepeval"
+  ],
+  "summary": {
+    "metric_averages": {
+      "deepeval.AnswerRelevancyMetric": 0.9666666666666667,
+      "deepeval.ContextualPrecisionMetric": 1.0,
+      "deepeval.ContextualRecallMetric": 1.0,
+      "deepeval.ContextualRelevancyMetric": 0.9523809523809523,
+      "deepeval.FaithfulnessMetric": 0.9545454545454546
+    },
+    "metric_counts": {
+      "deepeval.AnswerRelevancyMetric": 1,
+      "deepeval.ContextualPrecisionMetric": 1,
+      "deepeval.ContextualRecallMetric": 1,
+      "deepeval.ContextualRelevancyMetric": 1,
+      "deepeval.FaithfulnessMetric": 1
+    },
+    "error_count": 0,
+    "judge_provider": "langchain_anthropic",
+    "judge_model": "claude-sonnet-4-6"
+  },
+  "scores": [
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "FaithfulnessMetric",
+      "score": 0.9545454545454546,
+      "passed": true,
+      "reason": "The score is 0.95 because the actual output is largely faithful to the retrieval context, with only a minor contradiction: the actual output specifically mentions the impact of supply shortages and price increases on Apple's stock price, whereas the retrieval context only states that these factors can materially adversely affect Apple's business, without referencing stock price in that context.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "AnswerRelevancyMetric",
+      "score": 0.9666666666666667,
+      "passed": true,
+      "reason": "The score is 0.97 because the actual output is highly relevant to the input, thoroughly addressing the requested risk factors, supply-chain exposure, competition, and regulatory pressure in the analyst memo. However, it falls just short of a perfect score due to the inclusion of two minor irrelevant data points \u2014 the 52-week price range and the current stock price \u2014 which are stock trading metrics that do not directly contribute to any of the four focus areas requested in the memo.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualPrecisionMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because all relevant nodes are ranked above the single irrelevant node. The first four nodes in the retrieval contexts are all highly relevant to the memo's requirements: the first node covers competitive risks with details like \"competitors have aggressively cut prices and lowered product margins\" and Apple's \"minority market share,\" the second node addresses intellectual property and pricing competition noting competitors \"imitating the Company's products and infringing on its intellectual property,\" the third node supports supply-chain exposure with insights on \"significant risks of supply shortages and price increases\" and \"design and manufacturing defects,\" and the fourth node covers third-party ecosystem dependency risks around developer discontinuation. The only irrelevant node \u2014 a partial citation reference \"Apple Inc. | 2025 Form 10-K | 30 Apple Inc\" with no substantive content \u2014 is correctly ranked last at position five, ensuring perfect contextual precision.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRecallMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because all sentences in the expected output are fully supported by nodes in retrieval context. The guidance to discuss risk factors using retrieved evidence is backed by multiple nodes from Apple's 2025 Form 10-K covering competition, supply-chain, and third-party developer risks. Supply-chain and manufacturing exposure is explicitly addressed in the 3rd node. Competitive risks are well-supported by the 1st node, and the instruction to include them only when evidence is present aligns perfectly with the context. Finally, the directive to avoid invented citations is upheld as all nodes reference real excerpts from Apple's 2025 Form 10-K filings.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRelevancyMetric",
+      "score": 0.9523809523809523,
+      "passed": true,
+      "reason": "The score is 0.95 because the retrieval context is highly relevant to the input, containing extensive and detailed statements directly addressing risk factors (e.g., \"The Company remains subject to significant risks of supply shortages and price increases\"), supply-chain exposure (\"Defects can also exist in components and products the Company purchases from third parties\"), competition (\"Competition has been particularly intense as competitors have aggressively cut prices and lowered product margins,\" \"Certain competitors have the resources, experience or cost structures to provide products and services at little or no profit or even at a loss\"), and broader business risks tied to third-party dependencies and product integrity. The minor deduction is due to one irrelevant element \u2014 a bare page reference (\"page 30\") that \"contains no actual content, statements, or data relevant to risk factors, supply-chain exposure, competition, or regulatory pressure,\" and the near-absence of substantive regulatory pressure content in the retrieved statements.",
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-05-13T00:12:18.308157+00:00",
+  "sample_count": 1,
+  "judges": [
+    "ragas",
+    "deepeval"
+  ],
+  "summary": {
+    "metric_averages": {
+      "deepeval.AnswerRelevancyMetric": 0.8076923076923077,
+      "deepeval.ContextualPrecisionMetric": 1.0,
+      "deepeval.ContextualRecallMetric": 0.8,
+      "deepeval.ContextualRelevancyMetric": 0.9,
+      "deepeval.FaithfulnessMetric": 1.0,
+      "ragas.AnswerRelevancy": 0.5768659686428212,
+      "ragas.ContextPrecision": 0.999999999975,
+      "ragas.ContextRecall": 1.0,
+      "ragas.Faithfulness": 0.631578947368421
+    },
+    "metric_counts": {
+      "deepeval.AnswerRelevancyMetric": 1,
+      "deepeval.ContextualPrecisionMetric": 1,
+      "deepeval.ContextualRecallMetric": 1,
+      "deepeval.ContextualRelevancyMetric": 1,
+      "deepeval.FaithfulnessMetric": 1,
+      "ragas.AnswerRelevancy": 1,
+      "ragas.ContextPrecision": 1,
+      "ragas.ContextRecall": 1,
+      "ragas.Faithfulness": 1
+    },
+    "error_count": 0,
+    "judge_provider": "deepeval_default",
+    "judge_model": "gpt-4o-mini"
+  },
+  "scores": [
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "Faithfulness",
+      "score": 0.631578947368421,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "AnswerRelevancy",
+      "score": 0.5768659686428212,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextPrecision",
+      "score": 0.999999999975,
+      "passed": true,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextRecall",
+      "score": 1.0,
+      "passed": true,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "FaithfulnessMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because there are no contradictions present, indicating that the actual output aligns perfectly with the retrieval context.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "AnswerRelevancyMetric",
+      "score": 0.8076923076923077,
+      "passed": true,
+      "reason": "The score is 0.81 because while the response provided some relevant insights, it included several statements about Apple's valuation and market position that did not directly address the requested focus areas of risk factors, supply-chain exposure, competition, or regulatory pressure.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualPrecisionMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because all relevant nodes are ranked higher than the irrelevant node. The first four nodes provide substantial insights into competition, supply-chain exposure, and risk factors, with the first node stating, 'Competition has been particularly intense as competitors have aggressively cut prices and lowered product margins.' In contrast, the fifth node, which is ranked last, mentions third-party software developers but lacks direct relevance to competition or regulatory pressure, stating, 'The Company believes decisions by customers to purchase its hardware products depend in part on the availability of third-party software applications.' This clear distinction in relevance justifies the perfect score.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRecallMetric",
+      "score": 0.8,
+      "passed": true,
+      "reason": "The score is 0.80 because while the memo effectively discusses risk factors and supports supply-chain exposure with relevant context (node 1), it lacks direct support for the avoidance of invented citations (sentence 4), which slightly detracts from the overall alignment with the retrieval context.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRelevancyMetric",
+      "score": 0.9,
+      "passed": true,
+      "reason": "The score is 0.90 because while some statements in the retrieval context, such as 'Competition has been particularly intense as competitors have aggressively cut prices and lowered product margins' and 'The Company remains subject to significant risks of supply shortages and price increases that can materially adversely affect its business,' are relevant to the input, other statements focus on product design rather than the requested risk factors, supply-chain exposure, competition, or regulatory pressure.",
+      "error": null
+    }
+  ]
+}

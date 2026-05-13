@@ -1,0 +1,1639 @@
+[
+  {
+    "id": "aapl_business_products_services",
+    "ticker": "AAPL",
+    "query": "Where does Apple describe its main products and services?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "iPhone",
+      "Mac",
+      "services"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL business overview retrieval"
+  },
+  {
+    "id": "aapl_business_iphone_hardware",
+    "ticker": "AAPL",
+    "query": "How does Apple describe iPhone and other hardware products?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "iPhone",
+      "products",
+      "hardware"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL hardware product retrieval"
+  },
+  {
+    "id": "aapl_business_services_offerings",
+    "ticker": "AAPL",
+    "query": "What services does Apple discuss as part of its business?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "services",
+      "App Store",
+      "iCloud"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL services retrieval"
+  },
+  {
+    "id": "aapl_business_markets_distribution",
+    "ticker": "AAPL",
+    "query": "How does Apple describe markets, channels, and distribution?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "markets",
+      "distribution",
+      "sales"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL channels retrieval"
+  },
+  {
+    "id": "aapl_business_competition",
+    "ticker": "AAPL",
+    "query": "What does Apple say about competition in its business?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "competition",
+      "competitive",
+      "markets"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL competitive landscape retrieval"
+  },
+  {
+    "id": "aapl_business_research_development",
+    "ticker": "AAPL",
+    "query": "Where does Apple discuss research and development activity?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "research",
+      "development",
+      "innovation"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL R&D retrieval"
+  },
+  {
+    "id": "aapl_risk_supply_chain",
+    "ticker": "AAPL",
+    "query": "What does Apple say about supply chain risks?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "supply chain",
+      "supplier",
+      "manufacturing"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL supply-chain risk retrieval"
+  },
+  {
+    "id": "aapl_risk_global_economic_conditions",
+    "ticker": "AAPL",
+    "query": "What risks does Apple describe from global economic conditions?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "global",
+      "economic",
+      "conditions"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL macro risk retrieval"
+  },
+  {
+    "id": "aapl_risk_manufacturing_defects",
+    "ticker": "AAPL",
+    "query": "What does Apple say about product defects and manufacturing issues?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "defects",
+      "manufacturing",
+      "products"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL product defect risk retrieval"
+  },
+  {
+    "id": "aapl_risk_data_privacy_security",
+    "ticker": "AAPL",
+    "query": "What risks does Apple describe related to privacy, data security, or information systems?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "privacy",
+      "security",
+      "data"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL privacy/security risk retrieval"
+  },
+  {
+    "id": "aapl_risk_legal_regulatory",
+    "ticker": "AAPL",
+    "query": "What legal and regulatory risks does Apple discuss?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "legal",
+      "regulatory",
+      "laws"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL legal/regulatory risk retrieval"
+  },
+  {
+    "id": "aapl_risk_environmental_goals",
+    "ticker": "AAPL",
+    "query": "What risks does Apple mention around environmental goals and initiatives?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "environmental",
+      "goals",
+      "initiatives"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL environmental risk retrieval"
+  },
+  {
+    "id": "aapl_mda_net_sales",
+    "ticker": "AAPL",
+    "query": "How does Apple explain changes in net sales?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "net sales",
+      "iPhone",
+      "services"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL MD&A sales retrieval"
+  },
+  {
+    "id": "aapl_mda_gross_margin",
+    "ticker": "AAPL",
+    "query": "Where does Apple discuss gross margin performance?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "gross margin",
+      "products",
+      "services"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL MD&A margin retrieval"
+  },
+  {
+    "id": "aapl_mda_operating_expenses",
+    "ticker": "AAPL",
+    "query": "How does Apple describe operating expenses?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "operating expenses",
+      "research",
+      "development"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL MD&A opex retrieval"
+  },
+  {
+    "id": "aapl_mda_liquidity_cash",
+    "ticker": "AAPL",
+    "query": "How does Apple describe liquidity, cash, and capital resources?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "liquidity",
+      "cash",
+      "capital resources"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL MD&A liquidity retrieval"
+  },
+  {
+    "id": "aapl_mda_share_repurchases",
+    "ticker": "AAPL",
+    "query": "What does Apple say about share repurchases and dividends?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "repurchased",
+      "dividends",
+      "common stock"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL capital return retrieval"
+  },
+  {
+    "id": "aapl_mda_segment_geographic_performance",
+    "ticker": "AAPL",
+    "query": "Where does Apple discuss segment or geographic performance?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "Americas",
+      "Europe",
+      "Greater China"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL geographic performance retrieval"
+  },
+  {
+    "id": "aapl_market_risk_foreign_currency",
+    "ticker": "AAPL",
+    "query": "What market risks does Apple disclose related to foreign currency?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "foreign currency",
+      "exchange",
+      "hedging"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL FX market-risk retrieval"
+  },
+  {
+    "id": "aapl_market_risk_interest_rates",
+    "ticker": "AAPL",
+    "query": "How does Apple describe interest rate risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "interest rate",
+      "rates",
+      "securities"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL interest-rate risk retrieval"
+  },
+  {
+    "id": "aapl_market_risk_investments",
+    "ticker": "AAPL",
+    "query": "Where does Apple discuss investment portfolio market risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "investment",
+      "securities",
+      "fair value"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL investment risk retrieval"
+  },
+  {
+    "id": "aapl_market_risk_derivatives",
+    "ticker": "AAPL",
+    "query": "What does Apple say about derivative instruments and hedging?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "derivative",
+      "hedging",
+      "foreign exchange"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL derivative risk retrieval"
+  },
+  {
+    "id": "aapl_market_risk_sensitivity",
+    "ticker": "AAPL",
+    "query": "Where does Apple discuss sensitivity to market risk changes?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "sensitivity",
+      "market risk",
+      "interest"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL sensitivity analysis retrieval"
+  },
+  {
+    "id": "aapl_market_risk_credit_counterparty",
+    "ticker": "AAPL",
+    "query": "What does Apple say about credit risk or counterparties?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "credit",
+      "counterparties",
+      "financial institutions"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "AAPL credit/counterparty retrieval"
+  },
+  {
+    "id": "msft_business_cloud_services",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft describe cloud services and platforms?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "cloud",
+      "Azure",
+      "services"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT cloud business retrieval"
+  },
+  {
+    "id": "msft_business_productivity_business_processes",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe Productivity and Business Processes offerings?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "Productivity",
+      "Business Processes",
+      "Office"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT productivity business retrieval"
+  },
+  {
+    "id": "msft_business_linkedin",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft discuss LinkedIn as part of its business?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "LinkedIn",
+      "Talent",
+      "Marketing"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT LinkedIn retrieval"
+  },
+  {
+    "id": "msft_business_gaming",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about gaming products and services?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "gaming",
+      "Xbox",
+      "Game Pass"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT gaming retrieval"
+  },
+  {
+    "id": "msft_business_search_advertising",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft discuss search and advertising?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "search",
+      "advertising",
+      "Bing"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT search/ads retrieval"
+  },
+  {
+    "id": "msft_business_competition_research",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about competition and research activity?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "competition",
+      "research",
+      "development"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT competition/R&D retrieval"
+  },
+  {
+    "id": "msft_risk_cybersecurity",
+    "ticker": "MSFT",
+    "query": "What cybersecurity risks does Microsoft describe?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "cyber",
+      "security",
+      "attacks"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT cybersecurity risk retrieval"
+  },
+  {
+    "id": "msft_risk_privacy_data",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe privacy and data protection risks?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "privacy",
+      "data",
+      "regulations"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT privacy/data risk retrieval"
+  },
+  {
+    "id": "msft_risk_ai_regulation",
+    "ticker": "MSFT",
+    "query": "What risks does Microsoft disclose related to AI or responsible AI regulation?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "AI",
+      "regulation",
+      "responsible"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT AI risk retrieval"
+  },
+  {
+    "id": "msft_risk_cloud_service_disruption",
+    "ticker": "MSFT",
+    "query": "What risks does Microsoft discuss from cloud service outages or disruptions?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "services",
+      "disruption",
+      "outages"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT cloud disruption retrieval"
+  },
+  {
+    "id": "msft_risk_competition",
+    "ticker": "MSFT",
+    "query": "What competition risks does Microsoft describe?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "competition",
+      "competitive",
+      "markets"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT competition risk retrieval"
+  },
+  {
+    "id": "msft_risk_global_operations",
+    "ticker": "MSFT",
+    "query": "What risks does Microsoft describe from global operations or geopolitical conditions?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "global",
+      "geopolitical",
+      "operations"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT global/geopolitical risk retrieval"
+  },
+  {
+    "id": "msft_mda_cloud_revenue",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe cloud revenue performance?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "cloud",
+      "revenue",
+      "Azure"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT MD&A cloud revenue retrieval"
+  },
+  {
+    "id": "msft_mda_azure_growth",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft discuss Azure growth?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "Azure",
+      "growth",
+      "cloud"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT Azure growth retrieval"
+  },
+  {
+    "id": "msft_mda_productivity_business_processes",
+    "ticker": "MSFT",
+    "query": "How does Microsoft discuss Productivity and Business Processes performance?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "Productivity",
+      "Business Processes",
+      "revenue"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT productivity segment retrieval"
+  },
+  {
+    "id": "msft_mda_intelligent_cloud",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about Intelligent Cloud results?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "Intelligent Cloud",
+      "server",
+      "cloud"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT Intelligent Cloud retrieval"
+  },
+  {
+    "id": "msft_mda_more_personal_computing",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft discuss More Personal Computing revenue?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "More Personal Computing",
+      "Windows",
+      "revenue"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT personal computing retrieval"
+  },
+  {
+    "id": "msft_mda_capital_expenditures_liquidity",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about capital expenditures, liquidity, and cash?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "capital expenditures",
+      "liquidity",
+      "cash"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT capex/liquidity retrieval"
+  },
+  {
+    "id": "msft_market_risk_interest_rates",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about interest rate risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "interest rate",
+      "securities",
+      "market risk"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT interest-rate retrieval"
+  },
+  {
+    "id": "msft_market_risk_foreign_currency",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe foreign currency risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "foreign currency",
+      "exchange rates",
+      "revenue"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT FX retrieval"
+  },
+  {
+    "id": "msft_market_risk_investment_portfolio",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft discuss investment portfolio risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "investment",
+      "portfolio",
+      "securities"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT investment portfolio retrieval"
+  },
+  {
+    "id": "msft_market_risk_derivatives",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about derivative instruments?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "derivative",
+      "hedge",
+      "foreign currency"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT derivative retrieval"
+  },
+  {
+    "id": "msft_market_risk_credit",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe credit risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "credit risk",
+      "counterparties",
+      "financial"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT credit risk retrieval"
+  },
+  {
+    "id": "msft_market_risk_equity_investments",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft discuss equity or investment valuation risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "equity",
+      "investments",
+      "fair value"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT equity/investment valuation retrieval"
+  },
+  {
+    "id": "nvda_business_gpu_products",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA describe its GPU products?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "GPU",
+      "products",
+      "graphics"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA GPU business retrieval"
+  },
+  {
+    "id": "nvda_business_data_center",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe its data center business?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "data center",
+      "accelerated computing",
+      "AI"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA data center retrieval"
+  },
+  {
+    "id": "nvda_business_gaming",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA discuss gaming products or gaming platforms?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "gaming",
+      "GeForce",
+      "graphics"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA gaming retrieval"
+  },
+  {
+    "id": "nvda_business_professional_visualization",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe professional visualization?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "professional visualization",
+      "graphics",
+      "workstations"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA professional visualization retrieval"
+  },
+  {
+    "id": "nvda_business_automotive",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA discuss automotive platforms?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "automotive",
+      "platforms",
+      "autonomous"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA automotive retrieval"
+  },
+  {
+    "id": "nvda_business_networking_supply_chain",
+    "ticker": "NVDA",
+    "query": "What does NVIDIA say about networking products and supply dependencies?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "networking",
+      "InfiniBand",
+      "suppliers"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA networking/supply retrieval"
+  },
+  {
+    "id": "nvda_risk_export_controls",
+    "ticker": "NVDA",
+    "query": "What does NVIDIA say about export controls or trade restrictions?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "export",
+      "restrictions",
+      "China"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA export-control risk retrieval"
+  },
+  {
+    "id": "nvda_risk_supplier_dependency",
+    "ticker": "NVDA",
+    "query": "What risks does NVIDIA disclose about suppliers or manufacturing partners?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "suppliers",
+      "manufacturing",
+      "supply"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA supplier risk retrieval"
+  },
+  {
+    "id": "nvda_risk_demand_volatility",
+    "ticker": "NVDA",
+    "query": "What risks does NVIDIA describe around demand volatility?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "demand",
+      "customers",
+      "inventory"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA demand volatility retrieval"
+  },
+  {
+    "id": "nvda_risk_customer_concentration",
+    "ticker": "NVDA",
+    "query": "What risks does NVIDIA describe from customer concentration or large customers?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "customers",
+      "concentration",
+      "revenue"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA customer concentration retrieval"
+  },
+  {
+    "id": "nvda_risk_competition",
+    "ticker": "NVDA",
+    "query": "What competitive risks does NVIDIA discuss?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "competition",
+      "competitive",
+      "products"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA competition risk retrieval"
+  },
+  {
+    "id": "nvda_risk_cybersecurity_ip",
+    "ticker": "NVDA",
+    "query": "What risks does NVIDIA discuss around cybersecurity or intellectual property?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "cybersecurity",
+      "intellectual property",
+      "security"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA cyber/IP risk retrieval"
+  },
+  {
+    "id": "nvda_mda_revenue_growth",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA explain revenue growth or changes in revenue?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "revenue",
+      "growth",
+      "Data Center"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA MD&A revenue retrieval"
+  },
+  {
+    "id": "nvda_mda_data_center_revenue",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA discuss data center revenue performance?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "Data Center",
+      "revenue",
+      "compute"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA data center revenue retrieval"
+  },
+  {
+    "id": "nvda_mda_gross_margin",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA discuss gross margin performance?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "gross margin",
+      "inventory",
+      "products"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA margin retrieval"
+  },
+  {
+    "id": "nvda_mda_operating_expenses",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA discuss operating expenses and research development?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "operating expenses",
+      "research",
+      "development"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA opex/R&D retrieval"
+  },
+  {
+    "id": "nvda_mda_inventory_purchase_obligations",
+    "ticker": "NVDA",
+    "query": "What does NVIDIA say about inventory, supply commitments, or purchase obligations?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "inventory",
+      "purchase obligations",
+      "supply"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA inventory/obligations retrieval"
+  },
+  {
+    "id": "nvda_mda_liquidity_cash",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe liquidity, cash, and capital resources?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "liquidity",
+      "cash",
+      "capital resources"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA liquidity retrieval"
+  },
+  {
+    "id": "nvda_market_risk_interest_rates",
+    "ticker": "NVDA",
+    "query": "What market risk does NVIDIA disclose related to interest rates?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "interest rate",
+      "market risk",
+      "securities"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA interest-rate risk retrieval"
+  },
+  {
+    "id": "nvda_market_risk_foreign_currency",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe foreign currency exchange risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "foreign currency",
+      "exchange",
+      "international"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA FX risk retrieval"
+  },
+  {
+    "id": "nvda_market_risk_investments",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA discuss investment or securities market risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "investments",
+      "securities",
+      "fair value"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA investment risk retrieval"
+  },
+  {
+    "id": "nvda_market_risk_cash_equivalents",
+    "ticker": "NVDA",
+    "query": "What does NVIDIA disclose about cash equivalents and marketable securities?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "cash equivalents",
+      "marketable securities",
+      "investments"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA cash equivalents retrieval"
+  },
+  {
+    "id": "nvda_market_risk_sensitivity",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA provide sensitivity analysis for market risks?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "sensitivity",
+      "market risk",
+      "interest"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA sensitivity retrieval"
+  },
+  {
+    "id": "nvda_market_risk_credit_fair_value",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA discuss credit risk or fair value measurements?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "credit",
+      "fair value",
+      "financial"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA credit/fair-value retrieval"
+  },
+  {
+    "id": "aapl_business_intellectual_property",
+    "ticker": "AAPL",
+    "query": "How does Apple describe its intellectual property and licensing posture?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "intellectual property",
+      "patents",
+      "trademarks"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[semantic] IP and licensing | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_cross_liquidity_mda_and_market_risk",
+    "ticker": "AAPL",
+    "query": "What does Apple disclose about its liquidity position, cash and capital resources?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a",
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "liquidity",
+      "cash",
+      "capital resources"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[cross] md&a + market_risk | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_cross_supply_chain_business_and_risk",
+    "ticker": "AAPL",
+    "query": "How does Apple describe its supply chain and the risks associated with it?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business",
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "supply chain",
+      "suppliers",
+      "manufacturing"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[cross] business + risk_factors | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_mda_effective_tax_rate",
+    "ticker": "AAPL",
+    "query": "What does Apple say about provision for income taxes and the effective tax rate?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "income taxes",
+      "effective tax rate",
+      "provision"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[lexical] tax disclosure | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_mda_iphone_revenue_drivers",
+    "ticker": "AAPL",
+    "query": "What drove changes in iPhone revenue during fiscal 2025?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "iPhone",
+      "net sales",
+      "fiscal"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] product revenue narrative | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_mda_services_revenue",
+    "ticker": "AAPL",
+    "query": "How does Apple describe Services revenue growth?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "services",
+      "net sales",
+      "increased"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] services revenue narrative | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_risk_geopolitical_trade",
+    "ticker": "AAPL",
+    "query": "What risks does Apple describe from international operations and trade tensions?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "international",
+      "global",
+      "trade"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[semantic] geopolitical risk | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_risk_macro_consumer_demand",
+    "ticker": "AAPL",
+    "query": "How does Apple describe macroeconomic and consumer demand risks?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "demand",
+      "economic",
+      "consumers"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[semantic] demand risk | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "aapl_risk_third_party_developers",
+    "ticker": "AAPL",
+    "query": "How does Apple describe dependence on third-party software developers?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "third party",
+      "developers",
+      "software"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[semantic] developer ecosystem risk | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "msft_cross_cloud_capex_and_market_risk",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe cloud infrastructure capital expenditures and balance sheet impact?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a",
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "capital expenditures",
+      "cloud",
+      "infrastructure"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[cross] md&a + market_risk | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "msft_mda_ai_infrastructure_demand",
+    "ticker": "MSFT",
+    "query": "How does Microsoft describe demand for AI infrastructure and AI services?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "AI",
+      "infrastructure",
+      "demand"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[semantic] AI demand narrative | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "msft_mda_commercial_revenue",
+    "ticker": "MSFT",
+    "query": "What does Microsoft say about commercial business revenue and bookings?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "commercial",
+      "revenue",
+      "growth"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] commercial bookings | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "msft_mda_operating_income",
+    "ticker": "MSFT",
+    "query": "How does Microsoft discuss changes in operating income?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "md&a"
+    ],
+    "expected_keywords": [
+      "operating income",
+      "revenue",
+      "expenses"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] operating income | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_business_competition",
+    "ticker": "NVDA",
+    "query": "What competitive factors does NVIDIA disclose in its business section?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "competition",
+      "competitive",
+      "products"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] competition narrative | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_business_cuda_software",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe CUDA software and the developer ecosystem?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "CUDA",
+      "software",
+      "developers"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[lexical] CUDA platform | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_cross_china_business_and_risk",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe its China business and the export-control risks affecting it?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business",
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "China",
+      "export",
+      "international"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[cross] business + risk_factors | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_cross_supply_business_and_risk",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe manufacturing partners and the supply chain risks tied to them?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business",
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "manufacturing",
+      "supply",
+      "suppliers"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[cross] business + risk_factors | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_market_risk_marketable_securities",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA discuss marketable securities and their fair value?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "securities",
+      "fair value",
+      "investments"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] marketable securities | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_risk_cybersecurity",
+    "ticker": "NVDA",
+    "query": "What cybersecurity and data security risks does NVIDIA disclose?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "security",
+      "data",
+      "systems"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[lexical] cybersecurity risk | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_risk_inventory_purchase_obligations",
+    "ticker": "NVDA",
+    "query": "What risks does NVIDIA disclose around inventory and purchase obligations?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "inventory",
+      "purchase",
+      "obligations"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] inventory obligations | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_risk_ip_litigation",
+    "ticker": "NVDA",
+    "query": "What does NVIDIA say about intellectual property and litigation risks?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "intellectual property",
+      "litigation",
+      "patents"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[multi] IP litigation | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "nvda_risk_third_party_dependence",
+    "ticker": "NVDA",
+    "query": "How does NVIDIA describe dependence on third-party services and partners?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "risk_factors"
+    ],
+    "expected_keywords": [
+      "third party",
+      "partners",
+      "services"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "[semantic] third-party dependence | merged_from=retrieval_method_matrix_full"
+  },
+  {
+    "id": "msft_market_risk_sensitivity_analysis",
+    "ticker": "MSFT",
+    "query": "Where does Microsoft provide sensitivity analysis for market risk?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "market_risk"
+    ],
+    "expected_keywords": [
+      "sensitivity",
+      "market risk",
+      "interest"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "MSFT sensitivity retrieval | merged_from=retrieval_baseline"
+  },
+  {
+    "id": "nvda_business_customers_markets",
+    "ticker": "NVDA",
+    "query": "Where does NVIDIA describe customers and end markets?",
+    "filing_type": "10-K",
+    "expected_sections": [
+      "business"
+    ],
+    "expected_keywords": [
+      "customers",
+      "markets",
+      "products"
+    ],
+    "top_k": 5,
+    "mode": "query",
+    "notes": "NVDA customer/market retrieval | merged_from=retrieval_baseline"
+  }
+]

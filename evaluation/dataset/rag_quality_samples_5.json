@@ -1,0 +1,237 @@
+[
+  {
+    "case_id": "aapl_memo_grounding_core_business",
+    "ticker": "AAPL",
+    "input": "Generate a grounded analyst memo for Apple that explains core business drivers and cites retrieved filing/news evidence.",
+    "actual_output": "",
+    "expected_output": "The memo should identify Apple's main business drivers, cite retrieved evidence for factual claims, avoid unsupported revenue or market-share claims, and clearly separate evidence-backed observations from investment judgment.",
+    "retrieval_context": [],
+    "context": [
+      "The memo should identify Apple's main business drivers, cite retrieved evidence for factual claims, avoid unsupported revenue or market-share claims, and clearly separate evidence-backed observations from investment judgment."
+    ],
+    "tags": [
+      "memo",
+      "business",
+      "grounding"
+    ],
+    "metadata": {
+      "generated_at": "2026-05-09T00:33:04.060519+00:00",
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0,
+      "execution_time_ms": 120874.058,
+      "verification_result": {
+        "passed": false,
+        "total_claims": 0,
+        "cited_claims": 0,
+        "grounded_claims": 0,
+        "citation_coverage_rate": 0.0,
+        "grounded_claim_rate": 0.0,
+        "claims": [],
+        "orphan_citations": []
+      },
+      "errors": [
+        {
+          "step": "draft_memo",
+          "message": "model requires more system memory (3.7 GiB) than is available (947.0 MiB) (status code: 500)",
+          "recoverable": false,
+          "timestamp": "2026-05-09T00:33:04.055494+00:00"
+        },
+        {
+          "step": "verify_memo",
+          "message": "No memo was available for verification.",
+          "recoverable": true,
+          "timestamp": "2026-05-09T00:33:04.059348+00:00"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "aapl_memo_grounding_risk_factors",
+    "ticker": "AAPL",
+    "input": "Generate a grounded analyst memo for Apple focused on risk factors, supply-chain exposure, competition, and regulatory pressure.",
+    "actual_output": "",
+    "expected_output": "The memo should discuss risk factors using retrieved evidence, cover supply-chain or manufacturing exposure when supported, mention competitive and regulatory risks only when evidence is present, and avoid invented citations.",
+    "retrieval_context": [],
+    "context": [
+      "The memo should discuss risk factors using retrieved evidence, cover supply-chain or manufacturing exposure when supported, mention competitive and regulatory risks only when evidence is present, and avoid invented citations."
+    ],
+    "tags": [
+      "memo",
+      "risk_factors",
+      "grounding"
+    ],
+    "metadata": {
+      "generated_at": "2026-05-09T00:33:15.367698+00:00",
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0,
+      "execution_time_ms": 11282.247,
+      "verification_result": {
+        "passed": false,
+        "total_claims": 0,
+        "cited_claims": 0,
+        "grounded_claims": 0,
+        "citation_coverage_rate": 0.0,
+        "grounded_claim_rate": 0.0,
+        "claims": [],
+        "orphan_citations": []
+      },
+      "errors": [
+        {
+          "step": "draft_memo",
+          "message": "model requires more system memory (3.7 GiB) than is available (875.3 MiB) (status code: 500)",
+          "recoverable": false,
+          "timestamp": "2026-05-09T00:33:15.357720+00:00"
+        },
+        {
+          "step": "verify_memo",
+          "message": "No memo was available for verification.",
+          "recoverable": true,
+          "timestamp": "2026-05-09T00:33:15.366558+00:00"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "aapl_memo_grounding_financial_performance",
+    "ticker": "AAPL",
+    "input": "Generate a grounded analyst memo for Apple that explains financial-performance signals and connects them to evidence.",
+    "actual_output": "",
+    "expected_output": "The memo should summarize financial-performance signals using cited evidence, avoid unsupported numeric claims, explain the investment relevance of the evidence, and include uncertainty where support is weak.",
+    "retrieval_context": [],
+    "context": [
+      "The memo should summarize financial-performance signals using cited evidence, avoid unsupported numeric claims, explain the investment relevance of the evidence, and include uncertainty where support is weak."
+    ],
+    "tags": [
+      "memo",
+      "md&a",
+      "financial_performance"
+    ],
+    "metadata": {
+      "generated_at": "2026-05-09T00:33:26.258888+00:00",
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0,
+      "execution_time_ms": 10854.073,
+      "verification_result": {
+        "passed": false,
+        "total_claims": 0,
+        "cited_claims": 0,
+        "grounded_claims": 0,
+        "citation_coverage_rate": 0.0,
+        "grounded_claim_rate": 0.0,
+        "claims": [],
+        "orphan_citations": []
+      },
+      "errors": [
+        {
+          "step": "draft_memo",
+          "message": "model requires more system memory (3.7 GiB) than is available (937.5 MiB) (status code: 500)",
+          "recoverable": false,
+          "timestamp": "2026-05-09T00:33:26.248125+00:00"
+        },
+        {
+          "step": "verify_memo",
+          "message": "No memo was available for verification.",
+          "recoverable": true,
+          "timestamp": "2026-05-09T00:33:26.257090+00:00"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "aapl_memo_grounding_market_risk",
+    "ticker": "AAPL",
+    "input": "Generate a grounded analyst memo for Apple that includes market-risk exposure and cites the retrieved context.",
+    "actual_output": "",
+    "expected_output": "The memo should identify market-risk exposure only when supported by retrieved context, cite source numbers for factual claims, avoid generic finance filler, and state limitations when evidence is incomplete.",
+    "retrieval_context": [],
+    "context": [
+      "The memo should identify market-risk exposure only when supported by retrieved context, cite source numbers for factual claims, avoid generic finance filler, and state limitations when evidence is incomplete."
+    ],
+    "tags": [
+      "memo",
+      "market_risk",
+      "grounding"
+    ],
+    "metadata": {
+      "generated_at": "2026-05-09T00:33:37.451429+00:00",
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0,
+      "execution_time_ms": 11156.594000000001,
+      "verification_result": {
+        "passed": false,
+        "total_claims": 0,
+        "cited_claims": 0,
+        "grounded_claims": 0,
+        "citation_coverage_rate": 0.0,
+        "grounded_claim_rate": 0.0,
+        "claims": [],
+        "orphan_citations": []
+      },
+      "errors": [
+        {
+          "step": "draft_memo",
+          "message": "model requires more system memory (3.7 GiB) than is available (827.9 MiB) (status code: 500)",
+          "recoverable": false,
+          "timestamp": "2026-05-09T00:33:37.438434+00:00"
+        },
+        {
+          "step": "verify_memo",
+          "message": "No memo was available for verification.",
+          "recoverable": true,
+          "timestamp": "2026-05-09T00:33:37.450069+00:00"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "msft_memo_grounding_core_business",
+    "ticker": "MSFT",
+    "input": "Generate a grounded analyst memo for Microsoft that explains core business drivers and cites retrieved filing/news evidence.",
+    "actual_output": "",
+    "expected_output": "The memo should identify Microsoft's main business drivers, cite retrieved evidence for factual claims, avoid unsupported segment claims, and clearly separate evidence-backed observations from investment judgment.",
+    "retrieval_context": [],
+    "context": [
+      "The memo should identify Microsoft's main business drivers, cite retrieved evidence for factual claims, avoid unsupported segment claims, and clearly separate evidence-backed observations from investment judgment."
+    ],
+    "tags": [
+      "memo",
+      "business",
+      "grounding"
+    ],
+    "metadata": {
+      "generated_at": "2026-05-09T00:33:52.584610+00:00",
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0,
+      "execution_time_ms": 15091.162,
+      "verification_result": {
+        "passed": false,
+        "total_claims": 0,
+        "cited_claims": 0,
+        "grounded_claims": 0,
+        "citation_coverage_rate": 0.0,
+        "grounded_claim_rate": 0.0,
+        "claims": [],
+        "orphan_citations": []
+      },
+      "errors": [
+        {
+          "step": "draft_memo",
+          "message": "model requires more system memory (3.7 GiB) than is available (959.6 MiB) (status code: 500)",
+          "recoverable": false,
+          "timestamp": "2026-05-09T00:33:52.572869+00:00"
+        },
+        {
+          "step": "verify_memo",
+          "message": "No memo was available for verification.",
+          "recoverable": true,
+          "timestamp": "2026-05-09T00:33:52.583232+00:00"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,391 @@
+[
+  {
+    "case_id": "aapl_memo_grounding_risk_factors",
+    "ticker": "AAPL",
+    "input": "Generate a grounded analyst memo for Apple focused on risk factors, supply-chain exposure, competition, and regulatory pressure.",
+    "actual_output": "## Investment Memo: Apple Inc. (AAPL)  \n\n### 1. Executive Summary  \nApple maintains a dominant ecosystem position but faces significant competitive pressures and supply chain vulnerabilities. While its high valuation (P/E 34.84) reflects premium brand strength, intensifying competition and dependency on third-party developers create material downside risks. The company\u2019s market leadership must be weighed against aggressive pricing tactics from rivals and potential supply chain disruptions.  \n\n### 2. Company Overview  \nApple operates in the technology sector with a market capitalization of $4.22 trillion, positioning it as the world\u2019s most valuable public company. Its core business spans smartphones, personal computers, tablets, and wearables, with a focus on integrated hardware-software ecosystems. The company\u2019s 52-week price range ($193.46\u2013$292.13) underscores significant volatility, driven by sector dynamics rather than fundamental shifts. Apple\u2019s ability to sustain profitability hinges on ecosystem lock-in and brand loyalty, though market share in key categories remains minority [1].  \n\n### 3. Recent News & Market Sentiment  \n*Data unavailable for news or sentiment analysis per guidelines. SEC filings provide no recent event-specific details beyond the 2025 Form 10-K excerpts. Market sentiment cannot be assessed without external data sources.*  \n\n### 4. Key Risk Factors (from SEC Filings)  \n- **Intense Competition & Pricing Pressure**: Competitors aggressively cut prices and lower margins, with some operating at \"little or no profit or even at a loss.\" Apple holds a minority market share in smartphones, PCs, tablets, and wearables, and growth in these segments has stagnated or contracted [1].  \n- **Short Product Life Cycles & Imitation**: The market is defined by rapid technological advancements, short product cycles, and competitors imitating Apple\u2019s products while infringing on intellectual property [2].  \n- **Supply Chain Vulnerability**: The company faces significant risks of supply shortages and price increases, which could materially harm operations and stock price [3].  \n- **Third-Party Dependency**: Apple\u2019s success depends on third-party software developers; discontinuation of app/services could reduce hardware demand [4].  \n- **Design/Manufacturing Defects**: Complex hardware/software products risk defects that harm reputation and revenue [3].  \n\n### 5. Financial Highlights  \n- **Price**: $287.44 (current)  \n- **Market Cap**: $4.22 trillion  \n- **P/E Ratio**: 34.84 (high relative to tech sector averages)  \n- **52-Week Range**: $193.46\u2013$292.13 (indicating volatility)  \n*Note: No specific quarterly revenue, margin, or cash flow data was provided in SEC filings or stock data. Market cap and P/E are the only quantifiable financial metrics available.*  \n\n### 6. Investment Thesis  \n**Bullish Case**:  \n- Apple\u2019s ecosystem lock-in (App Store, iOS) creates defensible moats against competitors [4].  \n- Strong cash reserves (implied by market cap scale) provide flexibility for R&D and acquisitions.  \n- Wearables and services (e.g., Apple Music) offer recurring revenue streams beyond hardware [2].  \n\n**Bearish Case**:  \n- Intense competition with pricing pressure threatens profit margins [1].  \n- Supply chain risks (e.g., component shortages) could disrupt production and increase costs [3].  \n- Third-party developer dependency introduces systemic risk\u2014if developers abandon Apple platforms, hardware sales could decline [4].  \n- Stagnant growth in core markets (e.g., smartphones) limits expansion opportunities [1].  \n\n### 7. Conclusion with Recommendation  \nApple\u2019s premium brand and ecosystem strength provide a compelling long-term thesis, but **current risks are material and underappreciated**. The company\u2019s minority market share in key segments [1] and vulnerability to supply chain shocks [3] create asymmetric downside risk, especially if competitors intensify pricing wars. While the $4.22 trillion market cap reflects investor confidence in its ecosystem, the 34.84x P/E ratio suggests the premium is already pricing in significant near-term competition risks.  \n\n**Recommendation**: *Hold with caution*. The high valuation amplifies sensitivity to competitive pressures and supply chain events. We recommend a short-term neutral stance pending resolution of: (1) supply chain volatility [3], and (2) third-party developer sustainability [4]. Long-term, the ecosystem\u2019s defensibility may offset risks, but the current risk profile warrants avoiding aggressive upside positioning.  \n\n---  \n*Sources cited per guidelines: [1], [2], [3], [4]. Source [5] contains no substantive content and was unused. All factual claims tied to SEC filings are explicitly sourced. Market cap and P/E data are presented as provided in stock data without SEC filing citation, as no financial metrics were available in filings.*",
+    "expected_output": "The memo should discuss risk factors using retrieved evidence, cover supply-chain or manufacturing exposure when supported, mention competitive and regulatory risks only when evidence is present, and avoid invented citations.",
+    "retrieval_context": [
+      ". Competition has been particularly intense as competitors have aggressively cut prices and lowered product margins. Certain competitors have the resources, experience or cost structures to provide products and services at little or no profit or even at a loss. The Company has a minority market share in the global smartphone, personal computer, tablet and wearables markets, and some of the markets in which the Company competes have from time to time experienced little to no growth or contracted overall. If the Company is unable to compete successfully, its business, reputation, results of operations, financial condition and stock price can be materially adversely affected. Apple Inc. | 2025 Form 10-K | 7 Business Risks To remain competitive and stimulate customer demand, the Company must successfully manage frequent introductions and transitions of products and services",
+      ". The markets in which the Company competes are further defined by frequent introduction of new products and services, short product life cycles, evolving industry standards, and rapid adoption of technological advancements by competitors. Many of the Company\u2019s competitors seek to compete primarily through aggressive pricing and very low cost structures, and by imitating the Company\u2019s products and infringing on its intellectual property. Apple Inc. | 2025 Form 10-K | 2 The Company\u2019s ability to compete successfully depends heavily on ensuring the continuing and timely introduction of innovative new products, services and technologies to the marketplace. The Company designs and develops nearly the entire solution for its products, including the hardware, operating system, numerous software applications and related services",
+      ". Therefore, the Company remains subject to significant risks of supply shortages and price increases that can materially adversely affect its business, results of operations, financial condition and stock price. Apple Inc. | 2025 Form 10-K | 8 The Company\u2019s products and services may be affected from time to time by design and manufacturing defects that could materially adversely affect the Company\u2019s business and result in harm to the Company\u2019s reputation. The Company offers complex hardware and software products and services that can be affected by design and manufacturing defects. Sophisticated operating system software and applications, such as those offered by the Company, often have issues that can unexpectedly interfere with the intended operation of hardware or software products and services. Defects can also exist in components and products the Company purchases from third parties",
+      ". Apple Inc. | 2025 Form 10-K | 9 The Company\u2019s future performance depends in part on support from third-party software developers. The Company believes decisions by customers to purchase its hardware products depend in part on the availability of third-party software applications and services. Third-party developers may discontinue the development and maintenance of software applications and services for the Company\u2019s products. If third-party software applications and services cease to be developed and maintained for the Company\u2019s products, customers may choose not to buy the Company\u2019s products, adversely impacting the Company\u2019s business, results of operations, financial condition and stock price",
+      ". Apple Inc. | 2025 Form 10-K | 30 Apple Inc"
+    ],
+    "context": [
+      "The memo should discuss risk factors using retrieved evidence, cover supply-chain or manufacturing exposure when supported, mention competitive and regulatory risks only when evidence is present, and avoid invented citations."
+    ],
+    "tags": [
+      "memo",
+      "risk_factors",
+      "grounding"
+    ],
+    "metadata": {
+      "generated_at": "2026-05-08T05:47:31.101713+00:00",
+      "include_filing_analysis": true,
+      "include_news_sentiment": false,
+      "max_news_articles": 0,
+      "execution_time_ms": 147025.437,
+      "verification_result": {
+        "passed": false,
+        "total_claims": 38,
+        "cited_claims": 16,
+        "grounded_claims": 12,
+        "citation_coverage_rate": 0.42105263157894735,
+        "grounded_claim_rate": 0.75,
+        "claims": [
+          {
+            "sentence": "Apple maintains a dominant ecosystem position but faces significant competitive pressures and supply chain vulnerabilities.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "While its high valuation (P/E 34.84) reflects premium brand strength, intensifying competition and dependency on third-party developers create material downside risks.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "The company\u2019s market leadership must be weighed against aggressive pricing tactics from rivals and potential supply chain disruptions.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "Apple operates in the technology sector with a market capitalization of $4.22 trillion, positioning it as the world\u2019s most valuable public company.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "Its core business spans smartphones, personal computers, tablets, and wearables, with a focus on integrated hardware-software ecosystems.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "The company\u2019s 52-week price range ($193.46\u2013$292.13) underscores significant volatility, driven by sector dynamics rather than fundamental shifts.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "Apple\u2019s ability to sustain profitability hinges on ecosystem lock-in and brand loyalty, though market share in key categories remains minority .",
+            "citations": [
+              1
+            ],
+            "supported": true,
+            "overlap_score": 0.25,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "Recent News & Market Sentiment",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "SEC filings provide no recent event-specific details beyond the 2025 Form 10-K excerpts.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "Market sentiment cannot be assessed without external data sources.*",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "Key Risk Factors (from SEC Filings)",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "- **Intense Competition & Pricing Pressure**: Competitors aggressively cut prices and lower margins, with some operating at \"little or no profit or even at a loss.\" Apple holds a minority market share in smartphones, PCs, tablets, and wearables, and growth in these segments has stagnated or contracted .",
+            "citations": [
+              1
+            ],
+            "supported": true,
+            "overlap_score": 0.6451612903225806,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- **Short Product Life Cycles & Imitation**: The market is defined by rapid technological advancements, short product cycles, and competitors imitating Apple\u2019s products while infringing on intellectual property .",
+            "citations": [
+              2
+            ],
+            "supported": true,
+            "overlap_score": 0.8333333333333334,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- **Supply Chain Vulnerability**: The company faces significant risks of supply shortages and price increases, which could materially harm operations and stock price .",
+            "citations": [
+              3
+            ],
+            "supported": true,
+            "overlap_score": 0.75,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- **Third-Party Dependency**: Apple\u2019s success depends on third-party software developers; discontinuation of app/services could reduce hardware demand .",
+            "citations": [
+              4
+            ],
+            "supported": true,
+            "overlap_score": 0.46153846153846156,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- **Design/Manufacturing Defects**: Complex hardware/software products risk defects that harm reputation and revenue .",
+            "citations": [
+              3
+            ],
+            "supported": true,
+            "overlap_score": 0.6666666666666666,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- **Price**: $287.44 (current)",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "- **Market Cap**: $4.22 trillion",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "- **P/E Ratio**: 34.84 (high relative to tech sector averages)",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "- **52-Week Range**: $193.46\u2013$292.13 (indicating volatility)",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "*Note: No specific quarterly revenue, margin, or cash flow data was provided in SEC filings or stock data.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "Market cap and P/E are the only quantifiable financial metrics available.*",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "- Apple\u2019s ecosystem lock-in (App Store, iOS) creates defensible moats against competitors .",
+            "citations": [
+              4
+            ],
+            "supported": false,
+            "overlap_score": 0.09090909090909091,
+            "missing_citation": false,
+            "reason": "claim does not align with cited evidence"
+          },
+          {
+            "sentence": "- Strong cash reserves (implied by market cap scale) provide flexibility for R&D and acquisitions.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "- Wearables and services (e.g., Apple Music) offer recurring revenue streams beyond hardware .",
+            "citations": [
+              2
+            ],
+            "supported": true,
+            "overlap_score": 0.3,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- Intense competition with pricing pressure threatens profit margins .",
+            "citations": [
+              1
+            ],
+            "supported": true,
+            "overlap_score": 0.5714285714285714,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- Supply chain risks (e.g., component shortages) could disrupt production and increase costs .",
+            "citations": [
+              3
+            ],
+            "supported": true,
+            "overlap_score": 0.4,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- Third-party developer dependency introduces systemic risk\u2014if developers abandon Apple platforms, hardware sales could decline .",
+            "citations": [
+              4
+            ],
+            "supported": true,
+            "overlap_score": 0.4,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "- Stagnant growth in core markets (e.g., smartphones) limits expansion opportunities .",
+            "citations": [
+              1
+            ],
+            "supported": true,
+            "overlap_score": 0.25,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "Apple\u2019s premium brand and ecosystem strength provide a compelling long-term thesis, but **current risks are material and underappreciated**.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "The company\u2019s minority market share in key segments and vulnerability to supply chain shocks create asymmetric downside risk, especially if competitors intensify pricing wars.",
+            "citations": [
+              1,
+              3
+            ],
+            "supported": true,
+            "overlap_score": 0.35,
+            "missing_citation": false,
+            "reason": null
+          },
+          {
+            "sentence": "While the $4.22 trillion market cap reflects investor confidence in its ecosystem, the 34.84x P/E ratio suggests the premium is already pricing in significant near-term competition risks.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "The high valuation amplifies sensitivity to competitive pressures and supply chain events.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "We recommend a short-term neutral stance pending resolution of: (1) supply chain volatility , and (2) third-party developer sustainability .",
+            "citations": [
+              3,
+              4
+            ],
+            "supported": false,
+            "overlap_score": 0.07692307692307693,
+            "missing_citation": false,
+            "reason": "claim numbers do not match cited evidence"
+          },
+          {
+            "sentence": "Long-term, the ecosystem\u2019s defensibility may offset risks, but the current risk profile warrants avoiding aggressive upside positioning.",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          },
+          {
+            "sentence": "*Sources cited per guidelines: , , , .",
+            "citations": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": false,
+            "reason": "claim does not align with cited evidence"
+          },
+          {
+            "sentence": "Source contains no substantive content and was unused.",
+            "citations": [
+              5
+            ],
+            "supported": false,
+            "overlap_score": 0.16666666666666666,
+            "missing_citation": false,
+            "reason": "claim does not align with cited evidence"
+          },
+          {
+            "sentence": "Market cap and P/E data are presented as provided in stock data without SEC filing citation, as no financial metrics were available in filings.*",
+            "citations": [],
+            "supported": false,
+            "overlap_score": 0.0,
+            "missing_citation": true,
+            "reason": "claim is missing a citation"
+          }
+        ],
+        "orphan_citations": []
+      },
+      "errors": [
+        {
+          "step": "verify_memo",
+          "message": "Memo verification failed (citation_coverage=0.42), grounded_claim_rate=0.75",
+          "recoverable": true,
+          "timestamp": "2026-05-08T05:47:31.100776+00:00"
+        }
+      ]
+    }
+  }
+]

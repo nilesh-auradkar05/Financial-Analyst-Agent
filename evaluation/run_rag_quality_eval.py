@@ -15,6 +15,13 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, Literal, TypeVar, cast
 
 from pydantic import BaseModel
+from tenacity import (
+    AsyncRetrying,
+    Retrying,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_random_exponential,
+)
 
 from evaluation.build_rag_quality_samples import RAGQualitySample
 from evaluation.judge_models_interface import (
@@ -28,6 +35,10 @@ from evaluation.judge_models_interface import (
 
 JudgeName = Literal["ragas", "deepeval"]
 T = TypeVar("T")
+
+_RETRY_ATTEMPTS = 3
+_RETRY_WAIT_MULTIPLIER_SECONDS = 2
+_RETRY_WAIT_MAX_SECONDS = 30
 
 class MetricScore(BaseModel):
     """Normalized metric result across RAGAS and DeepEval."""
@@ -80,7 +91,6 @@ def _truncate_context(contexts: Iterable[str], *, max_chars: int) -> list[str]:
 def _error_text(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"
 
-
 def _is_retryable_exception(exc: BaseException) -> bool:
     text = _error_text(exc).lower()
     retryable_fragments = (
@@ -97,18 +107,6 @@ def _is_retryable_exception(exc: BaseException) -> bool:
     return any(fragment in text for fragment in retryable_fragments)
 
 
-def _sleep_for_retry(attempt: int, *, base_seconds: float) -> None:
-    if base_seconds <= 0:
-        return
-    time.sleep(base_seconds * (2 ** max(attempt - 1, 0)))
-
-
-async def _async_sleep_for_retry(attempt: int, *, base_seconds: float) -> None:
-    if base_seconds <= 0:
-        return
-    await asyncio.sleep(base_seconds * (2 ** max(attempt - 1, 0)))
-
-
 def _run_with_retries(
     fn: Callable[[], T],
     *,
@@ -117,15 +115,16 @@ def _run_with_retries(
 ) -> T:
     """Run a sync judge call with conservative retry handling."""
 
-    attempt = 0
-    while True:
-        try:
-            return fn()
-        except Exception as exc:
-            attempt += 1
-            if attempt > max_retries or not _is_retryable_exception(exc):
-                raise
-            _sleep_for_retry(attempt, base_seconds=retry_backoff_seconds)
+    retryer = Retrying(
+        retry=retry_if_exception(_is_retryable_exception),
+        stop=stop_after_attempt(max(max_retries, 0) + 1),
+        wait=wait_random_exponential(
+            multiplier=retry_backoff_seconds,
+            max=_RETRY_WAIT_MAX_SECONDS,
+        ),
+        reraise=True,
+    )
+    return retryer(fn)
 
 
 async def _run_with_retries_async(
@@ -134,17 +133,23 @@ async def _run_with_retries_async(
     max_retries: int,
     retry_backoff_seconds: float,
 ) -> T:
-    """Run an async judge call with conservative retry handling."""
+    """Run an async judge call with retry handling."""
 
-    attempt = 0
-    while True:
-        try:
+    retryer = AsyncRetrying(
+        retry=retry_if_exception(_is_retryable_exception),
+        stop=stop_after_attempt(max(max_retries, 0) + 1),
+        wait=wait_random_exponential(
+            multiplier=retry_backoff_seconds,
+            max=_RETRY_WAIT_MAX_SECONDS,
+        ),
+        reraise=True,
+    )
+
+    async for attempt in retryer:
+        with attempt:
             return await fn()
-        except Exception as exc:  # noqa: BLE001 - external judge failures are normalized later
-            attempt += 1
-            if attempt > max_retries or not _is_retryable_exception(exc):
-                raise
-            await _async_sleep_for_retry(attempt, base_seconds=retry_backoff_seconds)
+
+    raise RuntimeError("Retry loop exited without returning a result")
 
 
 def _constructor_kwargs(metric_cls: type[Any], kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -229,7 +234,7 @@ def run_deepeval(
     ]
 
     scores: list[MetricScore] = []
-    for sample in samples:
+    for sample_index, sample in enumerate(samples):
         test_case = LLMTestCase(
             input=sample.input,
             actual_output=sample.actual_output,
@@ -241,13 +246,27 @@ def run_deepeval(
             ),
         )
 
-        for metric in metrics:
+        for metric_index, metric in enumerate(metrics):
             metric_name = metric.__class__.__name__
+            started_at = time.monotonic()
+            print(
+                f"[{datetime.now().strftime('%H:%M:%S')}] Evaluating sample "
+                f"'{sample.case_id}' | Judge: deepeval | Metric: {metric_name}",
+                flush=True,
+            )
             try:
                 _run_with_retries(
                     lambda: metric.measure(test_case),
                     max_retries=max_retries,
                     retry_backoff_seconds=retry_backoff_seconds,
+                )
+                elapsed = time.monotonic() - started_at
+                print(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] Finished sample "
+                    f"'{sample.case_id}' | Judge: deepeval | Metric: {metric_name} "
+                    f"| score={_safe_float(getattr(metric, 'score', None))} "
+                    f"| elapsed={elapsed:.2f}s",
+                    flush=True,
                 )
                 scores.append(
                     MetricScore(
@@ -260,6 +279,13 @@ def run_deepeval(
                     )
                 )
             except Exception as exc:  # noqa: BLE001 - external judge failures should not kill report
+                elapsed = time.monotonic() - started_at
+                print(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] Failed sample "
+                    f"'{sample.case_id}' | Judge: deepeval | Metric: {metric_name} "
+                    f"| elapsed={elapsed:.2f}s | error={type(exc).__name__}: {exc}",
+                    flush=True,
+                )
                 scores.append(
                     MetricScore(
                         case_id=sample.case_id,
@@ -269,7 +295,16 @@ def run_deepeval(
                     )
                 )
 
-            if request_delay_seconds > 0:
+            has_next_request = (
+                sample_index < len(samples) - 1
+                or metric_index < len(metrics) - 1
+            )
+            if request_delay_seconds > 0 and has_next_request:
+                print(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] Waiting "
+                    f"{request_delay_seconds:.1f}s before next judge request",
+                    flush=True,
+                )
                 time.sleep(request_delay_seconds)
 
     return scores
@@ -391,7 +426,6 @@ def _ragas_kwargs_for_metric(
 
     return kwargs
 
-
 async def _score_ragas_metric(
     metric: Any,
     sample: RAGQualitySample,
@@ -438,10 +472,16 @@ async def run_ragas(
         metric_classes = _load_ragas_collection_metric_classes()
         ragas_llm = create_ragas_judge_llm(judge_config)
         ragas_embeddings = create_ragas_judge_embeddings(judge_config)
-        metrics = [
-            _instantiate_ragas_metric(metric_class, llm=ragas_llm, embeddings=ragas_embeddings)
-            for metric_class in metric_classes
-        ]
+
+        metrics = []
+        for metric_class in metric_classes:
+            metrics.append(
+                _instantiate_ragas_metric(
+                    metric_class,
+                    llm=ragas_llm,
+                    embeddings=ragas_embeddings,
+                )
+            )
     except Exception as exc:
         return [
             MetricScore(
@@ -454,9 +494,11 @@ async def run_ragas(
         ]
 
     scores: list[MetricScore] = []
-    for sample in samples:
-        for metric in metrics:
+    for sample_index, sample in enumerate(samples):
+        for metric_index, metric in enumerate(metrics):
             metric_name = metric.__class__.__name__
+
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Evaluating sample '{sample.case_id}' | Metric: {metric_name}")
             try:
                 result = await _score_ragas_metric(
                     metric,
@@ -486,7 +528,16 @@ async def run_ragas(
                     )
                 )
 
-            if request_delay_seconds > 0:
+            has_next_request = (
+                sample_index < len(samples) - 1
+                or metric_index < len(metrics) - 1
+            )
+            if request_delay_seconds > 0 and has_next_request:
+                print(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] Waiting "
+                    f"{request_delay_seconds:.1f}s before next judge request",
+                    flush=True,
+                )
                 await asyncio.sleep(request_delay_seconds)
 
     return scores
@@ -586,7 +637,6 @@ def _build_judge_config(args: argparse.Namespace) -> JudgeModelConfig:
         temperature=args.judge_temperature,
         top_p=args.judge_top_p,
         max_tokens=args.judge_max_tokens,
-        extra_body_json=args.judge_extra_body_json,
     )
 
 
@@ -603,13 +653,12 @@ def main() -> None:
         "--judge-provider",
         choices=[provider.value for provider in JudgeProvider],
         default=os.getenv("RAG_EVAL_JUDGE_PROVIDER", JudgeProvider.DEEPEVAL_DEFAULT.value),
-        help="Judge model provider: deepeval_default, langchain_anthropic, chat_nvidia",
+        help="Judge model provider: deepeval_default, langchain_anthropic",
     )
     parser.add_argument("--judge-model", default=os.getenv("RAG_EVAL_JUDGE_MODEL"), help="Judge model name", required=True)
     parser.add_argument("--judge-temperature", type=float, default=0.0)
     parser.add_argument("--judge-top-p", type=float, default=None)
     parser.add_argument("--judge-max-tokens", type=int, default=None)
-    parser.add_argument("--judge-extra-body-json", default=None)
     parser.add_argument(
         "--ragas-embeddings-provider",
         choices=["openai", "huggingface", "none"],

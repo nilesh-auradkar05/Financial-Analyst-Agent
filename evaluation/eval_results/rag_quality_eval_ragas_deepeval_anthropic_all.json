@@ -1,0 +1,108 @@
+{
+  "generated_at": "2026-05-13T00:24:17.728319+00:00",
+  "sample_count": 1,
+  "judges": [
+    "ragas",
+    "deepeval"
+  ],
+  "summary": {
+    "metric_averages": {
+      "ragas.AnswerRelevancy": 0.46991278595305025,
+      "ragas.ContextPrecision": 0.9999999999666667,
+      "ragas.ContextRecall": 0.6,
+      "ragas.Faithfulness": 0.423728813559322
+    },
+    "metric_counts": {
+      "ragas.AnswerRelevancy": 1,
+      "ragas.ContextPrecision": 1,
+      "ragas.ContextRecall": 1,
+      "ragas.Faithfulness": 1
+    },
+    "error_count": 5,
+    "judge_provider": "langchain_anthropic",
+    "judge_model": "claude-sonnet-4-6"
+  },
+  "scores": [
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "Faithfulness",
+      "score": 0.423728813559322,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "AnswerRelevancy",
+      "score": 0.46991278595305025,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextPrecision",
+      "score": 0.9999999999666667,
+      "passed": true,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextRecall",
+      "score": 0.6,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "FaithfulnessMetric",
+      "score": null,
+      "passed": null,
+      "reason": null,
+      "error": "BadRequestError: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` and `top_p` cannot both be specified for this model. Please use only one.'}, 'request_id': 'req_011Caycg6ur5mbgaD2e9nFpQ'}"
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "AnswerRelevancyMetric",
+      "score": null,
+      "passed": null,
+      "reason": null,
+      "error": "BadRequestError: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` and `top_p` cannot both be specified for this model. Please use only one.'}, 'request_id': 'req_011Caycg7dW5SN3Ui4pFgrJf'}"
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualPrecisionMetric",
+      "score": null,
+      "passed": null,
+      "reason": null,
+      "error": "BadRequestError: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` and `top_p` cannot both be specified for this model. Please use only one.'}, 'request_id': 'req_011CaycgCbQc17C7GFhKXoYg'}"
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRecallMetric",
+      "score": null,
+      "passed": null,
+      "reason": null,
+      "error": "BadRequestError: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` and `top_p` cannot both be specified for this model. Please use only one.'}, 'request_id': 'req_011CaycgT1pqb4tx4DPDdTQG'}"
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRelevancyMetric",
+      "score": null,
+      "passed": null,
+      "reason": null,
+      "error": "BadRequestError: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': '`temperature` and `top_p` cannot both be specified for this model. Please use only one.'}, 'request_id': 'req_011CaycgTsfQrH8fWoHkujqE'}"
+    }
+  ]
+}

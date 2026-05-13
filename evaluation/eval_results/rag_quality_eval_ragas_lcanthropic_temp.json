@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-05-12T03:53:34.578577+00:00",
+  "sample_count": 1,
+  "judges": [
+    "ragas",
+    "deepeval"
+  ],
+  "summary": {
+    "metric_averages": {
+      "deepeval.AnswerRelevancyMetric": 0.864406779661017,
+      "deepeval.ContextualPrecisionMetric": 1.0,
+      "deepeval.ContextualRecallMetric": 1.0,
+      "deepeval.ContextualRelevancyMetric": 0.95,
+      "deepeval.FaithfulnessMetric": 1.0,
+      "ragas.AnswerRelevancy": 0.4746828002582724,
+      "ragas.ContextPrecision": 0.9999999999666667,
+      "ragas.ContextRecall": 0.6,
+      "ragas.Faithfulness": 0.39344262295081966
+    },
+    "metric_counts": {
+      "deepeval.AnswerRelevancyMetric": 1,
+      "deepeval.ContextualPrecisionMetric": 1,
+      "deepeval.ContextualRecallMetric": 1,
+      "deepeval.ContextualRelevancyMetric": 1,
+      "deepeval.FaithfulnessMetric": 1,
+      "ragas.AnswerRelevancy": 1,
+      "ragas.ContextPrecision": 1,
+      "ragas.ContextRecall": 1,
+      "ragas.Faithfulness": 1
+    },
+    "error_count": 0,
+    "judge_provider": "langchain_anthropic",
+    "judge_model": "claude-sonnet-4-6"
+  },
+  "scores": [
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "Faithfulness",
+      "score": 0.39344262295081966,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "AnswerRelevancy",
+      "score": 0.4746828002582724,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextPrecision",
+      "score": 0.9999999999666667,
+      "passed": true,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "ragas",
+      "metric": "ContextRecall",
+      "score": 0.6,
+      "passed": false,
+      "reason": null,
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "FaithfulnessMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found. Great job!",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "AnswerRelevancyMetric",
+      "score": 0.864406779661017,
+      "passed": true,
+      "reason": "The score is 0.86 because the actual output does address the core requested focus areas of risk factors, supply-chain exposure, competition, and regulatory pressure for Apple, which is why it scores reasonably well. However, it cannot score higher due to several irrelevant inclusions: generic statements about Apple's sector, stock trading metrics (current price and 52-week range), and multiple disclaimers about data limitations and the AI's inability to access news, sentiment, or SEC filings. These additions do not contribute to the analyst memo's requested content and dilute the overall relevance of the response.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualPrecisionMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because all relevant nodes are ranked higher than the irrelevant node. The first four nodes in the retrieval contexts are all relevant and well-ordered: the first node grounds competitive pressure with evidence that \"competitors have aggressively cut prices and lowered product margins\" and that Apple \"has a minority market share in the global smartphone, personal computer, tablet and wearables markets\"; the second node reinforces competitive risks by describing \"frequent introduction of new products and services, short product life cycles, evolving industry standards, and rapid adoption of technological advancements by competitors\"; the third node directly supports supply-chain exposure with \"the Company remains subject to significant risks of supply shortages and price increases\"; and the fourth node addresses third-party ecosystem dependency, noting that \"decisions by customers to purchase its hardware products depend in part on the availability of third-party software applications and services.\" The only irrelevant node \u2014 ranked last (fifth) \u2014 contains merely a partial citation reference with no substantive content, and is correctly placed at the bottom of the rankings.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRecallMetric",
+      "score": 1.0,
+      "passed": true,
+      "reason": "The score is 1.00 because all sentences in the expected output are fully supported by nodes in retrieval context. The guidance to discuss risk factors using retrieved evidence is backed by the 1st, 2nd, and 3rd nodes, which provide extensive coverage of competitive and supply-chain risks. Supply-chain and manufacturing exposure is directly addressed in the 3rd node, while competitive risks are well-evidenced in the 1st and 2nd nodes. The instruction to avoid invented citations aligns perfectly with the real, attributable excerpts from Apple Inc.'s 2025 Form 10-K present in the retrieval context.",
+      "error": null
+    },
+    {
+      "case_id": "aapl_memo_grounding_risk_factors",
+      "judge": "deepeval",
+      "metric": "ContextualRelevancyMetric",
+      "score": 0.95,
+      "passed": true,
+      "reason": "The score is 0.95 because the retrieval context contains a wealth of highly relevant statements directly addressing the input's key focus areas. On competition, the context covers how \"competition has been particularly intense as competitors have aggressively cut prices and lowered product margins,\" Apple's \"minority market share in the global smartphone, personal computer, tablet and wearables markets,\" and how \"many of Apple's competitors seek to compete primarily through aggressive pricing.\" On supply-chain exposure, it notes that \"the Company remains subject to significant risks of supply shortages and price increases that can materially adversely affect its business.\" On product and operational risk factors, it highlights design/manufacturing defects and third-party software dependency risks. The minor deduction stems from one retrieved chunk being an empty document header \u2014 \"Apple Inc. | 2025 Form 10-K | 30 Apple Inc\" \u2014 with \"no actual content, statements, or data,\" and the retrieval context lacking explicit coverage of regulatory pressure, leaving that key topic area underserved.",
+      "error": null
+    }
+  ]
+}
