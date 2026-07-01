@@ -290,13 +290,51 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Sentiment analysis failed. Error: {e}")
         return add_error(state, "analyze_sentiment", str(e))
 
-def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -> list[dict]:
-    """
-    Build an ordered list of citable sources from the state.
+def _humanize_money(value: object) -> str:
+    """Render a raw market-cap number in the human form the model will use.
 
-    Returns a list of dicts like:
-        {"index": 1, "source_type": "news", "title": "....", "url": "...."}
+    Includes BOTH the abbreviated ('$4.25 trillion') and raw ('$4,250,000,000,000')
+    forms so the grounding number-check matches whichever the model writes.
     """
+    try:
+        v = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return str(value)
+    for threshold, suffix in ((1e12, "trillion"), (1e9, "billion"), (1e6, "million")):
+        if abs(v) >= threshold:
+            return f"${v / threshold:.2f} {suffix} (${v:,.0f})"
+    return f"${v:,.0f}"
+
+
+def _format_market_data_text(stock: dict) -> str:
+    parts: list[str] = []
+    if stock.get("current_price") is not None:
+        parts.append(f"Current share price: ${stock['current_price']}.")
+    if stock.get("market_cap"):
+        parts.append(f"Market capitalization: {_humanize_money(stock['market_cap'])}.")
+    if stock.get("pe_ratio") is not None:
+        parts.append(f"Price-to-earnings (P/E) ratio: {stock['pe_ratio']}.")
+    low, high = stock.get("fifty_two_week_low"), stock.get("fifty_two_week_high")
+    if low is not None and high is not None:
+        parts.append(f"52-week trading range: ${low} to ${high}.")
+    if stock.get("sector"):
+        parts.append(f"Sector: {stock['sector']}.")
+    return " ".join(parts)
+
+
+def _format_sentiment_text(sentiment: dict) -> str:
+    parts = [f"Overall news sentiment (FinBERT classifier): {sentiment.get('overall_sentiment', 'N/A')}."]
+    parts.append(
+        f"Positive articles: {sentiment.get('positive_count', 0)}. "
+        f"Negative articles: {sentiment.get('negative_count', 0)}."
+    )
+    if sentiment.get("neutral_count") is not None:
+        parts.append(f"Neutral articles: {sentiment['neutral_count']}.")
+    return " ".join(parts)
+
+
+def _build_citation_registry(state: "AgentState", *, max_filing_chunks: int = 5) -> list[dict]:
+    """Build an ordered list of citable sources from the state."""
     registry: list[dict] = []
     idx = 1
 
@@ -304,15 +342,31 @@ def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -
         snippet = (article.get("snippet") or "").strip()
         if not snippet:
             continue
-
         registry.append({
-            "index": idx,
-            "source_type": "news",
-            "title": article.get("title", "Untitled"),
-            "text": snippet,
-            "url": article.get("url", ""),
-            "date": article.get("published_date"),
+            "index": idx, "source_type": "news",
+            "title": article.get("title", "Untitled"), "text": snippet,
+            "url": article.get("url", ""), "date": article.get("published_date"),
             "source": article.get("source", "Unknown"),
+        })
+        idx += 1
+
+    # NEW: market data as a citable source (price / market cap / P/E / 52-week / sector).
+    stock = state.get("stock_data", {})
+    if stock and (stock.get("current_price") is not None or stock.get("market_cap")):
+        registry.append({
+            "index": idx, "source_type": "market_data",
+            "title": "Market Data (yfinance)", "text": _format_market_data_text(stock),
+            "url": None, "date": None,
+        })
+        idx += 1
+
+    # NEW: FinBERT sentiment as a citable source (overall tone + article counts).
+    sentiment = state.get("sentiment_result", {})
+    if sentiment and sentiment.get("overall_sentiment"):
+        registry.append({
+            "index": idx, "source_type": "sentiment",
+            "title": "News Sentiment (FinBERT)", "text": _format_sentiment_text(sentiment),
+            "url": None, "date": None,
         })
         idx += 1
 
@@ -320,19 +374,13 @@ def _build_citation_registry(state: AgentState, *, max_filing_chunks: int = 5) -
         text = (chunk.get("text") or "").strip()
         if not text:
             continue
-
         section = chunk.get("section", "Unknown")
         filing_type = chunk.get("filing_type", "10-K")
         registry.append({
-            "index": idx,
-            "source_type": "sec_filing",
-            "title": f"{section} - {filing_type}",
-            "text": text,
-            "url": chunk.get("source_url"),
-            "date": chunk.get("filing_date"),
-            "chunk_id": chunk.get("chunk_id"),
-            "section": section,
-            "filing_type": filing_type,
+            "index": idx, "source_type": "sec_filing",
+            "title": f"{section} - {filing_type}", "text": text,
+            "url": chunk.get("source_url"), "date": chunk.get("filing_date"),
+            "chunk_id": chunk.get("chunk_id"), "section": section, "filing_type": filing_type,
         })
         idx += 1
 

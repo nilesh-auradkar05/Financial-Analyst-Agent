@@ -233,6 +233,5 @@ LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md
 FILES-README.md
 evaluation/reports/
 evaluation/results/*
-!evaluation/results/latency_baseline_20260627T213830Z.json
-!evaluation/results/quality_baseline_20260628T061813Z.json
-!evaluation/results/quality_baseline_20260701T150855Z.json
+!evaluation/quality_res
+!evaluation/latency_res
