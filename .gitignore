@@ -210,8 +210,6 @@ __marimo__/
 data/
 app/**/__pycache__/
 tests/__pycache__/
-evaluation/reports/
-evaluation/results/
 .deepeval/
 
 agents/crew_agents.py
@@ -224,3 +222,17 @@ Nilesh_Auradkar_B01044448_CS-595-55_Project-Report.docx
 Nilesh_Auradkar_B01044448_CS-595-55_Project-Report.pdf
 Alpha_Analyst_Progressive_Project_Report_v2.docx
 .env.local
+.agents
+.codegraph
+.codex
+.cursor
+.runtime
+docs/
+tasks/
+LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md
+FILES-README.md
+evaluation/reports/
+evaluation/results/*
+!evaluation/results/latency_baseline_20260627T213830Z.json
+!evaluation/results/quality_baseline_20260628T061813Z.json
+!evaluation/results/quality_baseline_20260701T150855Z.json

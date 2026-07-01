@@ -38,8 +38,8 @@ class TestSyncWrappers:
         mock_get.return_value = mock_emb
 
         result = embed_texts(["text1", "text2"])
-        assert len(result) == 2
-        mock_emb.embed_documents.assert_called_once()
+        # Behavior: two input texts → the two embedding vectors are returned.
+        assert result == [[0.1, 0.2], [0.3, 0.4]]
 
     @patch("app.components.retrieval.embeddings.get_embeddings")
     def test_embed_query(self, mock_get):

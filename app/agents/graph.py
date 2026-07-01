@@ -39,8 +39,10 @@ from app.agents.state import (
     has_fatal_error,
 )
 from app.components.retrieval.vector_store import get_vector_store
+from app.config import settings
+from app.llm.provider import get_llm
 from app.observability.langsmith import get_tracer
-from app.services.llm import ANALYST_SYSTEM_PROMPT, get_llm
+from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
 from app.services.tools.web_search_tool import search_company_news
@@ -69,6 +71,13 @@ async def research_news_node(state: AgentState) -> dict:
         # Search for news
         query = f"{company_name} {ticker} stock news"
         max_results = state.get("max_news_articles", 10)
+        if max_results <= 0:
+            logger.info(f"[{ticker}] News search skipped because max_news_articles={max_results}")
+            return {
+                "news_articles": [],
+                "current_step": AgentStep.RESEARCH_NEWS.value,
+            }
+
         articles = await search_company_news(query, max_results=max_results)
 
         news_articles = [
@@ -422,29 +431,47 @@ async def draft_memo_node(state: AgentState) -> dict:
             f"{context}"
             f"{registry_block}\n\n"
             "Structure:\n"
-            "1. Executive Summary (2-3 sentences)\n"
+            "1. Executive Summary (2-3 sentences; every factual sentence cited)\n"
             "2. Company Overview\n"
             "3. Recent News & Market Sentiment\n"
             "4. Key Risk Factors (from SEC filings)\n"
             "5. Financial Highlights\n"
             "6. Investment Thesis (bullish and bearish cases)\n"
             "7. Conclusion with recommendation\n\n"
-            "Use ONLY the numbered sources listed above for citations.\n"
-            "Every non-trivial factual claim should cite one or more sources like [1] or [2][3].\n"
-            "Do not invent citation numbers.\n"
-            "Do not cite sources that are not listed.\n"
-            "If support is weak or missing, explicitly state uncertainty."
+            "CITATION REQUIREMENTS (mandatory):\n"
+            "- Every sentence stating a fact, number, metric, or event MUST end with a citation "
+            "to a listed source, e.g. [1] or [2][3] — in EVERY section, including the Executive "
+            "Summary and Investment Thesis.\n"
+            "- Use ONLY the numbered sources above. Never invent citation numbers or cite unlisted sources.\n"
+            "- If a claim is not supported by a listed source, do not assert it as fact: omit it "
+            "or state explicitly that it is unsupported/uncertain.\n"
+            "- The only uncited sentences allowed are section headers and your clearly-labeled "
+            "recommendation, which must rest on cited premises stated earlier.\n"
+            "- Before finishing, re-read each sentence: if it states a fact or number without a [N], "
+            "add the citation or delete the sentence.\n"
             f"{disclaimer}"
         )
 
-        llm = get_llm(temperature=0.7)
-        logger.info(f"[{ticker}] Invoking LLM for memo generation...")
-        response = await llm.ainvoke(
-            [
-                {"role": "system", "content": ANALYST_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ]
+        llm = get_llm(settings)
+        timeout_seconds = settings.llm.request_timeout_seconds
+        logger.info(
+            f"[{ticker}] Invoking LLM for memo generation (timeout={timeout_seconds}s)..."
         )
+        try:
+            response = await asyncio.wait_for(
+                llm.ainvoke(
+                    [
+                        {"role": "system", "content": ANALYST_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt},
+                    ]
+                ),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                "LLM memo generation timed out after "
+                f"{timeout_seconds}s (set LLM_REQUEST_TIMEOUT_SECONDS to increase)."
+            ) from exc
 
         memo = getattr(response, "content", "")
 

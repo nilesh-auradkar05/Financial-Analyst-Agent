@@ -64,7 +64,7 @@ class StubIngestResult:
     error = None
 
 
-async def fake_check_ollama_health() -> bool:
+async def fake_check_ollama_health(*, log_failure: bool = False) -> bool:
     return True
 
 

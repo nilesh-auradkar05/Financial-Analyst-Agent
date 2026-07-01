@@ -33,28 +33,24 @@ Usage:
     print(f"Sections: list(filing.sections.keys())")
 """
 
+import asyncio
 import html
 import re
 import warnings
 from dataclasses import dataclass, field
-from typing import Optional, cast
+from importlib import import_module
+from typing import Any, Optional, cast
 
 import httpx
 from bs4 import XMLParsedAsHTMLWarning
 from langsmith import traceable
 from loguru import logger
-from tenacity import wait_exponential
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import settings
 
 # Suppress XMLParsedAsHTMLWarning from BeautifulSoup
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-
-try:
-    from tenacity import retry, retry_if_exception_type, stop_after_attempt
-    TENACITY_AVAILABLE = True
-except ImportError:
-    TENACITY_AVAILABLE = False
 
 # Data Models
 
@@ -142,11 +138,57 @@ class Filing:
     def success(self) -> bool:
         return self.error is None and len(self.sections) > 0
 
+def _filing_from_edgartools_payload(payload: Any) -> Filing:
+    """Adapt EdgarTools payload into this module's existing Filing contract."""
+    metadata = FilingMetaData(
+        cik=payload.cik,
+        accession_number=payload.accession_number,
+        filing_type=payload.filing_type,
+        filing_date=payload.filing_date,
+        report_date=payload.report_date,
+        primary_document=payload.primary_document,
+        company_name=payload.company_name,
+        ticker=payload.ticker,
+    )
+
+    sections = {
+        name: FilingSection(name=name, content=section.content)
+        for name, section in payload.sections.items()
+    }
+
+    return Filing(metadata=metadata, sections=sections)
+
+
+async def _get_latest_10k_with_edgartools(ticker: str) -> Optional[Filing]:
+    """Try EdgarTools extraction without blocking the event loop."""
+    try:
+        extractor_module = import_module("app.services.tools.edgartools_sec_extractor")
+        extract_latest_10k_with_edgartools = getattr(
+            extractor_module,
+            "extract_latest_10k_with_edgartools",
+        )
+        payload = await asyncio.to_thread(
+            extract_latest_10k_with_edgartools,
+            ticker,
+            identity=settings.sec.user_agent,
+        )
+    except Exception as exc:
+        logger.warning("EdgarTools 10-K extraction failed for %s: %s", ticker, exc)
+        return None
+
+    filing = _filing_from_edgartools_payload(payload)
+
+    logger.info(
+        "EdgarTools extracted %s sections for %s: %s",
+        len(filing.sections),
+        ticker,
+        list(filing.sections.keys()),
+    )
+
+    return filing
+
 def _http_retry(func):
     """Apply tenacity retry decorator to httpx calls if available."""
-    if not TENACITY_AVAILABLE:
-        return func
-
     return retry(
         stop=stop_after_attempt(settings.retry.max_attempts),
         wait=wait_exponential(
@@ -159,6 +201,8 @@ def _http_retry(func):
         ),
         reraise=True,
     )(func)
+
+
 
 # Sec Client
 
@@ -333,26 +377,37 @@ class SECClient:
 async def get_latest_10k(
     ticker: str,
 ) -> Optional[Filing]:
+    """Download the latest 10-K for a company.
+
+    Primary path:
+        EdgarTools section extraction.
+
+    Fallback path:
+        Existing SECClient download + local regex parser.
+
+    This keeps the public Filing contract stable for ingestion while letting us
+    test whether EdgarTools fixes missing section extraction for MSFT/NVDA.
     """
-    Download the latest 10-K for a company (convenience function).
+    normalized_ticker = ticker.upper().strip()
 
-    Args:
-        ticker: Stock ticker symbol
-        save_locally: Whether to save to disk
+    edgar_filing = await _get_latest_10k_with_edgartools(normalized_ticker)
+    if edgar_filing is not None and edgar_filing.sections:
+        return edgar_filing
 
-    Returns:
-        Filing object or None if not found
+    logger.warning(
+        "Falling back to existing SECClient parser for %s because EdgarTools did not return sections",
+        normalized_ticker,
+    )
 
-    Example:
-        filing = await download_10k("AAPL")
-        if filing:
-            print(filing.get_section("Risk Factors").content[:500])
-    """
     async with SECClient() as client:
-        filings = await client.get_recent_filings(ticker, filing_type="10-K", count=1)
+        filings = await client.get_recent_filings(
+            normalized_ticker,
+            filing_type="10-K",
+            count=1,
+        )
 
         if not filings:
-            logger.warning(f"No 10-K filings found for {ticker}")
+            logger.warning("No 10-K filings found for %s", normalized_ticker)
             return None
 
         return cast(Optional[Filing], await client.download_filing(filings[0]))

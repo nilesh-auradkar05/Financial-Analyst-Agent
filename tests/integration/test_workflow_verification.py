@@ -76,7 +76,7 @@ async def test_run_agent_real_graph_populates_verification_result(monkeypatch):
     monkeypatch.setattr(graph_mod, "get_stock_data", fake_get_stock_data)
     monkeypatch.setattr(graph_mod, "get_vector_store", lambda: StubVectorStore())
     monkeypatch.setattr(graph_mod, "analyze_sentiment_batch", fake_analyze_sentiment_batch)
-    monkeypatch.setattr(graph_mod, "get_llm", lambda temperature=0.7: StubLLM())
+    monkeypatch.setattr(graph_mod, "get_llm", lambda _settings: StubLLM())
     monkeypatch.setattr(graph_mod, "get_tracer", lambda: None)
 
     result = await graph_mod.run_agent("AAPL", "Apple Inc.")

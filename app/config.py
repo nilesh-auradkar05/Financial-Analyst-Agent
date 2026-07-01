@@ -3,7 +3,7 @@ This file contains the configuration for the Financial Analyst Agent.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -52,7 +52,7 @@ class OllamaSettings(BaseSettings):
 
     # Main LLM model to use for reasoning tasks
     llm_model: str = Field(
-        default="qwen3-vl:8b", description="Ollama model for reasoning"
+        default="qwen3.5:9b", description="Ollama model for reasoning"
     )
 
     embed_model: str = Field(
@@ -67,6 +67,58 @@ class OllamaSettings(BaseSettings):
     timeout: int = Field(default=600, description="Request timeout in seconds (10 minutes)")
 
     temperature: float = Field(default=0.7, description="LLm temperature(0.0 to 1.0)")
+
+
+class LLMSettings(BaseSettings):
+    """Configuration for runtime chat-model provider selection."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="LLM_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    provider: Literal["bedrock", "ollama"] = Field(
+        default="bedrock",
+        description="Chat model provider used by agent runtime.",
+    )
+    model: str = Field(
+        default="anthropic.claude-sonnet-4-6",
+        description="Default chat model id for the selected provider.",
+    )
+    temperature: float = Field(
+        default=1.0,
+        description="Default chat-model temperature.",
+    )
+    max_tokens: int = Field(
+        default=4096,
+        description="Max completion tokens for provider calls.",
+    )
+    request_timeout_seconds: float = Field(
+        default=120.0,
+        gt=0,
+        description="Maximum seconds to wait for a single chat-model response.",
+    )
+    aws_region: Optional[str] = Field(
+        default="us-east-1",
+        validation_alias="AWS_REGION",
+        description="AWS region used when provider is Bedrock.",
+    )
+    thinking_mode: Literal["off", "enabled", "adaptive"] = Field(
+        default="off",
+        description="Thinking mode for the LLM (off, enabled, adaptive(only for anthropic .6 or later models)).",
+    )
+    thinking_budget_tokens: int = Field(
+        default=2048,
+        ge=1024,
+        le=50_000,
+        description="Maximum number of tokens to spend on thinking. This consumes tokens space in total tokens allowed constraint."
+    )
+    thinking_effort: str = Field(
+        default="low",
+        description="Thinking effort to be used by LLM."
+    )
 
 
 class TavilySettings(BaseSettings):
@@ -106,7 +158,7 @@ class LangSmithSettings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="LANGCHAIN_",
+        env_prefix="LANGSMITH_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
@@ -241,7 +293,7 @@ class Settings(BaseSettings):
         from config import settings
 
         # Access nested settings
-        model = settings.ollama.llm_model
+        model = settings.llm.model
         api_key = settings.tavily.api_key
 
     Environment:
@@ -255,6 +307,7 @@ class Settings(BaseSettings):
     )
 
     # Nested Settings objects
+    llm: LLMSettings = Field(default_factory=LLMSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
     tavily: TavilySettings = Field(default_factory=TavilySettings)
     langsmith: LangSmithSettings = Field(default_factory=LangSmithSettings)

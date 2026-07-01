@@ -80,24 +80,10 @@ class TestExtractUsedCitations:
         assert _extract_used_citations("See [1][2][3].") == {1, 2, 3}
 
 
-class TestOrphanDetection:
-    """Verify that we can detect citations the LLM invented."""
-
-    def test_all_valid(self, sample_news_articles):
-        state = {"news_articles": sample_news_articles, "filing_chunks": []}
-        registry = _build_citation_registry(state)
-        valid = {r["index"] for r in registry}
-        used = _extract_used_citations("See [1] and [2].")
-        orphans = used - valid
-        assert orphans == set()
-
-    def test_orphan_detected(self):
-        registry = [{"index": 1, "source_type": "news", "title": "A"}]
-        valid = {r["index"] for r in registry}
-        used = _extract_used_citations("See [1] and [99].")
-        orphans = used - valid
-        assert 99 in orphans
-
-    def test_no_false_positives_on_empty_memo(self):
-        used = _extract_used_citations("")
-        assert used == set()
+# NOTE: Orphan detection (a memo citation index that is NOT in the registry the
+# system built) is a real workflow behavior. It is tested end-to-end through the
+# PRODUCTION verify_memo_node path in
+# test_graph_verification_integration.py::test_verify_memo_flags_orphan_and_numeric_mismatch,
+# which asserts verification_result["orphan_citations"] == [99].
+# We deliberately do NOT re-implement `orphans = used - valid` here — that would
+# assert the test's own arithmetic, not the system's behavior.

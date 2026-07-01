@@ -116,7 +116,7 @@ def test_qdrant_add_documents_upserts_payload_with_original_retrieval_id(qdrant_
 
     assert written == 1
     assert client.collection_created is True
-    assert set(client.index_fields) >= {"ticker", "filing_type", "section_key", "filing_date"}
+    assert set(client.index_fields) >= {"ticker", "filing_type", "section_key", "filing_date", "accession_number"}
     assert client.points[0].payload["_retrieval_id"] == "AAPL_10-K_2025-10-31_business_000"
     assert client.points[0].payload["text"] == "Apple business overview"
     assert client.points[0].payload["ticker"] == "AAPL"

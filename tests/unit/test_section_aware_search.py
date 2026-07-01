@@ -5,12 +5,10 @@ from app.components.retrieval.vector_store import RetrievedChunk, SearchResult
 
 
 class SectionAwareStubStore:
-    def __init__(self) -> None:
-        self.search_called = False
-        self.search_sections_called = False
+    """Faithful stub: plain dense search ranks the business chunk first; the
+    section_aware re-ranker must promote the risk_factors chunk for a risk query."""
 
     def search(self, query, filters=None, n_results=5):
-        self.search_called = True
         return SearchResult(
             query=query,
             chunks=[
@@ -43,7 +41,6 @@ class SectionAwareStubStore:
         )
 
     def search_sections(self, ticker, sections, n_results=5, query=None, filing_type=None):
-        self.search_sections_called = True
         return SearchResult(
             query=query or "section query",
             chunks=[
@@ -76,8 +73,8 @@ def test_section_aware_search_promotes_inferred_section_result():
         top_k=2,
     )
 
-    assert store.search_called is True
-    assert store.search_sections_called is True
+    # section_aware must PROMOTE the risk_factors chunk to rank 0 even though plain
+    # dense search ranked the business chunk first — that re-ranking is the feature.
     assert result.chunks[0].id == "risk-1"
     assert result.filter_used is not None
     assert result.filter_used["mode"] == "section_aware"

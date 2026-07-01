@@ -18,22 +18,10 @@ from typing import Optional
 
 from langsmith import traceable
 from loguru import logger
-
-try:
-    from tavily import AsyncTavilyClient
-    TAVILY_AVAILABLE = True
-except ImportError:
-    AsyncTavilyClient = None
-    TAVILY_AVAILABLE = False
+from tavily import AsyncTavilyClient
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
-
-try:
-    from tenacity import retry, stop_after_attempt, wait_exponential
-    TENACITY_AVAILABLE = True
-except ImportError:
-    TENACITY_AVAILABLE = False
-
 
 # =============================================================================
 # DATA MODEL
@@ -53,8 +41,6 @@ class NewsArticle:
 
 def _tavily_retry(func):
     """Apply retry decorator if tenacity is available."""
-    if not TENACITY_AVAILABLE:
-        return func
     return retry(
         stop=stop_after_attempt(settings.retry.max_attempts),
         wait=wait_exponential(
@@ -86,8 +72,8 @@ async def search_company_news(
     Returns:
         List of NewsArticle objects
     """
-    if not TAVILY_AVAILABLE or AsyncTavilyClient is None:
-        logger.warning("Tavily not installed. Run: pip install tavily-python")
+    if max_results <= 0:
+        logger.info(f"Skipping Tavily search because max_results={max_results}")
         return []
 
     if not settings.tavily.api_key:

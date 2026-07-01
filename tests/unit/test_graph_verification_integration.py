@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.agents.graph import draft_memo_node, verify_memo_node
@@ -19,6 +21,11 @@ class StubLLM:
         return StubLLMResponse(self._content)
 
 
+class HangingLLM:
+    async def ainvoke(self, messages):
+        await asyncio.sleep(10)
+
+
 @pytest.mark.asyncio
 async def test_draft_and_verify_nodes_attach_passed_verification(monkeypatch):
     memo = (
@@ -28,7 +35,7 @@ async def test_draft_and_verify_nodes_attach_passed_verification(monkeypatch):
         "Supply chain concentration in China remains a risk [2]."
     )
 
-    monkeypatch.setattr("app.agents.graph.get_llm", lambda temperature=0.7: StubLLM(memo))
+    monkeypatch.setattr("app.agents.graph.get_llm", lambda _settings: StubLLM(memo))
 
     state = create_initial_state("AAPL", "Apple Inc.")
     state["news_articles"] = [
@@ -71,7 +78,7 @@ async def test_verify_memo_flags_orphan_and_numeric_mismatch(monkeypatch):
         "A second unsupported statement cites [99]."
     )
 
-    monkeypatch.setattr("app.agents.graph.get_llm", lambda temperature=0.7: StubLLM(memo))
+    monkeypatch.setattr("app.agents.graph.get_llm", lambda _settings: StubLLM(memo))
 
     state = create_initial_state("AAPL", "Apple Inc.")
     state["news_articles"] = [
@@ -91,3 +98,17 @@ async def test_verify_memo_flags_orphan_and_numeric_mismatch(monkeypatch):
     assert verify_update["verification_result"]["passed"] is False
     assert verify_update["verification_result"]["orphan_citations"] == [99]
     assert any(error["step"] == "verify_memo" for error in verify_update["errors"])
+
+
+@pytest.mark.asyncio
+async def test_draft_memo_times_out_and_marks_fatal_error(monkeypatch):
+    monkeypatch.setattr("app.agents.graph.get_llm", lambda _settings: HangingLLM())
+    monkeypatch.setattr("app.agents.graph.settings.llm.request_timeout_seconds", 0.01)
+
+    state = create_initial_state("AAPL", "Apple Inc.")
+    update = await draft_memo_node(state)
+
+    assert update["current_step"] == "error"
+    assert update["errors"][-1]["step"] == "draft_memo"
+    assert update["errors"][-1]["recoverable"] is False
+    assert "timed out" in update["errors"][-1]["message"].lower()

@@ -31,7 +31,7 @@ from app.config import settings
 
 DEFAULT_QDRANT_URL = "http://localhost:6333"
 DEFAULT_VECTOR_DISTANCE = models.Distance.COSINE
-PAYLOAD_INDEX_FIELDS = ("ticker", "filing_type", "section_key", "filing_date")
+PAYLOAD_INDEX_FIELDS = ("ticker", "filing_type", "section_key", "filing_date", "accession_number")
 
 def _env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)

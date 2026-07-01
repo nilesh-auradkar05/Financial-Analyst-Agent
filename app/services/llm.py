@@ -1,64 +1,31 @@
 """
-This module provides integration with ollama for local LLM inference.
-
-I am using Qwen3-VL model which can:
-    - Process text prompts
-    - Analyze images (in this context it is useful to process charts, tables, diagrams from SEC filings).
+This module exposes LLM prompts and health checks.
 
 Usage:
 ------------------------
-    from app.services.llm import get_llm, analyze_image, generate_text
+    from app.config import settings
+    from app.services.llm import get_llm
 
     # langchain-compatible llm
-    llm = get_llm()
+    llm = get_llm(settings)
     response = llm.invoke("Explain P/E ration")
-
-    # direct text generation
-    response = await generate_text("Summarize these risk factors: .......")
-
-    # Vision analysis (for chart/tables)
-    analysis = await analyze_image(
-        image_path = "chart.png",
-        prompt="Describe the revenue trend shown in this chart."
-    )
-
 """
 
 import httpx
-from langchain_ollama import ChatOllama
+from langchain_core.language_models.chat_models import BaseChatModel
+from loguru import logger
 
-from app.config import settings
+from app.config import Settings, settings
+from app.llm.provider import get_llm as get_provider_llm
 
 # =============================================================================
 # LLM ACCESS
 # =============================================================================
 
 
-def get_llm(temperature: float = 0.0) -> ChatOllama:
-    """
-    Get configured ChatOllama instance.
-
-    Args:
-        temperature: Override default temperature
-
-    Returns:
-        ChatOllama ready for use
-
-    Example:
-        llm = get_llm()
-        response = await llm.ainvoke([
-            {"role": "system", "content": ANALYST_SYSTEM_PROMPT},
-            {"role": "user", "content": "Analyze AAPL..."},
-        ])
-        print(response.content)
-    """
-    return ChatOllama(
-        model=settings.ollama.llm_model,
-        base_url=settings.ollama.base_url,
-        temperature=temperature or settings.ollama.temperature,
-        # num_ctx=8192,  # Context window size
-        # num_predict=2048,  # Max tokens to generate
-    )
+def get_llm(config: Settings = settings) -> BaseChatModel:
+    """Backward-compatible wrapper for provider-based LLM construction."""
+    return get_provider_llm(config)
 
 
 # =============================================================================
@@ -66,25 +33,38 @@ def get_llm(temperature: float = 0.0) -> ChatOllama:
 # =============================================================================
 
 
-async def check_ollama_health() -> bool:
+async def check_ollama_health(*, log_failure: bool = False) -> bool:
     """Check if Ollama server is running and model is available."""
+    tags_url = f"{settings.ollama.base_url.rstrip('/')}/api/tags"
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{settings.ollama.base_url}/app/tags",
+                tags_url,
                 timeout=5.0,
             )
 
             if response.status_code != 200:
+                if log_failure:
+                    logger.warning(
+                        f"Ollama health check failed at {tags_url}: HTTP {response.status_code}"
+                    )
                 return False
 
             # Check if our model is available
             data = response.json()
             models = [m.get("name", "") for m in data.get("models", [])]
 
-            return any(settings.ollama.llm_model in m for m in models)
+            model_available = any(settings.ollama.llm_model in m for m in models)
+            if not model_available and log_failure:
+                logger.warning(
+                    f"Ollama model {settings.ollama.llm_model!r} not found. "
+                    f"Available models: {models}"
+                )
+            return model_available
 
-    except Exception:
+    except Exception as exc:
+        if log_failure:
+            logger.warning(f"Ollama health check failed at {tags_url}: {exc}")
         return False
 
 
@@ -95,29 +75,20 @@ async def check_ollama_health() -> bool:
 
 ANALYST_SYSTEM_PROMPT = """\
 You are a senior financial analyst at a top-tier investment firm.
-Your role is to provide comprehensive, data-driven analysis of companies.
+You write comprehensive, data-driven investment memos grounded strictly in the numbered sources you are given.
 
-Guidelines:
-- Be specific and use actual numbers from the provided data
-- Cite sources using [N] notation matching the source registry provided
-- Present balanced analysis including both opportunities and risks
-- Use professional, clear language
-- Structure your analysis with clear sections"""
+Citation rules (hard requirements, not preferences):
+- Every sentence that states a fact, figure, metric, event, or claim MUST end with a citation to a listed source,
+e.g. [1] or [2][3].
+- If you cannot support a statement with a listed source, do not state it as fact: either omit it, or explicitly frame
+it as unsupported/uncertain.
+- Never invent citation numbers or cite sources not in the registry.
+- The ONLY sentences allowed without a citation are section headers and your own clearly-labeled analytical judgment
+(e.g. the recommendation), which must rest on cited premises stated earlier.
 
+Style:
+- Be specific; use actual numbers from the sources.
+- Present both opportunities and risks in balanced, professional language, organized into the requested sections.
 
-MEMO_TEMPLATE = """\
-Based on the following research data, write a comprehensive investment \
-memo for {company_name} ({ticker}).
-
-{context}
-
-Structure your memo with these sections:
-1. Executive Summary (2-3 key takeaways)
-2. Company Overview
-3. Recent Developments
-4. Financial Highlights
-5. Risk Factors
-6. Investment Thesis
-7. Conclusion
-
-Use [N] citations when referencing specific data points."""
+Before finishing, re-read every sentence. If it asserts a fact or number and has no [N], add the correct citation or remove
+the sentence."""

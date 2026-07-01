@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass
 from typing import Optional, cast
 
@@ -87,8 +88,8 @@ def get_embeddings(
         # Embed query
         query_vector = embeddings.embed_query("search query")
     """
-    model = model or settings.ollama.embed_model
-    base_url = base_url or settings.ollama.base_url
+    model = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:4b")
+    base_url = os.getenv("OLLAMA_EMBED_BASE_URL", "http://localhost:11434")
 
     logger.info(f"Creating OllamaEmbeddings (model={model})")
 

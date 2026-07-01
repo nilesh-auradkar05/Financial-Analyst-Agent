@@ -105,11 +105,11 @@ def test_build_index_documents_emits_metadata_rich_documents(sample_filing):
     assert metadata["source_url"] == "https://www.sec.gov/Archives/example"
     assert metadata["section_name"] == "Business"
     assert metadata["section_key"] == "business"
-    assert metadata["document_id"] == "AAPL_10-K_2025-09-28"
-    assert metadata["parent_section_id"] == "AAPL_10-K_2025-09-28:business"
+    assert metadata["document_id"] == "0000320193-25-000001"
+    assert metadata["parent_section_id"] == "0000320193-25-000001:business"
     assert metadata["chunk_id"] == first_document.id
     assert metadata["chunk_index"] == 0
-    assert first_document.id.startswith("AAPL_10-K_2025-09-28_business_")
+    assert first_document.id.startswith("0000320193-25-000001_business_")
 
 
 def test_ingest_filing_writes_section_aware_documents(monkeypatch, sample_filing):

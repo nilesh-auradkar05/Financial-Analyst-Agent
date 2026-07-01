@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.config import settings
 from app.services.llm import (
     ANALYST_SYSTEM_PROMPT,
     MEMO_TEMPLATE,
@@ -16,13 +17,19 @@ from app.services.llm import (
 
 
 class TestGetLLM:
-    def test_returns_chat_ollama(self):
-        llm = get_llm()
-        assert llm.model is not None
+    def test_delegates_to_provider(self):
+        sentinel = object()
+        with patch("app.services.llm.get_provider_llm", return_value=sentinel) as mock_get:
+            llm = get_llm()
+        assert llm is sentinel
+        mock_get.assert_called_once()
 
-    def test_temperature_override(self):
-        llm = get_llm(temperature=0.3)
-        assert llm.temperature == 0.3
+    def test_accepts_explicit_settings(self):
+        sentinel = object()
+        with patch("app.services.llm.get_provider_llm", return_value=sentinel) as mock_get:
+            llm = get_llm(settings)
+        assert llm is sentinel
+        mock_get.assert_called_once_with(settings)
 
 
 class TestPrompts:
@@ -43,7 +50,7 @@ class TestHealthCheck:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "models": [{"name": "qwen3-vl:8b"}],
+            "models": [{"name": "qwen3.5:9b"}],
         }
 
         with patch("app.services.llm.httpx.AsyncClient") as mockclient:
@@ -55,6 +62,7 @@ class TestHealthCheck:
             mockclient.return_value = instance
 
             result = await check_ollama_health()
+            # Behavior: a 200 response listing the configured model → healthy.
             assert result is True
 
     @pytest.mark.asyncio

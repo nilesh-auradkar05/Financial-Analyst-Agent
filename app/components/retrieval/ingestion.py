@@ -101,9 +101,28 @@ def _clean_section_text(text: str) -> str:
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
     return cleaned.strip()
 
-def _build_document_id(ticker: str, filing_type: str, filing_date: Optional[str]) -> str:
-    safe_date = filing_date or "unknown_date"
-    return f"{ticker.upper()}_{filing_type}_{safe_date}"
+def _required_metadata(metadata: Any, field_name: str) -> str:
+    value = getattr(metadata, field_name, None)
+    if value is None or str(value).strip() == "":
+        raise ValueError(f"filing metadata missing required field: {field_name}")
+    return str(value).strip()
+
+def _source_url(metadata: Any) -> str:
+    source_url = getattr(metadata, "source_url", None)
+    if source_url is not None and str(source_url).strip():
+        return str(source_url).strip()
+
+    filing_url = getattr(metadata, "filing_url", None)
+    if filing_url is not None and str(filing_url).strip():
+        return str(filing_url).strip()
+
+    raise ValueError("filing metadata missing required field: source_url")
+
+def _build_document_id(accession_number: str) -> str:
+    return accession_number
+
+def _build_chunk_id(accession_number: str, section_key: str, chunk_index: int) -> str:
+    return f"{accession_number}_{section_key}_{chunk_index:03d}"
 
 def _build_section_lookup(filing: Filing) -> dict[str, tuple[str, Any]]:
     lookup: dict[str, tuple[str, Any]] = {}
@@ -120,12 +139,12 @@ def build_index_documents(
     sections: list[str] | None = None,
 ) -> BuildDocumentsResult:
 
-    ticker = (filing.metadata.ticker or "").upper()
-    filing_type = filing.metadata.filing_type
-    filing_date = getattr(filing.metadata, "filing_date", None)
+    ticker = _required_metadata(filing.metadata, "ticker").upper()
+    filing_type = _required_metadata(filing.metadata, "filing_type").upper()
+    filing_date = _required_metadata(filing.metadata, "filing_date")
     company_name = getattr(filing.metadata, "company_name", None)
-    accession_number = getattr(filing.metadata, "accession_number", None)
-    source_url = getattr(filing.metadata, "source_url", None)
+    accession_number = _required_metadata(filing.metadata, "accession_number")
+    source_url = _source_url(filing.metadata)
 
     requested_section_names = sections or DEFAULT_SECTIONS
     requested_descriptors: list[CanonicalSection] = []
@@ -137,7 +156,7 @@ def build_index_documents(
 
     requested_keys = [descriptor.key for descriptor in requested_descriptors]
     available_sections = _build_section_lookup(filing)
-    document_id = _build_document_id(ticker, filing_type, filing_date)
+    document_id = _build_document_id(accession_number)
 
     documents: list[IndexDocument] = []
     sections_found: list[str] = []
@@ -163,10 +182,10 @@ def build_index_documents(
             continue
 
         sections_found.append(descriptor.key)
-        parent_section_id = f"{document_id}:{descriptor.slug}"
+        parent_section_id = f"{document_id}:{descriptor.key}"
 
         for chunk_idx, chunk_txt in enumerate(chunks):
-            chunk_id = f"{document_id}_{descriptor.slug}_{chunk_idx:03d}"
+            chunk_id = _build_chunk_id(accession_number, descriptor.key, chunk_idx)
             metadata = {
                 "ticker": ticker,
                 "company_name": company_name,

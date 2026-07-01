@@ -150,7 +150,7 @@ def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
                 "Install langchain-anthropic"
             ) from exc
 
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "model": config.model,
             "temperature": config.temperature,
         }

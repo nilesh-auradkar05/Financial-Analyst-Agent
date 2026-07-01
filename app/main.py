@@ -131,7 +131,7 @@ async def lifespan(app: FastAPI):
     setup_langsmith_env()
 
     # Check Ollama
-    ollama_ok = await check_ollama_health()
+    ollama_ok = await check_ollama_health(log_failure=True)
     if ollama_ok:
         logger.info(f"Ollama connected ({settings.ollama.llm_model})")
     else:
