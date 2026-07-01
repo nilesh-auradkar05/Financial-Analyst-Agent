@@ -1,10 +1,14 @@
-"""Print one memo's claim-by-claim grounding verdicts for manual validation.
+"""Validate + calibrate the semantic grounding oracle against your hand labels.
 
-You are about to optimize grounded_claim_rate, so first confirm it's honest:
-run this, read every UNGROUNDED line, and decide whether the cited evidence
-genuinely fails to support the claim, or whether it's a valid paraphrase the
-token-overlap heuristic simply missed. If most UNGROUNDED verdicts are unfair,
-the fix is a better grounding check (semantic / LLM-judge), not more prompting.
+Runs ONE memo, then for every claim shows the token-overlap verdict next to the
+semantic cosine similarity, and sweeps the similarity threshold. Use it like this:
+  1. Read each claim and compare the SEM_SIM column to your own fair/unfair judgment.
+  2. Find the threshold that best separates the claims you judged supported from the
+     ones you judged genuinely unsupported.
+  3. Set that value as min_similarity in grounding_semantic.py.
+
+Numeric claims still require a number match (NUM column); market-metric claims will
+stay ungrounded here until the registry gap is fixed - that's expected.
 
     TICKER=AAPL python -m evaluation.inspect_grounding
 """
@@ -12,12 +16,20 @@ the fix is a better grounding check (semantic / LLM-judge), not more prompting.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 
 from app.agents.graph import create_agent
 from app.agents.state import create_initial_state
-from evaluation.grounding import evaluate_memo_grounding
+from app.components.retrieval.embeddings import embed_texts
+from evaluation.grounding import (
+    _build_evidence_map,
+    _extract_citations,
+    _extract_claim_sentences,
+    _numbers_supported,
+    _strip_citations,
+    evaluate_memo_grounding,
+)
+from evaluation.semantic_grounding import _cosine
 
 
 async def main(ticker: str) -> None:
@@ -29,32 +41,49 @@ async def main(ticker: str) -> None:
     memo = final.get("investment_memo", "") or ""
     registry = final.get("citation_evidence", []) or []
 
-    result = evaluate_memo_grounding(memo, registry).to_dict()
-    print(f"coverage={result.get('citation_coverage_rate', 0):.2f}  "
-          f"grounded={result.get('grounded_claim_rate', 0):.2f}  "
-          f"claims={result.get('total_claims', 0)}\n")
+    token = evaluate_memo_grounding(memo, registry)
+    claims = _extract_claim_sentences(memo)
+    cleaned = [_strip_citations(s) for s in claims]
+    cites = [_extract_citations(s) for s in claims]
+    emap = _build_evidence_map(registry)
 
-    for i, c in enumerate(result.get("claims", []), 1):
-        grounded = c.get("grounded", c.get("is_grounded"))
-        cited = c.get("citations", c.get("cited"))
-        text = (c.get("text") or "").strip()
-        if not cited:
-            flag = "UNCITED   "
-        elif grounded:
-            flag = "OK        "
+    claim_vecs = embed_texts(cleaned) if cleaned else []
+    ev_idx = list(emap.keys())
+    ev_vecs = embed_texts([emap[i].text for i in ev_idx]) if ev_idx else []
+    evmap = dict(zip(ev_idx, ev_vecs))
+
+    print(f"TOKEN checker: coverage={token.citation_coverage_rate:.2f} grounded={token.grounded_claim_rate:.2f}\n")
+    print(f"{'#':>3} {'TOKEN':<11} {'SEM_SIM':>7} {'NUM':>4}  claim (cites)")
+
+    cited_scores: list[tuple[float, bool]] = []
+    for i, (clean, cvec, cite, ta) in enumerate(zip(cleaned, claim_vecs, cites, token.claims), 1):
+        best_sim, num_ok = 0.0, True
+        if cite:
+            best_sim = 0.0
+            num_ok = True
+            for idx in cite:
+                ev = evmap.get(idx)
+                if ev is None:
+                    continue
+                s = _cosine(cvec, ev)
+                if s > best_sim:
+                    best_sim = s
+                    num_ok = _numbers_supported(clean, emap[idx].text)
+            cited_scores.append((best_sim, num_ok))
+        tok_flag = "UNCITED" if ta.missing_citation else ("OK" if ta.supported else "UNGROUNDED")
+        print(f"{i:>3} {tok_flag:<11} {best_sim:>7.2f} {('y' if num_ok else 'n'):>4}  {clean[:88]} {cite}")
+
+    print("\nsemantic grounded_claim_rate by threshold (over cited claims):")
+    for t in (0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70):
+        if cited_scores:
+            g = sum(1 for sim, num_ok in cited_scores if sim >= t and num_ok) / len(cited_scores)
         else:
-            flag = "UNGROUNDED"
-        print(f"[{i:>2}] {flag} cites={cited}")
-        print(f"     {text}")
-        # dump anything else the claim carries, so you can see what it was checked against
-        extra = {k: v for k, v in c.items() if k not in {"text", "grounded", "is_grounded", "citations", "cited"}}
-        if extra:
-            print(f"     ~ {json.dumps(extra, default=str)[:300]}")
-        print()
+            g = 0.0
+        print(f"  thr {t:.2f} -> grounded {g:.2f}")
 
-    print("\n----- REGISTRY (cited evidence) -----")
+    print("\n----- REGISTRY -----")
     for e in registry:
-        print(f"[{e['index']}] {e.get('title','')} :: {(e.get('text') or '')[:160]}")
+        print(f"[{e['index']}] {e.get('title','')} :: {(e.get('text') or '')[:150]}")
 
 
 if __name__ == "__main__":

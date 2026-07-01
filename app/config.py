@@ -146,6 +146,24 @@ class TavilySettings(BaseSettings):
         default="advanced", description="Search depth (basic or advanced)"
     )
 
+    topic: str = Field(
+        default="news", description="Tavily search topic (general or news)"
+    )
+
+    news_recency_days: int = Field(
+        default=14,
+        description="Recency window in days for news-topic searches",
+    )
+
+    min_relevance_score: float = Field(
+        default=0.0, description="Drop results scoring below this relevance score"
+    )
+
+    min_content_chars: int = Field(
+        default=80,
+        description="Drop results whose cleaned content is shorter than this",
+    )
+
 
 class LangSmithSettings(BaseSettings):
     """
