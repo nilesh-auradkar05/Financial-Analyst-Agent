@@ -26,13 +26,67 @@ from app.agents.graph import create_agent
 from app.agents.state import create_initial_state, has_fatal_error
 from app.config import settings
 from app.llm.provider import MODEL_PRESETS, _model_family
-from evaluation.grounding import evaluate_memo_grounding
+from evaluation.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_grounding
 from evaluation.semantic_grounding import evaluate_memo_grounding_semantic
 
 RESULTS_DIR = Path("evaluation/results")
 MIN_CITATION_COVERAGE = 0.80
 MIN_GROUNDED_CLAIM_RATE = 0.75
 _CIT_RE = re.compile(r"\[(\d+)\]")
+_THRESHOLD_SWEEP = (0.40, 0.45, 0.50, 0.55)
+_BORDERLINE_BAND = 0.05
+_BASELINE_FILENAME_RE = re.compile(r"^retrieval_baseline_(\d{3})_")
+_FILENAME_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def _cited_claims(claims: list[dict]) -> list[dict]:
+    return [c for c in claims if not c.get("missing_citation")]
+
+
+def _threshold_sensitivity(claims: list[dict], thresholds: tuple[float, ...] = _THRESHOLD_SWEEP) -> dict[str, float]:
+    """Grounded rate at each similarity threshold, computed post-hoc from a single
+    run's per-claim `overlap_score` (best cited similarity) + `numbers_ok` (union
+    number gate). One run now answers the threshold-fragility question instead of
+    needing repeated runs to sample noise around the 0.45 default.
+
+    Meaningful for the semantic checker (overlap_score is cosine similarity); for
+    the token checker overlap_score is a token-overlap ratio on the same 0-1 scale,
+    so the same sweep is computed rather than special-cased to null.
+    """
+    cited = _cited_claims(claims)
+    if not cited:
+        return {f"{t:.2f}": 0.0 for t in thresholds}
+    return {
+        f"{t:.2f}": sum(1 for c in cited if c["overlap_score"] >= t and c["numbers_ok"]) / len(cited)
+        for t in thresholds
+    }
+
+
+def _borderline_claims(claims: list[dict], min_similarity: float, band: float = _BORDERLINE_BAND) -> int:
+    """Count of cited claims within `band` of the active threshold -- claims whose
+    grounded/ungrounded verdict would flip under a small recalibration."""
+    cited = _cited_claims(claims)
+    return sum(1 for c in cited if abs(c["overlap_score"] - min_similarity) <= band)
+
+
+def _sanitize_for_filename(value: str) -> str:
+    return _FILENAME_SAFE_RE.sub("-", value)
+
+
+def next_baseline_filename(results_dir: Path, model: str, temperature: float) -> str:
+    """Pure helper for the next `retrieval_baseline_<NNN>_<model>_<temperature>.json`
+    artifact name. NNN is a zero-padded 3-digit sequence = 1 + the highest existing
+    NNN among `retrieval_baseline_*.json` files in `results_dir` (001 if none).
+    `model` is sanitized to filesystem-safe characters.
+    """
+    seq = 0
+    if results_dir.exists():
+        for path in results_dir.glob("retrieval_baseline_*.json"):
+            match = _BASELINE_FILENAME_RE.match(path.name)
+            if match:
+                seq = max(seq, int(match.group(1)))
+    model_part = _sanitize_for_filename(model)
+    return f"retrieval_baseline_{seq + 1:03d}_{model_part}_{float(temperature)}.json"
 
 
 def _percentile(values: list[float], pct: float) -> float:
@@ -103,6 +157,8 @@ async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include
         "grounded_claims": int(gr["grounded_claims"]),
         "citation_coverage_rate": float(gr["citation_coverage_rate"]),
         "grounded_claim_rate": float(gr["grounded_claim_rate"]),
+        "threshold_sensitivity": _threshold_sensitivity(gr["claims"]),
+        "borderline_claims": _borderline_claims(gr["claims"], min_similarity),
         "orphan_citations": orphans,
         "evidence_count": len(registry),
         "filing_chunks": len(final.get("filing_chunks", []) or []),
@@ -121,12 +177,21 @@ def _aggregate(runs: list[dict]) -> dict:
     n = len(runs)
     keys = ["grounded_claim_rate", "citation_coverage_rate", "total_claims", "cited_claims",
             "grounded_claims", "orphan_citations", "evidence_count", "filing_chunks",
-            "news_articles", "memo_words", "run_ms"]
+            "news_articles", "memo_words", "run_ms", "borderline_claims"]
     out = {"n_runs": n,
            "pass_rate": sum(1 for r in runs if r["passed"]) / n if n else 0.0,
            "fatal_error_rate": sum(1 for r in runs if r["fatal_error"]) / n if n else 0.0}
     for k in keys:
         out[k] = _stats(col(k))
+    # Mean grounded rate per threshold across runs -- answers "how fragile is the
+    # 0.45 default" from this batch without a separate sweep run.
+    if runs:
+        thresholds = runs[0]["threshold_sensitivity"].keys()
+        out["threshold_sensitivity"] = {
+            t: statistics.fmean(r["threshold_sensitivity"][t] for r in runs) for t in thresholds
+        }
+    else:
+        out["threshold_sensitivity"] = {}
     return out
 
 
@@ -172,6 +237,7 @@ async def main() -> None:
         "temperature": settings.llm.temperature,
         "thinking_mode": settings.llm.thinking_mode,
         "grounding_checker": args.checker,
+        "grounding_eval_version": GROUNDING_EVAL_VERSION,
         "min_similarity": args.min_similarity if args.checker == "semantic" else None,
         "thresholds": {"min_citation_coverage": MIN_CITATION_COVERAGE, "min_grounded_claim_rate": MIN_GROUNDED_CLAIM_RATE},
         "config": {"tickers": args.tickers, "repeats": args.repeats,
@@ -184,8 +250,7 @@ async def main() -> None:
     }
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = RESULTS_DIR / f"quality_baseline_{stamp}.json"
+    out_path = RESULTS_DIR / next_baseline_filename(RESULTS_DIR, model_id, settings.llm.temperature)
     out_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
 
     g, c = overall["grounded_claim_rate"], overall["citation_coverage_rate"]

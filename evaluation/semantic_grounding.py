@@ -34,8 +34,7 @@ from evaluation.grounding import (
     _build_evidence_map,
     _extract_citations,
     _extract_claim_sentences,
-    _extract_numbers,
-    _numbers_supported,
+    _numbers_supported_any,
     _strip_citations,
 )
 
@@ -97,19 +96,22 @@ def evaluate_memo_grounding_semantic(
 
         cited_claims += 1
         best_sim = 0.0
-        best_number_match = False
+        cited_evidence_texts: list[str] = []
 
         for idx in citations:
             evec = ev_vec_map.get(idx)
             if evec is None:
                 continue
+            cited_evidence_texts.append(evidence_map[idx].text)
             sim = _cosine(cvec, evec)
-            number_match = _numbers_supported(cleaned_sentence, evidence_map[idx].text)
             if sim > best_sim:
                 best_sim = sim
-                best_number_match = number_match
 
-        supported = best_sim >= min_similarity and best_number_match
+        # Number gate is decoupled from best-similarity evidence selection: a
+        # claim's numbers are supported if ANY cited evidence contains them,
+        # not just the evidence with the highest cosine similarity.
+        numbers_ok, unmatched_numbers = _numbers_supported_any(cleaned_sentence, cited_evidence_texts)
+        supported = best_sim >= min_similarity and numbers_ok
         if supported:
             grounded_claims += 1
             assessments.append(
@@ -118,12 +120,13 @@ def evaluate_memo_grounding_semantic(
                     citations=citations,
                     supported=True,
                     overlap_score=best_sim,
+                    numbers_ok=numbers_ok,
                 )
             )
         else:
             reason = "claim not semantically supported by cited evidence"
-            if _extract_numbers(cleaned_sentence) and not best_number_match:
-                reason = "claim numbers do not match cited evidence"
+            if not numbers_ok:
+                reason = f"claim numbers not found in cited evidence: {', '.join(unmatched_numbers)}"
             assessments.append(
                 ClaimAssessment(
                     sentence=cleaned_sentence,
@@ -131,6 +134,7 @@ def evaluate_memo_grounding_semantic(
                     supported=False,
                     overlap_score=best_sim,
                     reason=reason,
+                    numbers_ok=numbers_ok,
                 )
             )
 

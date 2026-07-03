@@ -25,7 +25,7 @@ from evaluation.grounding import (
     _build_evidence_map,
     _extract_citations,
     _extract_claim_sentences,
-    _numbers_supported,
+    _numbers_supported_any,
     _strip_citations,
     evaluate_memo_grounding,
 )
@@ -58,9 +58,10 @@ async def main(ticker: str) -> None:
     cited_scores: list[tuple[float, bool]] = []
     for i, (clean, cvec, cite, ta) in enumerate(zip(cleaned, claim_vecs, cites, token.claims), 1):
         best_sim, num_ok = 0.0, True
+        unmatched: list[str] = []
         if cite:
             best_sim = 0.0
-            num_ok = True
+            cited_texts = [emap[idx].text for idx in cite if idx in emap]
             for idx in cite:
                 ev = evmap.get(idx)
                 if ev is None:
@@ -68,10 +69,16 @@ async def main(ticker: str) -> None:
                 s = _cosine(cvec, ev)
                 if s > best_sim:
                     best_sim = s
-                    num_ok = _numbers_supported(clean, emap[idx].text)
+            # Number gate is decoupled from best-similarity evidence: supported
+            # if ANY cited evidence (not just the highest-similarity one) has
+            # the number.
+            num_ok, unmatched = _numbers_supported_any(clean, cited_texts)
             cited_scores.append((best_sim, num_ok))
         tok_flag = "UNCITED" if ta.missing_citation else ("OK" if ta.supported else "UNGROUNDED")
-        print(f"{i:>3} {tok_flag:<11} {best_sim:>7.2f} {('y' if num_ok else 'n'):>4}  {clean[:88]} {cite}")
+        # Unmatched numbers are printed verbatim so a hand audit can jump straight
+        # to the offending figure instead of re-deriving it from the claim text.
+        num_note = f"  MISSING: {', '.join(unmatched)}" if unmatched else ""
+        print(f"{i:>3} {tok_flag:<11} {best_sim:>7.2f} {('y' if num_ok else 'n'):>4}  {clean[:88]} {cite}{num_note}")
 
     print("\nsemantic grounded_claim_rate by threshold (over cited claims):")
     for t in (0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70):

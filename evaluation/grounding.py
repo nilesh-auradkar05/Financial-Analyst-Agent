@@ -4,10 +4,15 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
+# Bumped when claim-extraction or number-gate semantics change, so pre-fix and
+# post-fix baseline artifacts can never be silently compared.
+GROUNDING_EVAL_VERSION = 2
+
 _SENTENCE_SPILT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 _WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9&'\-/]*")
 _NUMBER_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?%?")
+_EMPHASIS_RE = re.compile(r"[*_`]+")
 
 _STOPWORDS = {
     "a",
@@ -80,6 +85,7 @@ class ClaimAssessment:
     overlap_score: float
     missing_citation: bool = False
     reason: str | None = None
+    numbers_ok: bool = True
 
 @dataclass(frozen=True, slots=True)
 class GroundingCheckResult:
@@ -107,6 +113,7 @@ class GroundingCheckResult:
                     "overlap_score": claim.overlap_score,
                     "missing_citation": claim.missing_citation,
                     "reason": claim.reason,
+                    "numbers_ok": claim.numbers_ok,
                 }
                 for claim in self.claims
             ],
@@ -153,21 +160,20 @@ def evaluate_memo_grounding(
 
         cited_claims += 1
         best_score = 0.0
-        best_number_match = False
+        cited_evidence_texts: list[str] = []
 
         for citation_idx in citations:
             evidence_ref = evidence_map.get(citation_idx)
             if evidence_ref is None:
                 continue
 
+            cited_evidence_texts.append(evidence_ref.text)
             overlap_score = _token_overlap_score(cleaned_sentence, evidence_ref.text)
-            number_match = _numbers_supported(cleaned_sentence, evidence_ref.text)
-
             if overlap_score > best_score:
                 best_score = overlap_score
-                best_number_match = number_match
 
-        supported = best_score >= min_overlap_score and best_number_match
+        numbers_ok, unmatched_numbers = _numbers_supported_any(cleaned_sentence, cited_evidence_texts)
+        supported = best_score >= min_overlap_score and numbers_ok
         if supported:
             grounded_claims += 1
             assessments.append(
@@ -176,12 +182,13 @@ def evaluate_memo_grounding(
                     citations=citations,
                     supported=True,
                     overlap_score=best_score,
+                    numbers_ok=numbers_ok,
                 )
             )
         else:
             reason = "claim does not align with cited evidence"
-            if _extract_numbers(cleaned_sentence) and not best_number_match:
-                reason = "claim numbers do not match cited evidence"
+            if not numbers_ok:
+                reason = f"claim numbers not found in cited evidence: {', '.join(unmatched_numbers)}"
             assessments.append(
                 ClaimAssessment(
                     sentence=cleaned_sentence,
@@ -189,6 +196,7 @@ def evaluate_memo_grounding(
                     supported=False,
                     overlap_score=best_score,
                     reason=reason,
+                    numbers_ok=numbers_ok,
                 )
             )
 
@@ -239,14 +247,30 @@ def _looks_like_claim(sentence: str) -> bool:
     stripped = sentence.strip()
     if not stripped:
         return False
-    if stripped.startswith("#"):
+    # ATX headings and blockquotes are never claims.
+    if stripped.startswith(("#", ">")):
         return False
 
-    tokens = _content_tokens(stripped)
+    has_citation = bool(_CITATION_RE.search(stripped))
+    # Strip citations + markdown emphasis so heading markers and inline bold do
+    # not leak into the heading test below or into token / number extraction.
+    normalized = _EMPHASIS_RE.sub("", _CITATION_RE.sub("", stripped)).strip()
+    if not normalized:
+        return False
+
+    # A scorable claim is a terminated sentence OR carries a citation. Section
+    # headings written as bold fragments -- "**Recent News & Market Sentiment**",
+    # "**Key Risk Factors (from SEC Filings)**" -- have neither, yet trip claim
+    # hints ("market", "risk"). Without this guard they count as phantom uncited
+    # claims and silently depress citation coverage on every memo.
+    if not has_citation and normalized[-1] not in ".!?":
+        return False
+
+    tokens = _content_tokens(normalized)
     if len(tokens) < 3:
         return False
 
-    if _extract_numbers(stripped):
+    if _extract_numbers(normalized):
         return True
 
     return any(token in _CLAIM_HINTS for token in tokens)
@@ -261,13 +285,51 @@ def _strip_citations(sentence: str) -> str:
 def _extract_numbers(text: str) -> set[str]:
     return {match.group(0).replace(",", "") for match in _NUMBER_RE.finditer(text)}
 
-def _numbers_supported(claim_text: str, evidence_text: str) -> bool:
-    claim_numbers = _extract_numbers(claim_text)
-    if not claim_numbers:
-        return True
+def _extract_number_tokens(text: str) -> list[tuple[float, int]]:
+    """Return (value, stated_decimal_places) for each numeric token.
 
-    evidence_numbers = _extract_numbers(evidence_text)
-    return claim_numbers.issubset(evidence_numbers)
+    Precision is preserved so support can be judged at the precision the claim
+    actually states, rather than by exact string identity.
+    """
+    tokens: list[tuple[float, int]] = []
+    for match in _NUMBER_RE.finditer(text):
+        cleaned = match.group(0).replace("$", "").replace(",", "").replace("%", "")
+        try:
+            value = float(cleaned)
+        except ValueError:
+            continue
+        decimals = len(cleaned.split(".")[1]) if "." in cleaned else 0
+        tokens.append((value, decimals))
+    return tokens
+
+def _numbers_supported_any(claim_text: str, evidence_texts: Sequence[str]) -> tuple[bool, list[str]]:
+    """A claim's numbers are supported if, for EACH number token in the claim, AT
+    LEAST ONE cited evidence text contains a value that rounds (at the claim's
+    stated precision) to it.
+
+    This decouples the number gate from best-similarity evidence selection: a
+    claim citing [1][2] must not be flagged unsupported just because [1] (not
+    [2], which actually has the number) happens to score the higher similarity.
+
+    Returns (all_supported, unmatched) where `unmatched` lists the offending
+    number substrings verbatim as they appear in the claim, so a human can
+    hand-audit exactly which figures were not found in any cited evidence.
+    """
+    claim_tokens = _extract_number_tokens(claim_text)
+    if not claim_tokens:
+        return True, []
+
+    raw_matches = [match.group(0) for match in _NUMBER_RE.finditer(claim_text)]
+    evidence_values = [
+        value for text in evidence_texts for value, _ in _extract_number_tokens(text)
+    ]
+
+    unmatched: list[str] = []
+    for (value, decimals), raw in zip(claim_tokens, raw_matches):
+        if not any(round(ev, decimals) == value for ev in evidence_values):
+            unmatched.append(raw)
+
+    return not unmatched, unmatched
 
 def _token_overlap_score(claim_text: str, evidence_text: str) -> float:
     claim_tokens = set(_content_tokens(claim_text))
