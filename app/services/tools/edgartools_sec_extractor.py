@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from importlib import import_module
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from loguru import logger
@@ -281,6 +282,8 @@ def extract_latest_10k_with_edgartools(
     ticker: str,
     *,
     identity: Optional[str] = None,
+    record_evidence: bool = False,
+    evidence_output_dir: Path | str | None = None,
 ) -> EdgarToolsFilingPayload:
     """Extract the latest 10-K sections for a ticker using EdgarTools.
 
@@ -353,8 +356,35 @@ def extract_latest_10k_with_edgartools(
             normalized_ticker,
         )
 
-    return _build_metadata_payload(
+    payload = _build_metadata_payload(
         ticker=normalized_ticker,
         filing=filing,
         sections=sections,
+    )
+    if record_evidence:
+        _record_sec_snapshot(payload, output_dir=evidence_output_dir)
+    return payload
+
+
+def _record_sec_snapshot(
+    payload: EdgarToolsFilingPayload,
+    *,
+    output_dir: Path | str | None,
+) -> None:
+    from dataops.snapshot_writer import EvidenceSnapshotWriter
+
+    writer = EvidenceSnapshotWriter(output_dir or Path("artifacts/dataops/evidence_snapshots"))
+    writer.write_json(
+        source_type="sec_filing",
+        ticker=payload.ticker,
+        natural_key=payload.accession_number,
+        payload=asdict(payload),
+        fetcher_name="edgartools_sec_extractor",
+        fetcher_version="1",
+        metadata={
+            "filing_type": payload.filing_type,
+            "filing_date": payload.filing_date,
+            "report_date": payload.report_date or "",
+            "primary_document": payload.primary_document,
+        },
     )

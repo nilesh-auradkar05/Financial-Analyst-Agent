@@ -14,7 +14,8 @@ Usage:
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 from langsmith import traceable
@@ -119,6 +120,10 @@ def _tavily_retry(func):
 async def search_company_news(
     query: str,
     max_results: int = 5,
+    *,
+    record_evidence: bool = False,
+    evidence_ticker: str | None = None,
+    evidence_output_dir: Path | str | None = None,
 ) -> list[NewsArticle]:
     """
     Search for company news using Tavily.
@@ -186,6 +191,12 @@ async def search_company_news(
             f"Found {len(articles)} usable articles out of "
             f"{len(results)} returned by Tavily"
         )
+        if record_evidence:
+            _record_news_snapshots(
+                articles,
+                ticker=evidence_ticker or _infer_ticker(query),
+                output_dir=evidence_output_dir,
+            )
         return articles
 
     except Exception as e:
@@ -201,4 +212,36 @@ def _extract_source(url: str) -> str:
         return domain.split(".")[0].title()
     except Exception:
         return "Unknown"
+
+
+def _infer_ticker(query: str) -> str:
+    for token in query.replace("(", " ").replace(")", " ").split():
+        cleaned = re.sub(r"[^A-Za-z]", "", token)
+        if 1 <= len(cleaned) <= 5 and cleaned.isupper():
+            return cleaned
+    return "UNKNOWN"
+
+
+def _record_news_snapshots(
+    articles: list[NewsArticle],
+    *,
+    ticker: str,
+    output_dir: Path | str | None,
+) -> None:
+    from dataops.snapshot_writer import EvidenceSnapshotWriter
+
+    writer = EvidenceSnapshotWriter(output_dir or Path("artifacts/dataops/evidence_snapshots"))
+    for article in articles:
+        writer.write_json(
+            source_type="news_article",
+            ticker=ticker,
+            natural_key=article.url,
+            payload=asdict(article),
+            fetcher_name="web_search_tool",
+            fetcher_version="1",
+            metadata={
+                "source": article.source,
+                "published_date": article.published_date or "",
+            },
+        )
 

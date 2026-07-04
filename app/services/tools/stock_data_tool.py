@@ -23,11 +23,14 @@ Use:
 """
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from langsmith import traceable
 from loguru import logger
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
 
@@ -37,12 +40,6 @@ try:
 except ImportError:
     yf = None
     YFINANCE_AVAILABLE = False
-
-try:
-    from tenacity import retry, stop_after_attempt, wait_exponential
-    TENACITY_AVAILABLE = True
-except ImportError:
-    TENACITY_AVAILABLE = False
 
 # =============================================================================
 # DATA MODEL
@@ -105,9 +102,6 @@ def _yfinance_fetch_sync(ticker: str) -> dict:
 
 def _with_retry(func):
     """Apply tenacity retry if available."""
-    if not TENACITY_AVAILABLE:
-        return func
-
     return retry(
         stop=stop_after_attempt(settings.retry.max_attempts),
         wait=wait_exponential(
@@ -124,7 +118,12 @@ def _with_retry(func):
 
 
 @traceable(name="get_stock_data", run_type="tool", tags=["stock", "yfinance"])
-async def get_stock_data(ticker: str) -> StockInfo:
+async def get_stock_data(
+    ticker: str,
+    *,
+    record_evidence: bool = False,
+    evidence_output_dir: Path | str | None = None,
+) -> StockInfo:
     """
     Fetch stock data from YFinance.
 
@@ -147,6 +146,7 @@ async def get_stock_data(ticker: str) -> StockInfo:
         fetcher = _with_retry(_yfinance_fetch_sync)
         info = await asyncio.to_thread(fetcher, ticker)
 
+        fetched_at = datetime.now(timezone.utc)
         stock_info = StockInfo(
             ticker=ticker.upper(),
             company_name=info.get("longName") or info.get("shortName") or ticker,
@@ -164,9 +164,40 @@ async def get_stock_data(ticker: str) -> StockInfo:
             sector=info.get("sector"),
             industry=info.get("industry"),
         )
+        if record_evidence:
+            _record_stock_snapshot(
+                stock_info,
+                fetched_at=fetched_at,
+                output_dir=evidence_output_dir,
+            )
         logger.info(f"{ticker}: ${stock_info.current_price}")
         return stock_info
 
     except Exception as e:
         logger.error(f"Failed to fetch {ticker}: {e}")
         return StockInfo(ticker=ticker, company_name=ticker, error=str(e))
+
+
+def _record_stock_snapshot(
+    stock_info: StockInfo,
+    *,
+    fetched_at: datetime,
+    output_dir: Path | str | None,
+) -> None:
+    from dataops.snapshot_writer import EvidenceSnapshotWriter
+
+    writer = EvidenceSnapshotWriter(output_dir or Path("artifacts/dataops/evidence_snapshots"))
+    writer.write_json(
+        source_type="market_quote",
+        ticker=stock_info.ticker,
+        natural_key=f"{stock_info.ticker}:{fetched_at.isoformat()}",
+        payload=asdict(stock_info),
+        fetcher_name="stock_data_tool",
+        fetcher_version="1",
+        fetched_at=fetched_at,
+        metadata={
+            "company_name": stock_info.company_name,
+            "sector": stock_info.sector or "",
+            "industry": stock_info.industry or "",
+        },
+    )

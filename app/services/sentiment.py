@@ -32,7 +32,9 @@ Usage:
     analyzed = analyze_articles(articles)
 """
 
+import hashlib
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import torch
@@ -272,7 +274,13 @@ def _get_default_analyzer() -> SentimentAnalyzer:
     return _default_analyzer
 
 @traceable(name="analyze_sentiment_batch", run_type="chain", tags=["sentiment"])
-def analyze_sentiment_batch(texts: list[str]) -> list[SentimentResult]:
+def analyze_sentiment_batch(
+    texts: list[str],
+    *,
+    record_evidence: bool = False,
+    evidence_ticker: str = "UNKNOWN",
+    evidence_output_dir: Path | str | None = None,
+) -> list[SentimentResult]:
     """
     Analyze sentiment of list of texts. (Wrapper convenience function)
 
@@ -282,4 +290,42 @@ def analyze_sentiment_batch(texts: list[str]) -> list[SentimentResult]:
     Returns:
         List of SentimentResult objects.
     """
-    return _get_default_analyzer().analyze_batch(texts)
+    analyzer = _get_default_analyzer()
+    results = analyzer.analyze_batch(texts)
+    if record_evidence:
+        _record_sentiment_snapshots(
+            results,
+            ticker=evidence_ticker,
+            model_name=getattr(analyzer, "model_name", settings.finbert.model_name),
+            output_dir=evidence_output_dir,
+        )
+    return results
+
+
+def _record_sentiment_snapshots(
+    results: list[SentimentResult],
+    *,
+    ticker: str,
+    model_name: str,
+    output_dir: Path | str | None,
+) -> None:
+    from dataops.snapshot_writer import EvidenceSnapshotWriter
+
+    writer = EvidenceSnapshotWriter(output_dir or Path("artifacts/dataops/evidence_snapshots"))
+    for result in results:
+        text_hash = hashlib.sha256(result.text.encode("utf-8")).hexdigest()
+        writer.write_json(
+            source_type="sentiment_score",
+            ticker=ticker,
+            natural_key=f"{model_name}:{text_hash}",
+            payload={
+                "text": result.text,
+                "label": result.label,
+                "confidence": result.confidence,
+                "scores": result.scores,
+                "model_name": model_name,
+            },
+            fetcher_name="sentiment",
+            fetcher_version="1",
+            metadata={"model_name": model_name},
+        )
