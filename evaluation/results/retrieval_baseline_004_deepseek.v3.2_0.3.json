@@ -1,0 +1,853 @@
+{
+  "generated_at": "2026-07-04T19:00:05.694657+00:00",
+  "git": {
+    "commit": "89265b8",
+    "dirty": false
+  },
+  "provider": "bedrock",
+  "model": "deepseek.v3.2",
+  "model_family": "deepseek",
+  "temperature": 0.3,
+  "thinking_mode": "off",
+  "grounding_checker": "semantic",
+  "grounding_eval_version": 2,
+  "min_similarity": 0.45,
+  "evidence_release": null,
+  "thresholds": {
+    "min_citation_coverage": 0.8,
+    "min_grounded_claim_rate": 0.75
+  },
+  "config": {
+    "tickers": [
+      "AAPL",
+      "MSFT",
+      "NVDA"
+    ],
+    "repeats": 5,
+    "include_filing_analysis": true,
+    "include_news_sentiment": true,
+    "max_news_articles": 10,
+    "evidence_release": null,
+    "registry_root": "artifacts/dataops"
+  },
+  "overall": {
+    "n_runs": 15,
+    "pass_rate": 0.9333333333333333,
+    "fatal_error_rate": 0.0,
+    "grounded_claim_rate": {
+      "mean": 0.9410212136384344,
+      "stdev": 0.06355298511890216,
+      "p50": 0.9333333333333333,
+      "min": 0.8260869565217391,
+      "max": 1.0,
+      "n": 15
+    },
+    "citation_coverage_rate": {
+      "mean": 0.8827767739482659,
+      "stdev": 0.07172056884031597,
+      "p50": 0.875,
+      "min": 0.7931034482758621,
+      "max": 1.0,
+      "n": 15
+    },
+    "total_claims": {
+      "mean": 24.0,
+      "stdev": 5.398412465054624,
+      "p50": 24.0,
+      "min": 14.0,
+      "max": 34.0,
+      "n": 15
+    },
+    "cited_claims": {
+      "mean": 21.133333333333333,
+      "stdev": 4.853079532871984,
+      "p50": 22.0,
+      "min": 13.0,
+      "max": 30.0,
+      "n": 15
+    },
+    "grounded_claims": {
+      "mean": 19.8,
+      "stdev": 4.459340117743239,
+      "p50": 19.0,
+      "min": 13.0,
+      "max": 28.0,
+      "n": 15
+    },
+    "orphan_citations": {
+      "mean": 0.0,
+      "stdev": 0.0,
+      "p50": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "n": 15
+    },
+    "evidence_count": {
+      "mean": 16.333333333333332,
+      "stdev": 0.9759000729485332,
+      "p50": 17.0,
+      "min": 15.0,
+      "max": 17.0,
+      "n": 15
+    },
+    "filing_chunks": {
+      "mean": 7.666666666666667,
+      "stdev": 3.415650255319866,
+      "p50": 10.0,
+      "min": 3.0,
+      "max": 10.0,
+      "n": 15
+    },
+    "news_articles": {
+      "mean": 10.0,
+      "stdev": 0.0,
+      "p50": 10.0,
+      "min": 10.0,
+      "max": 10.0,
+      "n": 15
+    },
+    "memo_words": {
+      "mean": 738.8,
+      "stdev": 93.88686200498373,
+      "p50": 713.0,
+      "min": 612.0,
+      "max": 909.0,
+      "n": 15
+    },
+    "run_ms": {
+      "mean": 20420.744129000133,
+      "stdev": 3172.9197266761753,
+      "p50": 20110.950386000695,
+      "min": 16109.055925000575,
+      "max": 28866.589191999083,
+      "n": 15
+    },
+    "borderline_claims": {
+      "mean": 2.2,
+      "stdev": 1.5675276256394517,
+      "p50": 2.0,
+      "min": 0.0,
+      "max": 5.0,
+      "n": 15
+    },
+    "threshold_sensitivity": {
+      "0.40": 0.9667478585637154,
+      "0.45": 0.9410212136384344,
+      "0.50": 0.8639361494966781,
+      "0.55": 0.7588359736629131
+    }
+  },
+  "error_steps": {
+    "verify_memo": 2
+  },
+  "per_ticker": {
+    "AAPL": {
+      "n_runs": 5,
+      "pass_rate": 0.8,
+      "fatal_error_rate": 0.0,
+      "grounded_claim_rate": {
+        "mean": 0.9718518518518519,
+        "stdev": 0.03863231054934903,
+        "p50": 1.0,
+        "min": 0.9259259259259259,
+        "max": 1.0,
+        "n": 5
+      },
+      "citation_coverage_rate": {
+        "mean": 0.9005891741036504,
+        "stdev": 0.0802716245438946,
+        "p50": 0.8823529411764706,
+        "min": 0.7931034482758621,
+        "max": 1.0,
+        "n": 5
+      },
+      "total_claims": {
+        "mean": 28.4,
+        "stdev": 4.449719092257398,
+        "p50": 29.0,
+        "min": 23.0,
+        "max": 34.0,
+        "n": 5
+      },
+      "cited_claims": {
+        "mean": 25.4,
+        "stdev": 3.2093613071762426,
+        "p50": 25.0,
+        "min": 22.0,
+        "max": 30.0,
+        "n": 5
+      },
+      "grounded_claims": {
+        "mean": 24.6,
+        "stdev": 2.3021728866442674,
+        "p50": 25.0,
+        "min": 22.0,
+        "max": 28.0,
+        "n": 5
+      },
+      "orphan_citations": {
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p50": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "n": 5
+      },
+      "evidence_count": {
+        "mean": 17.0,
+        "stdev": 0.0,
+        "p50": 17.0,
+        "min": 17.0,
+        "max": 17.0,
+        "n": 5
+      },
+      "filing_chunks": {
+        "mean": 10.0,
+        "stdev": 0.0,
+        "p50": 10.0,
+        "min": 10.0,
+        "max": 10.0,
+        "n": 5
+      },
+      "news_articles": {
+        "mean": 10.0,
+        "stdev": 0.0,
+        "p50": 10.0,
+        "min": 10.0,
+        "max": 10.0,
+        "n": 5
+      },
+      "memo_words": {
+        "mean": 793.4,
+        "stdev": 92.21333959899728,
+        "p50": 792.0,
+        "min": 694.0,
+        "max": 909.0,
+        "n": 5
+      },
+      "run_ms": {
+        "mean": 22573.017219599933,
+        "stdev": 4063.174476985864,
+        "p50": 21823.32751800095,
+        "min": 18255.040597001425,
+        "max": 28866.589191999083,
+        "n": 5
+      },
+      "borderline_claims": {
+        "mean": 2.8,
+        "stdev": 1.9235384061671346,
+        "p50": 3.0,
+        "min": 0.0,
+        "max": 5.0,
+        "n": 5
+      },
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 0.9718518518518519,
+        "0.50": 0.8923730054164837,
+        "0.55": 0.7953634899721856
+      }
+    },
+    "MSFT": {
+      "n_runs": 5,
+      "pass_rate": 1.0,
+      "fatal_error_rate": 0.0,
+      "grounded_claim_rate": {
+        "mean": 0.8747412008281573,
+        "stdev": 0.04031788766017058,
+        "p50": 0.8571428571428571,
+        "min": 0.8260869565217391,
+        "max": 0.9166666666666666,
+        "n": 5
+      },
+      "citation_coverage_rate": {
+        "mean": 0.8905982905982907,
+        "stdev": 0.05648568028137775,
+        "p50": 0.8888888888888888,
+        "min": 0.8076923076923077,
+        "max": 0.9583333333333334,
+        "n": 5
+      },
+      "total_claims": {
+        "mean": 25.4,
+        "stdev": 1.3416407864998738,
+        "p50": 26.0,
+        "min": 24.0,
+        "max": 27.0,
+        "n": 5
+      },
+      "cited_claims": {
+        "mean": 22.6,
+        "stdev": 1.51657508881031,
+        "p50": 23.0,
+        "min": 21.0,
+        "max": 24.0,
+        "n": 5
+      },
+      "grounded_claims": {
+        "mean": 19.8,
+        "stdev": 2.04939015319192,
+        "p50": 19.0,
+        "min": 18.0,
+        "max": 22.0,
+        "n": 5
+      },
+      "orphan_citations": {
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p50": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "n": 5
+      },
+      "evidence_count": {
+        "mean": 17.0,
+        "stdev": 0.0,
+        "p50": 17.0,
+        "min": 17.0,
+        "max": 17.0,
+        "n": 5
+      },
+      "filing_chunks": {
+        "mean": 10.0,
+        "stdev": 0.0,
+        "p50": 10.0,
+        "min": 10.0,
+        "max": 10.0,
+        "n": 5
+      },
+      "news_articles": {
+        "mean": 10.0,
+        "stdev": 0.0,
+        "p50": 10.0,
+        "min": 10.0,
+        "max": 10.0,
+        "n": 5
+      },
+      "memo_words": {
+        "mean": 768.6,
+        "stdev": 68.59518933569613,
+        "p50": 805.0,
+        "min": 693.0,
+        "max": 826.0,
+        "n": 5
+      },
+      "run_ms": {
+        "mean": 20412.66208039997,
+        "stdev": 1611.5294856129728,
+        "p50": 20110.950386000695,
+        "min": 18437.103367999953,
+        "max": 22107.21136199936,
+        "n": 5
+      },
+      "borderline_claims": {
+        "mean": 2.4,
+        "stdev": 1.51657508881031,
+        "p50": 3.0,
+        "min": 0.0,
+        "max": 4.0,
+        "n": 5
+      },
+      "threshold_sensitivity": {
+        "0.40": 0.9120082815734989,
+        "0.45": 0.8747412008281573,
+        "0.50": 0.8029503105590063,
+        "0.55": 0.6717391304347826
+      }
+    },
+    "NVDA": {
+      "n_runs": 5,
+      "pass_rate": 1.0,
+      "fatal_error_rate": 0.0,
+      "grounded_claim_rate": {
+        "mean": 0.9764705882352942,
+        "stdev": 0.05261336417646565,
+        "p50": 1.0,
+        "min": 0.8823529411764706,
+        "max": 1.0,
+        "n": 5
+      },
+      "citation_coverage_rate": {
+        "mean": 0.8571428571428571,
+        "stdev": 0.08411200825074139,
+        "p50": 0.8095238095238095,
+        "min": 0.8,
+        "max": 1.0,
+        "n": 5
+      },
+      "total_claims": {
+        "mean": 18.2,
+        "stdev": 3.420526275297414,
+        "p50": 20.0,
+        "min": 14.0,
+        "max": 21.0,
+        "n": 5
+      },
+      "cited_claims": {
+        "mean": 15.4,
+        "stdev": 1.816590212458495,
+        "p50": 16.0,
+        "min": 13.0,
+        "max": 17.0,
+        "n": 5
+      },
+      "grounded_claims": {
+        "mean": 15.0,
+        "stdev": 1.5811388300841898,
+        "p50": 15.0,
+        "min": 13.0,
+        "max": 17.0,
+        "n": 5
+      },
+      "orphan_citations": {
+        "mean": 0.0,
+        "stdev": 0.0,
+        "p50": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "n": 5
+      },
+      "evidence_count": {
+        "mean": 15.0,
+        "stdev": 0.0,
+        "p50": 15.0,
+        "min": 15.0,
+        "max": 15.0,
+        "n": 5
+      },
+      "filing_chunks": {
+        "mean": 3.0,
+        "stdev": 0.0,
+        "p50": 3.0,
+        "min": 3.0,
+        "max": 3.0,
+        "n": 5
+      },
+      "news_articles": {
+        "mean": 10.0,
+        "stdev": 0.0,
+        "p50": 10.0,
+        "min": 10.0,
+        "max": 10.0,
+        "n": 5
+      },
+      "memo_words": {
+        "mean": 654.4,
+        "stdev": 62.46839200747847,
+        "p50": 620.0,
+        "min": 612.0,
+        "max": 759.0,
+        "n": 5
+      },
+      "run_ms": {
+        "mean": 18276.553087000502,
+        "stdev": 2142.9371100319695,
+        "p50": 18245.179333000124,
+        "min": 16109.055925000575,
+        "max": 21432.89774799996,
+        "n": 5
+      },
+      "borderline_claims": {
+        "mean": 1.4,
+        "stdev": 1.140175425099138,
+        "p50": 1.0,
+        "min": 0.0,
+        "max": 3.0,
+        "n": 5
+      },
+      "threshold_sensitivity": {
+        "0.40": 0.9882352941176471,
+        "0.45": 0.9764705882352942,
+        "0.50": 0.8964851325145442,
+        "0.55": 0.8094053005817712
+      }
+    }
+  },
+  "raw_runs": [
+    {
+      "ticker": "AAPL",
+      "passed": true,
+      "total_claims": 31,
+      "cited_claims": 27,
+      "grounded_claims": 25,
+      "citation_coverage_rate": 0.8709677419354839,
+      "grounded_claim_rate": 0.9259259259259259,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 0.9259259259259259,
+        "0.50": 0.8518518518518519,
+        "0.55": 0.8148148148148148
+      },
+      "borderline_claims": 4,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 909,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 28866.589191999083
+    },
+    {
+      "ticker": "AAPL",
+      "passed": true,
+      "total_claims": 23,
+      "cited_claims": 22,
+      "grounded_claims": 22,
+      "citation_coverage_rate": 0.9565217391304348,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 0.8636363636363636,
+        "0.55": 0.7727272727272727
+      },
+      "borderline_claims": 3,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 694,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 18255.040597001425
+    },
+    {
+      "ticker": "AAPL",
+      "passed": false,
+      "total_claims": 29,
+      "cited_claims": 23,
+      "grounded_claims": 23,
+      "citation_coverage_rate": 0.7931034482758621,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 0.9130434782608695,
+        "0.55": 0.782608695652174
+      },
+      "borderline_claims": 2,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 792,
+      "n_errors": 1,
+      "errors": [
+        {
+          "step": "verify_memo",
+          "message": "Memo verification failed (citation_coverage=0.79), grounded_claim_rate=0.87"
+        }
+      ],
+      "fatal_error": false,
+      "run_ms": 20161.43713299971
+    },
+    {
+      "ticker": "AAPL",
+      "passed": true,
+      "total_claims": 34,
+      "cited_claims": 30,
+      "grounded_claims": 28,
+      "citation_coverage_rate": 0.8823529411764706,
+      "grounded_claim_rate": 0.9333333333333333,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 0.9333333333333333,
+        "0.50": 0.8333333333333334,
+        "0.55": 0.7666666666666667
+      },
+      "borderline_claims": 5,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 859,
+      "n_errors": 1,
+      "errors": [
+        {
+          "step": "verify_memo",
+          "message": "Memo verification failed (citation_coverage=0.88), grounded_claim_rate=0.67"
+        }
+      ],
+      "fatal_error": false,
+      "run_ms": 21823.32751800095
+    },
+    {
+      "ticker": "AAPL",
+      "passed": true,
+      "total_claims": 25,
+      "cited_claims": 25,
+      "grounded_claims": 25,
+      "citation_coverage_rate": 1.0,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 1.0,
+        "0.55": 0.84
+      },
+      "borderline_claims": 0,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 713,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 23758.691657998497
+    },
+    {
+      "ticker": "MSFT",
+      "passed": true,
+      "total_claims": 26,
+      "cited_claims": 24,
+      "grounded_claims": 22,
+      "citation_coverage_rate": 0.9230769230769231,
+      "grounded_claim_rate": 0.9166666666666666,
+      "threshold_sensitivity": {
+        "0.40": 0.9166666666666666,
+        "0.45": 0.9166666666666666,
+        "0.50": 0.7916666666666666,
+        "0.55": 0.75
+      },
+      "borderline_claims": 3,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 693,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 19409.231591000207
+    },
+    {
+      "ticker": "MSFT",
+      "passed": true,
+      "total_claims": 24,
+      "cited_claims": 21,
+      "grounded_claims": 18,
+      "citation_coverage_rate": 0.875,
+      "grounded_claim_rate": 0.8571428571428571,
+      "threshold_sensitivity": {
+        "0.40": 0.9523809523809523,
+        "0.45": 0.8571428571428571,
+        "0.50": 0.8095238095238095,
+        "0.55": 0.6666666666666666
+      },
+      "borderline_claims": 3,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 695,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 18437.103367999953
+    },
+    {
+      "ticker": "MSFT",
+      "passed": true,
+      "total_claims": 27,
+      "cited_claims": 24,
+      "grounded_claims": 22,
+      "citation_coverage_rate": 0.8888888888888888,
+      "grounded_claim_rate": 0.9166666666666666,
+      "threshold_sensitivity": {
+        "0.40": 0.9166666666666666,
+        "0.45": 0.9166666666666666,
+        "0.50": 0.9166666666666666,
+        "0.55": 0.6666666666666666
+      },
+      "borderline_claims": 0,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 826,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 21998.813694999626
+    },
+    {
+      "ticker": "MSFT",
+      "passed": true,
+      "total_claims": 24,
+      "cited_claims": 23,
+      "grounded_claims": 19,
+      "citation_coverage_rate": 0.9583333333333334,
+      "grounded_claim_rate": 0.8260869565217391,
+      "threshold_sensitivity": {
+        "0.40": 0.8695652173913043,
+        "0.45": 0.8260869565217391,
+        "0.50": 0.782608695652174,
+        "0.55": 0.6086956521739131
+      },
+      "borderline_claims": 2,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 824,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 20110.950386000695
+    },
+    {
+      "ticker": "MSFT",
+      "passed": true,
+      "total_claims": 26,
+      "cited_claims": 21,
+      "grounded_claims": 18,
+      "citation_coverage_rate": 0.8076923076923077,
+      "grounded_claim_rate": 0.8571428571428571,
+      "threshold_sensitivity": {
+        "0.40": 0.9047619047619048,
+        "0.45": 0.8571428571428571,
+        "0.50": 0.7142857142857143,
+        "0.55": 0.6666666666666666
+      },
+      "borderline_claims": 4,
+      "orphan_citations": 0,
+      "evidence_count": 17,
+      "filing_chunks": 10,
+      "news_articles": 10,
+      "memo_words": 805,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 22107.21136199936
+    },
+    {
+      "ticker": "NVDA",
+      "passed": true,
+      "total_claims": 15,
+      "cited_claims": 13,
+      "grounded_claims": 13,
+      "citation_coverage_rate": 0.8666666666666667,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 0.9230769230769231,
+        "0.55": 0.9230769230769231
+      },
+      "borderline_claims": 1,
+      "orphan_citations": 0,
+      "evidence_count": 15,
+      "filing_chunks": 3,
+      "news_articles": 10,
+      "memo_words": 666,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 19072.335725000812
+    },
+    {
+      "ticker": "NVDA",
+      "passed": true,
+      "total_claims": 21,
+      "cited_claims": 17,
+      "grounded_claims": 15,
+      "citation_coverage_rate": 0.8095238095238095,
+      "grounded_claim_rate": 0.8823529411764706,
+      "threshold_sensitivity": {
+        "0.40": 0.9411764705882353,
+        "0.45": 0.8823529411764706,
+        "0.50": 0.7647058823529411,
+        "0.55": 0.7058823529411765
+      },
+      "borderline_claims": 3,
+      "orphan_citations": 0,
+      "evidence_count": 15,
+      "filing_chunks": 3,
+      "news_articles": 10,
+      "memo_words": 759,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 21432.89774799996
+    },
+    {
+      "ticker": "NVDA",
+      "passed": true,
+      "total_claims": 21,
+      "cited_claims": 17,
+      "grounded_claims": 17,
+      "citation_coverage_rate": 0.8095238095238095,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 1.0,
+        "0.55": 0.8823529411764706
+      },
+      "borderline_claims": 0,
+      "orphan_citations": 0,
+      "evidence_count": 15,
+      "filing_chunks": 3,
+      "news_articles": 10,
+      "memo_words": 612,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 16109.055925000575
+    },
+    {
+      "ticker": "NVDA",
+      "passed": true,
+      "total_claims": 20,
+      "cited_claims": 16,
+      "grounded_claims": 16,
+      "citation_coverage_rate": 0.8,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 0.9375,
+        "0.55": 0.75
+      },
+      "borderline_claims": 1,
+      "orphan_citations": 0,
+      "evidence_count": 15,
+      "filing_chunks": 3,
+      "news_articles": 10,
+      "memo_words": 620,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 16523.29670400104
+    },
+    {
+      "ticker": "NVDA",
+      "passed": true,
+      "total_claims": 14,
+      "cited_claims": 14,
+      "grounded_claims": 14,
+      "citation_coverage_rate": 1.0,
+      "grounded_claim_rate": 1.0,
+      "threshold_sensitivity": {
+        "0.40": 1.0,
+        "0.45": 1.0,
+        "0.50": 0.8571428571428571,
+        "0.55": 0.7857142857142857
+      },
+      "borderline_claims": 2,
+      "orphan_citations": 0,
+      "evidence_count": 15,
+      "filing_chunks": 3,
+      "news_articles": 10,
+      "memo_words": 615,
+      "n_errors": 0,
+      "errors": [],
+      "fatal_error": false,
+      "run_ms": 18245.179333000124
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "approved_citation_coverage_rate": {
+    "max": 1.0,
+    "mean": 0.9234001879293966,
+    "min": 0.8333333333333334,
+    "n": 30,
+    "stdev": 0.04728546130944697
+  },
+  "approved_grounded_claim_rate": {
+    "max": 1.0,
+    "mean": 0.9345695378963753,
+    "min": 0.8620689655172413,
+    "n": 30,
+    "stdev": 0.04470384730613865
+  },
+  "baseline_artifact_uri": "artifacts/dataops/quality_baselines/alpha-quality-baseline__0.1.0.json",
+  "checks": {
+    "approved_quality_baseline_registered": true,
+    "live_vs_frozen_delta_recorded": true,
+    "same_clean_commit": true,
+    "same_evidence_release": true,
+    "temperature_only_variance": {
+      "coverage_pair_delta": 0.008368449856233084,
+      "criterion": "absolute difference between consecutive frozen grounded means <= max observed per-run grounded stdev at temperature 0.3",
+      "grounded_pair_delta": 0.036032244314631034,
+      "max_coverage_stdev": 0.05082357483502524,
+      "max_grounded_stdev": 0.04160679802265476,
+      "passed": true,
+      "temperature": 0.3
+    }
+  },
+  "errors": [],
+  "live_vs_frozen_delta": {
+    "citation_coverage_rate_mean_delta": -0.040623413981130674,
+    "filing_chunks_mean_delta": 3.666666666666667,
+    "grounded_claim_rate_mean_delta": 0.006451675742059071,
+    "news_articles_mean_delta": 0.0
+  },
+  "passed": true,
+  "release_id": "alpha-quality-baseline:0.1.0",
+  "source_artifacts": [
+    "evaluation/results/retrieval_baseline_002_deepseek.v3.2_0.3.json",
+    "evaluation/results/retrieval_baseline_003_deepseek.v3.2_0.3.json",
+    "evaluation/results/retrieval_baseline_004_deepseek.v3.2_0.3.json"
+  ]
+}
