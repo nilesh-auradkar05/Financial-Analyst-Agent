@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpha Financial Analyst Agent — Ingestion Sequence</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'JetBrains Mono', monospace; background:#020617; min-height:100vh; padding:2rem; color:white; }
+    .container { max-width:1240px; margin:0 auto; }
+    .header { margin-bottom:2rem; }
+    .header-row { display:flex; align-items:center; gap:1rem; margin-bottom:0.5rem; }
+    .pulse-dot { width:12px; height:12px; background:#fbbf24; border-radius:50%; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    h1 { font-size:1.4rem; font-weight:700; letter-spacing:-0.025em; }
+    .subtitle { color:#94a3b8; font-size:0.85rem; margin-left:1.75rem; }
+    .diagram-container { background:rgba(15,23,42,0.5); border-radius:1rem; border:1px solid #1e293b; padding:1.5rem; overflow-x:auto; }
+    svg { width:100%; min-width:1080px; display:block; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:1rem; margin-top:2rem; }
+    .card { background:rgba(15,23,42,0.5); border-radius:0.75rem; border:1px solid #1e293b; padding:1.25rem; }
+    .card-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; }
+    .card-dot { width:8px; height:8px; border-radius:50%; }
+    .card-dot.emerald{background:#34d399;} .card-dot.amber{background:#fbbf24;} .card-dot.violet{background:#a78bfa;}
+    .card h3 { font-size:0.85rem; font-weight:600; }
+    .card ul { list-style:none; color:#94a3b8; font-size:0.72rem; line-height:1.5; }
+    .card li { margin-bottom:0.4rem; }
+    .footer { text-align:center; margin-top:1.5rem; color:#475569; font-size:0.72rem; }
+    code { color:#a5b4fc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row"><div class="pulse-dot"></div><h1>SEC Ingestion &amp; Indexing Sequence (offline path)</h1></div>
+      <p class="subtitle">Where evidence_id is born. Section keys are normalized, chunk IDs are deterministic, coverage is asserted through the store — not the parser.</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1100 770">
+        <defs>
+          <marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#64748b"/></marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- lifelines -->
+        <line x1="80"  y1="118" x2="80"  y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="240" y1="118" x2="240" y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="400" y1="118" x2="400" y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="560" y1="118" x2="560" y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="710" y1="118" x2="710" y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="870" y1="118" x2="870" y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="1030" y1="118" x2="1030" y2="690" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+
+        <!-- participants -->
+        <g font-size="9.5" font-weight="600" text-anchor="middle">
+          <rect x="25"  y="72" width="110" height="46" rx="6" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1.5"/><text x="80"  y="94" fill="white">Ingestion CLI</text><text x="80" y="108" fill="#94a3b8" font-size="7.5">ingest_service</text>
+          <rect x="185" y="72" width="110" height="46" rx="6" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.5"/><text x="240" y="94" fill="white">SEC / EDGAR</text><text x="240" y="108" fill="#94a3b8" font-size="7.5">filings</text>
+          <rect x="345" y="72" width="110" height="46" rx="6" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1.5"/><text x="400" y="94" fill="white">Parser</text><text x="400" y="108" fill="#94a3b8" font-size="7.5">edgartools</text>
+          <rect x="505" y="72" width="110" height="46" rx="6" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1.5"/><text x="560" y="94" fill="white">Chunker</text><text x="560" y="108" fill="#94a3b8" font-size="7.5">+ normalizer</text>
+          <rect x="655" y="72" width="110" height="46" rx="6" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.5"/><text x="710" y="94" fill="white">Embedding</text><text x="710" y="108" fill="#94a3b8" font-size="7.5">provider</text>
+          <rect x="815" y="72" width="110" height="46" rx="6" fill="rgba(76,29,149,0.5)" stroke="#a78bfa" stroke-width="1.5"/><text x="870" y="94" fill="white">Vector Store</text><text x="870" y="108" fill="#94a3b8" font-size="7.5">Chroma/Qdrant</text>
+          <rect x="975" y="72" width="110" height="46" rx="6" fill="rgba(120,53,15,0.4)" stroke="#fbbf24" stroke-width="1.5"/><text x="1030" y="94" fill="white">Coverage</text><text x="1030" y="108" fill="#94a3b8" font-size="7.5">checks</text>
+        </g>
+
+        <g font-size="8.5" fill="#cbd5e1">
+          <line x1="80"  y1="170" x2="238" y2="170" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="84" y="164">1 request filing (ticker / form / year)</text>
+          <line x1="240" y1="206" x2="82"  y2="206" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="86" y="200">2 filing document</text>
+
+          <line x1="80"  y1="246" x2="398" y2="246" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="84" y="240">3 parse canonical sections [ADR-0004]</text>
+          <line x1="400" y1="282" x2="82"  y2="282" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="86" y="276">4 section text by canonical section_key</text>
+
+          <line x1="80"  y1="322" x2="558" y2="322" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="84" y="316">5 chunk + attach metadata</text>
+          <line x1="560" y1="358" x2="82"  y2="358" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="86" y="352">6 chunks + deterministic chunk_id  [S1-T02]</text>
+
+          <line x1="80"  y1="398" x2="708" y2="398" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="84" y="392">7 embed chunks</text>
+          <line x1="710" y1="434" x2="82"  y2="434" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="86" y="428">8 vectors</text>
+
+          <line x1="80"  y1="474" x2="868" y2="474" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="84" y="468">9 upsert vectors + payload (idempotent by chunk_id)</text>
+          <line x1="870" y1="510" x2="82"  y2="510" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="86" y="504">10 ingest counts</text>
+
+          <line x1="80"  y1="550" x2="1028" y2="550" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="84" y="544">11 section coverage checks (through store interface)  [S1-T03]</text>
+          <line x1="1030" y1="586" x2="82" y2="586" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="86" y="580">12 critical sections non-zero  OR  explicit failure</text>
+        </g>
+
+        <!-- note: source-section cache feeds S2 validator -->
+        <rect x="320" y="618" width="500" height="40" rx="6" fill="rgba(120,53,15,0.25)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="570" y="635" fill="#fde68a" font-size="8.5" text-anchor="middle">note: the SAME parse (step 3) builds evaluation/fixtures/source_sections/*</text>
+        <text x="570" y="649" fill="#94a3b8" font-size="8" text-anchor="middle">→ the S2-T02 validator checks every gold anchor against this ground-truth cache</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header"><div class="card-dot violet"></div><h3>Where the join key is born</h3></div>
+        <ul>
+          <li>Step 6 mints <code>chunk_id = f(accession, section_key, chunk_index)</code> — deterministic.</li>
+          <li>That id becomes <code>EvidencePacket.evidence_id</code> at retrieval, the gold-label target at S2, and the citation key at memo time.</li>
+          <li>Re-ingest the same filing → identical ids (the S1-T02 idempotency test).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-dot emerald"></div><h3>Coverage is asserted at the store, not the parser</h3></div>
+        <ul>
+          <li>Step 11 counts critical-section chunks <em>through the retrieval interface</em>, so it catches "parsed fine but never indexed" bugs.</li>
+          <li>Missing optional section → explicit skip/xfail with reason, never a silent pass.</li>
+          <li>This is the regression lock that retires the old MSFT/NVDA zero-section failure for good.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-dot amber"></div><h3>One parse, two consumers</h3></div>
+        <ul>
+          <li>The parser output feeds both the live index (steps 5–9) and the offline source-section cache (the note).</li>
+          <li>Same parser = the benchmark validates anchors against exactly what the system ingested.</li>
+          <li>No live SEC calls in CI; the cache is committed and deterministic.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="footer">Alpha Financial Analyst Agent • Ingestion Sequence • review draft</p>
+  </div>
+</body>
+</html>

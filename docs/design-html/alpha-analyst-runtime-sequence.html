@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpha Financial Analyst Agent — Runtime Sequence</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'JetBrains Mono', monospace; background:#020617; min-height:100vh; padding:2rem; color:white; }
+    .container { max-width:1240px; margin:0 auto; }
+    .header { margin-bottom:2rem; }
+    .header-row { display:flex; align-items:center; gap:1rem; margin-bottom:0.5rem; }
+    .pulse-dot { width:12px; height:12px; background:#34d399; border-radius:50%; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    h1 { font-size:1.4rem; font-weight:700; letter-spacing:-0.025em; }
+    .subtitle { color:#94a3b8; font-size:0.85rem; margin-left:1.75rem; }
+    .diagram-container { background:rgba(15,23,42,0.5); border-radius:1rem; border:1px solid #1e293b; padding:1.5rem; overflow-x:auto; }
+    svg { width:100%; min-width:1080px; display:block; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:1rem; margin-top:2rem; }
+    .card { background:rgba(15,23,42,0.5); border-radius:0.75rem; border:1px solid #1e293b; padding:1.25rem; }
+    .card-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.75rem; }
+    .card-dot { width:8px; height:8px; border-radius:50%; }
+    .card-dot.emerald{background:#34d399;} .card-dot.amber{background:#fbbf24;} .card-dot.rose{background:#fb7185;}
+    .card h3 { font-size:0.85rem; font-weight:600; }
+    .card ul { list-style:none; color:#94a3b8; font-size:0.72rem; line-height:1.5; }
+    .card li { margin-bottom:0.4rem; }
+    .footer { text-align:center; margin-top:1.5rem; color:#475569; font-size:0.72rem; }
+    code { color:#a5b4fc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row"><div class="pulse-dot"></div><h1>Runtime Analysis Sequence (online path)</h1></div>
+      <p class="subtitle">One request, gated tool/retrieval steps, evidence before generation, verification after. Disabled controls are marked disabled — never faked.</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1100 800">
+        <defs>
+          <marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#64748b"/></marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+
+        <!-- lifelines -->
+        <line x1="70"  y1="114" x2="70"  y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="240" y1="114" x2="240" y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="400" y1="114" x2="400" y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="560" y1="114" x2="560" y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="720" y1="114" x2="720" y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="880" y1="114" x2="880" y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+        <line x1="1030" y1="114" x2="1030" y2="740" stroke="#334155" stroke-width="1" stroke-dasharray="4,4"/>
+
+        <!-- participant boxes -->
+        <g font-size="9.5" font-weight="600" text-anchor="middle">
+          <rect x="20"  y="70" width="100" height="44" rx="6" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.5"/><text x="70"  y="96" fill="white">Client</text>
+          <rect x="185" y="70" width="110" height="44" rx="6" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1.5"/><text x="240" y="92" fill="white">FastAPI</text><text x="240" y="105" fill="#94a3b8" font-size="7.5">/analyze /runs</text>
+          <rect x="345" y="70" width="110" height="44" rx="6" fill="rgba(76,29,149,0.5)" stroke="#a78bfa" stroke-width="1.5"/><text x="400" y="92" fill="white">Run State</text><text x="400" y="105" fill="#94a3b8" font-size="7.5">persistent</text>
+          <rect x="495" y="70" width="130" height="44" rx="6" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1.5"/><text x="560" y="92" fill="white">LangGraph</text><text x="560" y="105" fill="#94a3b8" font-size="7.5">workflow</text>
+          <rect x="660" y="70" width="120" height="44" rx="6" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.5"/><text x="720" y="92" fill="white">Tools</text><text x="720" y="105" fill="#94a3b8" font-size="7.5">market / news</text>
+          <rect x="820" y="70" width="120" height="44" rx="6" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1.5"/><text x="880" y="92" fill="white">Retrieval</text><text x="880" y="105" fill="#94a3b8" font-size="7.5">→ Chroma/Qdrant</text>
+          <rect x="970" y="70" width="120" height="44" rx="6" fill="rgba(30,41,59,0.6)" stroke="#94a3b8" stroke-width="1.5"/><text x="1030" y="92" fill="white">LLM /</text><text x="1030" y="105" fill="#94a3b8" font-size="7.5">Verifier</text>
+        </g>
+
+        <!-- opt frame for gated tools+retrieval -->
+        <rect x="505" y="322" width="430" height="158" rx="4" fill="transparent" stroke="#fbbf24" stroke-width="1" stroke-dasharray="5,4"/>
+        <rect x="505" y="322" width="200" height="16" fill="rgba(120,53,15,0.5)"/><text x="512" y="334" fill="#fbbf24" font-size="8">opt [controls enabled]</text>
+
+        <!-- messages -->
+        <g font-size="8.5" fill="#cbd5e1">
+          <line x1="70" y1="170" x2="238" y2="170" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="74" y="164">1 POST /analyze {ticker, controls}</text>
+          <line x1="240" y1="210" x2="398" y2="210" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="244" y="204">2 create run_id (queued→running)</text>
+          <line x1="240" y1="250" x2="558" y2="250" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="300" y="244">3 invoke(ticker, controls)</text>
+          <!-- self normalize -->
+          <path d="M 560 285 h 30 v 18 h -30" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="596" y="298" fill="#cbd5e1">4 normalize identity</text>
+
+          <line x1="560" y1="352" x2="718" y2="352" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="564" y="346">5 market + news (≤ max_news_articles)</text>
+          <line x1="720" y1="388" x2="562" y2="388" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="566" y="382">6 snapshot + articles</text>
+          <line x1="560" y1="428" x2="878" y2="428" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="564" y="422">7 search(ticker, sections, query)</text>
+          <line x1="880" y1="464" x2="562" y2="464" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="566" y="458">8 EvidencePackets + diagnostics</text>
+
+          <!-- self build context -->
+          <path d="M 560 500 h 30 v 18 h -30" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="596" y="513" fill="#cbd5e1">9 build context (EvidencePackets)</text>
+
+          <line x1="560" y1="552" x2="1028" y2="552" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="564" y="546">10 draft memo from context</text>
+          <line x1="1030" y1="588" x2="562" y2="588" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="566" y="582">11 memo + citations</text>
+          <line x1="560" y1="624" x2="1028" y2="624" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="564" y="618">12 verify grounding / citation coverage</text>
+          <line x1="1030" y1="660" x2="562" y2="660" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="566" y="654">13 verification payload</text>
+
+          <line x1="560" y1="696" x2="402" y2="696" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/><text x="406" y="690">14 persist result (succeeded/failed)</text>
+          <line x1="240" y1="728" x2="72" y2="728" stroke="#64748b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/><text x="76" y="722">15 result payload (or poll GET /runs/{id})</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header"><div class="card-dot emerald"></div><h3>The invariant order</h3></div>
+        <ul>
+          <li>Evidence is built (steps 7–9) <em>before</em> the memo (10). Generation never precedes retrieval.</li>
+          <li>Verification (12–13) is downstream of generation — it can only check what was produced.</li>
+          <li>The memo cites only IDs present in the EvidencePackets from step 8.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-dot amber"></div><h3>The control gate (opt frame)</h3></div>
+        <ul>
+          <li>Steps 5–8 run only when <code>include_news_sentiment</code> / <code>include_filing_analysis</code> are true.</li>
+          <li>Disabled → response marks that source disabled. No fabricated sentiment, no phantom SEC citation.</li>
+          <li><code>max_news_articles</code> bounds step 5. These are the test-plan §4 control cases.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-dot rose"></div><h3>Failure paths (not drawn, but specified)</h3></div>
+        <ul>
+          <li>Retrieval returns nothing → memo states the limitation; verifier flags low support.</li>
+          <li>Tool/LLM failure → run status failed/degraded with a safe error; step 14 still persists it.</li>
+          <li>Async: client polls GET /runs/{id} until terminal — step 15 is the poll resolution.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="footer">Alpha Financial Analyst Agent • Runtime Sequence • review draft</p>
+  </div>
+</body>
+</html>
