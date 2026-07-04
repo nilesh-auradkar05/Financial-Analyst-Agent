@@ -1,0 +1,172 @@
+# tasks/todo.md
+
+> Active work: **INTEGRATION_PLAN_v2 Phase 0 (docs→repo) → Phase 1 (evidence freeze)**. S2 execution is gated behind Phase 1 (S2's fixture is built on Phase 1's frozen evidence release). **S1 closed green 2026-06-04**; **BENCH-FIX closed green 2026-07-03** (grounding instrument sound). **S0/S1 sprint work + memo-grounding instrument are done; the fixture-freeze debt is the sole open prerequisite.**
+> Work top to bottom. Trace every task to its source before implementing. Run the Doc Sync Check before marking anything done. Record verification output in the Result field.
+
+## Audit log
+
+- [x] **S0-A00 — Current-state audit (read-only)** — done 2026-06-04
+  - Read SPEC, sprint-plan, test-plan, retrieval-benchmark, ADR-0003/0004, todo, lessons, AGENTS, design companions.
+  - Commands run: `check_no_scope_residue.py` PASS · `check_sprint_map.py` PASS · `check_doc_sync.py` PASS · residue grep clean · `pytest --collect-only` = 180 · `pytest tests/unit` = **162 passed** · `pytest tests/integration + top-level` = 5 passed, 2 skipped, **11 errors** (stale `fake_check_ollama_health` stub, G1) · `validate_retrieval_fixture.py v1` PASS (72 cases).
+  - Findings + C0–C3 classification + gap tickets G1–G8 captured in `tasks/sprint-review.md`.
+  - Headline: code is several gated sprints ahead of the docs; two gated decisions already taken in code (Qdrant default = G4; non-anchored benchmark methodology = G6) → hard-stop surfaces needing user direction.
+
+## Active
+
+- [ ] **BENCH-FIX — Make the memo-grounding benchmark instrument sound before further baseline runs** — planned 2026-07-03
+  - Trace: test-plan §7 ("Grounded claim | tied to retrieved evidence"; "Unsupported claim | verifier flags it"); test-plan §8 ("Embedding identity | model/version recorded in result files"); CLAUDE.md §4 (root-cause fix, no temporary patch). Evaluation tooling bug fix + provenance, NOT a retrieval-benchmark methodology change (docs/retrieval-benchmark.md untouched; memo grounding eval is a separate instrument from the retrieval oracle).
+  - Context: five baselines were run on an unsound instrument. Working tree holds two verified-but-uncommitted fixes (precision-aware number matcher; bold-heading claim filter). NOTE: the tree's claim-extractor fix (terminator/citation guard in `_looks_like_claim` + `_EMPHASIS_RE`) is a *different implementation* than the `_HEADER_LINE_RE` strip recorded in GROUND-FIX below — record corrected here.
+  - [x] T1 — Decouple number support from best-similarity evidence: in `evaluation/grounding.py`, `evaluation/semantic_grounding.py`, and `evaluation/inspect_grounding.py`, a claim number is supported if ANY cited evidence contains a value that rounds (at the claim's stated precision) to it — not just the single highest-similarity evidence. `reason` must name the unmatched numbers so hand audits (claims 7/33) are direct.
+    - Implemented once as `_numbers_supported_any(claim_text, evidence_texts) -> tuple[bool, list[str]]` in `evaluation/grounding.py`, reusing `_extract_number_tokens`; all three call sites route through it. The old single-evidence `_numbers_supported` was dead (nothing imported it after the union function landed) and was removed rather than kept as a wrapper. `inspect_grounding.py`'s per-claim print loop now also surfaces the unmatched numbers (`MISSING: ...`) instead of discarding them, so the hand-audit table names the offending figures directly.
+  - [x] T2 — Per-claim `numbers_ok` recorded in `ClaimAssessment`/`to_dict`; `quality_baseline.py` artifact gains `threshold_sensitivity` (grounded rate at 0.40/0.45/0.50/0.55 computed post-hoc from stored per-claim sims) and `borderline_claims` (|sim − threshold| ≤ 0.05). One run now answers the sweep; repeats no longer sample noise for that question. Threshold itself stays 0.45 — recalibration needs hand labels, out of scope here.
+  - [x] T3 — `GROUNDING_EVAL_VERSION = 2` constant recorded in the baseline artifact so pre-fix baselines are never compared to post-fix ones.
+  - [x] T4 — Baseline artifact filename → `retrieval_baseline_<NNN>_<model>_<temperature>.json` (NNN = next sequence in `evaluation/results/`, model id sanitized) via a pure, tested helper (`next_baseline_filename`).
+  - [x] T5 — Behavior-first tests (test-plan §7): rounded value grounded (37.32 vs 37.319225); hallucinated value rejected; number found in second cited evidence counts; reason names unmatched numbers; filename helper sequence/sanitization; existing header/emphasis tests stay green. (`tests/unit/test_grounding_eval.py`, `tests/unit/test_quality_baseline_filename.py`, `tests/unit/test_inspect_grounding.py`.)
+  - [x] T6 — Verification: focused + full `tests/unit` pytest, ruff, pyright on changed files, doc-sync scripts, determinism check (same memo+evidence → identical result across repeated in-process and cross-process evaluations). Independent verifier re-ran all of it (did not trust the coder's report) 2026-07-03.
+  - Result: **PASS** — `pytest tests/unit -q --ignore=tests/unit/test_llm.py` **171 passed, 1 failed** (sole failure = pre-existing `test_embeddings_client.py::test_custom_model` model-default mismatch, unrelated); focused `test_grounding_eval.py + test_quality_baseline_filename.py + test_inspect_grounding.py` **13 passed**; `ruff check evaluation/ tests/unit/` clean; `pyright` on `grounding.py`/`semantic_grounding.py`/`quality_baseline.py`/`inspect_grounding.py` **0 errors**; Doc Sync `check_no_scope_residue.py`/`check_sprint_map.py`/`check_doc_sync.py` PASS, `check_test_hygiene.py` fails only on pre-existing `test_llm.py:25,32`. Determinism: scratchpad probe (grounded numeric claim, rounded 37.32↔37.319225, hallucinated $300/12.5% named verbatim in reason, uncited terminated sentence still counted, bold-heading fragment dropped, period-header dropped) run twice as separate processes → **byte-identical JSON**. Adversarial hand-probes all green: union number gate is per-number-across-cited-evidence (split figures across [1][2] supported; empty cited-evidence → all numbers unmatched; $/%/thousands separators parsed; claim more precise than evidence correctly flagged); `_threshold_sensitivity`/`_borderline_claims` match hand computation and use CITED claims only; filename helper verified in-process (empty→001, past 007→008, `bedrock:anthropic/claude`→`bedrock-anthropic-claude`, same name returned on repeat call without a write — collision only under concurrent runs, sequential use is safe). Semantic checker verified by inspection to share claim extraction + `_numbers_supported_any` with the token checker; no stale `_numbers_supported` importers remain.
+  - Latent edges (reported, not fixed — none blocking): (1) float/banker's rounding can false-flag half-way human rounding: claim `2.68` vs evidence `2.675` is unmatched because `round(2.675, 2) == 2.67`; rare (needs an exact half at the claim's precision) but a known false-flag source for hand audits. (2) Token-checker runs compute `borderline_claims` against `--min-similarity` (default 0.45), not the token gate's 0.20; harmless for the default semantic checker but misleading if `--checker token` is used. (3) The terminator/citation guard also drops *uncited, unterminated* bullet claims (e.g. `- Strong services growth of 12%` with no period, no citation), which can inflate citation coverage on bullet-heavy memos — the guard trades phantom-heading deflation for this smaller inflation risk. (4) Artifact prefix `retrieval_baseline_` names a *memo-grounding* baseline; do not confuse with the separate S2 retrieval-benchmark oracle artifacts (cosmetic naming).
+  - Pre-existing exclusions (NOT introduced by BENCH-FIX, not fixed here): `tests/unit/test_llm.py` fails collection (`ImportError: cannot import name 'MEMO_TEMPLATE'`); `test_embeddings_client.py::test_custom_model` model-default mismatch (`qwen3-embedding:4b` vs `nomic-embed-text`); `check_test_hygiene.py` flags `test_llm.py:25,32` only.
+
+- [x] **GROUND-FIX — Drop markdown-header lines before claim assessment** — verified 2026-07-03 — **superseded record**: the implementation in the tree is a terminator/citation guard in `_looks_like_claim` (+ `_EMPHASIS_RE` for bold fragments), not the `_HEADER_LINE_RE` strip described below; see BENCH-FIX.
+  - Trace: test-plan §7 ("Grounded claim | tied to retrieved evidence"; "Citation mapping | each citation maps to an evidence_id"). Bug fix, not scope change.
+  - Root cause: `_extract_claim_sentences` split the whole memo by `_SENTENCE_SPILT_RE` (sentence punctuation OR newlines) and only dropped headers *after* splitting via `_looks_like_claim`'s `startswith("#")`. A header containing a period (`## 3. Financial Analysis: Revenue Detail`) fragments at the period; the post-`#` remainder (`Financial Analysis: Revenue Detail`) no longer starts with `#`, so it leaked in as a bogus **uncited** claim, inflating `total_claims` and deflating `citation_coverage_rate`.
+  - Fix: added `_HEADER_LINE_RE = ^[ \t]*#+.*$` (MULTILINE) and strip header lines from the memo in `_extract_claim_sentences` *before* the sentence split. Existing `startswith("#")` guard kept as cheap defense-in-depth.
+  - Test: `tests/unit/test_grounding_eval.py::test_markdown_header_lines_are_not_assessed_as_claims` (behavior-first; asserts `total_claims==2`, `citation_coverage_rate==1.0`, no header fragment in assessed sentences).
+  - Result: **PASS** — live repro before/after confirms `'Financial Analysis: Revenue Detail'` no longer leaks; `pytest tests/unit/test_grounding_eval.py` 5 passed; `test_inspect_grounding.py` 1 passed; `ruff check` clean; `pyright evaluation/grounding.py` 0 errors. Pre-existing `check_test_hygiene.py` flag is `test_llm.py:25,32` only (untouched by this change).
+  - Note (unrelated, pre-existing): working tree had a type-annotation removal on `_numbers_supported(claim_text, evidence_text)`; left untouched to keep this change focused (not part of the header fix).
+
+- [x] **S0-T01 — Apply doc topology + dedup edits** — verified 2026-06-04
+  - SPEC §0 is the sole home for source-of-truth order; CLAUDE/AGENTS point to it. ✓
+  - No PulsePress/Terraform/AWS residue in core Alpha docs (grep clean). ✓
+  - CLAUDE.md/AGENTS.md semantically equivalent on task loop, hard stops, conventions, verification, correction handling. ✓ (`check_doc_sync.py` PASS)
+  - Governance scripts exist and pass: `check_no_scope_residue.py` PASS · `check_doc_sync.py` PASS · `check_sprint_map.py` PASS.
+  - Result: **PASS** — governance topology is internally consistent.
+
+- [x] **S1-EXEC — Execute active S1 ingestion identity + coverage lock** — closed green 2026-06-04
+  - Trace: SPEC §7/§9; test-plan §3; sprint-plan S1-T02/S1-T03; ADR-0004.
+  - Confirmation: user requested "execute the plan"; scope limited to active S1 because S2/S3/S7 are gated.
+  - [x] Add behavior-first ingestion tests for metadata normalization and deterministic chunk IDs.
+  - [x] Add idempotent re-ingest test proving identical chunk IDs and no duplicates through the store interface.
+  - [x] Add section-coverage regression test for representative AAPL/MSFT/NVDA fixtures through the store interface.
+  - [x] Implement `chunk_id = f(accession_number, section_key, chunk_index)` and required metadata normalization.
+  - [x] Run focused S1 verification, full relevant suite, and Doc Sync Check.
+  - Result: **PASS** — `tests/ingestion` 5 passed; focused related tests 23 passed; `ruff` clean; `mypy app evaluation` success (44 files); doc scripts PASS; `check_test_hygiene.py` PASS; full `pytest` **181 passed, 2 skipped**; fixture validator PASS (72 precursor cases).
+
+- [x] **DOC-SETUP — Draft local and AWS test-environment setup guides** — verified 2026-06-05
+  - Trace: SPEC §3 CI/service-readiness support; SPEC §3 production cloud deployment out-of-scope guard; active S2 planning support.
+  - Scope caveat: AWS guide is a disposable non-production test environment only; no production deployment architecture, Terraform/IaC, managed cloud rollout, or scope change.
+  - [x] Add local setup/test guide in `docs/`.
+  - [x] Add AWS non-production setup/test guide in `docs/`.
+  - [x] Run Doc Sync Check and record results.
+  - Result: **PASS** — `git diff --check -- docs/setup-and-test.md docs/aws-test-environment.md tasks/todo.md` clean; `check_no_scope_residue.py` PASS; `check_sprint_map.py` PASS; `check_doc_sync.py` PASS; `check_test_hygiene.py` PASS; non-ASCII scan clean for new docs.
+
+- [x] **S2-HOTFIX — Bound memo-generation wait to avoid stuck latency baseline runs** — verified 2026-06-27
+  - Trace: SPEC §3 (evidence-grounded memo generation path); test-plan §2 (`LLM failure` must end in a safe error, not a hang).
+  - [x] Add configurable LLM invoke timeout (`LLM_REQUEST_TIMEOUT_SECONDS`, default 120s).
+  - [x] Wrap `draft_memo` LLM call with `asyncio.wait_for` and return a fatal `draft_memo` error on timeout.
+  - [x] Add unit coverage for timeout behavior and timeout config validation.
+  - Result: **PASS (targeted)** — `pytest tests/unit/test_graph_verification_integration.py tests/unit/test_config.py` (16 passed); `ReadLints` clean for edited files; Doc Sync checks `check_no_scope_residue.py`/`check_sprint_map.py`/`check_doc_sync.py` PASS, with pre-existing unrelated `check_test_hygiene.py` failure in `tests/unit/test_llm.py` (call-order spy assertions).
+
+- [x] **S2-HOTFIX — Fix inspect_grounding import cycle** — verified 2026-07-01
+  - Trace: SPEC §3/§10 (evaluation and evidence-grounded memo path); test-plan §7 (`Grounded claim`, `Citation mapping`, `Unsupported claim`); sprint-plan S2 evaluation tooling.
+  - [x] Reproduce the `evaluation.inspect_grounding` import failure.
+  - [x] Add a regression test that imports the inspection CLI without triggering the agent run.
+  - [x] Fix the import to use the semantic grounding helper module.
+  - [x] Run focused tests and Doc Sync Check; record results.
+  - Result: **PASS (targeted)** — red/green `pytest tests/unit/test_inspect_grounding.py -q` failed before the fix with the circular import, then passed (1 passed); `pytest tests/unit/test_inspect_grounding.py tests/unit/test_grounding_eval.py -q` 5 passed; `ruff check evaluation/inspect_grounding.py evaluation/semantic_grounding.py tests/unit/test_inspect_grounding.py` PASS after ruff import-sort on `evaluation/semantic_grounding.py`; `pyright evaluation/inspect_grounding.py evaluation/semantic_grounding.py tests/unit/test_inspect_grounding.py` 0 errors; Doc Sync checks `check_no_scope_residue.py`/`check_sprint_map.py`/`check_doc_sync.py` PASS, with pre-existing unrelated `check_test_hygiene.py` failure in `tests/unit/test_llm.py` (call-order spy assertions).
+
+- [x] **NEWS-FIX — News evidence pipeline returns garbage (quote-page nav/CAPTCHA/markdown-image content, no dates)** — verified 2026-07-01
+  - Trace: SPEC §3 (evidence-grounded memo generation path); test-plan §2 (`Empty retrieval` → memo states limitation; `Citations` resolve to evidence); CLAUDE.md §4 (correctness bug → root-cause fix, no temporary patch).
+  - Root cause (reproduced live vs Tavily): `search_company_news` calls Tavily with `search_depth="basic"` and no `topic` → general web search returns stock-quote *landing pages* not news articles; `published_date=None` for every result; `content` is nav chrome / `![Image ...]` markdown-image junk / "key data is currently not available" empty pages / off-topic articles (e.g. SpaceX), stored verbatim as citable evidence with zero cleaning or filtering. Hardcoded `"basic"` also ignores config `search_depth="advanced"`. Switching to `topic="news"` + advanced depth + `days` window returns real dated Apple articles.
+  - [x] (agent, sonnet 5) Switched Tavily call to `topic="news"`, honors `settings.tavily.search_depth`, adds `days` recency window (guarded to news topic); `published_date` now populated. Added `TavilySettings` fields `topic`/`news_recency_days`/`min_relevance_score`/`min_content_chars`.
+  - [x] (agent, sonnet 5) Added pure `_clean_snippet` (strip markdown images + nav-bullet lines, collapse whitespace) + `_is_low_quality` (8 hard bot-block/empty markers + min-chars) + min-score threshold + URL dedup, applied before building `NewsArticle`.
+  - [x] (main) Behavior-first tests `tests/unit/test_web_search_tool.py` (6 cases, traced to test-plan §2): junk filtered, snippet cleaned of nav/images, all-junk→empty, URL dedup, low-score dropped, outbound request asks for recent `topic="news"` at config depth.
+  - [x] Verify: focused + suite pytest, ruff, pyright, Doc Sync Check.
+  - Result: **PASS (targeted)** — `pytest tests/unit/test_web_search_tool.py tests/unit/test_research_news_node.py` **7 passed**; unit suite (excl. pre-existing-broken `test_llm.py`) **163 passed, 1 failed** where the sole failure `test_embeddings_client.py::test_custom_model` (`qwen3-embedding:4b` vs `nomic-embed-text`) is pre-existing and unrelated (no tavily/news refs, files unmodified by this task); `ruff` clean; `pyright` 0 errors on both changed files + new test; Doc Sync `check_no_scope_residue.py`/`check_sprint_map.py`/`check_doc_sync.py` PASS, with the pre-existing unrelated `check_test_hygiene.py` failure in `tests/unit/test_llm.py:25,32` only. Live end-to-end: fixed `search_company_news("Apple Inc AAPL stock news")` returns **9 real dated on-topic articles, zero CAPTCHA/quote-page/markdown-image junk** (was quote-page nav + `None` dates).
+  - Known residual (secondary, not the reported bug): some snippets retain soft leading site-chrome ("Skip to main content", "Watchlist Investing Club…") that co-occurs with real article text; deliberately not hard-dropped. Optional follow-up: trim leading chrome before first `#` heading, or use Tavily `include_raw_content`/extract for full article bodies.
+  - Pre-existing, out of scope (surfaced during verification, NOT introduced here): `tests/unit/test_llm.py` collection `ImportError: cannot import name 'MEMO_TEMPLATE'`; `test_embeddings_client.py::test_custom_model` model-default mismatch; `check_test_hygiene.py` flag on `test_llm.py`. Both broken modules show stale `D:\git\...` Windows paths.
+
+## Next (S0)
+
+- [x] S0-T02 — `retrieval-benchmark.md` comparison policy exists with single-axis + paired-comparison policy; SPEC §10 and test-plan §6 point to it. **PASS (doc-level).** NB: the *implemented* benchmark does not yet follow this methodology — see gap **G6**.
+- [x] S0-T03 — Sprint IDs match SPEC §12 ↔ sprint-plan.md (S0–S10). **PASS** (`check_sprint_map.py`).
+- [x] **S0-T04 — Baseline verification pass — CLOSED GREEN 2026-06-04.** Hard stops resolved by user decision (G4 ratify Qdrant; G6 upgrade to anchored labels at S2; G2/G3/G7/G8 pragmatic re-baseline). Code: G1 fixed (11 pass), G7 fixed. Docs reconciled (ADR-0003 Accepted; SPEC §1/§6/§7; retrieval-benchmark precursor note; sprint-plan S2 note; test-plan §1; CLAUDE/AGENTS §8). Verification all green: doc scripts PASS · ruff clean · mypy success (44 files) · **pytest 178 passed, 2 skipped** · fixture validator PASS (72). C-ledger: **C0 verified, C1 verified, C2 verified (re-baselined; healthcheck+parity → S3), C3 gap → S1-T03 (G5).** Full record in `tasks/sprint-review.md §6`.
+
+## S0 — EXITED (2026-06-04)
+
+Exit criteria met: doc scripts pass, sprint IDs match, baseline-status report complete, every C-ledger line verified or ticketed. Remaining open gaps are scheduled, not blocking: **G5** → S1-T03; **G3 `healthcheck()` code** → S3.
+
+## S1 — EXITED (2026-06-04)
+
+Exit criteria met: `chunk_id = f(accession_number, section_key, chunk_index)` is implemented; required metadata is normalized; idempotent re-ingest is covered; representative AAPL/MSFT/NVDA critical-section coverage is asserted through the store interface. **G5/C3 closed.**
+
+## ACTIVE — Phase 0 + Phase 1 (INTEGRATION_PLAN_v2)
+
+Execute top to bottom. Phases are strictly sequential: a phase with unmet exit criteria blocks the next. Record verification output in each Result field. Deliverables are complete updated files, not diffs.
+
+### PRE-FLIGHT — verify "DONE" claims before building on them
+Two audit claims are load-bearing for everything below. Prove them; do not assume.
+
+- [x] **PF1 — Resolve the `docs/` contradiction (do this FIRST).** v2 §0 asserts no `docs/` directory exists; SPEC §0 and this ledger reference `docs/…` throughout and DOC-SETUP claims files were committed there. Run `git ls-files docs/`.
+  - If `docs/` is tracked → v2's finding is stale; Phase 0 collapses to "wire the checks into CI + prove they fail on drift." Update v2 §0 to record the correction.
+  - If `docs/` is NOT tracked → v2 is right, the passing doc-checks validated working-tree paths that never shipped; DOC-SETUP's green was misleading. Phase 0 is a real commit.
+  - Trace: SPEC §0 (source-of-truth doc map); v2 §0 Action 0.
+  - Result: **MATERIAL FINDING CONFIRMED** — `docs/` exists in the working tree but `git ls-files docs/` is empty because `.gitignore` ignored `docs/`; `tasks/` was ignored too. The working-tree `docs/SPEC.md` was also a sprint-plan duplicate, not a product SPEC. Phase 0 is a real governance commit: remove the broad ignores, restore SPEC, track docs/tasks, wire CI, then prove drift failure.
+- [x] **PF2 — Confirm the `0.904 ± 0.062` baseline is on a clean commit.** Inspect `_git_state()` in its `quality_res/` JSON. If `dirty: true`, it is not a datapoint — re-run on the clean grounding-fix commit before Phase 1 exit criterion 3 references it. Trace: test-plan §8 (commit/version recorded in result files).
+  - Result: **CLAIM DISPROVED** — the quoted value is not backed by a clean artifact. `quality_baseline_20260703T202116Z.json` records `git.commit: 1a08689`, `dirty: true`, `grounded_claim_rate.mean: 0.834`, `stdev: 0.055`; `quality_baseline_20260703T205240Z.json` records `git.commit: 1a08689`, `dirty: true`, `grounded_claim_rate.mean: 0.828`, `stdev: 0.100`. The only inspected clean artifact, `quality_baseline_20260703T044321Z.json`, records `git.commit: 1a08689`, `dirty: false`, `grounded_claim_rate.mean: 0.786`, `stdev: 0.051`, and predates the committed `6826034` grounding fix. Phase 1 exit must produce a new clean frozen-evidence baseline; do not cite `0.904 ± 0.062` as approved.
+- [x] **PF3 — Confirm the claim-extractor + number-matcher fixes are committed, not just applied.** `git log --oneline -- evaluation/grounding.py` should show BENCH-FIX. The tree carries the terminator/citation guard (`_looks_like_claim` + `_EMPHASIS_RE`) and `_numbers_supported_any`; verify both are in history.
+  - Result: **PASS** — `git log --oneline -- evaluation/grounding.py` shows `6826034`; `git log -p -- evaluation/grounding.py | rg -n "_EMPHASIS_RE|terminated sentence"` finds `_EMPHASIS_RE` and the "terminated sentence OR carries a citation" guard in that commit. The number-matcher change is also in the same diff via `_numbers_supported_any`.
+
+### Phase 0 — Docs into repo *(hours; cheapest credibility fix)*
+Scope adapts to PF1's answer.
+- [x] **P0-T01** — Ensure `docs/` (SPEC, sprint-plan, test-plan, retrieval-benchmark, adr/, INTEGRATION_PLAN_v2.md) is committed. Trace: SPEC §0; v2 Phase 0.
+  - Progress: removed the broad `docs/` and `tasks/` ignores from `.gitignore`; moved `LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` into `docs/`; restored `docs/SPEC.md` as the product SPEC instead of a sprint-plan duplicate; corrected stale pre-flight claims.
+  - Result: **READY FOR PHASE 0 COMMIT** — `docs/` and `tasks/` are no longer ignored and will be included in the Phase 0 governance commit.
+- [x] **P0-T02** — Wire `check_doc_sync.py`, `check_sprint_map.py`, `check_no_scope_residue.py` into `.github/workflows/ci.yml`.
+  - Progress: added a `Run document governance checks` CI step running all three scripts through `uv run python`; changed the workflow push trigger to run on scratch-branch pushes as well as PRs to `main`, so P0-T03 can be proven without pushing drift to `main`; placed governance before lint/type/test so doc drift fails at the intended gate.
+  - Result: **PASS (local)** — `uv --cache-dir /tmp/uv-cache run python scripts/ci/check_no_scope_residue.py` PASS; `check_sprint_map.py` PASS; `check_doc_sync.py` PASS.
+- [x] **P0-T03 (exit)** — Prove CI fails on doc/code drift: push a deliberate drift on a scratch branch, watch CI go red, revert. A check that can't fail isn't a check.
+  - Result: **PASS** — local red-path proof inserted `TEMP_DRIFT_PROOF: Terraform` into `docs/SPEC.md`; `uv --cache-dir /tmp/uv-cache run python scripts/ci/check_no_scope_residue.py` failed with `docs/SPEC.md:13: Terraform residue`; marker removed and all three governance scripts passed. Remote proof: pushed `scratch/doc-governance-proof-20260704` commit `4fa648a` (`test: prove doc governance fails CI`); GitHub Actions run `28713339887` failed in both Python matrix jobs at **Run document governance checks** with lint/type/test skipped. Reverted the scratch drift in commit `275db60`.
+- **Exit:** **PASS** — CI red on governance drift, demonstrated locally and remotely.
+
+### ADRs *(paperwork; unblocks nothing downstream — time-box it)*
+- [x] **ADR-0005** — ratify (release registry as single versioning system). Trace: SPEC §15; v2 §7.
+  - Result: **DONE** — added `docs/adr/ADR-0005-unified-dataops-release-registry.md` as Accepted and referenced it from SPEC §15.
+- [x] **ADR-0006** — open as **Proposed** only (cloud). Owner decides provider + budget. Cloud non-goals in SPEC §2/§3 stay in force until this is Accepted + §3 amended.
+  - Result: **DONE** — added `docs/adr/ADR-0006-production-cloud-deployment.md` as Proposed only. No provider, budget, cloud resources, infra files, or deployment pipeline changes.
+
+### Phase 1 — Evidence snapshot & replay *(THE open prerequisite — closes the fixture-freeze debt)*
+Contracts + gate first (tested), then wire recording, then replay, then re-baseline. **`dataops/` must not import Qdrant/Chroma/provider SDKs or boto3** (v2 §3.4 layering rule).
+- [ ] **P1-T01** — `dataops/contracts.py`: `EvidenceSnapshot`, `DatasetReleaseManifest` (shapes per v2 §3.2/§3.3). Unit-tested: deterministic `snapshot_id = f(source_type, natural_key, payload_hash)`; immutability (payload change ⇒ new id); `code_version` = git hash (reuse the instrument's existing git-state helper — do not duplicate it). Trace: SPEC §7 (deterministic identity); test-plan §8.
+- [ ] **P1-T02** — `dataops/registry.py`: append-only `artifacts/dataops/releases.jsonl` + `artifacts/dataops/active/*.yaml` pointers. No DB. Unit-tested write/read/pin; append-only enforced.
+- [ ] **P1-T03** — `evidence_snapshot` gate in `dataops/gates.py`. Unit-tested (rejects mutated payload under existing id; requires non-empty `snapshot_ids`).
+- [ ] **P1-T04** — Snapshot writer behind a `--record-evidence` flag on the four tools (`edgartools_sec_extractor`, `web_search_tool`, `stock_data_tool`, `sentiment`). **Default path unchanged — no runtime behavior change.** DECISION NEEDED (owner): record-as-you-fetch inside the tool path, or a separate one-shot snapshot script. Lean: in-path (Minimal Impact, less duplicate call logic) — confirm before building.
+- [ ] **P1-T05** — Create evidence release `alpha-evidence:0.1.0` for the current ticker universe; register it.
+- [ ] **P1-T06** — `--evidence-release <name:version>` replay mode in `quality_baseline.py` (short-circuits live fetch; reads pinned snapshots). Trace: SPEC §10; test-plan §7.
+- [ ] **P1-T07 (exit)** — Re-baseline on the frozen release and prove the three exit criteria below.
+- **Exit criteria (all three, proven, not asserted):**
+  - [ ] Two consecutive baselines on the same evidence release differ **only** by sampling variance — stdev attributable to temperature alone (temp 0.3, measured once). This is the operational definition of "fixture frozen."
+  - [ ] One recorded **live-vs-frozen delta**, so feed drift is *quantified* (how much of the old ±0.062 was the news), not merely eliminated.
+  - [ ] `0.904 ± 0.062` (or the corrected PF2 number) re-established as a **frozen-evidence** baseline and registered as an `approved` `quality_baseline` release — the project's first reproducible metric.
+  - Caveat for interpretation: BENCH-FIX latent edge (3) — the terminator/citation guard drops uncited, unterminated bullet lines, which can *inflate* coverage on bullet-heavy memos. If the frozen coverage looks suspiciously high, check memo bullet density before crediting a real gain.
+
+### Sequencing guardrails (v2's own rule; enforced here)
+- [ ] **Phase 4 / cloud frozen** until all Phase 1 exit criteria are green. ADR-0006 may sit Proposed; no IaC, no provider setup, no cloud design. Rationale: the productive-procrastination pattern is now at the document level (v2 added Phases 4–5 while Phase 1 stayed open); this guard stops the shiny object jumping the queue.
+- [ ] **No Qdrant comparison (S4 / Phase 2 method matrix) on live evidence.** Gate A + the dense/hybrid/reranked/section-aware matrix consume the Phase 1 frozen release — the fixture-freeze rule (`sprint-plan.md`), now generalized to all evidence.
+
+## Then — GATED: S2 == Phase 2 (anchored retrieval fixture)
+
+- **S2 — Shared retrieval benchmark oracle → Gate A.** Executes *on Phase 1's frozen evidence*: build `evaluation/build_source_section_cache.py` from committed SEC snapshots (derived from a release, not re-fetched); author anchored, graded cases; anchor-in-source validator; deterministic runner; hardened paired comparator; register fixture as a `retrieval_benchmark` release. Gate A is **not** satisfied by the v1/v2_candidate keyword precursors.
+
+## Horizon: do not start; gated
+
+- S5 retrieval quality (C) · S6 answer quality (D) · S7 service readiness · **S8 frontend MVP (deferred)** · S9 portfolio polish · S10 optional multi-agent (E) · **Phase 4 cloud / Phase 5 LLMOps (ADR-0006-gated)**.
+- The frontend is deferred to S8: not in committed scope, nothing in S0–S4 depends on it, built fresh against the API when reached.
+
+## Notes
+
+- Do not work ahead: Phase 0 → Phase 1 → (S2 == Phase 2). Cloud is frozen until Phase 1 exits.
+- C-ledger after S1: **C0 verified, C1 verified, C2 verified (re-baselined), C3 verified** (`tasks/sprint-review.md §7`).
+- Open scheduled gaps: **G3 `healthcheck()` code** (S3). **G5 closed.**
+- BENCH-FIX latent edges (tracked, non-blocking): banker's-rounding half-value false-flag (`2.68` vs `2.675`); `borderline_claims` uses `--min-similarity` not the token gate; terminator/citation guard drops uncited unterminated bullets; `retrieval_baseline_` prefix names a *memo-grounding* artifact, distinct from S2 retrieval-oracle artifacts.
+- Deliverables are complete updated files, not diffs.
