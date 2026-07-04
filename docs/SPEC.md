@@ -10,8 +10,6 @@ Analyst Agent. Where documents disagree, resolve the conflict using §0.
 Methodology with a dedicated home is linked from this file rather than
 duplicated here.
 
-TEMP_DRIFT_PROOF: Terraform
-
 ---
 
 ## 0. Source Of Truth & Document Map
