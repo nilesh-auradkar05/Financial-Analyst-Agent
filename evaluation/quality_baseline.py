@@ -21,11 +21,13 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.agents.graph import create_agent
-from app.agents.state import create_initial_state, has_fatal_error
+from app.agents.graph import create_agent, draft_memo_node, verify_memo_node
+from app.agents.state import AgentState, create_initial_state, has_fatal_error
 from app.config import settings
 from app.llm.provider import MODEL_PRESETS, _model_family
+from dataops.evidence_release import SnapshotRecord
 from dataops.git_state import git_state as _git_state
+from dataops.replay import EvidenceReplayBundle, load_evidence_release_records
 from evaluation.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_grounding
 from evaluation.semantic_grounding import evaluate_memo_grounding_semantic
 
@@ -114,18 +116,160 @@ def _stats(values: list[float]) -> dict[str, float]:
     }
 
 
-async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include_news_sentiment,
-                              max_news_articles, checker: str, min_similarity: float) -> dict:
+def _company_name_from_records(ticker: str, records: list[SnapshotRecord]) -> str | None:
+    for record in records:
+        value = record.payload.get("company_name")
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def _news_articles_from_records(records: list[SnapshotRecord], max_news_articles: int) -> list[dict]:
+    articles: list[dict] = []
+    for record in records:
+        if record.snapshot.source_type != "news_article":
+            continue
+        payload = record.payload
+        articles.append(
+            {
+                "title": str(payload.get("title") or "Untitled"),
+                "url": str(payload.get("url") or record.snapshot.natural_key),
+                "source": str(payload.get("source") or payload.get("publisher") or "Unknown"),
+                "snippet": str(payload.get("snippet") or payload.get("content") or ""),
+                "published_date": payload.get("published_date"),
+            }
+        )
+    return articles[:max_news_articles]
+
+
+def _stock_data_from_records(records: list[SnapshotRecord]) -> dict:
+    market_records = [
+        record for record in records if record.snapshot.source_type == "market_quote"
+    ]
+    if not market_records:
+        return {}
+    latest = max(market_records, key=lambda record: record.snapshot.fetched_at)
+    return dict(latest.payload)
+
+
+def _filing_chunks_from_records(records: list[SnapshotRecord]) -> list[dict]:
+    chunks: list[dict] = []
+    for record in records:
+        if record.snapshot.source_type != "sec_filing":
+            continue
+        payload = record.payload
+        accession_number = str(payload.get("accession_number") or record.snapshot.natural_key)
+        sections = payload.get("sections")
+        if not isinstance(sections, dict):
+            continue
+        for chunk_index, (section_name, section_payload) in enumerate(sections.items()):
+            if isinstance(section_payload, dict):
+                text = str(section_payload.get("content") or "")
+                display_name = str(section_payload.get("name") or section_name)
+            else:
+                text = str(section_payload)
+                display_name = str(section_name)
+            if not text.strip():
+                continue
+            chunks.append(
+                {
+                    "text": text,
+                    "section": display_name,
+                    "filing_type": str(payload.get("filing_type") or "10-K"),
+                    "filing_date": payload.get("filing_date"),
+                    "relevance_score": 1.0,
+                    "chunk_id": f"{accession_number}_{section_name}_{chunk_index:03d}",
+                }
+            )
+    return chunks
+
+
+def _sentiment_result_from_records(records: list[SnapshotRecord]) -> dict:
+    counts = {"positive": 0, "negative": 0, "neutral": 0}
+    for record in records:
+        if record.snapshot.source_type != "sentiment_score":
+            continue
+        label = str(record.payload.get("label") or "neutral").lower()
+        if label not in counts:
+            label = "neutral"
+        counts[label] += 1
+
+    if not any(counts.values()):
+        return {}
+    if counts["positive"] > counts["negative"]:
+        overall = "positive"
+    elif counts["negative"] > counts["positive"]:
+        overall = "negative"
+    else:
+        overall = "neutral"
+
+    return {
+        "overall_sentiment": overall,
+        "positive_count": counts["positive"],
+        "negative_count": counts["negative"],
+        "neutral_count": counts["neutral"],
+    }
+
+
+def _state_from_evidence_records(
+    ticker: str,
+    records: list[SnapshotRecord],
+    *,
+    include_filing_analysis: bool,
+    include_news_sentiment: bool,
+    max_news_articles: int,
+) -> AgentState:
+    company_name = _company_name_from_records(ticker, records)
     state = create_initial_state(
-        ticker, None,
+        ticker,
+        company_name,
+        include_filing_analysis=include_filing_analysis,
+        include_news_sentiment=include_news_sentiment,
+        max_news_articles=max_news_articles,
+    )
+    state["news_articles"] = _news_articles_from_records(records, max_news_articles)
+    state["stock_data"] = _stock_data_from_records(records)
+    if state["stock_data"].get("company_name"):
+        state["company_name"] = str(state["stock_data"]["company_name"])
+    if include_filing_analysis:
+        state["filing_chunks"] = _filing_chunks_from_records(records)
+    if include_news_sentiment:
+        state["sentiment_result"] = _sentiment_result_from_records(records)
+    return state
+
+
+async def _run_frozen_evidence(
+    ticker: str,
+    records: list[SnapshotRecord],
+    *,
+    include_filing_analysis: bool,
+    include_news_sentiment: bool,
+    max_news_articles: int,
+) -> tuple[AgentState, float]:
+    state = _state_from_evidence_records(
+        ticker,
+        records,
         include_filing_analysis=include_filing_analysis,
         include_news_sentiment=include_news_sentiment,
         max_news_articles=max_news_articles,
     )
     t0 = time.perf_counter()
-    final = await agent.ainvoke(state, config={})
+    draft_update = await draft_memo_node(state)
+    merged = AgentState(**{**state, **draft_update})
+    verify_update = await verify_memo_node(merged)
+    final = AgentState(**{**merged, **verify_update})
     run_ms = (time.perf_counter() - t0) * 1000.0
+    return final, run_ms
 
+
+def _score_final_state(
+    ticker: str,
+    final: AgentState,
+    *,
+    run_ms: float,
+    checker: str,
+    min_similarity: float,
+) -> dict:
     memo = final.get("investment_memo", "") or ""
     registry = final.get("citation_evidence", []) or []
     errors = final.get("errors", []) or []
@@ -161,6 +305,41 @@ async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include
     }
 
 
+async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include_news_sentiment,
+                              max_news_articles, checker: str, min_similarity: float,
+                              evidence_records_by_ticker: dict[str, list[SnapshotRecord]] | None = None) -> dict:
+    if evidence_records_by_ticker is None:
+        state = create_initial_state(
+            ticker, None,
+            include_filing_analysis=include_filing_analysis,
+            include_news_sentiment=include_news_sentiment,
+            max_news_articles=max_news_articles,
+        )
+        t0 = time.perf_counter()
+        final = await agent.ainvoke(state, config={})
+        run_ms = (time.perf_counter() - t0) * 1000.0
+    else:
+        replay_ticker = ticker.upper()
+        records = evidence_records_by_ticker.get(replay_ticker)
+        if not records:
+            raise ValueError(f"evidence release has no snapshots for ticker {replay_ticker}")
+        final, run_ms = await _run_frozen_evidence(
+            replay_ticker,
+            records,
+            include_filing_analysis=include_filing_analysis,
+            include_news_sentiment=include_news_sentiment,
+            max_news_articles=max_news_articles,
+        )
+
+    return _score_final_state(
+        ticker,
+        final,
+        run_ms=run_ms,
+        checker=checker,
+        min_similarity=min_similarity,
+    )
+
+
 def _aggregate(runs: list[dict]) -> dict:
     def col(key: str) -> list[float]:
         return [float(r[key]) for r in runs]
@@ -194,11 +373,19 @@ async def main() -> None:
     parser.add_argument("--no-filings", action="store_true")
     parser.add_argument("--no-sentiment", action="store_true")
     parser.add_argument("--max-news", type=int, default=10)
+    parser.add_argument("--evidence-release", help="Replay a frozen evidence release (<name:version>)")
+    parser.add_argument("--registry-root", default="artifacts/dataops")
     args = parser.parse_args()
 
     include_filing_analysis = not args.no_filings
     include_news_sentiment = not args.no_sentiment
-    agent = create_agent()
+    evidence_bundle: EvidenceReplayBundle | None = None
+    if args.evidence_release:
+        evidence_bundle = load_evidence_release_records(
+            args.evidence_release,
+            registry_root=args.registry_root,
+        )
+    agent = None if evidence_bundle else create_agent()
 
     runs: list[dict] = []
     for ticker in args.tickers:
@@ -209,6 +396,9 @@ async def main() -> None:
                 include_news_sentiment=include_news_sentiment,
                 max_news_articles=args.max_news,
                 checker=args.checker, min_similarity=args.min_similarity,
+                evidence_records_by_ticker=(
+                    evidence_bundle.records_by_ticker if evidence_bundle else None
+                ),
             )
             runs.append(r)
             print(f"  {ticker} run {i}: grounded={r['grounded_claim_rate']:.2f} "
@@ -229,10 +419,22 @@ async def main() -> None:
         "grounding_checker": args.checker,
         "grounding_eval_version": GROUNDING_EVAL_VERSION,
         "min_similarity": args.min_similarity if args.checker == "semantic" else None,
+        "evidence_release": (
+            {
+                "release_id": evidence_bundle.manifest.release_id,
+                "dataset_name": evidence_bundle.manifest.dataset_name,
+                "dataset_version": evidence_bundle.manifest.dataset_version,
+                "snapshot_ids": evidence_bundle.manifest.snapshot_ids,
+                "artifact_uri": evidence_bundle.manifest.artifact_uri,
+            }
+            if evidence_bundle
+            else None
+        ),
         "thresholds": {"min_citation_coverage": MIN_CITATION_COVERAGE, "min_grounded_claim_rate": MIN_GROUNDED_CLAIM_RATE},
         "config": {"tickers": args.tickers, "repeats": args.repeats,
                    "include_filing_analysis": include_filing_analysis,
-                   "include_news_sentiment": include_news_sentiment, "max_news_articles": args.max_news},
+                   "include_news_sentiment": include_news_sentiment, "max_news_articles": args.max_news,
+                   "evidence_release": args.evidence_release, "registry_root": args.registry_root},
         "overall": overall,
         "error_steps": dict(error_steps),
         "per_ticker": {t: _aggregate([r for r in runs if r["ticker"] == t]) for t in args.tickers},
