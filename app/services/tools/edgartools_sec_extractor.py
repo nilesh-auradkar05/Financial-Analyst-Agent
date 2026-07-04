@@ -106,7 +106,11 @@ def _require_edgartools() -> tuple[Any, Callable[[str], Any]]:
 def _configure_identity(identity: Optional[str]) -> Any:
     company_cls, set_identity_fn = _require_edgartools()
 
-    resolved_identity = identity or os.getenv("EDGARTOOLS_IDENTITY")
+    resolved_identity = (
+        identity
+        or os.getenv("EDGAR_IDENTITY")
+        or os.getenv("EDGARTOOLS_IDENTITY")
+    )
     if not resolved_identity:
         logger.warning(
             "EDGAR_IDENTITY is not set. Set EDGAR_IDENTITY='Name email@example.com'"

@@ -143,6 +143,26 @@ def test_sec_extractor_records_filing_snapshot_only_when_enabled(monkeypatch, tm
     assert records[0]["payload"]["company_name"] == "Apple Inc."
 
 
+def test_sec_extractor_honors_edgar_identity_env(monkeypatch) -> None:
+    class FakeCompany:
+        pass
+
+    configured: list[str] = []
+
+    monkeypatch.setenv("EDGAR_IDENTITY", "agent@example.com")
+    monkeypatch.delenv("EDGARTOOLS_IDENTITY", raising=False)
+    monkeypatch.setattr(
+        sec_tool,
+        "_require_edgartools",
+        lambda: (FakeCompany, configured.append),
+    )
+
+    company_cls = sec_tool._configure_identity(None)
+
+    assert company_cls is FakeCompany
+    assert configured == ["agent@example.com"]
+
+
 def test_sentiment_records_score_snapshots_only_when_enabled(monkeypatch, tmp_path) -> None:
     class FakeAnalyzer:
         def analyze_batch(self, texts: list[str]) -> list[SentimentResult]:
