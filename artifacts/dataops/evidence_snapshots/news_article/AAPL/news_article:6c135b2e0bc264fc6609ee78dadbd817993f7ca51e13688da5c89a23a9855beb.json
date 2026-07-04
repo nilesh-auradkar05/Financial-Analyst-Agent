@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Thu, 25 Jun 2026 20:24:58 GMT",
+    "relevance_score": 0.40344992,
+    "snippet": "deal . We saw that in action six months later at its annual developers conference, when Apple unveiled a souped-up, more conversational Siri powered by Gemini. The new-and-improved Siri should be out later this year, another selling point going into the next iPhone upgrade cycle following a year of strong iPhone 17 sales. \"Look, we're just being patient,\" Jeff said. \"Obviously, Apple has been an 'own it, don't trade it' for so long.\" We have a hold-equivalent 2 rating on the stock and a $300 pri",
+    "source": "Cnbc",
+    "title": "Apple stock gets slammed on bigger Mac, iPad price hikes. Why it can weather the storm - CNBC",
+    "url": "https://www.cnbc.com/2026/06/25/apple-stock-gets-slammed-on-bigger-mac-ipad-price-hikes-why-it-can-weather-the-storm.html"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.188852Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Thu, 25 Jun 2026 20:24:58 GMT",
+      "source": "Cnbc"
+    },
+    "natural_key": "https://www.cnbc.com/2026/06/25/apple-stock-gets-slammed-on-bigger-mac-ipad-price-hikes-why-it-can-weather-the-storm.html",
+    "payload_hash": "e0337965e19055fe673b753bcd868f4316f2004406d134a8e152ad067021062d",
+    "snapshot_id": "news_article:6c135b2e0bc264fc6609ee78dadbd817993f7ca51e13688da5c89a23a9855beb",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:6c135b2e0bc264fc6609ee78dadbd817993f7ca51e13688da5c89a23a9855beb.json",
+    "ticker": "AAPL"
+  }
+}

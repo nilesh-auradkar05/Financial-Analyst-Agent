@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.7233753800392151,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.0123912887647748,
+      "neutral": 0.26423338055610657,
+      "positive": 0.7233753800392151
+    },
+    "text": "Skip to main content Exclusive news, data and analytics for financial market professionals Learn more about Refinitiv - Apple (AAPL.O), opens new tab said it is pushing forward a series of software updates that would previously have been \u200bbundled with a new version of its iOS operating \u200csystem, making them available, opens new tab earlier than in previous cycles in response to AI-driven security concerns. The company told Reuters on Monday it was adapting to \u200bthe reality that, given the ability "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.308653Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:64fb16025cba54e58477ab233b83c5cb97b39e006144526527b9788738e02268",
+    "payload_hash": "4c78a73454babeda8bfaa7fda44a5f5c3413c85a865158d55c1e1e2ab5c07ae1",
+    "snapshot_id": "sentiment_score:27a5d57d73dc59401acf5ccee1621afbafcff07089c63254abab2a2fd4ec3eec",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:27a5d57d73dc59401acf5ccee1621afbafcff07089c63254abab2a2fd4ec3eec.json",
+    "ticker": "AAPL"
+  }
+}

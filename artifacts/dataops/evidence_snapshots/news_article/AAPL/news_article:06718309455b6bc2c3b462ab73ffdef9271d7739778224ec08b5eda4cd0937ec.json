@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Thu, 25 Jun 2026 17:49:30 GMT",
+    "relevance_score": 0.16210158,
+    "snippet": "Markets News, June 23, 2026: Stocks Fall as Tech Sell-Off Expands to Memory, Chips; SpaceX Rebounds Off Record Low Markets News, June 22, 2026: Dow Ekes Out Gain as Big Tech Stocks Weigh on Nasdaq; SpaceX Falls To Lowest Close Ever Markets News, June 24, 2026: S&P 500, Nasdaq Fall for 3rd Straight Day; Oil Prices Drop to Lowest Level Since Start of War Markets News, June 18, 2026: Stocks Rise to Finish Winning Week; Intel Leads Chip, Memory Stocks Higher; SpaceX Continues Slide 5 Things to Know ",
+    "source": "Investopedia",
+    "title": "Stock Market Today: Nasdaq Slides as Tech Giants Outweigh Micron-Led Memory Rally; Oil Rises as Mideast Tensions Flare - Investopedia",
+    "url": "https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-06252026-12006401"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.193347Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Thu, 25 Jun 2026 17:49:30 GMT",
+      "source": "Investopedia"
+    },
+    "natural_key": "https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-06252026-12006401",
+    "payload_hash": "9e631c8ca9570fce03568f06a29297c4213f101ab13acb433feec0755d8e732d",
+    "snapshot_id": "news_article:06718309455b6bc2c3b462ab73ffdef9271d7739778224ec08b5eda4cd0937ec",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:06718309455b6bc2c3b462ab73ffdef9271d7739778224ec08b5eda4cd0937ec.json",
+    "ticker": "AAPL"
+  }
+}

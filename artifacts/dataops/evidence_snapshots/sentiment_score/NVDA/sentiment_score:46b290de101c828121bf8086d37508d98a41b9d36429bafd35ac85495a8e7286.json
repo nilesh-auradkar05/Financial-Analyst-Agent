@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.6680473685264587,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.02547590807080269,
+      "neutral": 0.3064766824245453,
+      "positive": 0.6680473685264587
+    },
+    "text": "Skip to main content Shorting the Grid: Bloom Energy\u2019s $25B AI Power Play Your book attached (Ad) SanDisk\u2019s Volatility May Be Telling Bulls What They Want to Hear Is the Memory Rally Still Alive After the Semiconductor Sell-Off? Louis Navellier: My #1 AI stock for 2026 (name & ticker inside) (Ad) Netflix Stock Is Near 2021 Levels, and Bulls See 4 Reasons to Care Tesla Stock Surges 15% as FSD Update Backs Its Autonomy Thesis CODE RED: AI Meltdown Imminent? (Ad) General Mills Is a 5-Star Turnaroun"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.355669Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:a78ba256a4ec49ab53ff4248de6ed9f6a54b8656a93165a9551b8de5b0bc52ed",
+    "payload_hash": "4889a1bb0b08eb0af146d3abf4a028f9872d6b7ec14c0b8a633be842c69ad91c",
+    "snapshot_id": "sentiment_score:46b290de101c828121bf8086d37508d98a41b9d36429bafd35ac85495a8e7286",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:46b290de101c828121bf8086d37508d98a41b9d36429bafd35ac85495a8e7286.json",
+    "ticker": "NVDA"
+  }
+}

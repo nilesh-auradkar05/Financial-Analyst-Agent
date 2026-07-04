@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Mon, 22 Jun 2026 23:52:51 GMT",
+    "relevance_score": 0.30557346,
+    "snippet": "Older 46. News \u2022 Jun 15, 2026 Markets are cheering the plan to reopen the Strait of Hormuz. But the relief may not last. 47. News \u2022 Jun 15, 2026 The Trump administration pulled Anthropic's latest AI model over jailbreak fears. Anthropic says the concerns are overblown. 48. News \u2022 Jun 15, 2026 SpaceX shares rose nearly 20% on their second day of trading, lifting gains to 35% 49. Breaking News \u2022 Jun 15, 2026 The Dow jumped over 450 points to a fresh record. The Nasdaq soared over 3% as investors c",
+    "source": "Finance",
+    "title": "Trump Provides Fresh Boost To Quantum Computing Space, Signs Two Orders - IBM, INFQ, QBTS, RGTI, QUBT Stocks In Focus - Yahoo Finance",
+    "url": "https://finance.yahoo.com/technology/ai/articles/trump-provides-fresh-boost-quantum-235251510.html"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.290964Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Mon, 22 Jun 2026 23:52:51 GMT",
+      "source": "Finance"
+    },
+    "natural_key": "https://finance.yahoo.com/technology/ai/articles/trump-provides-fresh-boost-quantum-235251510.html",
+    "payload_hash": "c089e23da9e4615271e455527c2578b92a6e76f9b39229688d491ffe508cf5aa",
+    "snapshot_id": "news_article:52596adca9faf467eeb4d1d205e364b97e6a92ed3e2ae5e5317cac2051414439",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/NVDA/news_article:52596adca9faf467eeb4d1d205e364b97e6a92ed3e2ae5e5317cac2051414439.json",
+    "ticker": "NVDA"
+  }
+}

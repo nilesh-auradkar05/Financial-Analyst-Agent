@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Sat, 27 Jun 2026 03:14:30 GMT",
+    "relevance_score": 0.18866788,
+    "snippet": "Skip to main content Ammonia Fuel Handling System Crypto Briefing Israel-Lebanon peace framework faces opposition from Hezbollah Crypto Briefing Leandro Trossard scores brace to keep Belgium alive in World Cup Image 17 CNBC TV18 Sign in to read exclusive news Image 18 TradingView PicS N.V. Stock 12\u2011Month Price Target Cut to $19.61, Implies 86% Upside ## More news from Reuters Image 19 Image 20 Image 21 Dec 22, 2025 Reuters Mergers and acquisitionsDec 22, 2025 Reuters KALENDER-Termine Politik/Ver",
+    "source": "Tradingview",
+    "title": "Magnitude 5.4 earthquake strikes Pakistan, EMSC says - TradingView",
+    "url": "https://www.tradingview.com/news/reuters.com,2026:newsml_FWN42Y13L:0-magnitude-5-4-earthquake-strikes-pakistan-emsc-says/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.294203Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Sat, 27 Jun 2026 03:14:30 GMT",
+      "source": "Tradingview"
+    },
+    "natural_key": "https://www.tradingview.com/news/reuters.com,2026:newsml_FWN42Y13L:0-magnitude-5-4-earthquake-strikes-pakistan-emsc-says/",
+    "payload_hash": "c5aab594824961287311bfeddbec929d729055efd9e8ff03d297a0a0bc697a80",
+    "snapshot_id": "news_article:d2ab10b1060465643aae1492c6ca81007df4d4ff757a62971d7cf331c87082d2",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/NVDA/news_article:d2ab10b1060465643aae1492c6ca81007df4d4ff757a62971d7cf331c87082d2.json",
+    "ticker": "NVDA"
+  }
+}

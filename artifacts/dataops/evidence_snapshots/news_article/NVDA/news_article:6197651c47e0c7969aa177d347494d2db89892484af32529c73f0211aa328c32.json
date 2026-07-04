@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Tue, 23 Jun 2026 15:33:08 GMT",
+    "relevance_score": 0.23155381,
+    "snippet": "Store My Products Founder's ClubSwingTraderLeaderboardMarketSurgeeIBDIBD DigitalIBD Live Recently Searched Research6:54 PM ET AI Cool Play Vertiv Joins 2 Best Stock Lists, Leads Group Of 14 New To IBD 50, Big Cap 20, More The Big Picture5:57 PM ET Stock Market Ends Mixed As SpaceX, Software Names Cast Pall On Nasdaq; Small Caps Shine Stock Market Today5:13 PM ET Dow Jones Futures: Tech Stocks Tumble As SpaceX Plunges; Amazon, Alphabet, Nvidia Sell Off News # SpaceX Conducts Starfall Cargo Test, ",
+    "source": "Investors",
+    "title": "SpaceX Conducts Starfall Cargo Test, Lands Next AST SpaceMobile Launch - Investor's Business Daily",
+    "url": "https://www.investors.com/news/spacex-starfall-spcx-stock-ast-spacemobile-asts-stock/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.291905Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Tue, 23 Jun 2026 15:33:08 GMT",
+      "source": "Investors"
+    },
+    "natural_key": "https://www.investors.com/news/spacex-starfall-spcx-stock-ast-spacemobile-asts-stock/",
+    "payload_hash": "e983de245a0e8f5418ad3d0b6820e3e9cd0ab0ffbbd80ac242d7ff1da2dfad3f",
+    "snapshot_id": "news_article:6197651c47e0c7969aa177d347494d2db89892484af32529c73f0211aa328c32",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/NVDA/news_article:6197651c47e0c7969aa177d347494d2db89892484af32529c73f0211aa328c32.json",
+    "ticker": "NVDA"
+  }
+}

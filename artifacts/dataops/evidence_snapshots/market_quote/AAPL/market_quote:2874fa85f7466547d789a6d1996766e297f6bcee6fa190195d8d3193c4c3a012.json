@@ -1,0 +1,36 @@
+{
+  "payload": {
+    "avg_volume": 53938887,
+    "company_name": "Apple Inc.",
+    "current_price": 308.63,
+    "dividend_yield": 0.35,
+    "error": null,
+    "fifty_two_week_high": 317.4,
+    "fifty_two_week_low": 201.5,
+    "industry": "Consumer Electronics",
+    "market_cap": 4532958920704,
+    "pe_ratio": 37.319225,
+    "price_change_percent": 4.84068,
+    "recommendation": "buy",
+    "sector": "Technology",
+    "target_price": 315.09048,
+    "ticker": "AAPL",
+    "volume": 71897697
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:07.588513Z",
+    "fetcher_name": "stock_data_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "company_name": "Apple Inc.",
+      "industry": "Consumer Electronics",
+      "sector": "Technology"
+    },
+    "natural_key": "AAPL:2026-07-04T18:28:07.588513+00:00",
+    "payload_hash": "ebc3c93537c88dd7ea25cb26835efe1da63e7c524929a6f15bbca24da258a8d6",
+    "snapshot_id": "market_quote:2874fa85f7466547d789a6d1996766e297f6bcee6fa190195d8d3193c4c3a012",
+    "source_type": "market_quote",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/market_quote/AAPL/market_quote:2874fa85f7466547d789a6d1996766e297f6bcee6fa190195d8d3193c4c3a012.json",
+    "ticker": "AAPL"
+  }
+}

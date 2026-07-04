@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.6741434335708618,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.2854689061641693,
+      "neutral": 0.04038764163851738,
+      "positive": 0.6741434335708618
+    },
+    "text": "Microsoft is the worst-performing stock in the \"Magnificent Seven\" group of equities, and traders believe there is little likelihood of a near-term rebound. On Stocktwits, retail sentiment for MSFT flipped to 'bearish' from 'bullish' the previous day. \"$MSFT so let me get this straight, memory chips keep on rallying and making new highs while their customer hyperscalers keep making new lows, makes perfect sense,\" said a trader. Another wrote: \"$AMZN $NVDA $NVDA $META $MSFT $GOOGL So glad I bough"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.629748Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:fc437e16b0c42efed0fc7674ca908516d3deaa4135a2b21aaf02a3ca652c9032",
+    "payload_hash": "aceee9bbbfa3663f06af5246fed589df82e0bd89af4b57f094ac1a78973d9069",
+    "snapshot_id": "sentiment_score:066061f7d8836ba9037b28dae1670fb6a83b93e0f8941489d5a4f995f6da88b1",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:066061f7d8836ba9037b28dae1670fb6a83b93e0f8941489d5a4f995f6da88b1.json",
+    "ticker": "MSFT"
+  }
+}

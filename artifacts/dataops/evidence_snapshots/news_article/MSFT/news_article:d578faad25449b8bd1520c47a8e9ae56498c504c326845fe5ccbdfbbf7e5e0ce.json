@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Wed, 01 Jul 2026 00:00:00 GMT",
+    "relevance_score": 0.68496037,
+    "snippet": "This article was written by Doug Nathman, with research by his team at Trefis. A new business within Microsoft (MSFT) has quietly grown to massive scale. The company's AI segment has crossed a $37 billion annual run rate, expanding at an astonishing 123%. This new growth engine already represents a meaningful portion of Microsoft Cloud, which itself exceeded $54 billion in quarterly revenue. This is not a future promise; it is a current reality. This rapid growth is why the upside case is center",
+    "source": "Forbes",
+    "title": "Is Microsoft Stock Heading For $550? - Forbes",
+    "url": "https://www.forbes.com/sites/greatspeculations/2026/07/01/is-microsoft-stock-heading-for-550/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.552028Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Wed, 01 Jul 2026 00:00:00 GMT",
+      "source": "Forbes"
+    },
+    "natural_key": "https://www.forbes.com/sites/greatspeculations/2026/07/01/is-microsoft-stock-heading-for-550/",
+    "payload_hash": "a408b08f5d7f5c6490ed30678bb1d381e34d33065ab03a16c1e761335b91f662",
+    "snapshot_id": "news_article:d578faad25449b8bd1520c47a8e9ae56498c504c326845fe5ccbdfbbf7e5e0ce",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:d578faad25449b8bd1520c47a8e9ae56498c504c326845fe5ccbdfbbf7e5e0ce.json",
+    "ticker": "MSFT"
+  }
+}

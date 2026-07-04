@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.7767341732978821,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.7767341732978821,
+      "neutral": 0.20278657972812653,
+      "positive": 0.020479192957282066
+    },
+    "text": "Image 1: The selloff has left Microsoft valued at the cheapest in a decade. The selloff has left Microsoft valued at the cheapest in a decade. Photographer: Adam Gray/Bloomberg Gift this article Add us on Google Contact us: Provide news feedback or report an error Confidential tip? Send a tip to our reporters Site feedback: Take our Survey By Ryan Vlastelica June 29, 2026 at 11:31 AM UTC Save Translate ## Takeaways by Bloomberg AISubscribe Microsoft Corp. shares are heading for their worst month"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.630836Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:364a3214ebe50af347be1b8335c0fc8e08a7f5d226b0a0fb924f195a4ec8aef5",
+    "payload_hash": "9280db5547510822b3f41a7cd0cb310064a2ac6e48c29ab2051473d26aed57e1",
+    "snapshot_id": "sentiment_score:b46a52595f280a8b164bb8659f31bfccb112bbcde1fd9f5ecf6090870e091f3f",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:b46a52595f280a8b164bb8659f31bfccb112bbcde1fd9f5ecf6090870e091f3f.json",
+    "ticker": "MSFT"
+  }
+}

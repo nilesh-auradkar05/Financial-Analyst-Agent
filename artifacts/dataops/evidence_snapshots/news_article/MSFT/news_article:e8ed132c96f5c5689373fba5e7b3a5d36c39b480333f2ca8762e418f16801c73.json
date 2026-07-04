@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Tue, 30 Jun 2026 12:13:39 GMT",
+    "relevance_score": 0.6533265,
+    "snippet": "MSFT Microsoft -- --% ## Featured Reads Our top personal finance-related articles today. Your wallet will thank you later. Drew Wood | ## Never Pay Medicare Premiums Again. Here's the Portfolio That Makes It Happen. Gerelyn Terzo | ## Core Inflation Just Hit a 3-Year High. For One Retired Couple, the Frozen Tax Thresholds Turn That Into a Stealth Tax Increase. ## Continue Reading Trey Thoelcke | ## After Microsoft\u2019s Q1 Slide, Are the Bulls Still On Board? Microsoft (NASDAQ: MSFT | MSFT Price Pre",
+    "source": "247Wallst",
+    "title": "This Stock Will Dominate The Second Half of 2026 - 24/7 Wall St.",
+    "url": "https://247wallst.com/investing/2026/06/30/this-stock-will-dominate-the-second-half-of-2026-2/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.553380Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Tue, 30 Jun 2026 12:13:39 GMT",
+      "source": "247Wallst"
+    },
+    "natural_key": "https://247wallst.com/investing/2026/06/30/this-stock-will-dominate-the-second-half-of-2026-2/",
+    "payload_hash": "d95c9295c0974b10c320210294d1972d92bb80599fdadde29cc65c7783743aec",
+    "snapshot_id": "news_article:e8ed132c96f5c5689373fba5e7b3a5d36c39b480333f2ca8762e418f16801c73",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:e8ed132c96f5c5689373fba5e7b3a5d36c39b480333f2ca8762e418f16801c73.json",
+    "ticker": "MSFT"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.9630295038223267,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.9630295038223267,
+      "neutral": 0.0272049680352211,
+      "positive": 0.00976555421948433
+    },
+    "text": "Accessibility Menu \u25b2 S&P 500 +---%|\u25b2 Stock Advisor +---%Join The Motley Fool AccessibilityHelp Microsoft (MSFT 3.66%) stock slipped 2.5% through 2:25 p.m. ET Thursday after Stifel analyst Brad Reback lowered his price target on the tech stock this morning, and maintained only a \"hold\" rating. Reback thinks Microsoft stock is worth $400 a share -- and it costs less than $357 as of this writing -- but that's still not cheap enough to convince Reback to rate it a \"buy.\" Image source: Microsoft. ## "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.630377Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:4b09a69339205a37de20eb98980c0976ecdf45191710e01c55a060c5cc74799d",
+    "payload_hash": "9db056133a1459268d9c3ff0dc9c94b7682602e04b420bab76a3c524bb0f9d40",
+    "snapshot_id": "sentiment_score:d73bd5f690f1dedb597125b5b89dd355b542fd9a89c970a4b8b551fa026689ab",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:d73bd5f690f1dedb597125b5b89dd355b542fd9a89c970a4b8b551fa026689ab.json",
+    "ticker": "MSFT"
+  }
+}

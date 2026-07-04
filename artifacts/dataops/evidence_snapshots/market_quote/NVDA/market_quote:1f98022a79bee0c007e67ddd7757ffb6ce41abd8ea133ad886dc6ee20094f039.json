@@ -1,0 +1,36 @@
+{
+  "payload": {
+    "avg_volume": 158966993,
+    "company_name": "NVIDIA Corporation",
+    "current_price": 194.83,
+    "dividend_yield": 0.51,
+    "error": null,
+    "fifty_two_week_high": 236.54,
+    "fifty_two_week_low": 157.34,
+    "industry": "Semiconductors",
+    "market_cap": 4718977351680,
+    "pe_ratio": 29.83614,
+    "price_change_percent": -1.39184,
+    "recommendation": "strong_buy",
+    "sector": "Technology",
+    "target_price": 301.6207,
+    "ticker": "NVDA",
+    "volume": 129909675
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:15.518214Z",
+    "fetcher_name": "stock_data_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "company_name": "NVIDIA Corporation",
+      "industry": "Semiconductors",
+      "sector": "Technology"
+    },
+    "natural_key": "NVDA:2026-07-04T18:29:15.518214+00:00",
+    "payload_hash": "e017e919010e1afe111c1863b9002c85c00a9ef5f567a62a5a5af914043c1546",
+    "snapshot_id": "market_quote:1f98022a79bee0c007e67ddd7757ffb6ce41abd8ea133ad886dc6ee20094f039",
+    "source_type": "market_quote",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/market_quote/NVDA/market_quote:1f98022a79bee0c007e67ddd7757ffb6ce41abd8ea133ad886dc6ee20094f039.json",
+    "ticker": "NVDA"
+  }
+}

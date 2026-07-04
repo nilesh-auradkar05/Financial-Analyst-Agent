@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Sat, 27 Jun 2026 13:00:00 GMT",
+    "relevance_score": 0.26891115,
+    "snippet": "Apple explained that the company has \"never seen a component price increase this much, this quickly,\" and while Apple held off on raising prices for as long as possible, the situation has become dire enough that it feels it needs to pass the increases along to customers. Apple says that it is \"working tirelessly to find solutions,\" but memory suppliers forecast that shortages and high prices will last well into 2027. Apple's price increases have largely yet to trickle down to third-party retaile",
+    "source": "Macrumors",
+    "title": "Top Stories: Massive Apple Price Increases, iOS 27 Beta 2, and More - MacRumors",
+    "url": "https://www.macrumors.com/2026/06/27/top-stories-massive-apple-price-increases/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.189595Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Sat, 27 Jun 2026 13:00:00 GMT",
+      "source": "Macrumors"
+    },
+    "natural_key": "https://www.macrumors.com/2026/06/27/top-stories-massive-apple-price-increases/",
+    "payload_hash": "d1799f6dfd02b5d9c96ec412836a405592fad2c8fe68e96336fce777081d4e4c",
+    "snapshot_id": "news_article:dc424202f2ceb77afbbb2e4ae492e333ebf754a36a454997be44895908b0e39f",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:dc424202f2ceb77afbbb2e4ae492e333ebf754a36a454997be44895908b0e39f.json",
+    "ticker": "AAPL"
+  }
+}

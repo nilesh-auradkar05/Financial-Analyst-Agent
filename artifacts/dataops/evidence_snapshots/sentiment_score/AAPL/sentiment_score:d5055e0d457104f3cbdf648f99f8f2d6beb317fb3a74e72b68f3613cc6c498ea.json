@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.9030724167823792,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.028756167739629745,
+      "neutral": 0.9030724167823792,
+      "positive": 0.068171426653862
+    },
+    "text": "Watchlist Investing Club Trust Portfolio Analysis Trade Alerts Meeting Videos Homestretch Jim's Columns Education Subscribe PRO Pro News Josh Brown Mike Santoli Calls of the Day My Portfolio Livestream Full Episodes Stock Screener Market Forecast Options Investing Chart Investing Subscribe Livestream Make It select USA INTL Livestream Livestream Watchlist SIGN IN Create free account Markets Business Investing Tech Politics Video Watchlist Investing Club PRO Livestream # Apple is a notable outlie"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.309852Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:c2c1762a83c4a46c4dc0b91041348d1d2dfca9064be3de1034351b3c7e2dff93",
+    "payload_hash": "73cc963955167e276e5f85061105f78fb8a2fec78736137dc46770685fdf28df",
+    "snapshot_id": "sentiment_score:d5055e0d457104f3cbdf648f99f8f2d6beb317fb3a74e72b68f3613cc6c498ea",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:d5055e0d457104f3cbdf648f99f8f2d6beb317fb3a74e72b68f3613cc6c498ea.json",
+    "ticker": "AAPL"
+  }
+}

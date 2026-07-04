@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.9682668447494507,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.9682668447494507,
+      "neutral": 0.015473059378564358,
+      "positive": 0.016260039061307907
+    },
+    "text": "Microsoft (MSFT) stock fell 3.5% over the latest trading session, a dip that has it trading about 34% below its 52-week high. For a systems software giant performing strongly, it\u2019s a notable move. On its latest earnings call, management reported its AI business surpassed a $37 billion annual run rate, up 123%, while the Microsoft Cloud segment exceeded $54 billion in quarterly revenue. The market is weighing that rapid growth against the company\u2019s plan to invest roughly $190 billion in capital e"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.629175Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:8f290388228a7dd0a020e31d075e0fd806aa1cfdd232dc158cdb7a91cc326c97",
+    "payload_hash": "1886380c62437e18b39251cce538087d396320e1f47b3af2d2f96620313ac2a1",
+    "snapshot_id": "sentiment_score:115e70eab5216cbc90b2aa4ab524f1dd43460b6183b1c5c8ad25dcd07ed8782a",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:115e70eab5216cbc90b2aa4ab524f1dd43460b6183b1c5c8ad25dcd07ed8782a.json",
+    "ticker": "MSFT"
+  }
+}

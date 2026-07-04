@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.6658796072006226,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.21009016036987305,
+      "neutral": 0.6658796072006226,
+      "positive": 0.1240302100777626
+    },
+    "text": "Skip to main content Ammonia Fuel Handling System Crypto Briefing Israel-Lebanon peace framework faces opposition from Hezbollah Crypto Briefing Leandro Trossard scores brace to keep Belgium alive in World Cup Image 17 CNBC TV18 Sign in to read exclusive news Image 18 TradingView PicS N.V. Stock 12\u2011Month Price Target Cut to $19.61, Implies 86% Upside ## More news from Reuters Image 19 Image 20 Image 21 Dec 22, 2025 Reuters Mergers and acquisitionsDec 22, 2025 Reuters KALENDER-Termine Politik/Ver"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.355488Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:386abe788e91e21ff397b698fcc7a185753f665e0cfaccb40f8cf5ac66ce49c2",
+    "payload_hash": "52e82649838c51a99bb30b22588518fadcd62f04d05bd3baaa78ad664cace147",
+    "snapshot_id": "sentiment_score:bc7e818218bbb7cce20ffcc383b15fa961dd90621944a3fd80441cab9de61cbc",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:bc7e818218bbb7cce20ffcc383b15fa961dd90621944a3fd80441cab9de61cbc.json",
+    "ticker": "NVDA"
+  }
+}

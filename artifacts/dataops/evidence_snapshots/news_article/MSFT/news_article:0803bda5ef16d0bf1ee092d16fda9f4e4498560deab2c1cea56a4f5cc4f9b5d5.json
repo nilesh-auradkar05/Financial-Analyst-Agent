@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Fri, 26 Jun 2026 13:54:54 GMT",
+    "relevance_score": 0.124521665,
+    "snippet": "14 min ago watch now watch now VIDEO06:31 Billionaire investor Jeremy Grantham on crypto: A useless, speculative mechanism an hour ago watch now watch now VIDEO08:11 Billionaire investor Jeremy Grantham: This is the most expensive market in American history 2 hours ago watch now watch now VIDEO05:16 Fed ought to take time to see how falling energy prices impacts inflation: Goldman's Robert Kaplan watch now watch now VIDEO05:22 Ariel Investments co-CEO John Rogers: AI craze will end the same way ",
+    "source": "Cnbc",
+    "title": "Market Open: June 26, 2026 - CNBC",
+    "url": "https://www.cnbc.com/video/2026/06/26/market-open-june-26-2026.html"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.555747Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Fri, 26 Jun 2026 13:54:54 GMT",
+      "source": "Cnbc"
+    },
+    "natural_key": "https://www.cnbc.com/video/2026/06/26/market-open-june-26-2026.html",
+    "payload_hash": "3aea12a23ca7bfb4225795d3561e80d6290f451c81f4946fd11bf4788344c1ed",
+    "snapshot_id": "news_article:0803bda5ef16d0bf1ee092d16fda9f4e4498560deab2c1cea56a4f5cc4f9b5d5",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:0803bda5ef16d0bf1ee092d16fda9f4e4498560deab2c1cea56a4f5cc4f9b5d5.json",
+    "ticker": "MSFT"
+  }
+}

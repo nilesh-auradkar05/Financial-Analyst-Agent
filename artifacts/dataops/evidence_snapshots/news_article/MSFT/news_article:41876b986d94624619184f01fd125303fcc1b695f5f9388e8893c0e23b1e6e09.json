@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Mon, 29 Jun 2026 11:31:07 GMT",
+    "relevance_score": 0.58408195,
+    "snippet": "Image 1: The selloff has left Microsoft valued at the cheapest in a decade. The selloff has left Microsoft valued at the cheapest in a decade. Photographer: Adam Gray/Bloomberg Gift this article Add us on Google Contact us: Provide news feedback or report an error Confidential tip? Send a tip to our reporters Site feedback: Take our Survey By Ryan Vlastelica June 29, 2026 at 11:31 AM UTC Save Translate ## Takeaways by Bloomberg AISubscribe Microsoft Corp. shares are heading for their worst month",
+    "source": "Bloomberg",
+    "title": "Microsoft\u2019s $570 Billion Rout Sets Up Its Worst Month Since 2000 - Bloomberg",
+    "url": "https://www.bloomberg.com/news/articles/2026-06-29/microsoft-s-570-billion-rout-sets-up-its-worst-month-since-2000"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.554515Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Mon, 29 Jun 2026 11:31:07 GMT",
+      "source": "Bloomberg"
+    },
+    "natural_key": "https://www.bloomberg.com/news/articles/2026-06-29/microsoft-s-570-billion-rout-sets-up-its-worst-month-since-2000",
+    "payload_hash": "f53ccce474088007bb90dbf4d95db661fd01905d53f13290ba9d1468c3d86857",
+    "snapshot_id": "news_article:41876b986d94624619184f01fd125303fcc1b695f5f9388e8893c0e23b1e6e09",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:41876b986d94624619184f01fd125303fcc1b695f5f9388e8893c0e23b1e6e09.json",
+    "ticker": "MSFT"
+  }
+}

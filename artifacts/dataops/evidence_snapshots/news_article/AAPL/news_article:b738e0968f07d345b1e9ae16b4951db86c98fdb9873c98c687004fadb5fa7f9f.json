@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Thu, 25 Jun 2026 23:55:00 GMT",
+    "relevance_score": 0.51193684,
+    "snippet": "0 \u00b7 16 hours ago ### Video: Our Stockpickers Talk Winners and Other Stuff That Matters 0 \u00b7 Jun 25, 2026 ### Warfare Technology Is Changing in Real Time. This ETF Captures the Shift. 2 \u00b7 Jun 23, 2026 ### There\u2019s Nothing Dim About Gentex. It Could Climb 40%. 0 \u00b7 Jun 23, 2026 Subscribe Learn More # Apple Stock Got Slammed After Price Hikes. It\u2019s Probably a Buying Opportunity. By Angela Palumbo Add us on Google Choose Barron's as a preferred source of financial news Apple stock has fallen 10% this m",
+    "source": "Barrons",
+    "title": "Apple\u2019s Price Increase Spooks Markets | June 25 Review & Preview - Barron's",
+    "url": "https://www.barrons.com/articles/stocks-today-apple-hikes-prices-tech-dip-8c241b91"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.188014Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Thu, 25 Jun 2026 23:55:00 GMT",
+      "source": "Barrons"
+    },
+    "natural_key": "https://www.barrons.com/articles/stocks-today-apple-hikes-prices-tech-dip-8c241b91",
+    "payload_hash": "8c2774ff907740d9468a64dc503f47c3e201eaf34a91d2a0231742e23fc9e24e",
+    "snapshot_id": "news_article:b738e0968f07d345b1e9ae16b4951db86c98fdb9873c98c687004fadb5fa7f9f",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:b738e0968f07d345b1e9ae16b4951db86c98fdb9873c98c687004fadb5fa7f9f.json",
+    "ticker": "AAPL"
+  }
+}

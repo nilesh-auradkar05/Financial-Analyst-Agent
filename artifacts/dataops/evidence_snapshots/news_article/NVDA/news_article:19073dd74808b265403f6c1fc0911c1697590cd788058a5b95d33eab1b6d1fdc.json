@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Wed, 24 Jun 2026 11:04:00 GMT",
+    "relevance_score": 0.7393665,
+    "snippet": "By Adam Clark Add us on Google Choose Barron's as a preferred source of financial news In this article NVDA AMD AVGO SOX Nvidia is the dominant artificial-intelligence chip provider. (Marlena Sloss/Bloomberg) Nvidia NVDA -0.52% stock was falling alongside its semiconductor peers as a widespread technology-sector slump hit chip stocks. Copyright \u00a92026 Dow Jones & Company, Inc. All Rights Reserved. 87990cbe856818d5eddac44c7b1cdeb8 # Nvidia Stock Is Falling on a Good Day for Intel and Other Chip St",
+    "source": "Barrons",
+    "title": "Nvidia Stock Tests Key Support Level. What\u2019s Keeping It From Rising? - Barron's",
+    "url": "https://www.barrons.com/articles/-why-nvidia-stock-is-not-going-up-b16d975d"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.288169Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Wed, 24 Jun 2026 11:04:00 GMT",
+      "source": "Barrons"
+    },
+    "natural_key": "https://www.barrons.com/articles/-why-nvidia-stock-is-not-going-up-b16d975d",
+    "payload_hash": "6a8fae03f1eab1d5a6d85b03f801d842ba9949815dd7e7e65858b727e256c21e",
+    "snapshot_id": "news_article:19073dd74808b265403f6c1fc0911c1697590cd788058a5b95d33eab1b6d1fdc",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/NVDA/news_article:19073dd74808b265403f6c1fc0911c1697590cd788058a5b95d33eab1b6d1fdc.json",
+    "ticker": "NVDA"
+  }
+}

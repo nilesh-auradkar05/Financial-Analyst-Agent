@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.9330499768257141,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.022904034703969955,
+      "neutral": 0.044046007096767426,
+      "positive": 0.9330499768257141
+    },
+    "text": "Older 46. News \u2022 Jun 15, 2026 Markets are cheering the plan to reopen the Strait of Hormuz. But the relief may not last. 47. News \u2022 Jun 15, 2026 The Trump administration pulled Anthropic's latest AI model over jailbreak fears. Anthropic says the concerns are overblown. 48. News \u2022 Jun 15, 2026 SpaceX shares rose nearly 20% on their second day of trading, lifting gains to 35% 49. Breaking News \u2022 Jun 15, 2026 The Dow jumped over 450 points to a fresh record. The Nasdaq soared over 3% as investors c"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.354963Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:2c047270068000d2b45159d970796288a6fe3966d7b14535afde9f101a2f23d5",
+    "payload_hash": "c1da9584fe07159cc2226ea7c6f70fdd85890679e87007e0473697c34f91c5a2",
+    "snapshot_id": "sentiment_score:1296e084342ce180a2c6dd60d1879d7de0d2a30eb57160552c714769ac2275a2",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:1296e084342ce180a2c6dd60d1879d7de0d2a30eb57160552c714769ac2275a2.json",
+    "ticker": "NVDA"
+  }
+}

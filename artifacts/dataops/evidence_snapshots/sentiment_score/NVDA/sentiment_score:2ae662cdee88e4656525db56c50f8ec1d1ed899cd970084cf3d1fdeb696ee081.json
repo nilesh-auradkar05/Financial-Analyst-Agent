@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.8576360940933228,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.032875027507543564,
+      "neutral": 0.8576360940933228,
+      "positive": 0.10948897153139114
+    },
+    "text": "NvidiaNVDA +1.66% stock was rising early Monday after a difficult week during which the chip maker\u2019s shares fell below its recent floor of $200. News of another major data-center deal could be helping the stock. Copyright \u00a92026 Dow Jones & Company, Inc. All Rights Reserved. 87990cbe856818d5eddac44c7b1cdeb8 Continue reading this article with a Barron\u2019s subscription SUBSCRIBE NOW 1. Technology # Super Micro\u2019s Problems Are a \u2018Slam Dunk\u2019 for Dell Stock By Callum Keown Share Add us on Google Choose B"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.354302Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:499cebc7325e19cb6e5b2404badab0ca85a3f864ba04ceb098361724adf79d5a",
+    "payload_hash": "fa03254e298dd490a6d86d49a5e30c1232af905fa8b01ab071cb5c479a535754",
+    "snapshot_id": "sentiment_score:2ae662cdee88e4656525db56c50f8ec1d1ed899cd970084cf3d1fdeb696ee081",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:2ae662cdee88e4656525db56c50f8ec1d1ed899cd970084cf3d1fdeb696ee081.json",
+    "ticker": "NVDA"
+  }
+}

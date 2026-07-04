@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.875203549861908,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.05754921957850456,
+      "neutral": 0.875203549861908,
+      "positive": 0.06724726408720016
+    },
+    "text": "MSFT Microsoft -- --% ## Featured Reads Our top personal finance-related articles today. Your wallet will thank you later. Drew Wood | ## Never Pay Medicare Premiums Again. Here's the Portfolio That Makes It Happen. Gerelyn Terzo | ## Core Inflation Just Hit a 3-Year High. For One Retired Couple, the Frozen Tax Thresholds Turn That Into a Stealth Tax Increase. ## Continue Reading Trey Thoelcke | ## After Microsoft\u2019s Q1 Slide, Are the Bulls Still On Board? Microsoft (NASDAQ: MSFT | MSFT Price Pre"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.630539Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:7e57c38faae50f2721eaf392215419d6923f3fd4b6b4f5410184497fb66a0497",
+    "payload_hash": "cf7e982698bc0c9d1715c82338d9cdd58aad39317df1bbf2afbc392d200ab48b",
+    "snapshot_id": "sentiment_score:9ab135beee3dc6e83c45a451c819d4568970266afb1fb7447176ee869b788241",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:9ab135beee3dc6e83c45a451c819d4568970266afb1fb7447176ee869b788241.json",
+    "ticker": "MSFT"
+  }
+}

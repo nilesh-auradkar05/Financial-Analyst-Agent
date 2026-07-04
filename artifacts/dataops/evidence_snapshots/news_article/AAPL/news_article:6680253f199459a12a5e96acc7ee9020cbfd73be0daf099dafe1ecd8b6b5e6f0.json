@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Fri, 26 Jun 2026 04:40:46 GMT",
+    "relevance_score": 0.18142302,
+    "snippet": "watch now watch now VIDEO04:29 JPMorgan's Marianne Lake to retire, company names Doug Petno and Troy Rohrbaugh co-presidents watch now watch now VIDEO05:16 Fed ought to take time to see how falling energy prices impacts inflation: Goldman's Robert Kaplan watch now watch now VIDEO05:22 Ariel Investments co-CEO John Rogers: AI craze will end the same way the internet bubble did watch now watch now VIDEO03:02 Marianne Lake's retirement from JPMorgan was a 'surprise' to many, says UBS' Erika Najaria",
+    "source": "Cnbc",
+    "title": "Apple shares slide as Mac and iPad hikes raise fears of higher iPhone prices - CNBC",
+    "url": "https://www.cnbc.com/video/2026/06/26/apple-shares-slide-as-mac-and-ipad-hikes-raise-fears-of-higher-iphone-prices.html"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.192085Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Fri, 26 Jun 2026 04:40:46 GMT",
+      "source": "Cnbc"
+    },
+    "natural_key": "https://www.cnbc.com/video/2026/06/26/apple-shares-slide-as-mac-and-ipad-hikes-raise-fears-of-higher-iphone-prices.html",
+    "payload_hash": "47123bd4b5bc019cd344722aa5898d379ee3e9d0844035730401908fbbd934e3",
+    "snapshot_id": "news_article:6680253f199459a12a5e96acc7ee9020cbfd73be0daf099dafe1ecd8b6b5e6f0",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:6680253f199459a12a5e96acc7ee9020cbfd73be0daf099dafe1ecd8b6b5e6f0.json",
+    "ticker": "AAPL"
+  }
+}

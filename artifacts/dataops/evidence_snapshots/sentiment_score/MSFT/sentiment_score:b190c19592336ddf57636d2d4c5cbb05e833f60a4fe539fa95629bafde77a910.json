@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.8420335054397583,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.12925852835178375,
+      "neutral": 0.8420335054397583,
+      "positive": 0.02870800904929638
+    },
+    "text": "14 min ago watch now watch now VIDEO06:31 Billionaire investor Jeremy Grantham on crypto: A useless, speculative mechanism an hour ago watch now watch now VIDEO08:11 Billionaire investor Jeremy Grantham: This is the most expensive market in American history 2 hours ago watch now watch now VIDEO05:16 Fed ought to take time to see how falling energy prices impacts inflation: Goldman's Robert Kaplan watch now watch now VIDEO05:22 Ariel Investments co-CEO John Rogers: AI craze will end the same way "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.639872Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:4508a6c817275c0be75a1ba411d6cf3448239eac3cf8be6aa7628d4ef851bd65",
+    "payload_hash": "16f4c4974c8e8d3d7af111e24f0b96cd650685c4ec6c7e6fc524028621235b71",
+    "snapshot_id": "sentiment_score:b190c19592336ddf57636d2d4c5cbb05e833f60a4fe539fa95629bafde77a910",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:b190c19592336ddf57636d2d4c5cbb05e833f60a4fe539fa95629bafde77a910.json",
+    "ticker": "MSFT"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Fri, 26 Jun 2026 00:00:00 GMT",
+    "relevance_score": 0.7610953,
+    "snippet": "Microsoft (MSFT) stock fell 3.5% over the latest trading session, a dip that has it trading about 34% below its 52-week high. For a systems software giant performing strongly, it\u2019s a notable move. On its latest earnings call, management reported its AI business surpassed a $37 billion annual run rate, up 123%, while the Microsoft Cloud segment exceeded $54 billion in quarterly revenue. The market is weighing that rapid growth against the company\u2019s plan to invest roughly $190 billion in capital e",
+    "source": "Trefis",
+    "title": "How Low Can Microsoft Stock Go? - Trefis",
+    "url": "https://www.trefis.com/stock/msft/articles/604665/how-low-can-microsoft-stock-go/2026-06-26"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.548691Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Fri, 26 Jun 2026 00:00:00 GMT",
+      "source": "Trefis"
+    },
+    "natural_key": "https://www.trefis.com/stock/msft/articles/604665/how-low-can-microsoft-stock-go/2026-06-26",
+    "payload_hash": "2e10f9550ad0e1b55cfd79bf4df2def40395624d8727bf81cc8eecebbeed3a22",
+    "snapshot_id": "news_article:2bdac3b4d408a0552ce53144a5994bfab6d10000567d92ba87f5fda78aae04b6",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:2bdac3b4d408a0552ce53144a5994bfab6d10000567d92ba87f5fda78aae04b6.json",
+    "ticker": "MSFT"
+  }
+}

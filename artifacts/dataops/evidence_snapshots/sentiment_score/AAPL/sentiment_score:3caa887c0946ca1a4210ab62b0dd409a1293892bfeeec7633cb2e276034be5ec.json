@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.5303569436073303,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.15501971542835236,
+      "neutral": 0.31462332606315613,
+      "positive": 0.5303569436073303
+    },
+    "text": "Apple explained that the company has \"never seen a component price increase this much, this quickly,\" and while Apple held off on raising prices for as long as possible, the situation has become dire enough that it feels it needs to pass the increases along to customers. Apple says that it is \"working tirelessly to find solutions,\" but memory suppliers forecast that shortages and high prices will last well into 2027. Apple's price increases have largely yet to trickle down to third-party retaile"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.309622Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:45ebb8e2ae3d2cb5c00bb5f7dada37df7a12e1478ae7396287a4eaf79fb9e5c9",
+    "payload_hash": "665454f21c60fa97f73c2467824b3905c871da1d4094caa5158e5ea9bcc6f98e",
+    "snapshot_id": "sentiment_score:3caa887c0946ca1a4210ab62b0dd409a1293892bfeeec7633cb2e276034be5ec",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:3caa887c0946ca1a4210ab62b0dd409a1293892bfeeec7633cb2e276034be5ec.json",
+    "ticker": "AAPL"
+  }
+}

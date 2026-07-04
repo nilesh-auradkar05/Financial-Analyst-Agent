@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.7896656394004822,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.007427204865962267,
+      "neutral": 0.20290718972682953,
+      "positive": 0.7896656394004822
+    },
+    "text": "Skip to main content Exclusive news, data and analytics for financial market professionals Learn more about Refinitiv - Australian AI infrastructure company Firmus Technologies said on Monday it had signed a strategic partnership with Nvidia Corp (NVDA.O), opens new tab to help \u200bprovide emerging AI firms with more cost-effective access to \u200ccomputing power. The Reuters Inside Track newsletter is your essential guide during the World Cup. Sign up here. [...] Firmus said in April it had raised $1.3"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.354578Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:28430ed625b8d12c2e4384fe24135df3fe3b908a2fb38ac0163afd5844bbeede",
+    "payload_hash": "f7a3a08757a7369ae7f5cea6083aafe695d5908d251b302d462b17bb7ced2bab",
+    "snapshot_id": "sentiment_score:04aa4e6428ac1bf2b19e99e1187459f915a50133795cafce5f55c7b2277fceb8",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:04aa4e6428ac1bf2b19e99e1187459f915a50133795cafce5f55c7b2277fceb8.json",
+    "ticker": "NVDA"
+  }
+}

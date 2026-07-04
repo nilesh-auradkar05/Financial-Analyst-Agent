@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Fri, 03 Jul 2026 08:08:55 GMT",
+    "relevance_score": 0.059521202,
+    "snippet": "Skip to main content Shorting the Grid: Bloom Energy\u2019s $25B AI Power Play Your book attached (Ad) SanDisk\u2019s Volatility May Be Telling Bulls What They Want to Hear Is the Memory Rally Still Alive After the Semiconductor Sell-Off? Louis Navellier: My #1 AI stock for 2026 (name & ticker inside) (Ad) Netflix Stock Is Near 2021 Levels, and Bulls See 4 Reasons to Care Tesla Stock Surges 15% as FSD Update Backs Its Autonomy Thesis CODE RED: AI Meltdown Imminent? (Ad) General Mills Is a 5-Star Turnaroun",
+    "source": "Marketbeat",
+    "title": "Taiwan Semiconductor Manufacturing Company Ltd. $TSM Shares Bought by Elevation Point Wealth Partners LLC - MarketBeat",
+    "url": "https://www.marketbeat.com/instant-alerts/filing-taiwan-semiconductor-manufacturing-company-ltd-tsm-shares-bought-by-elevation-point-wealth-partners-llc-2026-07-03/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.295330Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Fri, 03 Jul 2026 08:08:55 GMT",
+      "source": "Marketbeat"
+    },
+    "natural_key": "https://www.marketbeat.com/instant-alerts/filing-taiwan-semiconductor-manufacturing-company-ltd-tsm-shares-bought-by-elevation-point-wealth-partners-llc-2026-07-03/",
+    "payload_hash": "54ef11a83b2cc9eab2a6b30ccac72cedc438daf8d4731ad25cc11efb70e83977",
+    "snapshot_id": "news_article:def5ad5596a6de66abf6ebcc1132e41079ec4595ae6ff8006e3199f11becc5c5",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/NVDA/news_article:def5ad5596a6de66abf6ebcc1132e41079ec4595ae6ff8006e3199f11becc5c5.json",
+    "ticker": "NVDA"
+  }
+}

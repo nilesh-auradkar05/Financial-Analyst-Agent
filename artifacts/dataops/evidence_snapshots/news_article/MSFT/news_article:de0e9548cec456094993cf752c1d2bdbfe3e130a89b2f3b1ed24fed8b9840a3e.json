@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Tue, 23 Jun 2026 11:31:49 GMT",
+    "relevance_score": 0.22576675,
+    "snippet": "39. News \u2022 6 days ago Consumers are finally getting some relief at the pump. Here's where one expert says prices could land by July 4. 40. News \u2022 6 days ago The Trump administration expects shipping in the Strait of Hormuz to return to normal within weeks. Experts disagree. 41. News \u2022 6 days ago Why it might be time to embrace the 'FAB 10' 42. Breaking News \u2022 6 days ago Dow hits record, S&P 500, Nasdaq slip as Iran deal doubts grow and Fed decision looms 43. News \u2022 6 days ago SpaceX's stock surg",
+    "source": "Finance",
+    "title": "Quantum Computing Stocks Rally After Trump Signs New Industry Support Measures - Yahoo Finance",
+    "url": "https://finance.yahoo.com/technology/articles/quantum-computing-stocks-rally-trump-113149388.html"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.555166Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Tue, 23 Jun 2026 11:31:49 GMT",
+      "source": "Finance"
+    },
+    "natural_key": "https://finance.yahoo.com/technology/articles/quantum-computing-stocks-rally-trump-113149388.html",
+    "payload_hash": "99faa65e64ed0f3a3dc13e840c31f22f594c9888cc853ced59bc0881c84a0289",
+    "snapshot_id": "news_article:de0e9548cec456094993cf752c1d2bdbfe3e130a89b2f3b1ed24fed8b9840a3e",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:de0e9548cec456094993cf752c1d2bdbfe3e130a89b2f3b1ed24fed8b9840a3e.json",
+    "ticker": "MSFT"
+  }
+}

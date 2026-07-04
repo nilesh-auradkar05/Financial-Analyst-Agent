@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.974572479724884,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.974572479724884,
+      "neutral": 0.018026968464255333,
+      "positive": 0.0074006239883601665
+    },
+    "text": "Follow MSFTMicrosoft Corp $359.05-1.75% AAPLApple Inc $278.31-5.04%METAMeta Platforms Inc $550.95-1.21%AMZNAmazon.com Inc $228.09-2.64%GOOGAlphabet Inc $339.29-1.67%NVDANVIDIA Corp $194.56-2.23%ORCLOracle Corp $153.35-2.65%SOXXiShares PHLX SOX Semiconductor Sector Index Fund $612.491.83% Shares of Microsoft Corp. (NASDAQ:MSFT) are down over 20% in June, on pace for the steepest monthly drop since December 2000. Twelve months ago, the Redmond, Washington-based company\u2019s market cap hovered around "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.630691Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:dd604e8b9c4be5084c879568056bdbe51cd325e37f1fcf53e69595c4dccc0dea",
+    "payload_hash": "3c163d00458ca3a150d60434303121f247fd41058cd577f9a43783e74c58fdc2",
+    "snapshot_id": "sentiment_score:47f055d809de4db8eba3024ffb8222ad5ead788c3a9e5c4f0af3e72295d68106",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:47f055d809de4db8eba3024ffb8222ad5ead788c3a9e5c4f0af3e72295d68106.json",
+    "ticker": "MSFT"
+  }
+}

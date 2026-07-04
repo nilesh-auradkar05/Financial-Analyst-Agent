@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Sun, 28 Jun 2026 14:00:01 GMT",
+    "relevance_score": 0.19980752,
+    "snippet": "Apple: Price Hikes WWDC 2026 Recap Next-Gen AI Platform Privacy Concerns Foldable iPhone Hints Camera-Equipped AirPods Newsletter Power On # Apple\u2019s Sweeping Price Increases Bring Home the Costs of the AI Era The latest on the smart glasses competition. Contact us: Provide news feedback or report an error Confidential tip? Send a tip to our reporters Site feedback: Take our Survey By Mark Gurman This article is for subscribers only. Apple\u2019s extensive price hikes are a blow to many customers and ",
+    "source": "Bloomberg",
+    "title": "Apple\u2019s Sweeping Price Increases Bring Home the Costs of the AI Era - Bloomberg.com",
+    "url": "https://www.bloomberg.com/news/newsletters/2026-06-28/apple-s-sweeping-price-hikes-bring-the-ai-era-home-m6-m7-touch-macbook-pro"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.190718Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Sun, 28 Jun 2026 14:00:01 GMT",
+      "source": "Bloomberg"
+    },
+    "natural_key": "https://www.bloomberg.com/news/newsletters/2026-06-28/apple-s-sweeping-price-hikes-bring-the-ai-era-home-m6-m7-touch-macbook-pro",
+    "payload_hash": "c498a4835e4d4a1c4e82c60ce2146dd77adad71575dad1d53ebac1262b4f8cb7",
+    "snapshot_id": "news_article:0ab0099643bc507b313b9cfad28052d89310ea57f48736c9227ba355165d3357",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:0ab0099643bc507b313b9cfad28052d89310ea57f48736c9227ba355165d3357.json",
+    "ticker": "AAPL"
+  }
+}

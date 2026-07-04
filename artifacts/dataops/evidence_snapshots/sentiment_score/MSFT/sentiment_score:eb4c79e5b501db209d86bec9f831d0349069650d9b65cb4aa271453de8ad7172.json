@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.9648641347885132,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.9648641347885132,
+      "neutral": 0.02851782739162445,
+      "positive": 0.006618010811507702
+    },
+    "text": "\ud83d\ude80 Enjoy a 7-Day Free Trial Thru Jul 09, 2026! \u2728 GURUFOCUS.COM Latest News USA Software MSFT # Microsoft (MSFT) Plans to Lay Off Up to 2.5% of Workforce GuruFocus News 07/01/2026 20:43 On July 01, 2026, Microsoft Corp MSFT is reportedly set to announce a new round of layoffs, potentially affecting up to 2.5% of its workforce. This move could lead to the elimination of thousands of jobs across various sectors, including sales, consulting, and positions within the Xbox gaming division. As of June l"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.630030Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:67669a752728b636211159a569f8c71d8cef1dc65d03eb85ac28c9a7384363b5",
+    "payload_hash": "7728f7818a7ff06ed4b25b7ce5e466c05b18312a9f5199f93404967448718f0b",
+    "snapshot_id": "sentiment_score:eb4c79e5b501db209d86bec9f831d0349069650d9b65cb4aa271453de8ad7172",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:eb4c79e5b501db209d86bec9f831d0349069650d9b65cb4aa271453de8ad7172.json",
+    "ticker": "MSFT"
+  }
+}

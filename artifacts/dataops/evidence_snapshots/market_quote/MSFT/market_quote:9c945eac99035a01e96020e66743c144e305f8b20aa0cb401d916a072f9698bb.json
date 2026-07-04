@@ -1,0 +1,36 @@
+{
+  "payload": {
+    "avg_volume": 39839227,
+    "company_name": "Microsoft Corporation",
+    "current_price": 390.49,
+    "dividend_yield": 0.93,
+    "error": null,
+    "fifty_two_week_high": 555.45,
+    "fifty_two_week_low": 349.2,
+    "industry": "Software - Infrastructure",
+    "market_cap": 2900729528320,
+    "pe_ratio": 23.257294,
+    "price_change_percent": 1.61601,
+    "recommendation": "strong_buy",
+    "sector": "Technology",
+    "target_price": 561.1149,
+    "ticker": "MSFT",
+    "volume": 40690198
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:01.563005Z",
+    "fetcher_name": "stock_data_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "company_name": "Microsoft Corporation",
+      "industry": "Software - Infrastructure",
+      "sector": "Technology"
+    },
+    "natural_key": "MSFT:2026-07-04T18:29:01.563005+00:00",
+    "payload_hash": "f47ca4236e68e94e4790fb4d14f3d12e09765f590053c51b7f56967e562fe76c",
+    "snapshot_id": "market_quote:9c945eac99035a01e96020e66743c144e305f8b20aa0cb401d916a072f9698bb",
+    "source_type": "market_quote",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/market_quote/MSFT/market_quote:9c945eac99035a01e96020e66743c144e305f8b20aa0cb401d916a072f9698bb.json",
+    "ticker": "MSFT"
+  }
+}

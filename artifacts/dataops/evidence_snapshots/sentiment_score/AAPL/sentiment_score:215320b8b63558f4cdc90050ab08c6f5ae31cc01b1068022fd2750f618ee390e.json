@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.9601368308067322,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.9601368308067322,
+      "neutral": 0.023938510566949844,
+      "positive": 0.01592467539012432
+    },
+    "text": "Markets News, June 23, 2026: Stocks Fall as Tech Sell-Off Expands to Memory, Chips; SpaceX Rebounds Off Record Low Markets News, June 22, 2026: Dow Ekes Out Gain as Big Tech Stocks Weigh on Nasdaq; SpaceX Falls To Lowest Close Ever Markets News, June 24, 2026: S&P 500, Nasdaq Fall for 3rd Straight Day; Oil Prices Drop to Lowest Level Since Start of War Markets News, June 18, 2026: Stocks Rise to Finish Winning Week; Intel Leads Chip, Memory Stocks Higher; SpaceX Continues Slide 5 Things to Know "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.310734Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:455e0744d8b78d846b2b7cc01aee5672c222f98f6caf18f172d21601731ff49d",
+    "payload_hash": "4013a672b1863aed310aed6c77fa2718e1cfb4b917618d5f540a811c3ea2dffb",
+    "snapshot_id": "sentiment_score:215320b8b63558f4cdc90050ab08c6f5ae31cc01b1068022fd2750f618ee390e",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:215320b8b63558f4cdc90050ab08c6f5ae31cc01b1068022fd2750f618ee390e.json",
+    "ticker": "AAPL"
+  }
+}

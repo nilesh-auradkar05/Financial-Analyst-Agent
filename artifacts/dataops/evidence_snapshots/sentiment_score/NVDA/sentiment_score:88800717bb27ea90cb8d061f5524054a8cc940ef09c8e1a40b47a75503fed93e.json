@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.8861696124076843,
+    "label": "positive",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.023497838526964188,
+      "neutral": 0.09033253788948059,
+      "positive": 0.8861696124076843
+    },
+    "text": "SUBSCRIBE NOW Barron\u2019s Investor Circle ### Deere Shows Industrials Still Have Plenty of Gas Left 1\u00b7Jun 26, 2026 Image 3### Video: Our Stockpickers Talk Winners and Other Stuff That Matters 0\u00b7Jun 25, 2026 Image 4### Warfare Technology Is Changing in Real Time. This ETF Captures the Shift. 2\u00b7Jun 24, 2026 Image 5### There\u2019s Nothing Dim About Gentex. It Could Climb 40%. 0\u00b7Jun 24, 2026 Image 6 SubscribeLearn More 1. Chips # Nvidia Stock Rises Amid Signs of Strong AI Chip Demand By Adam Clark Share Ad"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.354023Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:87dbb90f4b4abae264e69d891e0ad5b191d820bed06620c69d681dc5c8606785",
+    "payload_hash": "12fd41bc735c93e4968c10bec4120d28bacf9b589f4d8c73c210367b194131da",
+    "snapshot_id": "sentiment_score:88800717bb27ea90cb8d061f5524054a8cc940ef09c8e1a40b47a75503fed93e",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:88800717bb27ea90cb8d061f5524054a8cc940ef09c8e1a40b47a75503fed93e.json",
+    "ticker": "NVDA"
+  }
+}

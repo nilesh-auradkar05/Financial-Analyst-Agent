@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Mon, 22 Jun 2026 18:24:47 GMT",
+    "relevance_score": 0.25532088,
+    "snippet": "Watchlist Investing Club Trust Portfolio Analysis Trade Alerts Meeting Videos Homestretch Jim's Columns Education Subscribe PRO Pro News Josh Brown Mike Santoli Calls of the Day My Portfolio Livestream Full Episodes Stock Screener Market Forecast Options Investing Chart Investing Subscribe Livestream Make It select USA INTL Livestream Livestream Watchlist SIGN IN Create free account Markets Business Investing Tech Politics Video Watchlist Investing Club PRO Livestream # Apple is a notable outlie",
+    "source": "Cnbc",
+    "title": "Apple is a notable outlier in Monday's drubbing of mega-cap tech stocks - CNBC",
+    "url": "https://www.cnbc.com/2026/06/22/apple-is-a-notable-outlier-in-mondays-drubbing-of-mega-cap-tech-stocks-.html"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.190164Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Mon, 22 Jun 2026 18:24:47 GMT",
+      "source": "Cnbc"
+    },
+    "natural_key": "https://www.cnbc.com/2026/06/22/apple-is-a-notable-outlier-in-mondays-drubbing-of-mega-cap-tech-stocks-.html",
+    "payload_hash": "27a877283d126805f5808c82e383c638b4118bdff2a4f8be37b8fe0ffb4cbc9d",
+    "snapshot_id": "news_article:67cc0da66f22cc62721c7127fd75117d0b871a2489fe80ea8c9d47e7018c5f09",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:67cc0da66f22cc62721c7127fd75117d0b871a2489fe80ea8c9d47e7018c5f09.json",
+    "ticker": "AAPL"
+  }
+}

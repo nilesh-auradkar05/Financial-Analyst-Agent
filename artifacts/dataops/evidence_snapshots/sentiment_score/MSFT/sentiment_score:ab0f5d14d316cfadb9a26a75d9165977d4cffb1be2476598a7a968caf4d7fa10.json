@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.8288601636886597,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.05193229764699936,
+      "neutral": 0.8288601636886597,
+      "positive": 0.119207464158535
+    },
+    "text": "39. News \u2022 6 days ago Consumers are finally getting some relief at the pump. Here's where one expert says prices could land by July 4. 40. News \u2022 6 days ago The Trump administration expects shipping in the Strait of Hormuz to return to normal within weeks. Experts disagree. 41. News \u2022 6 days ago Why it might be time to embrace the 'FAB 10' 42. Breaking News \u2022 6 days ago Dow hits record, S&P 500, Nasdaq slip as Iran deal doubts grow and Fed decision looms 43. News \u2022 6 days ago SpaceX's stock surg"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.631340Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:2b9bb0980a2679023161b96df9fe710218ee44088a942feea1acd6a68833f13c",
+    "payload_hash": "b46bb916609576d2011ee755848dbb0892fcb04f5985f81c2b07d5f356bc7de7",
+    "snapshot_id": "sentiment_score:ab0f5d14d316cfadb9a26a75d9165977d4cffb1be2476598a7a968caf4d7fa10",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:ab0f5d14d316cfadb9a26a75d9165977d4cffb1be2476598a7a968caf4d7fa10.json",
+    "ticker": "MSFT"
+  }
+}

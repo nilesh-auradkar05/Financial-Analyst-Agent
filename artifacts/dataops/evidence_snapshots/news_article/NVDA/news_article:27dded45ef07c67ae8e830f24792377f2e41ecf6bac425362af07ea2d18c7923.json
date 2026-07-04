@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Tue, 30 Jun 2026 11:09:00 GMT",
+    "relevance_score": 0.6786044,
+    "snippet": "NvidiaNVDA +1.66% stock was rising early Monday after a difficult week during which the chip maker\u2019s shares fell below its recent floor of $200. News of another major data-center deal could be helping the stock. Copyright \u00a92026 Dow Jones & Company, Inc. All Rights Reserved. 87990cbe856818d5eddac44c7b1cdeb8 Continue reading this article with a Barron\u2019s subscription SUBSCRIBE NOW 1. Technology # Super Micro\u2019s Problems Are a \u2018Slam Dunk\u2019 for Dell Stock By Callum Keown Share Add us on Google Choose B",
+    "source": "Barrons",
+    "title": "How Nvidia Became a Chip Stock Loser\u2014and Why It Might Stay That Way - Barron's",
+    "url": "https://www.barrons.com/articles/nvidia-stock-price-ai-chips-d7be8825"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.289356Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Tue, 30 Jun 2026 11:09:00 GMT",
+      "source": "Barrons"
+    },
+    "natural_key": "https://www.barrons.com/articles/nvidia-stock-price-ai-chips-d7be8825",
+    "payload_hash": "42aa5c631cb48de6917e48648036fcbc42aab8a3d454e4bfa04c39090ff66478",
+    "snapshot_id": "news_article:27dded45ef07c67ae8e830f24792377f2e41ecf6bac425362af07ea2d18c7923",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/NVDA/news_article:27dded45ef07c67ae8e830f24792377f2e41ecf6bac425362af07ea2d18c7923.json",
+    "ticker": "NVDA"
+  }
+}

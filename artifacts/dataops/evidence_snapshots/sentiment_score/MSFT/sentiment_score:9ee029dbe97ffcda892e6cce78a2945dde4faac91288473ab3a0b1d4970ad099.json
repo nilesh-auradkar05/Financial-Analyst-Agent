@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.6682541966438293,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.013802006840705872,
+      "neutral": 0.6682541966438293,
+      "positive": 0.3179437220096588
+    },
+    "text": "This article was written by Doug Nathman, with research by his team at Trefis. A new business within Microsoft (MSFT) has quietly grown to massive scale. The company's AI segment has crossed a $37 billion annual run rate, expanding at an astonishing 123%. This new growth engine already represents a meaningful portion of Microsoft Cloud, which itself exceeded $54 billion in quarterly revenue. This is not a future promise; it is a current reality. This rapid growth is why the upside case is center"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.630212Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:16c95202b40623782651aa91523a4dbddec786ace693f9e11bb06e8514eb0210",
+    "payload_hash": "50997bbadfb3e47c803524df5e8d0cee9f71f08c42c4901bc75adefff715a4d1",
+    "snapshot_id": "sentiment_score:9ee029dbe97ffcda892e6cce78a2945dde4faac91288473ab3a0b1d4970ad099",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/MSFT/sentiment_score:9ee029dbe97ffcda892e6cce78a2945dde4faac91288473ab3a0b1d4970ad099.json",
+    "ticker": "MSFT"
+  }
+}

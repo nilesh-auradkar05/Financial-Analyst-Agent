@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.501030683517456,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.3359333574771881,
+      "neutral": 0.501030683517456,
+      "positive": 0.16303598880767822
+    },
+    "text": "Store My Products Founder's ClubSwingTraderLeaderboardMarketSurgeeIBDIBD DigitalIBD Live Recently Searched Research6:54 PM ET AI Cool Play Vertiv Joins 2 Best Stock Lists, Leads Group Of 14 New To IBD 50, Big Cap 20, More The Big Picture5:57 PM ET Stock Market Ends Mixed As SpaceX, Software Names Cast Pall On Nasdaq; Small Caps Shine Stock Market Today5:13 PM ET Dow Jones Futures: Tech Stocks Tumble As SpaceX Plunges; Amazon, Alphabet, Nvidia Sell Off News # SpaceX Conducts Starfall Cargo Test, "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.355317Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:ff11256cb5f4d6721bc287e6ad46a54d6be71b32fb31cbc5dc80985a84a709a6",
+    "payload_hash": "10e3f3c6ac5210d33bc6c8c27c2ae89e8dbb960b3fad573118dd620c3100b284",
+    "snapshot_id": "sentiment_score:3c618700a2bc2c4df0b51029e8f049ba089089d8052add34629a1bf1910b0b82",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:3c618700a2bc2c4df0b51029e8f049ba089089d8052add34629a1bf1910b0b82.json",
+    "ticker": "NVDA"
+  }
+}

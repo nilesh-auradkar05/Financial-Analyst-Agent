@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Thu, 25 Jun 2026 14:40:50 GMT",
+    "relevance_score": 0.6342494,
+    "snippet": "Follow MSFTMicrosoft Corp $359.05-1.75% AAPLApple Inc $278.31-5.04%METAMeta Platforms Inc $550.95-1.21%AMZNAmazon.com Inc $228.09-2.64%GOOGAlphabet Inc $339.29-1.67%NVDANVIDIA Corp $194.56-2.23%ORCLOracle Corp $153.35-2.65%SOXXiShares PHLX SOX Semiconductor Sector Index Fund $612.491.83% Shares of Microsoft Corp. (NASDAQ:MSFT) are down over 20% in June, on pace for the steepest monthly drop since December 2000. Twelve months ago, the Redmond, Washington-based company\u2019s market cap hovered around ",
+    "source": "Benzinga",
+    "title": "Microsoft\u2019s Worst Month Since 2000: Why Is This Happening? - Benzinga",
+    "url": "https://www.benzinga.com/news/26/06/60101481/microsoft-stock-worst-month-since-2000-capex-problem-ai-data-center"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:03.553972Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Thu, 25 Jun 2026 14:40:50 GMT",
+      "source": "Benzinga"
+    },
+    "natural_key": "https://www.benzinga.com/news/26/06/60101481/microsoft-stock-worst-month-since-2000-capex-problem-ai-data-center",
+    "payload_hash": "0ece73bb48b4c6c2b2292c6f4929ebfbed67a669993997a12b94db745a06ea67",
+    "snapshot_id": "news_article:1c169e5bcb5777bc2a16b87a9768d2020a458a1e7cc40076787004b6cde8149a",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/MSFT/news_article:1c169e5bcb5777bc2a16b87a9768d2020a458a1e7cc40076787004b6cde8149a.json",
+    "ticker": "MSFT"
+  }
+}

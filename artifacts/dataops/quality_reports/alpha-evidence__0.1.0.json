@@ -1,0 +1,36 @@
+{
+  "errors": [],
+  "passed": true,
+  "required_source_types": [
+    "sec_filing",
+    "news_article",
+    "market_quote",
+    "sentiment_score"
+  ],
+  "snapshot_count": 66,
+  "source_counts": {
+    "AAPL": {
+      "market_quote": 1,
+      "news_article": 10,
+      "sec_filing": 1,
+      "sentiment_score": 10
+    },
+    "MSFT": {
+      "market_quote": 1,
+      "news_article": 10,
+      "sec_filing": 1,
+      "sentiment_score": 10
+    },
+    "NVDA": {
+      "market_quote": 1,
+      "news_article": 10,
+      "sec_filing": 1,
+      "sentiment_score": 10
+    }
+  },
+  "ticker_universe": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+  ]
+}

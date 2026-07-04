@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.8189473748207092,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.1283091902732849,
+      "neutral": 0.8189473748207092,
+      "positive": 0.052743494510650635
+    },
+    "text": "watch now watch now VIDEO04:29 JPMorgan's Marianne Lake to retire, company names Doug Petno and Troy Rohrbaugh co-presidents watch now watch now VIDEO05:16 Fed ought to take time to see how falling energy prices impacts inflation: Goldman's Robert Kaplan watch now watch now VIDEO05:22 Ariel Investments co-CEO John Rogers: AI craze will end the same way the internet bubble did watch now watch now VIDEO03:02 Marianne Lake's retirement from JPMorgan was a 'surprise' to many, says UBS' Erika Najaria"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.310516Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:d39868694a4f5a36e08864605041fce8cc37f7d734acf7cc550e7155ebcb6d0e",
+    "payload_hash": "3e08e5f5e60fe8e480e1cd3f1b74a6fd595d5b50cfae4577a0c4430ae61329ff",
+    "snapshot_id": "sentiment_score:ae5a55b1d62c5977bea244e0aab7cb6d3c0b67aef3a8ee540b4119779b1e6fac",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:ae5a55b1d62c5977bea244e0aab7cb6d3c0b67aef3a8ee540b4119779b1e6fac.json",
+    "ticker": "AAPL"
+  }
+}

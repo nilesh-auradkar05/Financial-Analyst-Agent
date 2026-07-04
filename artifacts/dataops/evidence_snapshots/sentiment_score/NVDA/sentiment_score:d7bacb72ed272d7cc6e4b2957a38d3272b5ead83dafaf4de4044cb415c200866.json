@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.944554328918457,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.02771492674946785,
+      "neutral": 0.944554328918457,
+      "positive": 0.027730658650398254
+    },
+    "text": "This copy is for your personal, non-commercial use only. Distribution and use of this material are governed by our Subscriber Agreement and by copyright law. For non-personal use or to order multiple copies, please contact Dow Jones Reprints at 1-800-843-0008 or visit www.djreprints.com. # Moderna, Nvidia, Sandisk, Palantir, ON Semi, and More Stocks That Explain Today\u2019s Market By George Glover and Kit Norton In this article MU SNDK NVDA MRNA ON Traders working at the New York Stock Exchange. (Co"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:29:17.354782Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:ec13b7c94208d70e31b794a61a4cf54a972840e3f947c53285195f18194c492e",
+    "payload_hash": "28c8bf1cde58ee9c38ff2c531a6ed51cbf666a3952cdb0c0824cfbc491521913",
+    "snapshot_id": "sentiment_score:d7bacb72ed272d7cc6e4b2957a38d3272b5ead83dafaf4de4044cb415c200866",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/NVDA/sentiment_score:d7bacb72ed272d7cc6e4b2957a38d3272b5ead83dafaf4de4044cb415c200866.json",
+    "ticker": "NVDA"
+  }
+}

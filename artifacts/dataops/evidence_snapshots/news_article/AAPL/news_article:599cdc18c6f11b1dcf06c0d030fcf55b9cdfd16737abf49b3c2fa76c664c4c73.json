@@ -1,0 +1,25 @@
+{
+  "payload": {
+    "published_date": "Mon, 29 Jun 2026 18:52:50 GMT",
+    "relevance_score": 0.57723385,
+    "snippet": "Skip to main content Exclusive news, data and analytics for financial market professionals Learn more about Refinitiv - Apple (AAPL.O), opens new tab said it is pushing forward a series of software updates that would previously have been \u200bbundled with a new version of its iOS operating \u200csystem, making them available, opens new tab earlier than in previous cycles in response to AI-driven security concerns. The company told Reuters on Monday it was adapting to \u200bthe reality that, given the ability ",
+    "source": "Reuters",
+    "title": "Apple says it is releasing updates early in response to AI cybersecurity concerns - Reuters",
+    "url": "https://www.reuters.com/business/apple-says-it-is-releasing-updates-early-response-ai-cybersecurity-concerns-2026-06-29/"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:09.179268Z",
+    "fetcher_name": "web_search_tool",
+    "fetcher_version": "1",
+    "metadata": {
+      "published_date": "Mon, 29 Jun 2026 18:52:50 GMT",
+      "source": "Reuters"
+    },
+    "natural_key": "https://www.reuters.com/business/apple-says-it-is-releasing-updates-early-response-ai-cybersecurity-concerns-2026-06-29/",
+    "payload_hash": "71f73f648f6f67d3ae73ee8ddb3f388985c3bf137759245bc6436389e189b7d4",
+    "snapshot_id": "news_article:599cdc18c6f11b1dcf06c0d030fcf55b9cdfd16737abf49b3c2fa76c664c4c73",
+    "source_type": "news_article",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/news_article/AAPL/news_article:599cdc18c6f11b1dcf06c0d030fcf55b9cdfd16737abf49b3c2fa76c664c4c73.json",
+    "ticker": "AAPL"
+  }
+}

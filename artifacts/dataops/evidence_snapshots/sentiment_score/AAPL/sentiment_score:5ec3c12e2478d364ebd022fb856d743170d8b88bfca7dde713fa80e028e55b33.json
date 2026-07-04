@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.8548762798309326,
+    "label": "negative",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.8548762798309326,
+      "neutral": 0.13014940917491913,
+      "positive": 0.01497424766421318
+    },
+    "text": "Home page Seeking Alpha - Power to Investors Search for Symbols, analysts, keywords # Apple suffers worst day in over a year after hiking MacBook and iPad prices Jun 26, 2026, 12:17 AM ETApple Inc. (AAPL) StockBy: Arundhati Sarkar, SA News Editor Comments (30) Apple (AAPL) shares suffered their worst drubbing in over a year on Thursday, tumbling more than 6% after the tech giant announced price hikes on MacBooks and iPads to combat soaring component costs. Here are the latest changes from Apple:"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.308076Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:e39a4bab95df4fffd5fe154b276723017c70100cf511a8ae9eef9333dd5f9e3a",
+    "payload_hash": "a34f43e276b34031e001f58eb040010c17deb65b78f68b7ab74e193c0e8cf61d",
+    "snapshot_id": "sentiment_score:5ec3c12e2478d364ebd022fb856d743170d8b88bfca7dde713fa80e028e55b33",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:5ec3c12e2478d364ebd022fb856d743170d8b88bfca7dde713fa80e028e55b33.json",
+    "ticker": "AAPL"
+  }
+}

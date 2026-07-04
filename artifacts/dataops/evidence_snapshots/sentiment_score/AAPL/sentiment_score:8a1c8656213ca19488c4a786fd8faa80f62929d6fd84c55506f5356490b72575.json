@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.7240201830863953,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.2508639693260193,
+      "neutral": 0.7240201830863953,
+      "positive": 0.025115834549069405
+    },
+    "text": "00:51 6 minutes ago watch now watch now VIDEO05:24 Wharton's Jeremy Siegel on Apple's price hikes: 'Technology's supposed to go down in price' 11 min ago watch now watch now VIDEO09:31 Watch CNBC\u2019s full interview with Wharton\u2019s Jeremy Siegel 12 min ago watch now watch now VIDEO03:01 U.S., Iran to resume technical talks 31 min ago watch now watch now VIDEO03:57 Comcast announces it will spin off media and tech wings into separate public companies 32 min ago watch now watch now VIDEO01:33 U.S. mil"
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.310291Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:87867ee38bb48ad7618c3f2c73f623fcf804b7a0ba3757973d439dc869ee8a05",
+    "payload_hash": "9e206018e7a8e08a6d29a36505a4982543d51dbf059b24036ba630f50b3b2ae2",
+    "snapshot_id": "sentiment_score:8a1c8656213ca19488c4a786fd8faa80f62929d6fd84c55506f5356490b72575",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:8a1c8656213ca19488c4a786fd8faa80f62929d6fd84c55506f5356490b72575.json",
+    "ticker": "AAPL"
+  }
+}

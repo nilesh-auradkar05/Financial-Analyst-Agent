@@ -1,0 +1,27 @@
+{
+  "payload": {
+    "confidence": 0.7696217894554138,
+    "label": "neutral",
+    "model_name": "ProsusAI/finbert",
+    "scores": {
+      "negative": 0.20727422833442688,
+      "neutral": 0.7696217894554138,
+      "positive": 0.023104045540094376
+    },
+    "text": "Apple: Price Hikes WWDC 2026 Recap Next-Gen AI Platform Privacy Concerns Foldable iPhone Hints Camera-Equipped AirPods Newsletter Power On # Apple\u2019s Sweeping Price Increases Bring Home the Costs of the AI Era The latest on the smart glasses competition. Contact us: Provide news feedback or report an error Confidential tip? Send a tip to our reporters Site feedback: Take our Survey By Mark Gurman This article is for subscribers only. Apple\u2019s extensive price hikes are a blow to many customers and "
+  },
+  "snapshot": {
+    "fetched_at": "2026-07-04T18:28:49.310062Z",
+    "fetcher_name": "sentiment",
+    "fetcher_version": "1",
+    "metadata": {
+      "model_name": "ProsusAI/finbert"
+    },
+    "natural_key": "ProsusAI/finbert:8345dbe9d941f522e556025967afa2cbc7668e8a129dd4f64ca0ee44c6e56183",
+    "payload_hash": "6c4d8002c7c535afeee171b5a2688a7ea6b67687ad70e48224347cf6cc2f4cec",
+    "snapshot_id": "sentiment_score:3deb7a50daf4de1dcb5cea3136fe6404462c21202b9f0f9a59e2bb9cd202c033",
+    "source_type": "sentiment_score",
+    "storage_uri": "artifacts/dataops/evidence_snapshots/sentiment_score/AAPL/sentiment_score:3deb7a50daf4de1dcb5cea3136fe6404462c21202b9f0f9a59e2bb9cd202c033.json",
+    "ticker": "AAPL"
+  }
+}
