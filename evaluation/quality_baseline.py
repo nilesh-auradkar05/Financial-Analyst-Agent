@@ -16,7 +16,6 @@ import asyncio
 import json
 import re
 import statistics
-import subprocess
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -26,6 +25,7 @@ from app.agents.graph import create_agent
 from app.agents.state import create_initial_state, has_fatal_error
 from app.config import settings
 from app.llm.provider import MODEL_PRESETS, _model_family
+from dataops.git_state import git_state as _git_state
 from evaluation.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_grounding
 from evaluation.semantic_grounding import evaluate_memo_grounding_semantic
 
@@ -112,16 +112,6 @@ def _stats(values: list[float]) -> dict[str, float]:
         "max": max(values),
         "n": len(values),
     }
-
-
-def _git_state() -> dict:
-    def run(args: list[str]) -> str:
-        try:
-            return subprocess.run(args, capture_output=True, text=True, check=True).stdout.strip()
-        except Exception:
-            return ""
-    return {"commit": run(["git", "rev-parse", "--short", "HEAD"]) or "unknown",
-            "dirty": bool(run(["git", "status", "--porcelain"]))}
 
 
 async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include_news_sentiment,

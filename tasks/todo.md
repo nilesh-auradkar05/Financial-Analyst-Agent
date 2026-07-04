@@ -137,9 +137,12 @@ Scope adapts to PF1's answer.
 
 ### Phase 1 — Evidence snapshot & replay *(THE open prerequisite — closes the fixture-freeze debt)*
 Contracts + gate first (tested), then wire recording, then replay, then re-baseline. **`dataops/` must not import Qdrant/Chroma/provider SDKs or boto3** (v2 §3.4 layering rule).
-- [ ] **P1-T01** — `dataops/contracts.py`: `EvidenceSnapshot`, `DatasetReleaseManifest` (shapes per v2 §3.2/§3.3). Unit-tested: deterministic `snapshot_id = f(source_type, natural_key, payload_hash)`; immutability (payload change ⇒ new id); `code_version` = git hash (reuse the instrument's existing git-state helper — do not duplicate it). Trace: SPEC §7 (deterministic identity); test-plan §8.
-- [ ] **P1-T02** — `dataops/registry.py`: append-only `artifacts/dataops/releases.jsonl` + `artifacts/dataops/active/*.yaml` pointers. No DB. Unit-tested write/read/pin; append-only enforced.
-- [ ] **P1-T03** — `evidence_snapshot` gate in `dataops/gates.py`. Unit-tested (rejects mutated payload under existing id; requires non-empty `snapshot_ids`).
+- [x] **P1-T01** — `dataops/contracts.py`: `EvidenceSnapshot`, `DatasetReleaseManifest` (shapes per v2 §3.2/§3.3). Unit-tested: deterministic `snapshot_id = f(source_type, natural_key, payload_hash)`; immutability (payload change ⇒ new id); `code_version` = git hash (reuse the instrument's existing git-state helper — do not duplicate it). Trace: SPEC §7 (deterministic identity); test-plan §8.
+  - Result: **PASS** — added frozen Pydantic v2 `EvidenceSnapshot` and `DatasetReleaseManifest`; extracted the existing baseline `_git_state()` logic to `dataops/git_state.py` and imported it back into `evaluation/quality_baseline.py` so `DatasetReleaseManifest.create()` can default `code_version` without duplicating the helper. Tests cover deterministic snapshot identity, payload-sensitive IDs, model immutability, literal validation, and code-version defaulting.
+- [x] **P1-T02** — `dataops/registry.py`: append-only `artifacts/dataops/releases.jsonl` + `artifacts/dataops/active/*.yaml` pointers. No DB. Unit-tested write/read/pin; append-only enforced.
+  - Result: **PASS** — added `ReleaseRegistry` with JSONL append/read/get, duplicate release rejection, and simple active YAML pointers under `active/*.yaml`.
+- [x] **P1-T03** — `evidence_snapshot` gate in `dataops/gates.py`. Unit-tested (rejects mutated payload under existing id; requires non-empty `snapshot_ids`).
+  - Result: **PASS** — added `gate_evidence_snapshot()` returning `QualityGateResult`; rejects empty release snapshot IDs, missing referenced snapshots, mutated payload hashes under existing IDs, empty natural keys/storage URIs, and duplicate source/natural-key entries with different payload hashes.
 - [ ] **P1-T04** — Snapshot writer behind a `--record-evidence` flag on the four tools (`edgartools_sec_extractor`, `web_search_tool`, `stock_data_tool`, `sentiment`). **Default path unchanged — no runtime behavior change.** DECISION NEEDED (owner): record-as-you-fetch inside the tool path, or a separate one-shot snapshot script. Lean: in-path (Minimal Impact, less duplicate call logic) — confirm before building.
 - [ ] **P1-T05** — Create evidence release `alpha-evidence:0.1.0` for the current ticker universe; register it.
 - [ ] **P1-T06** — `--evidence-release <name:version>` replay mode in `quality_baseline.py` (short-circuits live fetch; reads pinned snapshots). Trace: SPEC §10; test-plan §7.
@@ -170,3 +173,10 @@ Contracts + gate first (tested), then wire recording, then replay, then re-basel
 - Open scheduled gaps: **G3 `healthcheck()` code** (S3). **G5 closed.**
 - BENCH-FIX latent edges (tracked, non-blocking): banker's-rounding half-value false-flag (`2.68` vs `2.675`); `borderline_claims` uses `--min-similarity` not the token gate; terminator/citation guard drops uncited unterminated bullets; `retrieval_baseline_` prefix names a *memo-grounding* artifact, distinct from S2 retrieval-oracle artifacts.
 - Deliverables are complete updated files, not diffs.
+
+## Phase 1 verification log
+
+- 2026-07-04 P1-T01..T03: `uv --cache-dir /tmp/uv-cache run pytest tests/unit/test_dataops_contracts.py tests/unit/test_dataops_registry.py tests/unit/test_dataops_gates.py -q` -> **11 passed** (red first: `ModuleNotFoundError: No module named 'dataops'`).
+- 2026-07-04 focused regression: `uv --cache-dir /tmp/uv-cache run pytest tests/unit/test_dataops_contracts.py tests/unit/test_dataops_registry.py tests/unit/test_dataops_gates.py tests/unit/test_quality_baseline_filename.py -q` -> **15 passed**.
+- 2026-07-04 static checks: `uv --cache-dir /tmp/uv-cache run ruff check dataops evaluation/quality_baseline.py tests/unit/test_dataops_contracts.py tests/unit/test_dataops_registry.py tests/unit/test_dataops_gates.py` -> **PASS**; `uv --cache-dir /tmp/uv-cache run pyright dataops evaluation/quality_baseline.py tests/unit/test_dataops_contracts.py tests/unit/test_dataops_registry.py tests/unit/test_dataops_gates.py` -> **0 errors**.
+- 2026-07-04 Doc Sync Check: `check_no_scope_residue.py` PASS; `check_sprint_map.py` PASS; `check_doc_sync.py` PASS.
