@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": ".claude/hooks/session_context.sh", "timeout": 20}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": ".claude/hooks/require_plan.py", "timeout": 10}]}
+    ],
+    "PreToolUse": [
+      {"matcher": "Edit|Write|MultiEdit",
+       "hooks": [{"type": "command", "command": ".claude/hooks/protect_paths.py", "timeout": 10}]},
+      {"matcher": "Bash",
+       "hooks": [
+         {"type": "command", "command": ".claude/hooks/block_destructive.py", "timeout": 10},
+         {"type": "command", "command": ".claude/hooks/single_axis.py", "timeout": 20},
+         {"type": "command", "command": ".claude/hooks/replay_no_network.py", "timeout": 10}
+       ]},
+      {"matcher": "Bash|Read",
+       "hooks": [{"type": "command", "command": ".claude/hooks/block_secrets.py", "timeout": 10}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "Edit|Write|MultiEdit",
+       "hooks": [{"type": "command", "command": ".claude/hooks/lint_on_write.sh", "timeout": 120}]},
+      {"matcher": "Bash",
+       "hooks": [{"type": "command", "command": ".claude/hooks/capture_lesson.py", "timeout": 10}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": ".claude/hooks/stop_gate.py", "timeout": 300}]}
+    ]
+  }
+}

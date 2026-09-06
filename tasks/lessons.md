@@ -76,3 +76,5 @@ a deliberate drift before marking it done.
 **Applied:** Yes. Restored `docs/SPEC.md` v1.2 from HEAD; amendment lives at `docs/SPEC-AMENDMENT-v1.3.md`. Restored HEAD `tasks/todo.md` and appended this task. Re-ran Doc Sync: sprint-map / doc-sync / scope-residue PASS. Committing only this task's artefacts.
 
 **Verification:** `python scripts/ci/check_sprint_map.py` PASS; `check_doc_sync.py` PASS; `check_no_scope_residue.py` PASS.
+
+L: `.claude/hooks/stop_gate.py` blocks the turn on any dirty tree. The "or state why uncommitted" clause is agent-facing text only; the hook does not parse a reason. A leftover overlay must be committed or reverted before the turn can end. Do not delete `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` while SPEC §0 still names it.

@@ -3,7 +3,6 @@
 > **Authority:** Source-of-truth rank 3 (SPEC §0). Sprint IDs match SPEC §12 exactly. Committed sprints (S0–S4) are detailed; horizon sprints (S5–S10) are gated one-liners, detailed only when the predecessor gate clears.
 > **Task format:** Trace · Goal · Scope · Expected behavior · Tests · Verification · Done · Non-goals · Result.
 > **Discipline:** No task is marked done without recorded verification output. Run the Doc Sync Check before closing any task.
-> **Active addendum (2026-07-04):** `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` inserts Phase 0 and Phase 1 before S2 execution. Phase 0 commits the governance docs/tasks and CI doc checks. Phase 1 freezes evidence snapshots and adds replay. S2 is Phase 2 and consumes the frozen evidence release.
 
 ---
 
@@ -21,6 +20,8 @@ These exist from prior work but are **not yet proven by a recorded test run in t
 ### Discovered gaps (audit 2026-06-04)
 
 Full detail in `tasks/sprint-review.md §4`. Hard-stop surfaces are **G4** and **G6**.
+
+- **G10** `app/agents/graph.py` imports `evaluation.grounding` — production depends on the eval package (layering inversion). Resolve S2-T00d · **G11** `ci.yml` never invokes `scripts/ci/check_*.py`; governance docs not tracked at HEAD, so no doc rule is enforced. Resolve S2-T00a · **G12** `add_error` mutates `state["errors"]` in place — unsafe under fan-out. Resolve S2-T00c · **G13** `/health` reports `degraded` on Ollama outage regardless of configured provider. Resolve S7.
 
 - **G1** stale API test stub (11 errors) · **G2** `EvidencePacket` naming vs SPEC §7 · **G3** `RetrievalStore` shape vs SPEC §6 · **G4** default backend = qdrant vs SPEC §1/ADR-0003 (hard stop) · **G5** no section-coverage regression test (S1-T03) · **G6** benchmark is keyword/section-based, not the content-anchored graded methodology in `retrieval-benchmark.md`; no `source_sections/` cache or `build_source_section_cache.py` (hard stop) · **G7** Qdrant payload indexes miss `accession_number` (4 of 5) · **G8** doc/path name drift (eval scripts, test dirs, API routes) makes several documented verification commands non-runnable as written.
 
@@ -157,6 +158,95 @@ Goal: a trusted, self-validating oracle before any backend or method is judged.
 > **Phase overlay (INTEGRATION_PLAN_v2, 2026-07).** Two local-first phases precede S2 *execution* and are prerequisites for it, not replacements:
 > - **Phase 0** — governance `docs/` committed + doc checks wired into CI. Verify actual git state first (`git ls-files docs/`); v2's "no docs/" finding may be stale given SPEC §0 already specifies the `docs/` tree.
 > - **Phase 1** — evidence-snapshot freeze/replay (`--evidence-release`). This is the fixture-freeze rule below, generalized to *all* evidence (SEC + news + market + FinBERT), not just retrieval fixtures. **S2's anchored fixture and Gate A baseline are built on Phase 1's frozen release**, so the source-section cache is derived from a committed snapshot rather than re-fetched. S2 does not start until Phase 1 exit criteria are green.
+
+> **Production-readiness overlay (review 2026-08-24, SPEC amendment v1.3 §12).** The review ordered eight steps. Steps 1–3 are S2 pre-tasks below (T00a–T00d) and are prerequisites for S2 execution. Steps 4–8 are absorbed into S6/S7/S10 (see HORIZON). **Sequencing rule:** no step opens before the previous step has a recorded `Result:` with commit evidence. Opening a later step early is the scope-expansion pattern and is a hard stop.
+>
+> | Step | Home | What |
+> | --- | --- | --- |
+> | 1 | S2-T00a | Governance docs into `docs/`, `scripts/ci/check_*.py` wired into CI (Phase 0) |
+> | 2 | S2-T00c | Fan-out + event-loop hygiene; graph singleton; `errors` reducer |
+> | 3 | S2-T00b, S2-T00d | EvidenceSnapshot + zero-network replay (Phase 1); verification-fail and evidence-missing status semantics |
+> | 4 | S6 | Eval registry with lineage, CI regression gate, verifier↔judge agreement |
+> | 5 | S6 | Bounded draft→verify→revise loop (max 2), paired against no-loop on frozen snapshot |
+> | 6 | S7 | Guardrails: input schema, untrusted-content framing, output policy, API auth + rate limit |
+> | 7 | S7 | Caching: evidence (per-source TTL), query-embedding, memo (snapshot_hash) |
+> | 8 | S7 → S10 | Queue/worker, Postgres job store, Qdrant, FinBERT out-of-process, circuit breaker; cloud gated on ADR-0006 |
+
+```text
+S2-T00a — Governance docs into repo + CI governance gate  (Phase 0; step 1)
+Trace: SPEC §0/§13/§14; INTEGRATION_PLAN_v2 Phase 0; gap G11
+Goal: every governance rule the repo claims is enforced by a script that CI actually runs.
+Scope:
+- git-track docs/SPEC.md, docs/sprint-plan.md, docs/test-plan.md, docs/retrieval-benchmark.md, docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md, docs/adr/*.
+- Add a `governance` job to .github/workflows/ci.yml running check_no_scope_residue, check_sprint_map, check_doc_sync, check_test_hygiene.
+- Remove .runtime/run_store.json and test_image/ from tracking; add to .gitignore.
+- Commit .claude/settings.json + .claude/hooks/* (SPEC §14).
+Expected: `git ls-files docs/` non-empty; governance job green on main; a PR that edits SPEC §12 without sprint-plan fails CI.
+Tests: test-plan §9, §15.
+Verification:
+- git ls-files docs/ | wc -l  (≥ 5)
+- gh run view --job governance  (pass)
+- Deliberately break a sprint ID in a throwaway branch → governance job must fail.
+Done: all three verification outputs recorded below; hooks H3/H4/H8/H9/H12 pass manual stdin smoke tests.
+Non-goals: no app code; no doc content changes beyond path fixes.
+Result: Pending
+```
+
+```text
+S2-T00b — Evidence snapshot freeze/replay with zero-network assertion  (Phase 1; step 3a)
+Trace: SPEC §7.x/§11.1; INTEGRATION_PLAN_v2 Phase 1; test-plan §13
+Goal: any memo can be re-produced from a committed evidence release with the network disabled.
+Scope:
+- app/dataops/: build_snapshot(ticker, request) → EvidenceSnapshot{snapshot_hash, evidence_as_of, packets, manifest}; freeze to evaluation/evidence_releases/<release>/; replay loader.
+- run_agent(..., evidence_release=...) bypasses live tools when set.
+- snapshot_hash + evidence_as_of surfaced in AgentState and AnalysisResponse.
+Expected: two replays of the same release produce byte-identical citation registries.
+Tests: test-plan §13 (replay determinism, zero-network).
+Verification:
+- EVIDENCE_MODE=replay pytest tests/unit -m replay  under `unshare -n` (or HTTP_PROXY dead-proxy fallback on macOS) → green.
+- Hook H7 rewrites the command; record the rewritten command line.
+Done: zero-network run green; hash stable across two runs; release manifest committed.
+Non-goals: no cloud storage; no scheduler.
+Result: Pending
+```
+
+```text
+S2-T00c — Fan-out and event-loop hygiene  (step 2)
+Trace: SPEC §9.1–9.4; gap G12; latency-baseline discipline (single axis)
+Goal: independent evidence nodes run concurrently; no node blocks the loop; graph and clients are singletons.
+Scope:
+- research_news ‖ fetch_stock ‖ retrieve_filings via LangGraph branch/Send; join before analyze_sentiment.
+- analyze_sentiment_batch and Chroma/Qdrant calls under asyncio.to_thread.
+- create_agent() at module import; get_llm cached per process.
+- AgentState.errors declared with an append reducer; add_error returns a fresh list.
+- Retrieval returns exactly the number of chunks the registry uses (no dead top-10 → top-5 waste).
+Expected: p50 wall-time of the evidence phase ≈ max(node latencies) instead of their sum; concurrent /analyze requests do not serialize on FinBERT.
+Tests: test-plan §10.
+Verification:
+- evaluation/latency_baseline.py on the frozen release before and after; SAME model/temperature; record both JSON filenames.
+- Concurrency probe: 4 simultaneous /analyze on replay → total wall-time < 1.5× single.
+Done: both artifacts recorded; unit tests for reducer + parallel routing green.
+Non-goals: no multi-agent; no caching; no repair loop.
+Result: Pending
+```
+
+```text
+S2-T00d — Verification and evidence-completeness status semantics  (step 3b)
+Trace: SPEC §9.5; gap G10; test-plan §11
+Goal: the API never reports `completed` for a memo that failed verification or lacks a required evidence class.
+Scope:
+- Move evaluation/grounding.py runtime path to app/verification/; evaluation/ imports it, not the reverse.
+- New terminal statuses: degraded, evidence_missing. _format_response derives status from verification.passed and get_data_availability.
+- Ticker with zero indexed filings and include_filing_analysis=True → evidence_missing with an actionable `missing=[...]` list.
+Expected: JobStatus enum extended; existing tests updated to new semantics; no silent completion path remains.
+Tests: test-plan §11.
+Verification:
+- grep -rn "from evaluation" app/  → empty.
+- pytest tests/unit/test_graph_verification_integration.py tests/unit/test_api_schema_defaults.py → green with new statuses.
+Done: grep empty; tests green; SPEC §9.5 statuses match models.JobStatus exactly.
+Non-goals: no repair loop (S6); no guardrails (S7).
+Result: Pending
+```
 
 > **Implementation note (2026-06-04, audit reconciliation).** Decision: *upgrade the existing keyword/section benchmark to the content-anchored graded methodology* in `retrieval-benchmark.md` (raise code to spec). Bind the doc's planned filenames to the actual files to **extend, not recreate** (G8 path drift):
 > - `evaluation/validate_benchmark_fixture.py` → **extend** existing `evaluation/validate_retrieval_fixture.py` (add `gold_evidence` with `accession_number`/`section_key`/verbatim `anchor_text`≥8 words/`relevance∈{1,2}`, `answer_intent`, and the anchor-in-source check). Note: the current validator's `--min-cases` is hardcoded (`MIN_CASES=50`), not a flag.
@@ -343,9 +433,9 @@ Exit = Gate B.
 
 # HORIZON: gated, detailed only when predecessor gate clears
 
-- **S5 — Retrieval quality diagnostics → hybrid/rerank (Gate C).** Per-query diagnostics and failure taxonomy first; optional section prior, hybrid dense+sparse, and rerank candidates evaluated on same fixture.
-- **S6 — Answer-quality & prompt optimization (Gate D).** Answer-quality fixture, judge-config validation, LLM-as-judge/RAGAS, then GEPA on holdout.
-- **S7 — Service readiness.** CI matrix, observability, correlation IDs, structured logs, failure capture.
-- **S8 — Frontend MVP.** Thin API-driven SPA for ticker controls, memo, citations, evidence, verification, diagnostics. Built fresh against hardened API.
-- **S9 — Portfolio polish.** README, measured results, honest limitations, diagram exports, benchmark report, demo, fresh-clone smoke.
-- **S10 — Optional multi-agent (Gate E).** Only if a single-agent bottleneck is documented and specialization measurably helps.
+- **S5 — Retrieval quality diagnostics → hybrid/rerank (Gate C).** Per-query diagnostics and failure taxonomy first; optional section prior, hybrid dense+sparse, and rerank candidates evaluated on same fixture. Unchanged.
+- **S6 — Answer quality & eval hardening (Gate D). Steps 4–5.** (a) Eval registry `evaluation/registry/runs/*.json` with lineage keys (SPEC §11.2); hook H5 + CI reject unlineaged results. (b) `eval-replay` CI job on the frozen release, fails on >2σ regression of grounded_claim_rate / citation_coverage. (c) Verifier↔judge agreement on ≥50 claims; κ recorded. (d) Bounded draft→verify→revise loop (max 2), `attempts` in response, paired vs no-loop on the same snapshot/model/temperature. (e) Then LLM-as-judge/RAGAS, then GEPA on holdout. Order inside S6 is fixed: (a)→(b)→(c)→(d)→(e).
+- **S7 — Service readiness. Steps 6–8 (local).** (a) Guardrails per SPEC §11.4 with adversarial fixture in CI. (b) API auth + rate limit + idempotency key. (c) Caching per SPEC §11.3 with hit/miss metrics. (d) `JobQueue` protocol → Redis Streams; `RunStore` protocol → Postgres; LangGraph checkpointer. (e) FinBERT out-of-process; provider circuit breaker (Bedrock→Ollama at runtime, not config). (f) Fix G13. CI matrix, correlation IDs, structured logs retained from prior S7 scope.
+- **S8 — Frontend MVP.** Thin API-driven SPA against the hardened API. Unchanged.
+- **S9 — Portfolio polish.** README, measured results, honest limitations, benchmark report, demo, fresh-clone smoke. Unchanged.
+- **S10 — Cloud (INTEGRATION_PLAN_v2 Phases 4–5). Step 8 (remote).** Gated on ADR-0006 + SPEC §3 amendment. Kafka is explicitly *not* adopted until a second consumer type exists for the same event stream (review 2026-08-24).

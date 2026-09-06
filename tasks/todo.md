@@ -252,6 +252,7 @@ Trace: `production-scale-topic.txt` → SPEC-AMENDMENT v1.3 §3.y / §11.3 / §1
 - Renderer note: skill `render_template.html` `esm.sh/@excalidraw/excalidraw?bundle` 404s on `@braintree/sanitize-url@6.0.2`. Rendered with `@excalidraw/excalidraw@0.18.0?bundle-deps`; skill file not modified.
 
 ## Commit scope
-This task commits only: `docs/System-design/production/`, `docs/png/production/`, `docs/production-readiness-interview.md`, `production-scale-topic.txt`, this ledger entry, and the lessons.md correction.
-
-Stays uncommitted (separate 2026-08-24 governance/hooks work, not this task): `README.md`, `docs/sprint-plan.md`, `docs/test-plan.md`, `docs/SPEC-AMENDMENT-v1.3.md`, `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` (deleted), `.claude/`, `old_artifacts/`, and the pre-existing prototype diagrams under `docs/System-design/*.excalidraw` + `docs/png/*.png` (non-`production/`). Applying the amendment to SPEC.md (→ v1.3) remains an open follow-up.
+- `73c056d` — production diagrams, interview doc, topic file, this ledger, lessons correction.
+- Follow-up (this commit) — land the leftover overlay so stop-gate can pass: prototype `docs/System-design/*.excalidraw` + `docs/png/*.png`, `docs/SPEC-AMENDMENT-v1.3.md`, README / sprint-plan / test-plan production-readiness overlay, `.claude/` hooks, `old_artifacts/`.
+- Restored `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` (not committed as a delete): SPEC §0 still names it as the Phase 0/1 companion plan.
+- Open follow-up: apply the amendment into `docs/SPEC.md` and bump to v1.3.

@@ -12,36 +12,37 @@ Built with **LangGraph**, **FastAPI**, **RAG**, **Pydantic**, local-first LLM to
 
 ## Project Status
 
-**Stage: instrumented prototype → production-readiness sprint.** A production-readiness review (2026-08-24, recorded in `docs/SPEC-AMENDMENT-v1.3.md` and `docs/sprint-plan.md`) found the eval/grounding harness to be the project's strongest asset and the service shell its weakest. The current work is the ordered eight-step plan below; nothing later in the list opens before the previous step has commit evidence.
+The project is currently in a **retrieval benchmark stabilization sprint**.
 
-What exists and is measured:
+Core MVP and production-hardening foundations are complete:
 
-- LangGraph single-agent workflow with citation registry built before the LLM call
-- SEC 10-K ingestion (edgartools), section-aware chunk metadata, `RetrievalStore` abstraction (Chroma default, Qdrant behind the interface)
-- FastAPI sync/async endpoints, file-backed run store, Prometheus metrics, LangSmith tracing
-- Heuristic memo verifier (claim extraction, tolerance number match, cosine ≥ 0.45) — latest live-evidence baseline `grounded_claim_rate 0.904 ± 0.062`, `citation_coverage 0.925 ± 0.049`, classification **candidate** (live evidence cannot reach `approved`)
-- Retrieval benchmark fixtures, paired case-level comparator, quality/latency baseline runners
+- LangGraph-based single-agent analysis workflow
+- FastAPI service endpoints for sync and async analysis
+- SEC filing ingestion with section-aware metadata
+- normalized evidence packets for grounding and citations
+- backend-facing retrieval abstraction
+- persistent file-backed async run tracking
+- health, stats, metrics, and runtime-hardening endpoints
+- retrieval evaluation scaffolding and baseline comparison utilities
+- memo verification and citation coverage checks wired into the workflow
 
-Known limitations at HEAD (verified against code, not aspiration):
+Recent retrieval experiments showed that adding hybrid retrieval or reranking did **not** yet produce reliable quality gains. The current priority is therefore not another shiny retrieval trick taped to the side of the system. The current priority is to run every retrieval method against the same shared benchmark fixture and make paired, case-level comparisons.
 
-- A ticker that was never ingested produces a memo with no SEC evidence and still reports `completed`
-- Verification failure is logged, not enforced; there is no repair loop
-- Evidence nodes run serially; FinBERT inference blocks the event loop
-- No guardrails, no caching, no auth, no rate limiting, in-process background jobs
-- Eval results carry no lineage (commit, model, snapshot) and no eval runs in CI
+### Current Sprint Objective
 
-### Implementation order (authoritative copy: `docs/sprint-plan.md`, S2 preamble)
+Establish a trustworthy retrieval baseline using:
 
-| Step | Task | Exit evidence |
-| --- | --- | --- |
-| 1 | S2-T00a — governance docs into `docs/`, CI governance job, hooks committed | `git ls-files docs/` non-empty; governance job green; deliberate break fails CI |
-| 2 | S2-T00c — fan-out of independent nodes, `to_thread` for FinBERT/store, graph singleton, `errors` reducer | latency baseline before/after (same model/temp); 4 concurrent requests < 1.5× single |
-| 3 | S2-T00b/T00d — `EvidenceSnapshot` freeze/replay with zero-network test; `degraded` / `evidence_missing` statuses | replay green under `unshare -n`; `grep "from evaluation" app/` empty |
-| 4 | S6 — eval registry with lineage; `eval-replay` CI regression gate; verifier↔judge κ | a PR that regresses grounding fails CI |
-| 5 | S6 — bounded draft→verify→revise loop (max 2) | paired comparison vs no-loop on the frozen snapshot |
-| 6 | S7 — guardrails (input, untrusted content, output policy), API auth + rate limit | adversarial fixture in CI |
-| 7 | S7 — evidence / query-embedding / memo caching keyed on `snapshot_hash` | cache hit-rate in `/metrics` |
-| 8 | S7 → S10 — queue + worker, Postgres job store, FinBERT out-of-process, circuit breaker; cloud gated on ADR-0006 | `JobQueue`/`RunStore` protocols swapped without app changes |
+```text
+evaluation/fixtures/retrieval_shared_benchmark_v1.json
+```
+
+Every retrieval method should be evaluated against the same case IDs before any method becomes the default.
+
+### Current Decision
+
+Do **not** adopt reranked hybrid retrieval as the default yet.
+
+The corrected paired comparison showed small top-rank gains in some metrics, but weaker recall and section coverage. For this project, evidence coverage matters more than a cosmetic precision bump that quietly drops useful filing context into the void.
 
 ## What This System Does
 
@@ -410,45 +411,43 @@ Expected result metadata:
 
 ## Current Sprint Checklist
 
-- [x] Shared retrieval fixture, paired comparator, measured baseline selected
-- [x] Grounding instrument fixed at root cause (tolerance number match, heading-aware claim extraction) and unit-tested
-- [x] Production-readiness review recorded; SPEC amendment v1.3 drafted; sprint-plan and test-plan reconciled
-- [ ] S2-T00a — docs tracked, CI governance job, hooks committed
-- [ ] S2-T00c — fan-out and event-loop hygiene
-- [ ] S2-T00b — evidence snapshot freeze/replay, zero-network assertion
-- [ ] S2-T00d — verification/evidence-completeness status semantics
-- [ ] S2 execution — anchored fixture v3 → Gate A
+- [x] Complete MVP hardening baseline
+- [x] Add evidence packet schema and citation-grounding path
+- [x] Add retrieval abstraction and section-aware ingestion
+- [x] Add persistent async run state
+- [x] Add baseline retrieval evaluation scaffolding
+- [x] Add Qdrant migration/evaluation path
+- [x] Create `retrieval_shared_benchmark_v1.json`
+- [x] Run all retrieval methods on the shared benchmark fixture
+- [x] Compare methods using strict paired `case_id` evaluation
+- [x] Select the real retrieval baseline from measured results
+- [x] Diagnose section-recall losses before adopting hybrid or reranked retrieval
+- [ ] Move to GEPA prompt / agent-answer optimization after retrieval evaluation stabilizes
 
 ## Roadmap Direction
 
-Steps 1–3 above, then S2 (Gate A), then S6 eval hardening + repair loop, then S7 service readiness. Multi-agent decomposition, frontend, and cloud remain deferred; each is gated on a documented exit criterion, not on enthusiasm.
+### Current Priority
 
-Explicitly **not** planned: semantic caching of memo outputs (unsafe for time-sensitive financial content — caching is keyed on the evidence snapshot hash instead) and Kafka (no second consumer type exists; Redis Streams behind a `JobQueue` protocol until one does).
+1. stabilize shared retrieval evaluation,
+2. run all methods against `retrieval_shared_benchmark_v1.json`,
+3. select the measured retrieval baseline,
+4. diagnose section-recall loss,
+5. only then optimize prompts/agent answers with GEPA.
 
-## Agent-Tooling Hooks
+### Deferred
 
-Governance rules that can be checked mechanically are enforced at the coding-agent boundary by `.claude/settings.json` and the scripts in `.claude/hooks/` (Claude Code; the same scripts register for Codex CLI's six-event subset). Blocking hooks exist only on `PreToolUse`, `UserPromptSubmit`, and `Stop`.
+- broad multi-agent orchestration
+- frontend polish
+- cloud deployment hardening
+- long-term memory
+- production queue system
+- MCP/A2A/swarm-style agent expansion
 
-| Id | Event | Rule |
-| --- | --- | --- |
-| H1 | SessionStart | inject `tasks/lessons.md`, recent commits, active sprint task, tree status |
-| H2 | UserPromptSubmit | implementation prompts require an unchecked plan item in `tasks/todo.md` |
-| H3 | PreToolUse Edit/Write | governance docs read-only unless `ALLOW_SPEC_EDIT=1` |
-| H4 | PreToolUse Edit/Write | frozen fixtures and datasets immutable |
-| H5 | PreToolUse Edit/Write | eval result files must carry lineage keys |
-| H6 | PreToolUse Bash | benchmark runs refused when uncommitted changes span more than one axis |
-| H7 | PreToolUse Bash | replay test commands rewritten to run without network |
-| H8 | PreToolUse Bash/Read | secrets files and credential patterns blocked |
-| H9 | PreToolUse Bash | force-push, hard reset, destructive `rm`, collection deletion blocked |
-| H10 | PostToolUse Edit/Write | `ruff` + `mypy` on the written file; failures fed back |
-| H11 | PostToolUse Bash | after a user correction followed by a failure, stub appended to `tasks/lessons.md` |
-| H12 | Stop | turn cannot end with a dirty tree, failing unit tests, or failing doc-sync |
-
-Smoke-test any hook with `echo '<event json>' | .claude/hooks/<script>`; see `docs/test-plan.md §15` for the cases.
+These are valid future directions, but they are not the current bottleneck. The current bottleneck is proving retrieval quality with a benchmark that does not lie by accident.
 
 ## Recommended Repo Status Statement
 
-> Financial Analyst Agent is a single-agent, evidence-grounded financial analysis system (LangGraph, FastAPI, SEC/news/market tools, citation registry, heuristic verifier, backend-abstracted retrieval) with a measured grounding baseline of 0.90 ± 0.06 on live evidence. It is a prototype, not a production service: a 2026-08 review recorded the gaps (silent evidence omission, unenforced verification, serial nodes, no guardrails/caching/queue) and an eight-step, evidence-gated order for closing them, starting with governance-in-CI and evidence-snapshot replay.
+> Financial Analyst Agent is a single-agent financial analysis system built around LangGraph, FastAPI, SEC/news/market-data tools, structured evidence packets, verification-aware memo generation, persistent run tracking, and backend-abstracted retrieval. The current sprint is focused on stabilizing retrieval evaluation by running all retrieval methods against `retrieval_shared_benchmark_v1.json` with paired case-level comparison before adopting hybrid/reranked retrieval or moving into GEPA-based prompt optimization.
 
 ## License
 
