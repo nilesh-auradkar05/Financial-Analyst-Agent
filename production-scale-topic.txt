@@ -1,0 +1,18 @@
+Every question needs to be answered in system design/distributed system/Production scale Agentic AI System
+
+How would we handle document volume? from thousands to millions of document. What will be architectural difference?
+How would we handle Query volume? single user to thousands of concurrent queries?
+Latency target? flexible/best-effort to sub-3 second p95 TTFT.?
+Cost?Development cost to Core priority(API and Infra spend)?
+Metadata Architecture and Pre-Retrieval Filtering? treating metadata as a first class concern to reduce search space and improve relevance before. Leveraging ANN, metadata filtering, sharding as per year or company domain to reduce sub-3 latency over millions of records.
+Vector database architecture and indexing (HNSW)? store hnsw index structure graph on memory though the actual vector data can store on disk. How would we address RAM required for increasing corpus size from thousands to millions to hundred's of millions of vector data.
+Hybrid retrieval and re-ranking pipelines? dense + approximate retrieval for faster and efficient retrieval(Parallel execution, RRF). Cross-Encoders for re-ranking.
+Multi-layer caching architecture? query cache, embedding/semantic cache, retrieval cache. Distiguishing frequent similar query domain(QA) vs research based where most queries could be different? which to implement how to implement?
+Monitoring, Quality Evaluation, Cost observability? quality metrics(Target accuracy, retrieval precision, recall, answer correctness, NDCG for ranking quality). Retrieval eval, RAG/Agent eval, Generation eval, User signals, Performance Metrics(TTFT, Cost per generation/answer/query, etc), Golden dataset for CI/CD regression(should include easy query, multi-hop queries, ambiguous queries, No-answer queries)
+Production checklist:
+1. Throughput verification: confirm the ingestion pipeline can handle the volume.
+2. HNSW tuning.
+3. Cache validation: confirm hit rates.
+4. circuit breakers: implement failsafes for LLM API downtime(eg: fallback to cached responses)
+5. cost observability
+A successful production RAG system is a living architecture requiring continuous experimentation to balance user needs with economic constraints.# Production RAG Systems: Architectural Scaling, Cost Optimization, and Implementation Notes

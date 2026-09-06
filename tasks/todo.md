@@ -224,3 +224,34 @@ Contracts + gate first (tested), then wire recording, then replay, then re-basel
 - 2026-07-04 P1-T07 static checks: `ruff check` on touched DataOps/evaluator/tool/script/test surfaces -> **PASS**; matching `pyright` command -> **0 errors**.
 - 2026-07-04 P1-T07 Doc Sync Check: `check_no_scope_residue.py` PASS; `check_sprint_map.py` PASS; `check_doc_sync.py` PASS; `check_test_hygiene.py` still fails only on pre-existing `tests/unit/test_llm.py:25,32` call-order spy assertions.
 - 2026-07-04 P1-T07 artifact/registry checks: `git diff --check` PASS; `python -m json.tool` on both quality-baseline JSON artifacts PASS; `ReleaseRegistry('artifacts/dataops').read_active('quality_baseline')` resolves to `alpha-quality-baseline:0.1.0`, status `approved`, code version `89265b8`, 66 snapshot IDs, parent `alpha-evidence:0.1.0`.
+
+---
+
+# Production-scale design diagrams + interview doc (2026-09-05)
+
+Trace: `production-scale-topic.txt` → SPEC-AMENDMENT v1.3 §3.y / §11.3 / §12 (S7–S10), ADR-0003 (Qdrant), ADR-0006 (cloud, still Proposed). Design artefacts only; no runtime code, no scope change.
+
+## Decisions (user-confirmed)
+- Scale target SEC-wide (~40M chunks); two-mode latency (SSE draft ≤ 3 s TTFT, verified memo async); Qdrant-native sparse + server-side RRF, reranker as TEI service; Bedrock → Azure OpenAI → vLLM → stale MemoCache; Redis Streams for jobs, Kafka/Event Hubs gated (Delta tables are the ingestion bus); Prometheus + Grafana + Langfuse; AWS serving plane, Azure Databricks + dbt data plane.
+
+## Plan
+- [x] Read code (codegraph), README, SPEC amendment, existing four diagrams, mem0 decisions
+- [x] Clarify decisions with user; present design; approval
+- [x] `docs/System-design/production/hld.excalidraw` + render
+- [x] `docs/System-design/production/lld.excalidraw` + render
+- [x] `docs/System-design/production/critical-flow.excalidraw` + render
+- [x] `docs/System-design/production/system-design.excalidraw` + render
+- [x] `docs/production-readiness-interview.md`
+
+## Verification (2026-09-06)
+- Rendered all four to `docs/png/production/*.png` and inspected visually (text fits, arrows bound, no overlaps).
+- `python scripts/ci/check_no_scope_residue.py` → PASS
+- `python scripts/ci/check_sprint_map.py` → PASS (after restoring `docs/SPEC.md` v1.2 from HEAD; the 2026-08-24 amendment text lives at uncommitted `docs/SPEC-AMENDMENT-v1.3.md`, not over SPEC)
+- `python scripts/ci/check_doc_sync.py` → PASS
+- `python scripts/ci/check_test_hygiene.py` → FAIL `tests/unit/test_llm.py:25,32` call-order spies. Pre-existing at HEAD; tests untouched.
+- Renderer note: skill `render_template.html` `esm.sh/@excalidraw/excalidraw?bundle` 404s on `@braintree/sanitize-url@6.0.2`. Rendered with `@excalidraw/excalidraw@0.18.0?bundle-deps`; skill file not modified.
+
+## Commit scope
+This task commits only: `docs/System-design/production/`, `docs/png/production/`, `docs/production-readiness-interview.md`, `production-scale-topic.txt`, this ledger entry, and the lessons.md correction.
+
+Stays uncommitted (separate 2026-08-24 governance/hooks work, not this task): `README.md`, `docs/sprint-plan.md`, `docs/test-plan.md`, `docs/SPEC-AMENDMENT-v1.3.md`, `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` (deleted), `.claude/`, `old_artifacts/`, and the pre-existing prototype diagrams under `docs/System-design/*.excalidraw` + `docs/png/*.png` (non-`production/`). Applying the amendment to SPEC.md (→ v1.3) remains an open follow-up.

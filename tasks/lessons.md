@@ -64,3 +64,15 @@ check may have run against working-tree files that never shipped.
 Rule: a check is only trustworthy if it fails when it should. Verify committed state
 (git ls-files) before trusting any doc/CI check, and prove every new check goes red on
 a deliberate drift before marking it done.
+
+## 2026-09-06 — Done conditions: failing sprint-map + dirty tree
+
+**Correction:** User rejected "done" because the working tree was uncommitted and `check_sprint_map.py` failed (`SPEC missing S0/S1/S3/S4`).
+
+**Root cause:** The 2026-08-24 session overwrote `docs/SPEC.md` with amendment text (no S0/S1/S3/S4). This task then recorded that failure as "pre-existing, unchanged" and marked done without a commit or an explicit uncommitted-scope statement. A passing check against a dirty overlay is not verification.
+
+**Prevention rule:** Never mark done while a Doc Sync Check is red. If the red check is outside this task, restore the canonical file so the check is green on HEAD-equivalent SPEC, then either commit this task's files or name each leftover path and why it stays out. Do not overwrite `tasks/todo.md`; append.
+
+**Applied:** Yes. Restored `docs/SPEC.md` v1.2 from HEAD; amendment lives at `docs/SPEC-AMENDMENT-v1.3.md`. Restored HEAD `tasks/todo.md` and appended this task. Re-ran Doc Sync: sprint-map / doc-sync / scope-residue PASS. Committing only this task's artefacts.
+
+**Verification:** `python scripts/ci/check_sprint_map.py` PASS; `check_doc_sync.py` PASS; `check_no_scope_residue.py` PASS.
