@@ -317,3 +317,19 @@ Trace: user "yes apply and bump" → SPEC-AMENDMENT-v1.3.md §B/C, ADR-0008, SPE
 - `python scripts/ci/check_test_hygiene.py` → FAIL `tests/unit/test_llm.py:25,32` call-order spies. Pre-existing; tests untouched.
 - Mapping: amendment workflow §9.1–9.5 → SPEC §8.1–8.5; v1.2 §9 SEC ingestion unchanged. Amendment retirement target ADR-0007 was already the interview-scale ADR, so the application record is ADR-0008.
 
+---
+
+# Land interview-revision artefacts (2026-09-12)
+
+Stop-gate: remaining dirty tree from the 2026-09-06 interview revision. User forwarded the dirty-tree done condition.
+
+- [x] Retarget interview + ADR-0007 pointers from SPEC v1.2 / "S10 is multi-agent" to SPEC v1.3 (§12 S10 cloud gated on ADR-0006; §3.y still out of committed scope)
+- [x] Mark production-design-review.md as a historical v1.2 review
+- [x] Commit diagrams, SVGs, PNGs, interview, ADR-0007, review, lessons
+
+## Verification
+- `python scripts/ci/check_no_scope_residue.py` → PASS
+- `python scripts/ci/check_sprint_map.py` → PASS
+- `python scripts/ci/check_doc_sync.py` → PASS
+- `check_test_hygiene.py` still FAIL on pre-existing `tests/unit/test_llm.py:25,32`; tests untouched.
+

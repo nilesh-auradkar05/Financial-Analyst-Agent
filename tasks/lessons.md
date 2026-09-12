@@ -78,3 +78,15 @@ a deliberate drift before marking it done.
 **Verification:** `python scripts/ci/check_sprint_map.py` PASS; `check_doc_sync.py` PASS; `check_no_scope_residue.py` PASS.
 
 L: `.claude/hooks/stop_gate.py` blocks the turn on any dirty tree. The "or state why uncommitted" clause is agent-facing text only; the hook does not parse a reason. A leftover overlay must be committed or reverted before the turn can end. Do not delete `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` while SPEC §0 still names it.
+
+## 2026-09-06 — Scale interview versus practical performance testing
+
+**Correction:** User clarified that the production companion explains how the project could handle thousands to millions of documents and requests; practical testing should remain affordable, with performance logged at each achievable level. Million-user execution is not a deliverable.
+
+**Root cause:** The review framed full production load/soak gates without clearly separating hypothetical employer-scale acceptance from the project's practical validation budget.
+
+**Prevention rule:** Distinguish implemented, measured, proposed and projected claims. Specify document counts, chunk counts, request rate and concurrency separately. Provide resource-capped experiments and extrapolation assumptions; never present projections as measured results or require unaffordable scale tests for an interview artifact.
+
+**Applied:** Yes. Revised the interview, all four production diagrams and proposed ADR-0007 to distinguish affordable measured experiments from large-scale interview projections.
+
+**Verification:** 63 Q&A entries and four SVG embeds; local links, source/export consistency, offline SVG display and visual inspection pass. Scope/sprint/doc-sync checks pass; existing test-hygiene failures at tests/unit/test_llm.py:25,32 remain recorded in the task ledger. No scale tests or runtime changes were claimed.
