@@ -256,3 +256,64 @@ Trace: `production-scale-topic.txt` → SPEC-AMENDMENT v1.3 §3.y / §11.3 / §1
 - Follow-up (this commit) — land the leftover overlay so stop-gate can pass: prototype `docs/System-design/*.excalidraw` + `docs/png/*.png`, `docs/SPEC-AMENDMENT-v1.3.md`, README / sprint-plan / test-plan production-readiness overlay, `.claude/` hooks, `old_artifacts/`.
 - Restored `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` (not committed as a delete): SPEC §0 still names it as the Phase 0/1 companion plan.
 - Open follow-up: apply the amendment into `docs/SPEC.md` and bump to v1.3.
+
+
+## Production design review (2026-09-06)
+
+Trace: user-requested review of production-scale-topic.txt, production diagrams and interview; SPEC sections 0, 3, 4–11; retrieval-benchmark.md; test-plan production-readiness cases; ADR-0003 and proposed ADR-0006. Review only; no implementation or scope ratification.
+
+- [x] Read requirements, relevant Mem0 decisions, CodeGraph runtime evidence, and all eight Excalidraw sources plus four production PNGs.
+- [x] Review production contracts and interview answers; check vendor-specific claims against primary documentation.
+- [x] Produce a severity-ranked review with failure scenarios, corrections, grades and acceptance evidence.
+- [ ] Run document governance checks and record results honestly; do not mark production readiness complete.
+
+Verification (2026-09-06): Review delivered in docs/production-design-review.md. All eight Excalidraw sources parsed; four production PNGs visually inspected; CodeGraph runtime inspection and scoped Mem0 searches completed; vendor checks used official Qdrant, Redis, Hugging Face and Langfuse documentation. Arithmetic reproduced for shards, concurrency, dimensions, storage, cost and backfill duration.
+- Scope-residue: PASS.
+- Sprint-map: PASS.
+- Doc-sync: PASS.
+- Test-hygiene: FAIL, existing tests/unit/test_llm.py:25,32 call-order assertions; no test files changed.
+- Runtime/load/chaos tests: not run; review only, no behavior change.
+- Outcome: proposed design graded 6/10, returned for revision; production readiness NOT approved. Full governance-green completion remains open because of the existing test-hygiene failure.
+- Files intentionally left uncommitted for user review: docs/production-design-review.md and this appended tasks/todo.md entry. No deployment, scope ratification, or changes to reviewed artifacts.
+
+
+## Accepted production interview revisions (2026-09-06)
+
+Authorization: user accepted the review and requested revised Excalidraw diagrams, SVG embeds and expanded follow-up Q&A. Clarification: practical affordable measurements and logs; large document/request scales are interview design projections, not a commitment to perform million-user tests. Trace: production-design-review.md findings 1–15, production-scale-topic.txt, SPEC §§0/3/7/10, test-plan §§11–14, retrieval-benchmark §8, accepted ADR-0003 and proposed ADR-0006. No runtime/cloud implementation or canonical scope/sprint change.
+
+- [x] Revise interview answers with follow-ups, measured/proposed/projected labels, practical test ladder and logging contract.
+- [x] Revise four production Excalidraw diagrams section by section; record design direction in proposed ADR-0007.
+- [x] Export matching SVG and PNG, embed SVGs in interview, inspect renders and correct layout/flow.
+- [ ] Verify source/export links and semantic consistency; run Doc Sync and record all results honestly.
+
+
+Verification (2026-09-06):
+- Interview: 63 main/follow-up Q&A entries; 4 embedded SVGs; affordable component/corpus/concurrency/recovery ladder, explicit stop budgets and proposed JSONL/run-manifest logging fields. No new performance measurements or runtime implementation claimed.
+- Four Excalidraw sources revised with the Excalidraw skill. Matching SVG/PNG exports rendered, visually inspected and corrected; final text bounding-box check reports zero text overlaps. Source IDs/bindings, SVG text coverage and document local links/fences PASS.
+- Export used the existing skill renderer/Playwright environment with a temporary exporter and pinned Excalidraw 0.18.0 bundle-deps URL (the unpinned upstream module fails). SVGs embed fonts, exclude executable/external references, and all four opened in an offline browser with fonts loaded. No skill or dependency files changed.
+- Independent consistency review found one residual policy/verification ambiguity; critical-flow now explicitly separates policy rejection -> failed from exhausted financial verification -> degraded diagnostics. Final bytes, exact quote identity, durable events/fences and projection arithmetic are consistent across the interview and diagrams.
+- Commands: python3 scripts/ci/check_no_scope_residue.py PASS; check_sprint_map.py PASS; check_doc_sync.py PASS; check_test_hygiene.py FAIL at unchanged tests/unit/test_llm.py:25,32 (existing call-order spy assertions). git diff --check PASS.
+- No runtime, paid-provider, load or chaos tests run: this is a documentation revision. Full governance-green completion remains open because of the existing test-hygiene failure; production readiness is not approved.
+- Doc Sync assessment: SPEC scope/source-of-truth order, sprint IDs, benchmark oracle and AGENTS/CLAUDE operating rules remain unchanged. ADR-0007 is Proposed; ADR-0006 is not accepted.
+- Uncommitted reviewable files: docs/production-readiness-interview.md; docs/adr/ADR-0007-production-interview-scale-design.md; docs/System-design/production/{hld,lld,critical-flow,system-design}.excalidraw; corresponding four docs/svg/production/*.svg and four docs/png/production/*.png; tasks/todo.md; tasks/lessons.md. docs/production-design-review.md remains the prior turn's historical review. These remain uncommitted for user review; no implementation, deployment or scope ratification is included.
+
+---
+
+# Apply SPEC amendment and bump to v1.3 (2026-09-12)
+
+Trace: user "yes apply and bump" → SPEC-AMENDMENT-v1.3.md §B/C, ADR-0008, SPEC §0/§3/§12. No runtime code.
+
+## Plan
+- [x] Apply amendment inserts into SPEC v1.2 section homes (not the guessed amendment numbers)
+- [x] Bump header to v1.3; retire amendment to ADR-0008 (ADR-0007 already used)
+- [x] Retarget sprint-plan traces: workflow §9.1–9.5 → §8.1–8.5; S1 ADR cite §15 → §16
+- [x] Run Doc Sync Check and record results
+
+## Verification
+- `ALLOW_SPEC_EDIT=1` used (H3) because this task is the authorized amendment application.
+- `python scripts/ci/check_no_scope_residue.py` → PASS
+- `python scripts/ci/check_sprint_map.py` → PASS (S0–S10 present in SPEC v1.3 and sprint-plan)
+- `python scripts/ci/check_doc_sync.py` → PASS
+- `python scripts/ci/check_test_hygiene.py` → FAIL `tests/unit/test_llm.py:25,32` call-order spies. Pre-existing; tests untouched.
+- Mapping: amendment workflow §9.1–9.5 → SPEC §8.1–8.5; v1.2 §9 SEC ingestion unchanged. Amendment retirement target ADR-0007 was already the interview-scale ADR, so the application record is ADR-0008.
+

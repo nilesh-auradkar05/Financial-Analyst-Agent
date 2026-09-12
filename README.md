@@ -12,7 +12,7 @@ Built with **LangGraph**, **FastAPI**, **RAG**, **Pydantic**, local-first LLM to
 
 ## Project Status
 
-**Stage: instrumented prototype → production-readiness sprint.** A production-readiness review (2026-08-24, recorded in `docs/SPEC-AMENDMENT-v1.3.md` and `docs/sprint-plan.md`) found the eval/grounding harness to be the project's strongest asset and the service shell its weakest. The current work is the ordered eight-step plan below; nothing later in the list opens before the previous step has commit evidence.
+**Stage: instrumented prototype → production-readiness sprint.** A production-readiness review (2026-08-24) is now canonical in `docs/SPEC.md` v1.3 (application record `docs/adr/ADR-0008-production-readiness-order.md`) and `docs/sprint-plan.md`. The eval/grounding harness is the strongest asset and the service shell the weakest. The current work is the ordered eight-step plan below; nothing later in the list opens before the previous step has commit evidence.
 
 What exists and is measured:
 
@@ -412,7 +412,7 @@ Expected result metadata:
 
 - [x] Shared retrieval fixture, paired comparator, measured baseline selected
 - [x] Grounding instrument fixed at root cause (tolerance number match, heading-aware claim extraction) and unit-tested
-- [x] Production-readiness review recorded; SPEC amendment v1.3 drafted; sprint-plan and test-plan reconciled
+- [x] Production-readiness review applied: SPEC v1.3 canonical; ADR-0008 records the application
 - [ ] S2-T00a — docs tracked, CI governance job, hooks committed
 - [ ] S2-T00c — fan-out and event-loop hygiene
 - [ ] S2-T00b — evidence snapshot freeze/replay, zero-network assertion

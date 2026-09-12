@@ -113,7 +113,7 @@ Goal: lock section extraction and stable identity so the S2 benchmark can label 
 
 ```text
 S1-T01 — ADR-0004: edgartools parser decision
-Trace: SPEC §9/§15; test-plan §3
+Trace: SPEC §9/§16; test-plan §3
 Goal: stop re-litigating parser strategy.
 Scope: docs/adr/ADR-0004-edgartools-parser.md records prior zero-section failure, why edgartools, fallback trigger, and coverage gate.
 Tests: ADR exists and references the coverage gate.
@@ -212,7 +212,7 @@ Result: Pending
 
 ```text
 S2-T00c — Fan-out and event-loop hygiene  (step 2)
-Trace: SPEC §9.1–9.4; gap G12; latency-baseline discipline (single axis)
+Trace: SPEC §8.1–8.4; gap G12; latency-baseline discipline (single axis)
 Goal: independent evidence nodes run concurrently; no node blocks the loop; graph and clients are singletons.
 Scope:
 - research_news ‖ fetch_stock ‖ retrieve_filings via LangGraph branch/Send; join before analyze_sentiment.
@@ -232,7 +232,7 @@ Result: Pending
 
 ```text
 S2-T00d — Verification and evidence-completeness status semantics  (step 3b)
-Trace: SPEC §9.5; gap G10; test-plan §11
+Trace: SPEC §8.5; gap G10; test-plan §11
 Goal: the API never reports `completed` for a memo that failed verification or lacks a required evidence class.
 Scope:
 - Move evaluation/grounding.py runtime path to app/verification/; evaluation/ imports it, not the reverse.
@@ -243,7 +243,7 @@ Tests: test-plan §11.
 Verification:
 - grep -rn "from evaluation" app/  → empty.
 - pytest tests/unit/test_graph_verification_integration.py tests/unit/test_api_schema_defaults.py → green with new statuses.
-Done: grep empty; tests green; SPEC §9.5 statuses match models.JobStatus exactly.
+Done: grep empty; tests green; SPEC §8.5 statuses match models.JobStatus exactly.
 Non-goals: no repair loop (S6); no guardrails (S7).
 Result: Pending
 ```
