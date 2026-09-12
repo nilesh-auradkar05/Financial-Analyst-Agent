@@ -333,3 +333,20 @@ Stop-gate: remaining dirty tree from the 2026-09-06 interview revision. User for
 - `python scripts/ci/check_doc_sync.py` → PASS
 - `check_test_hygiene.py` still FAIL on pre-existing `tests/unit/test_llm.py:25,32`; tests untouched.
 
+
+---
+
+# Current-state review + TASKS.md register (2026-09-12)
+
+Trace: user request "review SPEC, TASKS, sprint-plan, test-plan and code; mark completed / needs-update / next; create TASKS.md". Read-only review against SPEC §0/§3/§12, sprint-plan S0–S10, test-plan §1–15, retrieval-benchmark §2–8. No code, scope, or governance-doc changes.
+
+- [x] Read SPEC v1.3, sprint-plan, test-plan, retrieval-benchmark, todo, sprint-review, test-suite-audit, CI, hooks, and code
+- [x] Run verification (governance, ruff, mypy, pytest, fixture validators)
+- [x] Create `tasks/TASKS.md` (derived status register: IDs, context, trace, status, evidence, remaining, dependencies; update list; gap register; ordered next steps)
+
+## Verification
+- `check_no_scope_residue.py` PASS · `check_sprint_map.py` PASS · `check_doc_sync.py` PASS · `check_test_hygiene.py` FAIL (`tests/unit/test_llm.py:25,32`, pre-existing).
+- `uv run ruff check .` → 4 errors · `uv run python -m mypy .` → 6 errors in 4 files · `uv run python -m pytest --continue-on-collection-errors` → 218 passed, 1 failed (`test_custom_model`: `get_embeddings` ignores `model=` at `embeddings.py:91`), 2 skipped, 1 collection error (`test_llm.py`).
+- Environment finding: `.venv/bin/*` shebangs point to the pre-move path `git/prj/…`, so `uv run pytest`/`uv run mypy` fail to spawn (also affects hook H12). Used `python -m` instead.
+- CI on GitHub not verified (`gh` unauthenticated); expected red from the local mypy/pytest results.
+- Outcome: S0-T04 green bar regressed; S2-T00a/T00b partial, T00c/T00d not started; next = ENV-01, UPD-01..03, then finish S2-T00a. Detail in `tasks/TASKS.md`.
