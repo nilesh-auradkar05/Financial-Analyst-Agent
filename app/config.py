@@ -5,7 +5,7 @@ This file contains the configuration for the Financial Analyst Agent.
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 """ PATHS CONFIGURATION """
@@ -182,16 +182,16 @@ class LangSmithSettings(BaseSettings):
         extra="ignore",
     )
 
-    tracing_v2: str = Field(
-        default="true",
-        alias="LANGCHAIN_TRACING_V2",
+    tracing_v2: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2"),
         description="Enable LangSmith tracing.",
     )
 
-    api_key: Optional[str] = Field(default=None, description="LangSmith API Key")
+    api_key: Optional[str] = Field(default=None, validation_alias=AliasChoices("LANGSMITH_API_KEY", "LANGCHAIN_API_KEY"), description="LangSmith API Key")
 
     project: str = Field(
-        default="financial-analyst-system", description="LangSmith project name"
+        default="financial-analyst-system", validation_alias=AliasChoices("LANGSMITH_PROJECT", "LANGCHAIN_PROJECT"), description="LangSmith project name"
     )
 
 

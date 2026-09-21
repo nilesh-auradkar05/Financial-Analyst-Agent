@@ -173,9 +173,9 @@ async def get_stock_data(
         logger.info(f"{ticker}: ${stock_info.current_price}")
         return stock_info
 
-    except Exception as e:
-        logger.error(f"Failed to fetch {ticker}: {e}")
-        return StockInfo(ticker=ticker, company_name=ticker, error=str(e))
+    except Exception:
+        logger.error(f"Failed to fetch {ticker}")
+        return StockInfo(ticker=ticker, company_name=ticker, error="Stock data unavailable.")
 
 
 def _record_stock_snapshot(

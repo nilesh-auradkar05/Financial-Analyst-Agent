@@ -26,7 +26,7 @@ from typing import Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, START, StateGraph
-from langsmith import traceable
+from langsmith import get_current_run_tree, traceable
 from loguru import logger
 
 from app.agents.state import (
@@ -40,8 +40,7 @@ from app.agents.state import (
 )
 from app.components.retrieval.vector_store import get_vector_store
 from app.config import settings
-from app.llm.provider import get_llm
-from app.observability.langsmith import get_tracer
+from app.llm.provider import get_llm, model_metadata
 from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
@@ -50,6 +49,7 @@ from evaluation.grounding import evaluate_memo_grounding
 
 # NODE FUNCTIONS
 
+@traceable(name="research_news", run_type="chain", tags=["agent"])
 async def research_news_node(state: AgentState) -> dict:
     """
     Research recent news about the company.
@@ -72,6 +72,8 @@ async def research_news_node(state: AgentState) -> dict:
         query = f"{company_name} {ticker} stock news"
         max_results = state.get("max_news_articles", 10)
         if max_results <= 0:
+            if run := get_current_run_tree():
+                run.metadata["outcome"] = "skipped"
             logger.info(f"[{ticker}] News search skipped because max_news_articles={max_results}")
             return {
                 "news_articles": [],
@@ -98,9 +100,9 @@ async def research_news_node(state: AgentState) -> dict:
             "current_step": AgentStep.RESEARCH_NEWS.value,
         }
 
-    except Exception as e:
-        logger.error(f"[{ticker}] News research failed. Error: {e}")
-        return add_error(state, "research_news", str(e))
+    except Exception:
+        logger.error(f"[{ticker}] News research failed")
+        return add_error(state, "research_news", "Workflow step failed.")
 
 @traceable(name="fetch_stock", run_type="chain", tags=["agent"])
 async def fetch_stock_node(state: AgentState) -> dict:
@@ -150,9 +152,9 @@ async def fetch_stock_node(state: AgentState) -> dict:
             "current_step": AgentStep.FETCH_STOCK.value,
         }
 
-    except Exception as e:
-        logger.error(f"[{ticker}] Stock Fetch Failed. Error: {e}")
-        return add_error(state, "fetch_stock", str(e))
+    except Exception:
+        logger.error(f"[{ticker}] Stock Fetch Failed")
+        return add_error(state, "fetch_stock", "Workflow step failed.")
 
 @traceable(name="retrieve_filings", run_type="retriever", tags=["agent"])
 async def retrieve_sec_filings_node(state: AgentState) -> dict:
@@ -173,6 +175,8 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
     logger.info(f"[retrieve_filings] Searching filings for {ticker}")
 
     if not state.get("include_filing_analysis", True):
+        if run := get_current_run_tree():
+            run.metadata["outcome"] = "skipped"
         return {
             "filing_chunks": [],
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
@@ -223,9 +227,9 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
         }
 
-    except Exception as e:
-        logger.error(f"[{ticker}] Filing retrieval failed. Error: {e}")
-        return add_error(state, "retrieve_filings", str(e))
+    except Exception:
+        logger.error(f"[{ticker}] Filing retrieval failed")
+        return add_error(state, "retrieve_filings", "Workflow step failed.")
 
 @traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
 async def analyze_sentiment_node(state: AgentState) -> dict:
@@ -246,6 +250,8 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
     logger.info(f"[{ticker}] Analyzing sentiments on {len(articles)} articles")
 
     if not state.get("include_news_sentiment", True):
+        if run := get_current_run_tree():
+            run.metadata["outcome"] = "skipped"
         return {
             "sentiment_result": {},
             "current_step": AgentStep.ANALYZE_SENTIMENT.value,
@@ -286,9 +292,9 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
             "current_step": AgentStep.ANALYZE_SENTIMENT.value,
         }
 
-    except Exception as e:
-        logger.error(f"[{ticker}] Sentiment analysis failed. Error: {e}")
-        return add_error(state, "analyze_sentiment", str(e))
+    except Exception:
+        logger.error(f"[{ticker}] Sentiment analysis failed")
+        return add_error(state, "analyze_sentiment", "Workflow step failed.")
 
 def _humanize_money(value: object) -> str:
     """Render a raw market-cap number in the human form the model will use.
@@ -427,7 +433,7 @@ def _extract_used_citations(memo: str) -> set[int]:
     """Pull citation indices like ``[1]``, ``[3]``, out of the memo text."""
     return {int(m) for m in re.findall(r"\[(\d+)\]", memo)}
 
-@traceable(name="draft_memo", run_type="llm", tags=["agent"])
+@traceable(name="draft_memo", run_type="chain", tags=["agent"])
 async def draft_memo_node(state: AgentState) -> dict:
     """
     Draft the investment memo using the LLM.
@@ -501,6 +507,12 @@ async def draft_memo_node(state: AgentState) -> dict:
         )
 
         llm = get_llm(settings)
+        if run := get_current_run_tree():
+            run.metadata.update({
+                "provider": settings.llm.provider,
+                "model": getattr(llm, "model_id", None) or getattr(llm, "model_name", None) or getattr(llm, "model", None),
+                "temperature": getattr(llm, "temperature", None),
+            })
         timeout_seconds = settings.llm.request_timeout_seconds
         logger.info(
             f"[{ticker}] Invoking LLM for memo generation (timeout={timeout_seconds}s)..."
@@ -521,7 +533,12 @@ async def draft_memo_node(state: AgentState) -> dict:
                 f"{timeout_seconds}s (set LLM_REQUEST_TIMEOUT_SECONDS to increase)."
             ) from exc
 
-        memo = getattr(response, "content", "")
+        content = getattr(response, "content", "")
+        memo = content if isinstance(content, str) else "\n".join(
+            block if isinstance(block, str) else block.get("text", "")
+            for block in content
+            if isinstance(block, str) or isinstance(block, dict) and block.get("type") == "text"
+        )
 
         used_citations = _extract_used_citations(memo)
         valid_indices = {entry["index"] for entry in registry}
@@ -561,9 +578,9 @@ async def draft_memo_node(state: AgentState) -> dict:
             "current_step": AgentStep.DRAFT_MEMO.value,
         }
 
-    except Exception as e:
-        logger.error(f"[{ticker}] Memo generation failed. Error: {e}")
-        return add_error(state, "draft_memo", str(e), recoverable=False)
+    except Exception:
+        logger.error(f"[{ticker}] Memo generation failed")
+        return add_error(state, "draft_memo", "Workflow step failed.", recoverable=False)
 
 @traceable(name="verify_memo", run_type="chain", tags=["agent"])
 async def verify_memo_node(state: AgentState) -> dict:
@@ -758,9 +775,10 @@ async def run_agent(
     # Create agent
     agent = create_agent()
 
-    # Get tracer for LangGraph
-    tracer = get_tracer()
-    config: RunnableConfig | None = {"callbacks": [tracer]} if tracer else {}
+    metadata = {"agent": "financial_analyst", "agent_version": "1.1.0", **model_metadata(settings)}
+    if run := get_current_run_tree():
+        run.metadata.update(metadata)
+    config: RunnableConfig = {"run_name": "financial_analyst_graph", "metadata": metadata, "tags": ["agent"]}
 
     # Excecute
     start_time = datetime.now(timezone.utc)

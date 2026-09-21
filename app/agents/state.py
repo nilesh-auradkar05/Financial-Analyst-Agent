@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Required, TypedDict
 
+from langsmith import get_current_run_tree
+
 # ENUMS
 
 class AgentStep(str, Enum):
@@ -122,10 +124,12 @@ def add_error(
     recoverable: bool = True,
 ) -> dict:
     """Add error to state. Returns partial state update."""
+    if run := get_current_run_tree():
+        run.metadata.update(outcome="failed", error_code="workflow_step_failed")
     errors = state.get("errors", [])
     errors.append({
         "step": step,
-        "message": message,
+        "message": "Workflow step failed.",
         "recoverable": recoverable,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })

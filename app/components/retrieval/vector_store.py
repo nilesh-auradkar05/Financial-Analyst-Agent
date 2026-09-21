@@ -35,6 +35,7 @@ from typing import Any, Literal, Optional, Protocol, cast
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from langsmith import get_current_run_tree
 from loguru import logger
 
 from app.components.retrieval.embeddings import get_embeddings
@@ -471,6 +472,8 @@ class ChromaDBVectorStore:
 
         try:
             # Generate query embedding
+            if run := get_current_run_tree():
+                run.metadata.update(embedding_model=self._embeddings.model, embedding_provider="ollama")
             query_embedding = self._embeddings.embed_query(query)
 
             # Build query Kwargs

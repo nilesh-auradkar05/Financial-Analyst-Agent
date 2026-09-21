@@ -199,8 +199,8 @@ async def search_company_news(
             )
         return articles
 
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
+    except Exception:
+        logger.error("News search failed")
         return []
 
 

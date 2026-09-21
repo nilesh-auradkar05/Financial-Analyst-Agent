@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from langsmith import traceable
+from langsmith import get_current_run_tree, traceable
 from loguru import logger
 from transformers import PreTrainedTokenizerBase
 
@@ -211,6 +211,8 @@ class SentimentAnalyzer:
         if not texts:
             return []
 
+        if run := get_current_run_tree():
+            run.metadata.update(model=self.model_name, provider="huggingface", model_role="sentiment")
         import torch
         self._load_model()
         if self._tokenizer is None or self._model is None:

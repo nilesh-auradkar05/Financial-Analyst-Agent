@@ -214,6 +214,8 @@ class AnalysisResponse(BaseModel):
 
     # Identifiers
     job_id: Optional[str] = None
+    request_id: Optional[str] = None
+    trace_id: Optional[str] = None
     ticker: str
     company_name: str
 
@@ -258,6 +260,8 @@ class JobAcceptedResponse(BaseModel):
     """Immediate response for async job acceptance."""
 
     job_id: str
+    request_id: Optional[str] = None
+    trace_id: Optional[str] = None
     ticker: str
     status: JobStatus
     started_at: str
@@ -270,6 +274,8 @@ class JobPollResponse(BaseModel):
     """
 
     job_id: str
+    request_id: Optional[str] = None
+    trace_id: Optional[str] = None
     ticker: str
     status: JobStatus
     started_at: str

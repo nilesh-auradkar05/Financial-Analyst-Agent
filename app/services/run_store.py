@@ -22,6 +22,8 @@ class RunRecord:
     error: Optional[str] = None
     idempotency_identity: Optional[str] = None
     request_fingerprint: Optional[str] = None
+    request_id: Optional[str] = None
+    trace_id: Optional[str] = None
 
 class FileBackedRunStore:
     """
@@ -34,12 +36,13 @@ class FileBackedRunStore:
         if not self.path.exists():
             self._write_all({})
 
-    def create_run(self, job_id: str, ticker: str, company_name: Optional[str] = None) -> RunRecord:
+    def create_run(self, job_id: str, ticker: str, company_name: Optional[str] = None, *, request_id: str | None = None, trace_id: str | None = None) -> RunRecord:
         now = datetime.now(timezone.utc).isoformat()
         record = RunRecord(
             job_id=job_id,
             ticker=ticker.upper(),
             company_name=company_name,
+            request_id=request_id, trace_id=trace_id,
             status="pending",
             started_at=now,
         )
@@ -58,6 +61,8 @@ class FileBackedRunStore:
         idempotency_key: str,
         request_fingerprint: str,
         company_name: Optional[str] = None,
+        request_id: str | None = None,
+        trace_id: str | None = None,
     ) -> tuple[RunRecord, bool]:
         identity = f"{principal}:{idempotency_key}"
         with self._lock:
@@ -73,6 +78,7 @@ class FileBackedRunStore:
                 job_id=job_id,
                 ticker=ticker.upper(),
                 company_name=company_name,
+            request_id=request_id, trace_id=trace_id,
                 status="pending",
                 started_at=datetime.now(timezone.utc).isoformat(),
                 idempotency_identity=identity,

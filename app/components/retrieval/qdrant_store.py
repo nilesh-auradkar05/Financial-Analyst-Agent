@@ -13,6 +13,7 @@ import time
 import uuid
 from typing import Any, Optional, cast
 
+from langsmith import get_current_run_tree
 from loguru import logger
 from qdrant_client import QdrantClient, models
 
@@ -164,6 +165,8 @@ class QdrantVectorStore(RetrievalStore):
                 filter_used=self._filters_for_reporting(filters),
             )
 
+        if run := get_current_run_tree():
+            run.metadata.update(embedding_model=self._embeddings.model, embedding_provider="ollama")
         query_embedding = self._embeddings.embed_query(query)
         query_filter = self._to_qdrant_filter(filters)
 

@@ -499,3 +499,38 @@ without printing it. For exactly one analysis use
 `python scripts/smoke_test_live_pipeline.py --async-only --skip-ingest`.
 Polling stops at completed, degraded, evidence_missing or failed; non-completed
 outcomes are printed honestly and exit with status 1.
+
+
+### Request correlation and LangSmith tracing
+
+Tracing defaults to **off**. Configure `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`
+and optionally `LANGSMITH_PROJECT`. Legacy `LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`
+and `LANGCHAIN_PROJECT` are also accepted; modern names win. False, 0, no and off
+all disable tracing; no nonblank key means no exporter. Restart the API after changing
+configuration. One client lives for the API lifespan, with a bounded shutdown flush.
+
+Inspect headers with an authorized request (credentials supplied through your environment):
+
+```bash
+curl -i -H "X-API-Key: $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"ticker":"AAPL"}' http://localhost:8000/analyze/async
+```
+
+Every response includes `X-Request-ID`; callers may supply a canonical UUID. Invalid
+IDs return 400 with a generated ID. Enabled tracing adds `X-Trace-ID`. Both headers
+are exposed through CORS. Poll the returned `Location`: poll headers identify the
+poll itself, while `request_id`/`trace_id` in the body and nested result identify the
+original analysis. Idempotent retries retain that original job correlation.
+
+Find the trace ID in the configured LangSmith project. The HTTP span records route,
+status, duration and outcome. Async HTTP duration ends at the 202 response; its
+`analysis_job` child contains `run_financial_analysis`, `financial_analyst_graph`,
+node/tool/retrieval spans, the native chat-model call and verification. Native model
+spans contain prompts/generations/token usage and provider-exposed reasoning when
+returned; they do not expose hidden thoughts. Only text blocks enter the memo.
+Effective chat model/provider/temperature are recorded; executing FinBERT and retrieval
+spans record their actual model identifiers. App-managed errors use safe codes; HTTP
+auth/cookies/full headers are not trace inputs. Exported evidence and model content
+remain visible in your LangSmith project. A trace header is a correlation identifier,
+not proof of delivery when the exporter is unavailable. Health reports tracing
+configuration without making a credentialed export probe.

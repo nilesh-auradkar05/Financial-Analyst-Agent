@@ -38,6 +38,21 @@ def _model_family(model_id: str) -> str:
     return "other"
 
 
+def model_metadata(settings: Settings) -> dict:
+    """Effective factory settings; native model spans remain authoritative."""
+    provider = settings.llm.provider.lower()
+    model = settings.ollama.llm_model if provider == "ollama" else MODEL_PRESETS.get(settings.llm.model, settings.llm.model)
+    family = _model_family(model)
+    omit_temperature = provider == "bedrock_openai" or (
+        provider == "bedrock" and (
+            family == "claude" and settings.llm.thinking_mode in {"enabled", "adaptive"}
+            or family == "deepseek" and settings.llm.thinking_mode != "off"
+        )
+    )
+    return {"provider": provider, "model": model,
+            "temperature": None if omit_temperature else settings.llm.temperature}
+
+
 def get_llm(settings: Settings) -> BaseChatModel:
     """Return a configured chat model using the active provider settings."""
     provider = settings.llm.provider.lower()

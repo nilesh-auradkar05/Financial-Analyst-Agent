@@ -59,6 +59,17 @@ Allowed:
 - Fatal workflow failure or absent memo wins over evidence gaps. Required stock, enabled filings, and enabled news/sentiment gaps appear in `missing`. Otherwise absent/failed verification is degraded; only explicit passed verification is completed. Poll and nested result status agree; workflow error messages are sanitized.
 - Health checks the actual embedding model separately from local chat; Bedrock checks configuration only (no inference guarantee). Missing retrieval/embedding/local-chat dependency yields 503 without leaking backend exceptions.
 
+
+### Correlated tracing (authorized S7 slice, 2026-09-21)
+
+- T2-01: Canonical UUID `X-Request-ID` is accepted or generated on every response; invalid/duplicate/oversized IDs return safe 400 with a fresh ID. Traced responses expose `X-Trace-ID`, including validation, router and application errors. HTTP spans record resolved route, status, response duration and outcome without auth/cookies/full headers.
+- T2-02: Real compiled graph produces HTTP → run_financial_analysis → financial_analyst_graph → node/tool/retrieval/verifier/native model lineage. Only actual chat-model spans are LLM runs. Model metadata reflects effective provider/model/temperature; actual sentiment and embedding execution records its model identifier. Disabled stages record skipped outcomes; failed app stages use safe error text.
+- T2-03: Async acceptance ends HTTP timing at 202; analysis_job restores an explicit native carrier using the same lifespan client, even after the accepting context closes. Job and result persist original request/trace IDs; idempotent replay preserves them, while poll/replay HTTP headers identify their own requests.
+- T2-04: Concurrent HTTP requests have independent IDs, trees and ticker outputs. An in-memory public SDK create/update collector verifies hierarchy and original async correlation; offline tests deny network transport.
+- T2-05: Boolean false/0/no/off and absent/blank keys disable export, even with inherited tracing environment enabled. Modern LANGSMITH aliases take precedence over legacy LANGCHAIN aliases. Defaults are off. One lifespan client is reused and shutdown flush is bounded; initialization/create/update/flush failures cannot fail successful business requests.
+- T2-06: Native model spans retain raw messages, prompts, token metadata and provider-exposed reasoning blocks when supplied. Memo/API text includes only text content blocks. No hidden reasoning is claimed.
+- T2-07: Error spans/records retain safe public codes/error IDs and correlation, excluding raw app exception text, credentials and cookies. Failed async jobs remain pollable under original correlation.
+
 ## 2. Workflow behavior
 
 | Case | Expected behavior |

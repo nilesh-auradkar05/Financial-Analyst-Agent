@@ -89,7 +89,13 @@ from app.models import (
     VerificationClaimResponse,
     VerificationResponse,
 )
-from app.observability.langsmith import check_langsmith_connection, setup_langsmith_env
+from app.observability.langsmith import (
+    RequestTracingMiddleware,
+    check_langsmith_connection,
+    setup_langsmith_env,
+    shutdown_langsmith,
+    trace_boundary,
+)
 from app.observability.metrics import (
     get_metrics,
     get_metrics_content_type,
@@ -105,6 +111,7 @@ run_store = FileBackedRunStore(RUN_STORE_PATH)
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     code: {"model": ErrorResponse, "description": description}
     for code, description in {
+        400: "Invalid request correlation ID",
         401: "Missing or invalid API key", 404: "Resource not found",
         405: "Method not allowed",
         409: "Idempotency key conflict", 422: "Request validation failed",
@@ -173,7 +180,7 @@ def _raise_internal_error(
     exc: Exception,
 ) -> NoReturn:
     error_id = _new_error_id()
-    logger.exception(f"{operation} failed | error_id={error_id}")
+    logger.error(f"{operation} failed | error_id={error_id}")
     raise HTTPException(
         status_code=500,
         detail=_public_error_detail(code, message, error_id),
@@ -246,7 +253,10 @@ async def lifespan(app: FastAPI):
 
     logger.info("Financial Analyst Agent System API ready!")
 
-    yield
+    try:
+        yield
+    finally:
+        await shutdown_langsmith()
 
     # Shutdown
     logger.info("Shutting down...")
@@ -262,7 +272,7 @@ app = FastAPI(
     description="AI-powered financial analysis agent",
     version="1.1.0",
     lifespan=lifespan,
-    responses={code: ERROR_RESPONSES[code] for code in (404, 405, 500)},
+    responses={code: ERROR_RESPONSES[code] for code in (400, 404, 405, 500)},
 )
 
 
@@ -277,7 +287,10 @@ async def prevent_sensitive_response_caching(request: Request, call_next):
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
     fields = [".".join(str(part) for part in error["loc"] if part != "body") for error in exc.errors()]
-    return _error_response(422, "validation_error", f"Invalid request fields: {', '.join(fields)}")
+    response = _error_response(422, "validation_error", f"Invalid request fields: {', '.join(fields)}")
+    detail = json.loads(bytes(response.body))["error"]
+    _request.state.trace_error = {key: detail[key] for key in ("code", "error_id")}
+    return response
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -287,13 +300,14 @@ async def http_error_handler(_request: Request, exc: StarletteHTTPException) -> 
         content = {"error": detail}
     else:
         content = {"error": _public_error_detail("http_error", str(detail), _new_error_id())}
+    _request.state.trace_error = {key: content["error"][key] for key in ("code", "error_id")}
     return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
 
 
 @app.exception_handler(Exception)
 async def unhandled_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     error_id = _new_error_id()
-    logger.exception(f"Unhandled API error | error_id={error_id}")
+    logger.error(f"Unhandled API error | error_id={error_id}")
     return JSONResponse(status_code=500, content={"error": _public_error_detail("internal_error", "Internal server error.", error_id)}, headers={"Cache-Control": "no-store"})
 
 # CORS
@@ -302,9 +316,12 @@ app.add_middleware(
     allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization", "X-API-Key", "Idempotency-Key"],
-    expose_headers=["Location", "Retry-After"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "Idempotency-Key", "X-Request-ID"],
+    expose_headers=["Location", "Retry-After", "X-Request-ID", "X-Trace-ID"],
 )
+
+
+app.add_middleware(RequestTracingMiddleware)
 
 
 # =============================================================================
@@ -373,7 +390,7 @@ async def stats(_principal: str = Depends(_authenticate), store: RetrievalStore 
 
 
 @app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 429, 503)})
-async def analyze(request: AnalysisRequest, _principal: str = Depends(_limit_submission)):
+async def analyze(request: AnalysisRequest, http_request: Request, _principal: str = Depends(_limit_submission)):
     """
     Run synchronous stock analysis.
 
@@ -392,7 +409,11 @@ async def analyze(request: AnalysisRequest, _principal: str = Depends(_limit_sub
                     include_news_sentiment=request.include_news_sentiment,
                     max_news_articles=request.max_news_articles,
                 )
-                return _format_response(result)
+                formatted = _format_response(result)
+                formatted.request_id = http_request.state.request_id
+                formatted.trace_id = http_request.state.trace_id
+                http_request.state.trace_outcome = formatted.status.value
+                return formatted
 
             except Exception as exc:
                 _raise_internal_error(
@@ -407,6 +428,7 @@ async def analyze(request: AnalysisRequest, _principal: str = Depends(_limit_sub
 async def analyze_async(
     request: AnalysisRequest,
     background_tasks: BackgroundTasks,
+    http_request: Request,
     response: Response,
     principal: str = Depends(_limit_submission),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", min_length=1, max_length=200),
@@ -428,11 +450,13 @@ async def analyze_async(
                 job_id, ticker, principal=principal,
                 idempotency_key=hashlib.sha256(idempotency_key.encode()).hexdigest(),
                 request_fingerprint=fingerprint, company_name=request.company_name,
+                request_id=http_request.state.request_id, trace_id=http_request.state.trace_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=409, detail={"code": "idempotency_conflict", "message": str(exc), "error_id": _new_error_id()}) from exc
     else:
-        record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name)
+        record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name,
+                                      request_id=http_request.state.request_id, trace_id=http_request.state.trace_id)
 
     # Start background task
     if created:
@@ -444,13 +468,17 @@ async def analyze_async(
         request.include_filing_analysis,
         request.include_news_sentiment,
         request.max_news_articles,
+        http_request.state.trace_parent,
         )
         logger.info(f"Started async job {record.job_id} for {ticker}")
 
+    http_request.state.trace_outcome = "accepted"
     response.headers["Location"] = f"/jobs/{record.job_id}"
 
     return JobAcceptedResponse(
         job_id=record.job_id,
+        request_id=record.request_id,
+        trace_id=record.trace_id,
         status=JobStatus(record.status),
         ticker=record.ticker,
         started_at=record.started_at,
@@ -469,6 +497,8 @@ async def get_job_status(job_id: uuid.UUID, _principal: str = Depends(_authentic
 
     return JobPollResponse(
         job_id=record.job_id,
+        request_id=record.request_id,
+        trace_id=record.trace_id,
         status=JobStatus(record.status),
         ticker=record.ticker,
         started_at=record.started_at,
@@ -485,31 +515,36 @@ async def _run_analysis_job(
     include_filing_analysis: bool = True,
     include_news_sentiment: bool = True,
     max_news_articles: int = 10,
+    trace_parent: dict[str, str] | None = None,
 ) -> None:
-    """Background task for async analysis."""
-    run_store.mark_running(job_id)
+    """Background task linked explicitly to the accepting HTTP span."""
+    record = run_store.get_run(job_id)
+    async with trace_boundary("analysis_job", parent=trace_parent, metadata={
+        "job_id": job_id, "ticker": ticker,
+        "request_id": record.request_id if record else None,
+    }) as run:
+        try:
+            run_store.mark_running(job_id)
+            with track_agent_run(ticker):
+                result = await run_agent(
+                    ticker, company_name,
+                    include_filing_analysis=include_filing_analysis,
+                    include_news_sentiment=include_news_sentiment,
+                    max_news_articles=max_news_articles,
+                )
+                formatted = _format_response(result).model_dump()
+                formatted.update(job_id=job_id, request_id=record.request_id if record else None,
+                                 trace_id=record.trace_id if record else None)
+                run_store.mark_finished(job_id, status=formatted["status"], result=formatted)
+                if run:
+                    run.end(outputs={"outcome": formatted["status"], "job_id": job_id})
+        except Exception:
+            error_id = _new_error_id()
+            logger.error("Async analysis failed | job_id={} | error_id={}", job_id, error_id)
+            run_store.mark_failed(job_id, error=_public_failure_message("Analysis job failed", error_id))
+            if run:
+                run.end(outputs={"outcome": "failed", "error_id": error_id}, error="analysis_failed")
 
-    try:
-        with track_agent_run(ticker):
-            result = await run_agent(
-                ticker,
-                company_name,
-                include_filing_analysis=include_filing_analysis,
-                include_news_sentiment=include_news_sentiment,
-                max_news_articles=max_news_articles,
-            )
-            formatted = _format_response(result).model_dump()
-            formatted["job_id"] = job_id
-            run_store.mark_finished(job_id, status=formatted["status"], result=formatted)
-    except Exception:
-        error_id = _new_error_id()
-        logger.exception(
-            f"Async analysis job failed | job_id={job_id} | ticker={ticker} | error_id={error_id}"
-        )
-        run_store.mark_failed(
-            job_id,
-            error=_public_failure_message(message="Analysis job failed", error_id=error_id),
-        )
 
 def _format_response(state: AgentState) -> AnalysisResponse:
     """Format agent state as API response."""
@@ -684,7 +719,7 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
             raise
         except Exception:
             error_id = _new_error_id()
-            logger.exception(
+            logger.error(
                 f"Ingestion failed | ticker={ticker} | error_id={error_id}",
             )
             raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": error_id})
