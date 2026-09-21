@@ -548,3 +548,23 @@ def test_openapi_defines_security_and_error_schema(client):
     assert {"HTTPBearer": []} in operation["security"]
     assert {"APIKeyHeader": []} in operation["security"]
     assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith("ErrorResponse")
+
+
+# Trace: docs/test-plan.md §1 all-route OpenAPI contracts.
+def test_all_nine_routes_document_actual_success_and_errors(client):
+    schema = client.get("/openapi.json").json()
+    routes = [("/", "get", "200"), ("/health", "get", "200"),
+              ("/metrics", "get", "200"), ("/stats", "get", "200"),
+              ("/analyze", "post", "200"), ("/analyze/async", "post", "202"),
+              ("/jobs/{job_id}", "get", "200"), ("/ingest", "post", "200"),
+              ("/ingest/{ticker}", "get", "200")]
+    for path, method, status in routes:
+        operation = schema["paths"][path][method]
+        content = operation["responses"][status]["content"]
+        if path == "/metrics":
+            actual = client.get(path)
+            assert actual.headers["content-type"] in content
+            assert "application/json" not in content
+        else:
+            assert content["application/json"]["schema"].get("$ref")
+        assert operation["responses"]["405"]["content"]["application/json"]["schema"]["$ref"].endswith("ErrorResponse")

@@ -5,7 +5,7 @@ This module defines the Pydantic models for the API request/response validation.
 """
 
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -296,13 +296,21 @@ class HealthResponse(BaseModel):
     timestamp: str
     components: dict[str, dict]
 
-class StatsResponse(BaseModel):
-    """System statistics response."""
+class InfoResponse(BaseModel):
+    name: str
+    version: str
+    description: str
 
-    total_jobs_completed: int
-    total_companies_indexed: int
-    vector_store_documents: int
-    uptime_seconds: float
+
+class IngestionStatusResponse(BaseModel):
+    ticker: str
+    indexed: bool
+    document_count: int
+
+
+class StatsResponse(BaseModel):
+    vector_store: dict[str, Any]
+    run_store: dict[str, Any]
 
 # ERROR RESPONSES
 

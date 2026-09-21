@@ -490,3 +490,12 @@ A 200 health response therefore does not certify a successful Bedrock inference.
 Ingestion supports only 10-K; `force_refresh: true` replaces existing content.
 Terminal statuses are failed (fatal/no memo), evidence_missing (required source
 missing), degraded (verification absent/failed), or completed (verified).
+
+
+The Compose API service forwards host `API_KEY` into its container. Export it
+before `docker compose up`; an empty value intentionally leaves auth fail-closed.
+The maintained live smoke client also reads `API_KEY` from its environment
+without printing it. For exactly one analysis use
+`python scripts/smoke_test_live_pipeline.py --async-only --skip-ingest`.
+Polling stops at completed, degraded, evidence_missing or failed; non-completed
+outcomes are printed honestly and exit with status 1.

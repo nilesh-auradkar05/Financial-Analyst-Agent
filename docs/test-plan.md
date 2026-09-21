@@ -48,6 +48,8 @@ Allowed:
 
 ### REST hardening (authorized S7 slice, 2026-09-21)
 
+- All nine routes document their actual success schema/media type; metrics is Prometheus text, not JSON. The maintained smoke client supplies process-environment auth, accepts all terminal states, returns a failing exit for non-completed results, and supports a single async submission.
+
 - Async submission returns 202 and a pollable `Location`; OpenAPI describes the typed error envelope and either Bearer or X-API-Key authentication.
 - Every protected route rejects missing/invalid credentials with 401 and `WWW-Authenticate`; an unconfigured server fails closed with 503. Root and health remain public.
 - Validation, router 404/405, upstream 502, and unhandled 500 responses expose only `{error: {code, message, error_id}}`; 405 preserves `Allow`. Financial/job/error responses use `Cache-Control: no-store`.

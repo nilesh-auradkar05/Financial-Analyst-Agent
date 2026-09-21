@@ -75,13 +75,16 @@ from app.models import (
     ErrorDetail,
     ErrorResponse,
     HealthResponse,
+    InfoResponse,
     IngestionRequest,
     IngestionResponse,
+    IngestionStatusResponse,
     JobAcceptedResponse,
     JobPollResponse,
     JobStatus,
     NewsArticleResponse,
     SentimentResponse,
+    StatsResponse,
     StockDataResponse,
     VerificationClaimResponse,
     VerificationResponse,
@@ -103,6 +106,7 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     code: {"model": ErrorResponse, "description": description}
     for code, description in {
         401: "Missing or invalid API key", 404: "Resource not found",
+        405: "Method not allowed",
         409: "Idempotency key conflict", 422: "Request validation failed",
         429: "Submission rate limit exceeded", 500: "Internal server error",
         502: "Upstream ingestion failure", 503: "Service unavailable",
@@ -258,7 +262,7 @@ app = FastAPI(
     description="AI-powered financial analysis agent",
     version="1.1.0",
     lifespan=lifespan,
-    responses=ERROR_RESPONSES,
+    responses={code: ERROR_RESPONSES[code] for code in (404, 405, 500)},
 )
 
 
@@ -308,7 +312,7 @@ app.add_middleware(
 # =============================================================================
 
 
-@app.get("/", tags=["Info"])
+@app.get("/", tags=["Info"], response_model=InfoResponse)
 async def root():
     """API information."""
     return {
@@ -346,7 +350,7 @@ async def health():
     return JSONResponse(status_code=200 if response.status == "healthy" else 503, content=response.model_dump())
 
 
-@app.get("/metrics", tags=["Info"])
+@app.get("/metrics", tags=["Info"], response_class=Response, responses={**{code: ERROR_RESPONSES[code] for code in (401, 503)}, 200: {"content": {get_metrics_content_type(): {"schema": {"type": "string"}}}}})
 async def metrics(_principal: str = Depends(_authenticate)):
     """Prometheus metrics endpoint."""
     return Response(
@@ -355,7 +359,7 @@ async def metrics(_principal: str = Depends(_authenticate)):
     )
 
 
-@app.get("/stats", tags=["Info"])
+@app.get("/stats", tags=["Info"], response_model=StatsResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 503)})
 async def stats(_principal: str = Depends(_authenticate), store: RetrievalStore = Depends(_get_store)):
     """Vector store and run-store statistics."""
     return {
@@ -368,7 +372,7 @@ async def stats(_principal: str = Depends(_authenticate), store: RetrievalStore 
 # =============================================================================
 
 
-@app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"], responses=ERROR_RESPONSES)
+@app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 429, 503)})
 async def analyze(request: AnalysisRequest, _principal: str = Depends(_limit_submission)):
     """
     Run synchronous stock analysis.
@@ -454,7 +458,7 @@ async def analyze_async(
     )
 
 
-@app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"], responses=ERROR_RESPONSES)
+@app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
 async def get_job_status(job_id: uuid.UUID, _principal: str = Depends(_authenticate)):
     """Get async job status and return completed result when available."""
     record = run_store.get_run(str(job_id))
@@ -650,7 +654,7 @@ def _normalize_sections_processed(value: object) -> list[str]:
 # =============================================================================
 
 
-@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], responses=ERROR_RESPONSES)
+@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 429, 502, 503)})
 async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_limit_submission)):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
@@ -686,7 +690,7 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
             raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": error_id})
 
 
-@app.get("/ingest/{ticker}", tags=["Ingestion"])
+@app.get("/ingest/{ticker}", tags=["Ingestion"], response_model=IngestionStatusResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
 async def check_ingestion(
     ticker: Annotated[str, ApiPath(pattern=r"^[A-Za-z]{1,5}(?:\.[A-Za-z])?$")],
     _principal: str = Depends(_authenticate),
