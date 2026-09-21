@@ -46,6 +46,17 @@ Allowed:
 
 ---
 
+### REST hardening (authorized S7 slice, 2026-09-21)
+
+- Async submission returns 202 and a pollable `Location`; OpenAPI describes the typed error envelope and either Bearer or X-API-Key authentication.
+- Every protected route rejects missing/invalid credentials with 401 and `WWW-Authenticate`; an unconfigured server fails closed with 503. Root and health remain public.
+- Validation, router 404/405, upstream 502, and unhandled 500 responses expose only `{error: {code, message, error_id}}`; 405 preserves `Allow`. Financial/job/error responses use `Cache-Control: no-store`.
+- Tickers normalize to uppercase, including BRK.B; reject malformed UUIDs, extra fields, long/control-containing names, and non-10-K filings. Force refresh replaces existing ingestion content.
+- The eleventh mutating request per key per 60 seconds returns 429 with `Retry-After`; expiry admits requests again.
+- Atomic async idempotency binds hashed principal/key to normalized body: replay returns the same job without new execution; changed body returns 409. Raw credentials never enter persistence.
+- Fatal workflow failure or absent memo wins over evidence gaps. Required stock, enabled filings, and enabled news/sentiment gaps appear in `missing`. Otherwise absent/failed verification is degraded; only explicit passed verification is completed. Poll and nested result status agree; workflow error messages are sanitized.
+- Health checks the actual embedding model separately from local chat; Bedrock checks configuration only (no inference guarantee). Missing retrieval/embedding/local-chat dependency yields 503 without leaking backend exceptions.
+
 ## 2. Workflow behavior
 
 | Case | Expected behavior |

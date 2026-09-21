@@ -4,11 +4,12 @@ API Schemas
 This module defines the Pydantic models for the API request/response validation.
 """
 
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+TICKER_PATTERN = r"^[A-Z]{1,5}(?:\.[A-Z])?$"
 
 # ENUMS
 
@@ -18,6 +19,8 @@ class JobStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
+    DEGRADED = "degraded"
+    EVIDENCE_MISSING = "evidence_missing"
     FAILED = "failed"
 
 class SentimentLabel(str, Enum):
@@ -54,13 +57,15 @@ class AnalysisRequest(BaseModel):
     ticker: str = Field(
         ...,
         min_length=1,
-        max_length=10,
+        max_length=6,
+        pattern=TICKER_PATTERN,
         description="Stock ticker symbol (eg: 'AAPL', 'TSLA')",
         examples=["AAPL", "TSLA"],
     )
 
     company_name: Optional[str] = Field(
         default=None,
+        max_length=80,
         description="Company name (Optional, auto-fetched if not provided)",
     )
     include_filing_analysis: bool = Field(
@@ -78,6 +83,18 @@ class AnalysisRequest(BaseModel):
         description="Maximum news articles to analyze",
     )
 
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
+
+    @field_validator("company_name")
+    @classmethod
+    def reject_control_characters(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value):
+            raise ValueError("company_name must not contain control characters")
+        return value
+
 class IngestionRequest(BaseModel):
     """Request to ingest SEC filings for a company.
 
@@ -89,17 +106,24 @@ class IngestionRequest(BaseModel):
     ticker: str = Field(
         ...,
         min_length=1,
-        max_length=10,
+        max_length=6,
+        pattern=TICKER_PATTERN,
         description="Stock ticker symbol",
     )
     filing_type: str = Field(
         default="10-K",
+        pattern=r"^10-K$",
         description="SEC filing type to ingest",
     )
     force_refresh: bool = Field(
         default=False,
         description="Re-ingest even if data already exists",
     )
+
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
 
 # RESPONSE MODELS
 
@@ -209,6 +233,7 @@ class AnalysisResponse(BaseModel):
 
     # Errors (for partial failures)
     errors: list[ErrorDetail] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
 
     # Metadata
     started_at: Optional[str] = None
@@ -281,31 +306,21 @@ class StatsResponse(BaseModel):
 
 # ERROR RESPONSES
 
+class PublicErrorDetail(BaseModel):
+    """Safe API failure details, with an opaque support identifier."""
+
+    code: str
+    message: str
+    error_id: str
+
+
 class ErrorResponse(BaseModel):
-    """Standard error response."""
+    error: PublicErrorDetail
 
-    error: str
-    detail: Optional[str] = None
-    status_code: int
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-    model_config = ConfigDict(
-        json_schema_extra = {
-            "example": {
-                "error": "Analysis failed",
-                "detail": "Could not connect to Ollama server",
-                "status_code": 500,
-                "timestamp": "2025-01-01T10:32:00Z",
-            }
-        },
-    )
+class ValidationErrorResponse(ErrorResponse):
+    """Validation failures use the same safe envelope as other errors."""
 
-class ValidationErrorResponse(BaseModel):
-    """Validation error response."""
-
-    error: str = "Validation error"
-    detail: list[dict]
-    status_code: int = 422
 
 # MODULE EXPORTS
 

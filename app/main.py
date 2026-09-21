@@ -33,15 +33,34 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
+import json
+import secrets
+import time
 import uuid
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import NoReturn, Optional
+from typing import Annotated, Any, NoReturn, Optional
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
+from fastapi import Path as ApiPath
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # Local Imports
 from app.agents.graph import run_agent
@@ -54,6 +73,7 @@ from app.models import (
     AnalysisResponse,
     CitationResponse,
     ErrorDetail,
+    ErrorResponse,
     HealthResponse,
     IngestionRequest,
     IngestionResponse,
@@ -78,6 +98,51 @@ from app.services.run_store import FileBackedRunStore
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
+
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    code: {"model": ErrorResponse, "description": description}
+    for code, description in {
+        401: "Missing or invalid API key", 404: "Resource not found",
+        409: "Idempotency key conflict", 422: "Request validation failed",
+        429: "Submission rate limit exceeded", 500: "Internal server error",
+        502: "Upstream ingestion failure", 503: "Service unavailable",
+    }.items()
+}
+
+bearer_auth = HTTPBearer(auto_error=False)
+key_auth = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+
+class SubmissionRateLimiter:
+    """Single-process sliding-window submission limiter with stale-key cleanup."""
+
+    def __init__(self) -> None:
+        self._requests: dict[str, deque[float]] = defaultdict(deque)
+
+    def check(self, principal: str) -> None:
+        now = time.monotonic()
+        cutoff = now - settings.api_rate_window_seconds
+        # ponytail: single-process limiter; use shared storage before multiple workers.
+        self._requests = defaultdict(deque, {
+            key: values for key, values in self._requests.items()
+            if values and values[-1] > cutoff
+        })
+        history = self._requests[principal]
+        while history and history[0] <= cutoff:
+            history.popleft()
+        if len(history) >= settings.api_rate_limit:
+            retry_after = max(1, int(history[0] + settings.api_rate_window_seconds - now) + 1)
+            raise HTTPException(
+                status_code=429,
+                detail={"code": "rate_limited", "message": "Submission rate limit exceeded.", "error_id": _new_error_id()},
+                headers={"Retry-After": str(retry_after)},
+            )
+        history.append(now)
+
+
+
+submission_limiter = SubmissionRateLimiter()
 
 def _get_store() -> RetrievalStore:
     """FastAPI dependency. Override in tests via app.dependency_overrides"""
@@ -111,6 +176,37 @@ def _raise_internal_error(
     ) from exc
 
 
+def _error_response(status_code: int, code: str, message: str, *, headers: dict[str, str] | None = None) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": _public_error_detail(code, message, _new_error_id())},
+        headers=headers,
+    )
+
+
+async def _authenticate(
+    authorization: HTTPAuthorizationCredentials | None = Depends(bearer_auth),
+    x_api_key: str | None = Depends(key_auth),
+) -> str:
+    configured = settings.api_key
+    if not configured:
+        raise HTTPException(status_code=503, detail={"code": "auth_unconfigured", "message": "API authorization is not configured.", "error_id": _new_error_id()})
+    bearer = authorization.credentials if authorization else None
+    supplied = x_api_key or bearer
+    if supplied is None or not secrets.compare_digest(supplied.encode(), configured.encode()):
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "unauthorized", "message": "A valid API key is required.", "error_id": _new_error_id()},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return hashlib.sha256(supplied.encode()).hexdigest()
+
+
+async def _limit_submission(principal: str = Depends(_authenticate)) -> str:
+    submission_limiter.check(principal)
+    return principal
+
+
 # =============================================================================
 # LIFESPAN
 # =============================================================================
@@ -130,17 +226,19 @@ async def lifespan(app: FastAPI):
     # Setup LangSmith
     setup_langsmith_env()
 
-    # Check Ollama
-    ollama_ok = await check_ollama_health(log_failure=True)
-    if ollama_ok:
-        logger.info(f"Ollama connected ({settings.ollama.llm_model})")
-    else:
-        logger.warning("Ollama not available")
+    # Embeddings always use Ollama, independently of the selected chat provider.
+    embeddings_ok = await check_ollama_health(model=settings.ollama.embed_model, log_failure=True)
+    if not embeddings_ok:
+        logger.warning("Ollama embedding model not available")
+    if settings.llm.provider == "ollama":
+        await check_ollama_health(log_failure=True)
 
-    # Initialize vector store
-    store = get_vector_store()
+    try:
+        store = get_vector_store()
+        logger.info(f"Vector store: {store.count} documents")
+    except Exception:
+        logger.warning("Vector store unavailable; health endpoint will report degraded")
     logger.info(f"Run store: {RUN_STORE_PATH}")
-    logger.info(f"Vector store: {store.count} documents")
 
     logger.info("Financial Analyst Agent System API ready!")
 
@@ -160,7 +258,39 @@ app = FastAPI(
     description="AI-powered financial analysis agent",
     version="1.1.0",
     lifespan=lifespan,
+    responses=ERROR_RESPONSES,
 )
+
+
+@app.middleware("http")
+async def prevent_sensitive_response_caching(request: Request, call_next):
+    response = await call_next(request)
+    if response.status_code >= 400 or request.url.path.startswith(("/analyze", "/jobs", "/ingest", "/stats")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    fields = [".".join(str(part) for part in error["loc"] if part != "body") for error in exc.errors()]
+    return _error_response(422, "validation_error", f"Invalid request fields: {', '.join(fields)}")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    detail = exc.detail
+    if isinstance(detail, dict) and {"code", "message", "error_id"} <= detail.keys():
+        content = {"error": detail}
+    else:
+        content = {"error": _public_error_detail("http_error", str(detail), _new_error_id())}
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
+
+
+@app.exception_handler(Exception)
+async def unhandled_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    error_id = _new_error_id()
+    logger.exception(f"Unhandled API error | error_id={error_id}")
+    return JSONResponse(status_code=500, content={"error": _public_error_detail("internal_error", "Internal server error.", error_id)}, headers={"Cache-Control": "no-store"})
 
 # CORS
 app.add_middleware(
@@ -168,7 +298,8 @@ app.add_middleware(
     allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "Idempotency-Key"],
+    expose_headers=["Location", "Retry-After"],
 )
 
 
@@ -187,27 +318,36 @@ async def root():
     }
 
 
-@app.get("/health", response_model=HealthResponse, tags=["Info"])
-async def health(store: RetrievalStore = Depends(_get_store)):
+@app.get("/health", response_model=HealthResponse, tags=["Info"], responses={503: {"model": HealthResponse, "description": "Dependency unavailable"}})
+async def health():
     """Health check endpoint."""
-    ollama_ok = await check_ollama_health()
-    vector_ok = store.count >= 0
+    embedding_ok = await check_ollama_health(model=settings.ollama.embed_model)
+    local_chat = settings.llm.provider == "ollama"
+    chat_ok = (await check_ollama_health()) if local_chat else bool(
+        settings.llm.aws_region and settings.llm.model
+    )
+    try:
+        vector_ok = get_vector_store().count >= 0
+    except Exception:
+        vector_ok = False
     langsmith_status = await check_langsmith_connection()
 
-    return HealthResponse(
-        status="healthy" if (ollama_ok and vector_ok) else "degraded",
+    response = HealthResponse(
+        status="healthy" if (embedding_ok and chat_ok and vector_ok) else "degraded",
         version="1.1.0",
         timestamp=datetime.now(timezone.utc).isoformat(),
         components={
-            "ollama": {"ok": ollama_ok},
+            "chat_model": {"ok": chat_ok, "provider": settings.llm.provider, "check": "model_available" if local_chat else "configuration_only", "inference_verified": False},
+            "ollama_embeddings": {"ok": embedding_ok},
             "vector_store": {"ok": vector_ok},
             "langsmith": {"connected": langsmith_status.get("connected", False)},
         },
     )
+    return JSONResponse(status_code=200 if response.status == "healthy" else 503, content=response.model_dump())
 
 
 @app.get("/metrics", tags=["Info"])
-async def metrics():
+async def metrics(_principal: str = Depends(_authenticate)):
     """Prometheus metrics endpoint."""
     return Response(
         content=get_metrics(),
@@ -216,7 +356,7 @@ async def metrics():
 
 
 @app.get("/stats", tags=["Info"])
-async def stats(store: RetrievalStore = Depends(_get_store)):
+async def stats(_principal: str = Depends(_authenticate), store: RetrievalStore = Depends(_get_store)):
     """Vector store and run-store statistics."""
     return {
         "vector_store": store.get_stats(),
@@ -228,8 +368,8 @@ async def stats(store: RetrievalStore = Depends(_get_store)):
 # =============================================================================
 
 
-@app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"])
-async def analyze(request: AnalysisRequest):
+@app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"], responses=ERROR_RESPONSES)
+async def analyze(request: AnalysisRequest, _principal: str = Depends(_limit_submission)):
     """
     Run synchronous stock analysis.
 
@@ -259,8 +399,14 @@ async def analyze(request: AnalysisRequest):
                 )
 
 
-@app.post("/analyze/async", response_model=JobAcceptedResponse, tags=["Analysis"])
-async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTasks):
+@app.post("/analyze/async", response_model=JobAcceptedResponse, status_code=status.HTTP_202_ACCEPTED, tags=["Analysis"], responses={**ERROR_RESPONSES, 202: {"headers": {"Location": {"schema": {"type": "string"}, "description": "Polling URL"}}}})
+async def analyze_async(
+    request: AnalysisRequest,
+    background_tasks: BackgroundTasks,
+    response: Response,
+    principal: str = Depends(_limit_submission),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", min_length=1, max_length=200),
+):
     """
     Start async stock analysis.
 
@@ -270,23 +416,34 @@ async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTa
     job_id = str(uuid.uuid4())
 
     # Create job
-    record = run_store.create_run(
-        job_id=job_id,
-        ticker=ticker,
-        company_name=request.company_name,
-    )
+    created = True
+    if idempotency_key:
+        fingerprint = hashlib.sha256(json.dumps(request.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        try:
+            record, created = run_store.create_idempotent_run(
+                job_id, ticker, principal=principal,
+                idempotency_key=hashlib.sha256(idempotency_key.encode()).hexdigest(),
+                request_fingerprint=fingerprint, company_name=request.company_name,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail={"code": "idempotency_conflict", "message": str(exc), "error_id": _new_error_id()}) from exc
+    else:
+        record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name)
 
     # Start background task
-    background_tasks.add_task(
+    if created:
+        background_tasks.add_task(
         _run_analysis_job,
-        job_id,
+        record.job_id,
         ticker,
         request.company_name,
         request.include_filing_analysis,
         request.include_news_sentiment,
         request.max_news_articles,
-    )
-    logger.info(f"Started async job {job_id} for {ticker}")
+        )
+        logger.info(f"Started async job {record.job_id} for {ticker}")
+
+    response.headers["Location"] = f"/jobs/{record.job_id}"
 
     return JobAcceptedResponse(
         job_id=record.job_id,
@@ -297,12 +454,12 @@ async def analyze_async(request: AnalysisRequest, background_tasks: BackgroundTa
     )
 
 
-@app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"])
-async def get_job_status(job_id: str):
+@app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"], responses=ERROR_RESPONSES)
+async def get_job_status(job_id: uuid.UUID, _principal: str = Depends(_authenticate)):
     """Get async job status and return completed result when available."""
-    record = run_store.get_run(job_id)
+    record = run_store.get_run(str(job_id))
     if record is None:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail={"code": "job_not_found", "message": "Job not found.", "error_id": _new_error_id()})
 
     result = AnalysisResponse.model_validate(record.result) if record.result else None
 
@@ -338,7 +495,8 @@ async def _run_analysis_job(
                 max_news_articles=max_news_articles,
             )
             formatted = _format_response(result).model_dump()
-            run_store.mark_completed(job_id, result=formatted)
+            formatted["job_id"] = job_id
+            run_store.mark_finished(job_id, status=formatted["status"], result=formatted)
     except Exception:
         error_id = _new_error_id()
         logger.exception(
@@ -358,19 +516,30 @@ def _format_response(state: AgentState) -> AnalysisResponse:
     errors = [
         ErrorDetail(
             step=error.get("step", ""),
-            message=error.get("message", ""),
+            message="A workflow step failed.",
             timestamp=error.get("timestamp", ""),
             recoverable=error.get("recoverable", True),
         )
         for error in state.get("errors", [])
     ]
 
-    if state.get("investment_memo"):
-        status = JobStatus.COMPLETED
-    elif errors:
-        status = JobStatus.FAILED if not any(error.recoverable for error in errors) else JobStatus.COMPLETED
+    missing: list[str] = []
+    if not stock:
+        missing.append("stock")
+    if state.get("include_filing_analysis", True) and not state.get("filing_chunks"):
+        missing.append("filings")
+    if state.get("include_news_sentiment", True) and not state.get("news_articles"):
+        missing.append("news")
+    if state.get("include_news_sentiment", True) and not sentiment:
+        missing.append("sentiment")
+    if any(not error.recoverable for error in errors) or not state.get("investment_memo"):
+        response_status = JobStatus.FAILED
+    elif missing:
+        response_status = JobStatus.EVIDENCE_MISSING
+    elif verification.get("passed") is not True:
+        response_status = JobStatus.DEGRADED
     else:
-        status = JobStatus.FAILED
+        response_status = JobStatus.COMPLETED
 
     market_cap_formatted = None
     market_cap = stock.get("market_cap")
@@ -385,7 +554,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
     return AnalysisResponse(
         ticker=state.get("ticker", ""),
         company_name=state.get("company_name", ""),
-        status=status,
+        status=response_status,
         executive_summary=state.get("executive_summary"),
         investment_memo=state.get("investment_memo"),
         stock_data=StockDataResponse(
@@ -445,6 +614,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
             ],
         ) if verification else None,
         errors=errors,
+        missing=missing,
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         execution_time_ms=state.get("execution_time_ms"),
@@ -480,8 +650,8 @@ def _normalize_sections_processed(value: object) -> list[str]:
 # =============================================================================
 
 
-@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"])
-async def ingest_filing(request: IngestionRequest):
+@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], responses=ERROR_RESPONSES)
+async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_limit_submission)):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
     logger.info(f"Ingesting 10-K for {ticker}")
@@ -489,11 +659,13 @@ async def ingest_filing(request: IngestionRequest):
 
     with track_request("POST", "/ingest"):
         try:
-            result = await ingest_10k_for_ticker(ticker)
+            result = await ingest_10k_for_ticker(ticker, replace_existing=request.force_refresh)
             sections_processed = _normalize_sections_processed(
                 getattr(result, "sections_processed", None)
             )
 
+            if not result.success:
+                raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": _new_error_id()})
             return IngestionResponse(
                 ticker=ticker,
                 filing_type=filing_type,
@@ -501,26 +673,25 @@ async def ingest_filing(request: IngestionRequest):
                 chunks_created=getattr(result, "total_chunks", 0),
                 sections_processed=sections_processed,
                 filing_date=getattr(result, "filing_date", None),
-                error=getattr(result, "error", None),
+                error=None,
             )
 
+        except HTTPException:
+            raise
         except Exception:
             error_id = _new_error_id()
             logger.exception(
                 f"Ingestion failed | ticker={ticker} | error_id={error_id}",
             )
-            return IngestionResponse(
-                ticker=ticker,
-                filing_type=filing_type,
-                status="failed",
-                chunks_created=0,
-                sections_processed=[],
-                error=_public_failure_message("Ingestion failed", error_id),
-            )
+            raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": error_id})
 
 
 @app.get("/ingest/{ticker}", tags=["Ingestion"])
-async def check_ingestion(ticker: str, store: RetrievalStore = Depends(_get_store)):
+async def check_ingestion(
+    ticker: Annotated[str, ApiPath(pattern=r"^[A-Za-z]{1,5}(?:\.[A-Za-z])?$")],
+    _principal: str = Depends(_authenticate),
+    store: RetrievalStore = Depends(_get_store),
+):
     """Check if a ticker has been ingested."""
     ticker = ticker.upper()
     document_count = store.count_documents(SearchFilters(ticker=ticker))

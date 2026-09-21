@@ -64,7 +64,7 @@ class StubIngestResult:
     error = None
 
 
-async def fake_check_ollama_health(*, log_failure: bool = False) -> bool:
+async def fake_check_ollama_health(*, log_failure: bool = False, model: str | None = None) -> bool:
     return True
 
 
@@ -72,7 +72,7 @@ async def fake_check_langsmith_connection() -> dict[str, bool]:
     return {"connected": True}
 
 
-async def fake_ingest_10k_for_ticker(ticker: str) -> StubIngestResult:
+async def fake_ingest_10k_for_ticker(ticker: str, replace_existing: bool = False) -> StubIngestResult:
     return StubIngestResult()
 
 
@@ -146,6 +146,7 @@ async def fake_run_agent(
                 "date": "2026-03-15",
             }
         ],
+        "filing_chunks": [{"text": "filing evidence"}],
         "verification_result": {
             "passed": True,
             "total_claims": 2,
@@ -172,8 +173,11 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(api_main, "check_langsmith_connection", fake_check_langsmith_connection)
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
+    monkeypatch.setattr(api_main.settings, "api_key", "test-secret")
+    monkeypatch.setattr(api_main, "submission_limiter", api_main.SubmissionRateLimiter())
 
     with TestClient(api_main.app) as test_client:
+        test_client.headers["Authorization"] = "Bearer test-secret"
         yield test_client
 
 def test_health_endpoint_returns_component_statuses(client: TestClient):
@@ -182,7 +186,7 @@ def test_health_endpoint_returns_component_statuses(client: TestClient):
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "healthy"
-    assert payload["components"]["ollama"]["ok"] is True
+    assert payload["components"]["ollama_embeddings"]["ok"] is True
     assert payload["components"]["vector_store"]["ok"] is True
     assert payload["components"]["langsmith"]["connected"] is True
 
@@ -239,7 +243,8 @@ def test_async_analysis_poll_returns_completed_result_payload(client: TestClient
         json={"ticker": "MSFT", "company_name": "Microsoft Corp."},
     )
 
-    assert create_response.status_code == 200
+    assert create_response.status_code == 202
+    assert create_response.headers["location"].startswith("/jobs/")
     create_payload = create_response.json()
     assert create_payload["ticker"] == "MSFT"
     assert create_payload["status"] in {"pending", "running", "completed"}
@@ -332,7 +337,7 @@ def test_stats_endpoint_reports_vector_and_run_store_counts(client: TestClient):
         "/analyze/async",
         json={"ticker": "AAPL", "company_name": "Apple Inc."},
     )
-    assert response.status_code == 200
+    assert response.status_code == 202
 
     stats_response = client.get("/stats")
 
@@ -360,8 +365,186 @@ def test_sync_analysis_failure_returns_stable_public_error(
     response = client.post("/analyze", json={"ticker": "AAPL"})
 
     assert response.status_code == 500
-    detail = response.json()["detail"]
+    detail = response.json()["error"]
     assert detail["code"] == "analysis_failed"
     assert detail["message"] == "Analysis failed."
     assert detail["error_id"]
     assert "secret provider token exploded" not in str(detail)
+
+
+def test_protected_routes_require_auth_but_root_and_health_are_public(client: TestClient):
+    client.headers.pop("Authorization")
+    assert client.get("/").status_code == 200
+    assert client.get("/health").status_code == 200
+    for method, path in [("get", "/stats"), ("get", "/metrics"), ("get", "/ingest/AAPL")]:
+        response = getattr(client, method)(path)
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Bearer"
+        assert response.headers["cache-control"] == "no-store"
+
+
+def test_input_contract_normalizes_ticker_and_rejects_unsafe_values(client: TestClient):
+    assert client.post("/analyze", json={"ticker": "brk.b"}).json()["ticker"] == "BRK.B"
+    assert client.post("/analyze", json={"ticker": "AAPL; DROP"}).status_code == 422
+    assert client.post("/analyze", json={"ticker": "AAPL", "company_name": "bad\nname"}).status_code == 422
+    assert client.post("/ingest", json={"ticker": "AAPL", "filing_type": "10-Q"}).status_code == 422
+
+
+def test_async_idempotency_reuses_job_and_conflicts_on_changed_body(client: TestClient):
+    headers = {"Idempotency-Key": "request-1"}
+    first = client.post("/analyze/async", json={"ticker": "AAPL"}, headers=headers)
+    same = client.post("/analyze/async", json={"ticker": "AAPL"}, headers=headers)
+    changed = client.post("/analyze/async", json={"ticker": "MSFT"}, headers=headers)
+    assert first.status_code == same.status_code == 202
+    assert first.json()["job_id"] == same.json()["job_id"]
+    assert changed.status_code == 409
+
+
+def test_method_error_preserves_allow_header(client: TestClient):
+    response = client.put("/analyze", json={"ticker": "AAPL"})
+    assert response.status_code == 405
+    assert "POST" in response.headers["allow"]
+
+
+def test_submission_rate_limit_returns_retry_after(client: TestClient):
+    for _ in range(10):
+        assert client.post("/analyze", json={"ticker": "AAPL"}).status_code == 200
+    response = client.post("/analyze", json={"ticker": "AAPL"})
+    assert response.status_code == 429
+    assert int(response.headers["retry-after"]) >= 1
+
+
+def test_openapi_documents_async_and_error_contracts(client: TestClient):
+    operation = client.get("/openapi.json").json()["paths"]["/analyze/async"]["post"]
+    assert "202" in operation["responses"]
+    assert {"401", "409", "422", "429", "500"} <= operation["responses"].keys()
+
+
+# Trace: docs/test-plan.md §1 REST hardening and §11 evidence completeness.
+@pytest.mark.parametrize("patch, expected, missing", [
+    ({"verification_result": {"passed": False}}, "degraded", []),
+    ({"verification_result": {}}, "degraded", []),
+    ({"filing_chunks": []}, "evidence_missing", ["filings"]),
+    ({"stock_data": {}}, "evidence_missing", ["stock"]),
+    ({"filing_chunks": [], "errors": [{"recoverable": False, "message": "secret"}]}, "failed", ["filings"]),
+    ({"filing_chunks": [], "news_articles": [], "include_filing_analysis": False, "include_news_sentiment": False}, "completed", []),
+])
+def test_job_and_result_share_truthful_terminal_status(client, monkeypatch, patch, expected, missing):
+    async def run(ticker, company_name, **kwargs):
+        state = await fake_run_agent(ticker, company_name)
+        return {**state, **patch}
+    monkeypatch.setattr(api_main, "run_agent", run)
+    accepted = client.post("/analyze/async", json={"ticker": "AAPL"})
+    response = client.get(accepted.headers["location"])
+    body = response.json()
+    assert body["status"] == body["result"]["status"] == expected
+    assert body["result"]["missing"] == missing
+    assert "secret" not in response.text
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_common_errors_are_typed_and_safe(client, monkeypatch):
+    response = client.put("/analyze")
+    assert set(response.json()["error"]) == {"code", "message", "error_id"}
+    monkeypatch.setattr(api_main, "get_metrics", lambda: 1 / 0)
+    with TestClient(api_main.app, raise_server_exceptions=False) as probe:
+        response = probe.get("/metrics", headers={"X-API-Key": "test-secret"})
+    assert response.status_code == 500
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["error"]["code"] == "internal_error"
+
+
+def test_auth_fail_closed_and_header_alternative(client, monkeypatch):
+    client.headers.pop("Authorization")
+    assert client.get("/metrics", headers={"X-API-Key": "test-secret"}).status_code == 200
+    for path in ("/analyze", "/analyze/async", "/ingest"):
+        assert client.post(path, json={"ticker": "AAPL"}).status_code == 401
+    assert client.get("/jobs/00000000-0000-0000-0000-000000000000").status_code == 401
+    monkeypatch.setattr(api_main.settings, "api_key", None)
+    assert client.get("/stats", headers={"X-API-Key": "test-secret"}).status_code == 503
+
+
+def test_ingestion_refresh_changes_existing_content_and_failures_are_safe(client, monkeypatch):
+    contents = {"AAPL": 1}
+    async def ingest(ticker, replace_existing=False):
+        if replace_existing:
+            contents[ticker] = 2
+        return StubIngestResult()
+    monkeypatch.setattr(api_main, "ingest_10k_for_ticker", ingest)
+    assert client.post("/ingest", json={"ticker": "AAPL"}).status_code == 200
+    assert contents["AAPL"] == 1
+    assert client.post("/ingest", json={"ticker": "AAPL", "force_refresh": True}).status_code == 200
+    assert contents["AAPL"] == 2
+    async def failed(ticker, replace_existing=False):
+        result = StubIngestResult()
+        result.success = False
+        result.error = "secret provider details"
+        return result
+    monkeypatch.setattr(api_main, "ingest_10k_for_ticker", failed)
+    response = client.post("/ingest", json={"ticker": "AAPL"})
+    assert response.status_code == 502
+    assert "secret" not in response.text
+
+
+def test_health_reports_unavailable_retrieval_and_configuration_only_bedrock(client, monkeypatch):
+    monkeypatch.setattr(api_main.settings.llm, "provider", "bedrock")
+    response = client.get("/health")
+    assert response.json()["components"]["chat_model"]["check"] == "configuration_only"
+    def unavailable():
+        raise RuntimeError("private backend location")
+    monkeypatch.setattr(api_main, "get_vector_store", unavailable)
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json()["components"]["vector_store"]["ok"] is False
+    assert "private" not in response.text
+
+
+def test_idempotent_replay_preserves_original_result(client, monkeypatch):
+    first = client.post("/analyze/async", json={"ticker": "aapl"}, headers={"Idempotency-Key": "same"})
+    original = client.get(first.headers["location"]).json()
+    async def revised(ticker, company_name, **kwargs):
+        state = await fake_run_agent(ticker, company_name)
+        state["investment_memo"] = "New underlying evidence"
+        return state
+    monkeypatch.setattr(api_main, "run_agent", revised)
+    replay = client.post("/analyze/async", json={"ticker": "AAPL"}, headers={"Idempotency-Key": "same"})
+    assert replay.headers["location"] == first.headers["location"]
+    assert client.get(replay.headers["location"]).json() == original
+    fresh = client.post("/analyze/async", json={"ticker": "AAPL"}, headers={"Idempotency-Key": "new"})
+    assert client.get(fresh.headers["location"]).json()["result"]["investment_memo"] == "New underlying evidence"
+    assert "test-secret" not in api_main.run_store.path.read_text()
+
+
+def test_rate_limit_expires_and_is_scoped_to_key(client, monkeypatch):
+    from types import SimpleNamespace
+    now = [1000.0]
+    monkeypatch.setattr(api_main, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    monkeypatch.setattr(api_main.settings, "api_rate_limit", 1)
+    assert client.post("/analyze", json={"ticker": "AAPL"}).status_code == 200
+    assert client.post("/ingest", json={"ticker": "AAPL"}).status_code == 429
+    monkeypatch.setattr(api_main.settings, "api_key", "rotated-key")
+    assert client.post("/analyze", json={"ticker": "AAPL"}, headers={"Authorization": "Bearer rotated-key"}).status_code == 200
+    monkeypatch.setattr(api_main.settings, "api_key", "test-secret")
+    now[0] += 61
+    assert client.post("/ingest", json={"ticker": "AAPL"}).status_code == 200
+
+
+def test_bedrock_does_not_depend_on_ollama_chat_model(client, monkeypatch):
+    async def available(*, model=None, log_failure=False):
+        return model == api_main.settings.ollama.embed_model
+    monkeypatch.setattr(api_main, "check_ollama_health", available)
+    monkeypatch.setattr(api_main.settings.llm, "provider", "bedrock")
+    assert client.get("/health").status_code == 200
+    monkeypatch.setattr(api_main.settings.llm, "provider", "ollama")
+    assert client.get("/health").status_code == 503
+    monkeypatch.setattr(api_main.settings.llm, "provider", "bedrock")
+    monkeypatch.setattr(api_main.settings.llm, "aws_region", None)
+    assert client.get("/health").status_code == 503
+
+
+def test_openapi_defines_security_and_error_schema(client):
+    schema = client.get("/openapi.json").json()
+    operation = schema["paths"]["/analyze/async"]["post"]
+    assert {"HTTPBearer": []} in operation["security"]
+    assert {"APIKeyHeader": []} in operation["security"]
+    assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith("ErrorResponse")

@@ -27,7 +27,7 @@ Known limitations at HEAD (verified against code, not aspiration):
 - A ticker that was never ingested produces a memo with no SEC evidence and still reports `completed`
 - Verification failure is logged, not enforced; there is no repair loop
 - Evidence nodes run serially; FinBERT inference blocks the event loop
-- No guardrails, no caching, no auth, no rate limiting, in-process background jobs
+- No full guardrail layer or caching; single-process auth/rate limits, in-process background jobs
 - Eval results carry no lineage (commit, model, snapshot) and no eval runs in CI
 
 ### Implementation order (authoritative copy: `docs/sprint-plan.md`, S2 preamble)
@@ -453,3 +453,40 @@ Smoke-test any hook with `echo '<event json>' | .claude/hooks/<script>`; see `do
 ## License
 
 MIT License.
+
+
+### REST API access and retry contract
+
+Set `API_KEY` in the server process environment to a high-entropy secret before
+using protected routes. Send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+An unset server key fails closed with 503. `/` and `/health` remain public;
+analysis, ingestion, jobs, stats and `/metrics` require authentication.
+Configure Prometheus `authorization.type: Bearer` and
+`authorization.credentials_file` pointing to a protected file containing the
+same key to scrape `/metrics`; do not put the key in a URL or commit it.
+
+`POST /analyze/async` returns 202 with `Location: /jobs/<uuid>`. Supply
+`Idempotency-Key` (1–200 characters) to retry the same normalized request with the
+same key: the existing job is returned; a changed request returns 409. Mappings
+persist with the run store, including completed/failed runs. Use a new key for a
+new execution. Only hashes of credentials and idempotency keys are persisted.
+All three submission endpoints share a per-key limit (default 10 per 60 seconds;
+`API_RATE_LIMIT` and `API_RATE_WINDOW_SECONDS` configure it). A 429 includes
+`Retry-After`; replays also consume this quota.
+
+Run **one server worker**: rate limiting and file-store locking are in-process.
+Multiple workers/replicas need shared rate-limit/idempotency storage first.
+The file store is retained indefinitely; manage its retention operationally.
+CORS permits Authorization, X-API-Key and Idempotency-Key and exposes Location
+and Retry-After for configured origins. Errors use
+`{"error":{"code":"...","message":"...","error_id":"..."}}`; financial,
+job and error responses include `Cache-Control: no-store`.
+
+`/health` checks retrieval availability and the configured Ollama embedding
+model. For Ollama chat it also checks that chat model. Bedrock health reports
+`configuration_only` and `inference_verified: false`: it checks model/region
+configuration, not credentials, network reachability or inference permissions.
+A 200 health response therefore does not certify a successful Bedrock inference.
+Ingestion supports only 10-K; `force_refresh: true` replaces existing content.
+Terminal statuses are failed (fatal/no memo), evidence_missing (required source
+missing), degraded (verification absent/failed), or completed (verified).

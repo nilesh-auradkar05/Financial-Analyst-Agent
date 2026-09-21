@@ -348,6 +348,13 @@ class Settings(BaseSettings):
             "as a JSON list or comma-seperated string."
         ),
     )
+    api_key: Optional[str] = Field(
+        default=None,
+        validation_alias="API_KEY",
+        description="Shared API key required by protected HTTP routes.",
+    )
+    api_rate_limit: int = Field(default=10, ge=1, description="Mutating requests per window.")
+    api_rate_window_seconds: int = Field(default=60, ge=1)
 
 
 settings = Settings()
