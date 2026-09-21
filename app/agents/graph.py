@@ -527,11 +527,8 @@ async def draft_memo_node(state: AgentState) -> dict:
                 ),
                 timeout=timeout_seconds,
             )
-        except asyncio.TimeoutError as exc:
-            raise TimeoutError(
-                "LLM memo generation timed out after "
-                f"{timeout_seconds}s (set LLM_REQUEST_TIMEOUT_SECONDS to increase)."
-            ) from exc
+        except asyncio.TimeoutError:
+            return add_error(state, "draft_memo", "LLM memo generation timed out.", recoverable=False)
 
         content = getattr(response, "content", "")
         memo = content if isinstance(content, str) else "\n".join(

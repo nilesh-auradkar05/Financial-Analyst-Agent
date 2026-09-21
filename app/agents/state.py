@@ -124,12 +124,13 @@ def add_error(
     recoverable: bool = True,
 ) -> dict:
     """Add error to state. Returns partial state update."""
+    timed_out = message == "LLM memo generation timed out."
     if run := get_current_run_tree():
-        run.metadata.update(outcome="failed", error_code="workflow_step_failed")
+        run.metadata.update(outcome="failed", error_code="llm_timeout" if timed_out else "workflow_step_failed")
     errors = state.get("errors", [])
     errors.append({
         "step": step,
-        "message": "Workflow step failed.",
+        "message": "LLM memo generation timed out." if timed_out else "Workflow step failed.",
         "recoverable": recoverable,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
