@@ -233,3 +233,6 @@ evaluation/reports/
 evaluation/results/*
 !evaluation/quality_res
 !evaluation/latency_res
+
+# graphify knowledge-graph output (regenerable via /graphify)
+graphify-out/
