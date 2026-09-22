@@ -68,7 +68,7 @@ Allowed:
 - T2-04: Concurrent HTTP requests have independent IDs, trees and ticker outputs. An in-memory public SDK create/update collector verifies hierarchy and original async correlation; offline tests deny network transport.
 - T2-05: Boolean false/0/no/off and absent/blank keys disable export, even with inherited tracing environment enabled. Modern LANGSMITH aliases take precedence over legacy LANGCHAIN aliases. Defaults are off. One lifespan client is reused and shutdown flush is bounded; initialization/create/update/flush failures cannot fail successful business requests.
 - T2-06: Native model spans retain raw messages, prompts, token metadata and provider-exposed reasoning blocks when supplied. Memo/API text includes only text content blocks. No hidden reasoning is claimed.
-- T2-07: Error spans/records retain safe public codes/error IDs and correlation, excluding raw app exception text, credentials and cookies. Failed async jobs remain pollable under original correlation.
+- T2-07: Error spans/records retain safe public codes/error IDs and correlation, excluding raw app exception text, credentials and cookies. Failed async jobs remain pollable under original correlation. Verifier execution errors produce an explicit safe `verification_failed` marker and a degraded response; raw evaluator exceptions never enter native graph spans.
 
 ## 2. Workflow behavior
 

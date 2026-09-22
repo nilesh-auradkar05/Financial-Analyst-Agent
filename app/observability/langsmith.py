@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import asyncio
+import functools
+import inspect
 import time
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, ParamSpec, TypeVar, cast
 from uuid import UUID, uuid4
 
-from langsmith import Client, trace, tracing_context
+from langsmith import Client, get_current_run_tree, trace, tracing_context
+from langsmith import traceable as _traceable
 from langsmith.run_trees import RunTree
 from loguru import logger
 from starlette.datastructures import Headers, MutableHeaders
@@ -18,8 +21,43 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.config import settings
 from app.llm.provider import model_metadata
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
 _client: Client | None = None
 FLUSH_TIMEOUT_SECONDS = 2.0
+
+
+def app_traceable(*args: Any, **kwargs: Any) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
+    """Trace app spans with a safe failure marker instead of exception details."""
+    kwargs["exceptions_to_handle"] = (Exception,)
+    traced = _traceable(*args, **kwargs)
+
+    def decorate(function: Callable[_P, _R]) -> Callable[_P, _R]:
+        if inspect.iscoroutinefunction(function):
+            @functools.wraps(function)
+            async def async_wrapper(*function_args: Any, **function_kwargs: Any) -> Any:
+                try:
+                    return await function(*function_args, **function_kwargs)
+                except Exception:
+                    if run := get_current_run_tree():
+                        run.metadata.update(outcome="failed", error_code="app_stage_failed")
+                    raise
+
+            return cast(Callable[_P, _R], traced(async_wrapper))
+
+        @functools.wraps(function)
+        def wrapper(*function_args: Any, **function_kwargs: Any) -> Any:
+            try:
+                return function(*function_args, **function_kwargs)
+            except Exception:
+                if run := get_current_run_tree():
+                    run.metadata.update(outcome="failed", error_code="app_stage_failed")
+                raise
+
+        return cast(Callable[_P, _R], traced(wrapper))
+
+    return decorate
 
 
 def is_tracing_enabled() -> bool:
@@ -75,7 +113,7 @@ async def trace_boundary(
                          parent=restored_parent or False):
         manager = trace(name, inputs={}, metadata={
             "agent": "financial_analyst", "agent_version": "1.1.0",
-            "tools": ["search_company_news", "get_stock_data", "retrieve_filings", "analyze_sentiment_batch", "verify_memo"],
+            "available_tools": ["search_company_news", "get_stock_data", "retrieve_filings", "analyze_sentiment_batch", "verify_memo"],
             **model_metadata(settings), **metadata,
         }, client=client)
         run = None

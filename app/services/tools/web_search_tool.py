@@ -18,12 +18,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from langsmith import traceable
 from loguru import logger
 from tavily import AsyncTavilyClient
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.observability.langsmith import app_traceable
 
 # =============================================================================
 # QUALITY FILTERING
@@ -116,7 +116,7 @@ def _tavily_retry(func):
 # =============================================================================
 
 
-@traceable(name="search_company_news", run_type="tool", tags=["search", "tavily"])
+@app_traceable(name="search_company_news", run_type="tool", tags=["search", "tavily"])
 async def search_company_news(
     query: str,
     max_results: int = 5,

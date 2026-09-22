@@ -190,10 +190,62 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     assert "provider-visible-reasoning" in str(llms[0]["outputs"])
     assert "usage_metadata" in str(llms[0]["outputs"])
     assert llms[0]["inputs"]
+    assert "available_tools" in roots[0]["extra"]["metadata"]
+    assert "tools" not in roots[0]["extra"]["metadata"]
     draft = next(run for run in children if run["name"] == "draft_memo" and run["extra"]["metadata"].get("model") == "offline-evidence-model")
     assert draft["extra"]["metadata"]["temperature"] == 0.0
     exported = str(runs)
     assert all(secret not in exported for secret in ("private-auth-value", "private-cookie-value", "private-export-key"))
+
+
+def test_nested_app_failure_exports_only_safe_error(traced, evidence, monkeypatch):
+    from app.agents import graph
+    from app.observability.langsmith import app_traceable
+
+    @app_traceable(name="analyze_sentiment_batch", run_type="chain", tags=["sentiment"])
+    def failed_sentiment(_texts):
+        raise RuntimeError("private-nested-exception-secret")
+
+    monkeypatch.setattr(graph, "analyze_sentiment_batch", failed_sentiment)
+    with TestClient(api.app) as client:
+        response = client.post(
+            "/analyze",
+            json={"ticker": "AAPL"},
+            headers={"X-API-Key": "private-auth-value"},
+        )
+
+    assert response.status_code == 200
+    assert "private-nested-exception-secret" not in str(traced.runs)
+    nested = next(run for run in traced.runs.values() if run["name"] == "analyze_sentiment_batch")
+    assert nested.get("error") is None
+    assert nested["extra"]["metadata"]["outcome"] == "failed"
+    assert nested["extra"]["metadata"]["error_code"] == "app_stage_failed"
+
+
+def test_verifier_failure_never_exports_raw_error(traced, evidence, monkeypatch):
+    from app.agents import graph
+
+    def failed_verifier(*_args, **_kwargs):
+        raise RuntimeError("private-verifier-exception-secret")
+
+    monkeypatch.setattr(graph, "evaluate_memo_grounding", failed_verifier)
+    with TestClient(api.app, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/analyze",
+            json={"ticker": "AAPL"},
+            headers={"X-API-Key": "private-auth-value"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
+    assert response.json()["verification"]["passed"] is False
+    assert any(error["step"] == "verify_memo" for error in response.json()["errors"])
+    assert "private-verifier-exception-secret" not in str(traced.runs)
+    assert any(
+        "verification_failed" in str(run.get("outputs"))
+        for run in traced.runs.values()
+        if run["name"] == "verify_memo"
+    )
 
 
 def test_async_original_correlation_survives_parent_end_replay_and_poll(traced, evidence):

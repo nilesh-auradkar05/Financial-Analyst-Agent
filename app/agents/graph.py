@@ -26,7 +26,7 @@ from typing import Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, START, StateGraph
-from langsmith import get_current_run_tree, traceable
+from langsmith import get_current_run_tree
 from loguru import logger
 
 from app.agents.state import (
@@ -41,6 +41,7 @@ from app.agents.state import (
 from app.components.retrieval.vector_store import get_vector_store
 from app.config import settings
 from app.llm.provider import get_llm, model_metadata
+from app.observability.langsmith import app_traceable
 from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
@@ -49,7 +50,7 @@ from evaluation.grounding import evaluate_memo_grounding
 
 # NODE FUNCTIONS
 
-@traceable(name="research_news", run_type="chain", tags=["agent"])
+@app_traceable(name="research_news", run_type="chain", tags=["agent"])
 async def research_news_node(state: AgentState) -> dict:
     """
     Research recent news about the company.
@@ -104,7 +105,7 @@ async def research_news_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] News research failed")
         return add_error(state, "research_news", "Workflow step failed.")
 
-@traceable(name="fetch_stock", run_type="chain", tags=["agent"])
+@app_traceable(name="fetch_stock", run_type="chain", tags=["agent"])
 async def fetch_stock_node(state: AgentState) -> dict:
     """
     Fetch stock market data for the company.
@@ -156,7 +157,7 @@ async def fetch_stock_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Stock Fetch Failed")
         return add_error(state, "fetch_stock", "Workflow step failed.")
 
-@traceable(name="retrieve_filings", run_type="retriever", tags=["agent"])
+@app_traceable(name="retrieve_filings", run_type="retriever", tags=["agent"])
 async def retrieve_sec_filings_node(state: AgentState) -> dict:
     """
     Retrieve relevant SEC filing chunks from vector store.
@@ -231,7 +232,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Filing retrieval failed")
         return add_error(state, "retrieve_filings", "Workflow step failed.")
 
-@traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
+@app_traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
 async def analyze_sentiment_node(state: AgentState) -> dict:
     """
     Analyze sentiment of news articles using FinBERT.
@@ -433,7 +434,7 @@ def _extract_used_citations(memo: str) -> set[int]:
     """Pull citation indices like ``[1]``, ``[3]``, out of the memo text."""
     return {int(m) for m in re.findall(r"\[(\d+)\]", memo)}
 
-@traceable(name="draft_memo", run_type="chain", tags=["agent"])
+@app_traceable(name="draft_memo", run_type="chain", tags=["agent"])
 async def draft_memo_node(state: AgentState) -> dict:
     """
     Draft the investment memo using the LLM.
@@ -579,7 +580,7 @@ async def draft_memo_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Memo generation failed")
         return add_error(state, "draft_memo", "Workflow step failed.", recoverable=False)
 
-@traceable(name="verify_memo", run_type="chain", tags=["agent"])
+@app_traceable(name="verify_memo", run_type="chain", tags=["agent"])
 async def verify_memo_node(state: AgentState) -> dict:
     """Run heuristic groundedness and citation coverage checks on the generated memo."""
     ticker = state["ticker"]
@@ -619,7 +620,16 @@ async def verify_memo_node(state: AgentState) -> dict:
     valid_indices = {entry["index"] for entry in registry}
     orphan_indices = sorted(used - valid_indices)
 
-    grounding = evaluate_memo_grounding(memo, registry)
+    try:
+        grounding = evaluate_memo_grounding(memo, registry)
+    except Exception:
+        logger.error(f"[{ticker}] Memo verification failed")
+        return {
+            **add_error(state, "verify_memo", "Workflow step failed."),
+            "verification_result": {"passed": False, "error_code": "verification_failed"},
+            "current_step": AgentStep.COMPLETE.value,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        }
     verification_result = grounding.to_dict()
     verification_result["orphan_citations"] = orphan_indices
 
@@ -733,7 +743,7 @@ def create_agent() -> Runnable[AgentState, AgentState]:
 
 # AGENT EXECUTION
 
-@traceable(name="run_financial_analysis", tags=['agent', "main"])
+@app_traceable(name="run_financial_analysis", tags=['agent', "main"])
 async def run_agent(
     ticker: str,
     company_name: Optional[str] = None,
