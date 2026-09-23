@@ -60,6 +60,15 @@ def app_traceable(*args: Any, **kwargs: Any) -> Callable[[Callable[_P, _R]], Cal
     return decorate
 
 
+def mark_trace_failed(error_code: str) -> None:
+    """Finish the current app span with a stable, non-sensitive failure code."""
+    if run := get_current_run_tree():
+        run.end(
+            error=error_code,
+            metadata={"outcome": "failed", "error_code": error_code},
+        )
+
+
 def is_tracing_enabled() -> bool:
     return bool(settings.langsmith.tracing_v2 and (settings.langsmith.api_key or "").strip())
 

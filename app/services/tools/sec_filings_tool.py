@@ -47,7 +47,7 @@ from loguru import logger
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import settings
-from app.observability.langsmith import app_traceable
+from app.observability.langsmith import app_traceable, mark_trace_failed
 
 # Suppress XMLParsedAsHTMLWarning from BeautifulSoup
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -266,8 +266,9 @@ class SECClient:
 
             return None
 
-        except Exception as e:
-            logger.error(f"CIK lookup failed: {e}")
+        except Exception:
+            logger.error("CIK lookup failed")
+            mark_trace_failed("sec_cik_lookup_failed")
             return None
 
     @app_traceable(name="sec_get_filings", run_type="tool", tags=["sec"])
@@ -310,8 +311,9 @@ class SECClient:
 
             return results
 
-        except Exception as e:
-            logger.error(f"Filing lookup failed: {e}")
+        except Exception:
+            logger.error("Filing lookup failed")
+            mark_trace_failed("sec_filings_lookup_failed")
             return []
 
     @app_traceable(name="sec_download_filing", run_type="tool", tags=["sec"])
@@ -329,9 +331,10 @@ class SECClient:
 
             return Filing(metadata=metadata, sections=sections)
 
-        except Exception as e:
-            logger.error(f"Download failed: {e}")
-            return Filing(metadata=metadata, error=str(e))
+        except Exception:
+            logger.error("Filing download failed")
+            mark_trace_failed("sec_filing_download_failed")
+            return Filing(metadata=metadata, error="SEC filing download failed.")
 
     def _parse_sections(self, text: str) -> dict[str, FilingSection]:
         """Extract sections from filing HTML/text."""

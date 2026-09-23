@@ -22,7 +22,7 @@ import asyncio
 import hashlib
 import re
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -38,7 +38,7 @@ from app.agents.state import (
     get_data_availability,
     has_fatal_error,
 )
-from app.components.retrieval.vector_store import get_vector_store
+from app.components.retrieval.vector_store import RetrievalStore, SearchResult, get_vector_store
 from app.config import settings
 from app.llm.provider import get_llm, model_metadata
 from app.observability.langsmith import app_traceable
@@ -157,6 +157,31 @@ async def fetch_stock_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Stock Fetch Failed")
         return add_error(state, "fetch_stock", "Workflow step failed.")
 
+
+def _filing_search_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    return {key: inputs[key] for key in ("query", "ticker", "n_results")}
+
+
+def _filing_search_outputs(result: SearchResult) -> dict[str, Any]:
+    return {
+        "count": len(result.chunks),
+        "evidence_ids": [chunk.id for chunk in result.chunks],
+    }
+
+
+@app_traceable(
+    name="search_filing_chunks",
+    run_type="retriever",
+    tags=["agent", "retrieval"],
+    process_inputs=_filing_search_inputs,
+    process_outputs=_filing_search_outputs,
+)
+def _search_filing_chunks(
+    store: RetrievalStore, query: str, ticker: str, n_results: int = 3,
+) -> SearchResult:
+    return store.search_by_ticker(query, ticker=ticker, n_results=n_results)
+
+
 @app_traceable(name="retrieve_filings", run_type="retriever", tags=["agent"])
 async def retrieve_sec_filings_node(state: AgentState) -> dict:
     """
@@ -198,7 +223,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         seen_texts: set[str] = set()
 
         for query in queries:
-            result = store.search_by_ticker(query, ticker=ticker, n_results=3)
+            result = _search_filing_chunks(store, query, ticker, 3)
 
             for chunk in result.chunks:
                 # Deduplicate by text

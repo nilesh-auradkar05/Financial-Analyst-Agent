@@ -90,3 +90,15 @@ L: `.claude/hooks/stop_gate.py` blocks the turn on any dirty tree. The "or state
 **Applied:** Yes. Revised the interview, all four production diagrams and proposed ADR-0007 to distinguish affordable measured experiments from large-scale interview projections.
 
 **Verification:** 63 Q&A entries and four SVG embeds; local links, source/export consistency, offline SVG display and visual inspection pass. Scope/sprint/doc-sync checks pass; existing test-hygiene failures at tests/unit/test_llm.py:25,32 remain recorded in the task ledger. No scale tests or runtime changes were claimed.
+
+## 2026-09-23 — Bound correction loops and honor exact model constraints
+
+**Correction:** User requested no more than two correction attempts and subagents only with gpt-6-sol at high effort.
+
+**Root cause:** Repeated implementation/review cycles expanded the verification handoff instead of converging on a bounded result; earlier available-model substitution no longer matches the tightened instruction.
+
+**Prevention rule:** Count correction attempts explicitly, perform one final review/check after the cap, and report residual findings without another fix loop. Never substitute a model after an exact model-only restriction; if unavailable, disclose it and perform authorized remaining work locally.
+
+**Applied:** Yes. Preserved the second correction, spawned no additional agents, made no further runtime fixes, and performed the final all-route audit and clean-environment suite locally.
+
+**Verification:** Final suite279passed,1knownembeddingfailure,2skipped; all nine OpenAPI route contracts passed. Live credential approval remains pending.

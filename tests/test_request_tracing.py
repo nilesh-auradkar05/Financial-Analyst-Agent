@@ -145,7 +145,7 @@ def evidence(monkeypatch):
 
     class Store:
         def search_by_ticker(self, query, ticker, n_results=3):
-            return SimpleNamespace(chunks=[SimpleNamespace(text=f"{ticker} sells software and faces competition.",
+            return SimpleNamespace(chunks=[SimpleNamespace(id=f"{ticker}-business", text=f"{ticker} sells software and faces competition.",
                 section="Business", metadata={"filing_type": "10-K"}, filing_date="2026-01-01", relevance_score=1.0)])
 
     monkeypatch.setattr(graph, "get_stock_data", stock)
@@ -184,6 +184,10 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     assert names.count("run_financial_analysis") == 1
     assert names.count("financial_analyst_graph") == 1
     assert {"get_stock_data", "search_company_news", "retrieve_filings", "verify_memo"} <= set(names)
+    searches = [run for run in children if run["name"] == "search_filing_chunks"]
+    assert len(searches) == 4
+    assert all(set(run["inputs"]) == {"query", "ticker", "n_results"} for run in searches)
+    assert all(run["outputs"] == {"count": 1, "evidence_ids": ["AAPL-business"]} for run in searches)
     assert all(run["run_type"] == "chain" for run in children if run["name"] == "draft_memo")
     llms = [run for run in children if run["run_type"] == "llm"]
     assert len(llms) == 1
@@ -341,6 +345,95 @@ def test_configuration_aliases_export_one_root(offline, monkeypatch, prefix):
     assert len(offline.runs) == 1
     assert response.headers["X-Trace-ID"] in offline.runs
     assert next(iter(offline.runs.values()))["session_name"] == "offline-project"
+
+
+@pytest.mark.asyncio
+async def test_caught_tool_failures_export_safe_codes(traced, monkeypatch):
+    from app.components.retrieval import ingestion
+    from app.observability.langsmith import trace_boundary
+    from app.services.tools import sec_filings_tool, stock_data_tool, web_search_tool
+
+    class FailingTavilyClient:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def search(self, **kwargs):
+            if kwargs["query"] == "legitimate empty":
+                return {"results": []}
+            raise RuntimeError("private-news-boundary-secret")
+
+    class FailingHTTPClient:
+        async def get(self, *_args, **_kwargs):
+            raise RuntimeError("private-cik-boundary-secret")
+
+    class FailingCIKClient(sec_filings_tool.SECClient):
+        @property
+        def client(self):
+            return FailingHTTPClient()
+
+    class FailingSECClient(sec_filings_tool.SECClient):
+        async def get_cik(self, _ticker):
+            return "0000320193"
+
+        async def _get(self, _url):
+            raise RuntimeError("private-sec-boundary-secret")
+
+    def fail_stock(_ticker):
+        raise RuntimeError("private-stock-boundary-secret")
+
+    async def fail_ingestion(_ticker):
+        raise RuntimeError("private-ingestion-boundary-secret")
+
+    monkeypatch.setattr(stock_data_tool, "YFINANCE_AVAILABLE", True)
+    monkeypatch.setattr(stock_data_tool, "yf", object())
+    monkeypatch.setattr(stock_data_tool, "_with_retry", lambda function: function)
+    monkeypatch.setattr(stock_data_tool, "_yfinance_fetch_sync", fail_stock)
+    monkeypatch.setattr(web_search_tool, "_tavily_retry", lambda function: function)
+    monkeypatch.setattr(web_search_tool, "AsyncTavilyClient", FailingTavilyClient)
+    monkeypatch.setattr(ingestion, "get_latest_10k", fail_ingestion)
+
+    metadata = sec_filings_tool.FilingMetaData(
+        cik="0000320193", accession_number="0000320193-26-000001",
+        filing_type="10-K", filing_date="2026-09-26", primary_document="aapl.htm",
+        ticker="AAPL",
+    )
+    cik_client = FailingCIKClient()
+    sec_client = FailingSECClient()
+
+    async with api.lifespan(api.app):
+        async with trace_boundary("caught tool failures", metadata={}):
+            monkeypatch.setattr(web_search_tool.settings.tavily, "api_key", "test-key")
+            assert await web_search_tool.search_company_news("legitimate empty") == []
+            stock = await stock_data_tool.get_stock_data("AAPL")
+            news = await web_search_tool.search_company_news("failing news")
+            cik = await cik_client.get_cik("AAPL")
+            filings = await sec_client.get_recent_filings("AAPL")
+            filing = await sec_client.download_filing(metadata)
+            ingested = await ingestion.ingest_10k_for_ticker("AAPL")
+
+    assert stock.error == "Stock data unavailable."
+    assert news == [] and cik is None and filings == []
+    assert filing.error == "SEC filing download failed."
+    assert ingested.error == "10-K ingestion failed."
+
+    runs = list(traced.runs.values())
+    empty = next(run for run in runs if run["name"] == "search_company_news"
+                 and run["inputs"]["query"] == "legitimate empty")
+    assert empty.get("error") is None
+    expected = {
+        "get_stock_data": "stock_fetch_failed",
+        "search_company_news": "news_search_failed",
+        "sec_get_cik": "sec_cik_lookup_failed",
+        "sec_get_filings": "sec_filings_lookup_failed",
+        "sec_download_filing": "sec_filing_download_failed",
+        "ingest_10k_for_ticker": "ingestion_failed",
+    }
+    for name, error_code in expected.items():
+        run = next(run for run in runs if run["name"] == name and run.get("error"))
+        assert run["error"] == error_code
+        assert run["extra"]["metadata"]["outcome"] == "failed"
+        assert run["extra"]["metadata"]["error_code"] == error_code
+    assert "private-" not in str(runs)
 
 
 def test_safe_error_correlation_and_failed_job(traced, monkeypatch):

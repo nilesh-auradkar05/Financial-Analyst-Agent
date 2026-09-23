@@ -44,7 +44,7 @@ from app.components.retrieval.vector_store import (
     SearchFilters,
     get_vector_store,
 )
-from app.observability.langsmith import app_traceable
+from app.observability.langsmith import app_traceable, mark_trace_failed
 from app.services.tools.sec_filings_tool import Filing, get_latest_10k
 
 # Data Models
@@ -348,11 +348,12 @@ async def ingest_10k_for_ticker(
             sections=sections,
             replace_existing=replace_existing,
         )
-    except Exception as exc:
-        logger.exception(f"Failed to ingest 10-K for {normalized_ticker}")
+    except Exception:
+        logger.error(f"Failed to ingest 10-K for {normalized_ticker}")
+        mark_trace_failed("ingestion_failed")
 
         return IngestionResult(
             ticker=normalized_ticker,
             filing_type="10-K",
-            error=f"{type(exc).__name__}: {exc}",
+            error="10-K ingestion failed.",
         )

@@ -23,7 +23,7 @@ from tavily import AsyncTavilyClient
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
-from app.observability.langsmith import app_traceable
+from app.observability.langsmith import app_traceable, mark_trace_failed
 
 # =============================================================================
 # QUALITY FILTERING
@@ -201,6 +201,7 @@ async def search_company_news(
 
     except Exception:
         logger.error("News search failed")
+        mark_trace_failed("news_search_failed")
         return []
 
 

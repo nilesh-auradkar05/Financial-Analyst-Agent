@@ -37,6 +37,34 @@ Result: **278 passed, 1 failed, 2 skipped**.
 
 ## Limits
 
-- No external service calls were made.
+- No intentional live validation or external-service execution was performed in this resume; earlier dotenv-affected runs were not globally network-denied.
 - No environment file was directly read or printed; final verification disabled python-dotenv before collection.
 - Live trace export remains controller-owned because required credentials were absent.
+
+## Reviewer follow-up fixes
+
+- Added one native child retriever span per filing-store query. Each span exports only the query, ticker, requested result count, returned count, and evidence identifiers; store/client objects and chunk text remain excluded.
+- Marked caught stock, news, SEC CIK/list/download, and ingestion failures with stable safe failure codes while preserving their public fallback values. Legitimate empty news evidence remains a successful span.
+- Replaced raw SEC download and ingestion exception text in returned error fields with stable public messages.
+- Updated T2-02 and T2-07 to state the query-level lineage and caught-failure behavior.
+- Deferred the reviewer’s minor HTTP-duration finalization observation to a separate change because it is outside the critical/important failure and lineage fixes.
+
+### Follow-up verification
+
+All Python commands set `PYTHON_DOTENV_DISABLED=1`, `LANGCHAIN_HANDLER=false`, `LANGCHAIN_TRACING=false`, `LANGSMITH_TRACING=false`, `LANGCHAIN_TRACING_V2=false`, and `PYTHONPATH` to this durable worktree.
+
+- New compiled-graph retrieval and caught-failure collector probes: **2 passed**.
+- Focused tracing, news/stock evidence, graph-news, and API integration regression suite: **69 passed**.
+- Focused Ruff across all changed Python files: **PASS**.
+- Focused mypy across all changed Python files: the only error is the pre-existing `app/services/tools/web_search_tool.py:159 [no-any-return]`; no new type errors were reported.
+- Governance checks (`check_no_scope_residue`, `check_sprint_map`, `check_doc_sync`, `check_test_hygiene`): **PASS**.
+- No full-suite rerun was performed for this bounded follow-up; the preceding clean-environment full-suite result remains recorded above.
+
+## Controller final verification — 2026-09-23
+
+User capped corrections at two and restricted new agents to unavailable gpt-6-sol(high); no new agents were spawned, and no additional runtime fixes were made. Controller reviewed the pending second correction locally.
+
+- Final default full suite: **279 passed, 1 failed, 2 skipped** in27.66s; remaining embedding override failure.
+- Explicit offline integration suite: **1 passed, 1 failed** in13.29s; stale fake_check_ollama_health rejects model keyword. This supersedes historical broad-pass claims for that integration and remains unresolved at the correction cap.
+- All nine OpenAPI route contracts checked: **PASS** (inventory, success schemas/media, authorization schemes,405,async202+Location).
+- Live execution/export still pending explicit runtime credential-loading approval.

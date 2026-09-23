@@ -32,7 +32,7 @@ from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
-from app.observability.langsmith import app_traceable
+from app.observability.langsmith import app_traceable, mark_trace_failed
 
 try:
     import yfinance as yf
@@ -175,6 +175,7 @@ async def get_stock_data(
 
     except Exception:
         logger.error(f"Failed to fetch {ticker}")
+        mark_trace_failed("stock_fetch_failed")
         return StockInfo(ticker=ticker, company_name=ticker, error="Stock data unavailable.")
 
 
