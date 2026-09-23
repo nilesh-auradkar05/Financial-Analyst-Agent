@@ -1,455 +1,339 @@
-# Financial Analyst Agent System
+# Financial Analyst Agent
 
-AI-powered financial analyst agent that researches companies, analyzes SEC filings, evaluates market sentiment, retrieves filing evidence, and generates investment memos with citations.
+A single-agent financial research system: give it a stock ticker and it gathers market data, recent news and SEC 10-K filing evidence, then writes an investment memo where every factual sentence cites a numbered source. A verifier then checks the memo claim by claim before it is returned.
 
-Built with **LangGraph**, **FastAPI**, **RAG**, **Pydantic**, local-first LLM tooling, and a retrieval evaluation workflow designed for measurable grounding improvements.
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.0+-green.svg)](https://github.com/langchain-ai/langgraph)
+[![FastAPI](https://img.shields.io/badge/FastAPI-service-teal.svg)](https://fastapi.tiangolo.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-green.svg)](https://github.com/langchain-ai/langgraph)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-teal.svg)](https://fastapi.tiangolo.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Ollama embeddings · Amazon Bedrock or Ollama chat models · FinBERT · edgartools · Tavily · yfinance · Prometheus · LangSmith
 
-## Project Status
+### What it does
 
-**Stage: instrumented prototype → production-readiness sprint.** A production-readiness review (2026-08-24) is now canonical in `docs/SPEC.md` v1.3 (application record `docs/adr/ADR-0008-production-readiness-order.md`) and `docs/sprint-plan.md`. The eval/grounding harness is the strongest asset and the service shell the weakest. The current work is the ordered eight-step plan below; nothing later in the list opens before the previous step has commit evidence.
+1. **Collects evidence**: recent news (Tavily), a market snapshot (yfinance) and sections of the company's latest 10-K filing (Business, Risk Factors, MD&A, Market Risk) retrieved from a vector store.
+2. **Scores sentiment** on the news with FinBERT.
+3. **Builds a citation registry**: every source gets a number *before* the model is called, so the model can only cite sources that exist.
+4. **Drafts the memo** in seven fixed sections, from executive summary to recommendation.
+5. **Verifies the memo**: it extracts factual claims, matches their numbers within a tolerance and checks semantic similarity (≥ 0.45) against the cited evidence. It reports `citation_coverage_rate`, `grounded_claim_rate` and any citations that point to no source.
+6. **Serves it all through a FastAPI service** with synchronous and asynchronous endpoints, health checks, statistics and Prometheus metrics.
 
-What exists and is measured:
+### Project status
 
-- LangGraph single-agent workflow with citation registry built before the LLM call
-- SEC 10-K ingestion (edgartools), section-aware chunk metadata, `RetrievalStore` abstraction (Chroma default, Qdrant behind the interface)
-- FastAPI sync/async endpoints, file-backed run store, Prometheus metrics, LangSmith tracing
-- Heuristic memo verifier (claim extraction, tolerance number match, cosine ≥ 0.45) — latest live-evidence baseline `grounded_claim_rate 0.904 ± 0.062`, `citation_coverage 0.925 ± 0.049`, classification **candidate** (live evidence cannot reach `approved`)
-- Retrieval benchmark fixtures, paired case-level comparator, quality/latency baseline runners
+This is an **instrumented prototype** that is being made production-ready. The evaluation and grounding harness is the most mature part; the service layer is the least. Known gaps, verified against the code:
 
-Known limitations at HEAD (verified against code, not aspiration):
+- An ingestion failure or un-ingested ticker produces a memo without SEC evidence that still reports `completed`.
+- Verification results are reported but not enforced, and there is no repair loop.
+- Graph nodes run one after another, and FinBERT blocks the event loop.
+- There is no authentication, rate limiting, guardrails or caching, and async jobs run in-process.
 
-- A ticker that was never ingested produces a memo with no SEC evidence and still reports `completed`
-- Verification failure is logged, not enforced; there is no repair loop
-- Evidence nodes run serially; FinBERT inference blocks the event loop
-- No guardrails, no caching, no auth, no rate limiting, in-process background jobs
-- Eval results carry no lineage (commit, model, snapshot) and no eval runs in CI
+The ordered plan for closing these gaps is in [`docs/sprint-plan.md`](docs/sprint-plan.md). Scope and source-of-truth rules are in [`docs/SPEC.md`](docs/SPEC.md).
 
-### Implementation order (authoritative copy: `docs/sprint-plan.md`, S2 preamble)
+---
 
-| Step | Task | Exit evidence |
-| --- | --- | --- |
-| 1 | S2-T00a — governance docs into `docs/`, CI governance job, hooks committed | `git ls-files docs/` non-empty; governance job green; deliberate break fails CI |
-| 2 | S2-T00c — fan-out of independent nodes, `to_thread` for FinBERT/store, graph singleton, `errors` reducer | latency baseline before/after (same model/temp); 4 concurrent requests < 1.5× single |
-| 3 | S2-T00b/T00d — `EvidenceSnapshot` freeze/replay with zero-network test; `degraded` / `evidence_missing` statuses | replay green under `unshare -n`; `grep "from evaluation" app/` empty |
-| 4 | S6 — eval registry with lineage; `eval-replay` CI regression gate; verifier↔judge κ | a PR that regresses grounding fails CI |
-| 5 | S6 — bounded draft→verify→revise loop (max 2) | paired comparison vs no-loop on the frozen snapshot |
-| 6 | S7 — guardrails (input, untrusted content, output policy), API auth + rate limit | adversarial fixture in CI |
-| 7 | S7 — evidence / query-embedding / memo caching keyed on `snapshot_hash` | cache hit-rate in `/metrics` |
-| 8 | S7 → S10 — queue + worker, Postgres job store, FinBERT out-of-process, circuit breaker; cloud gated on ADR-0006 | `JobQueue`/`RunStore` protocols swapped without app changes |
+## Diagrams
 
-## What This System Does
+### Agent workflow (current code)
 
-Given a ticker, the system can:
+Drawn from `create_agent()` in [`app/agents/graph.py`](app/agents/graph.py). If a node records a fatal error, the graph skips straight to `draft_memo`, and the memo states which data was unavailable. The request's `include_*` options are handled inside the nodes.
 
-1. fetch market context,
-2. collect recent company news,
-3. ingest and retrieve SEC filing sections,
-4. build structured evidence packets,
-5. run sentiment and structured analysis,
-6. generate an investment memo with citations,
-7. verify memo grounding and citation coverage,
-8. expose the workflow through a FastAPI service.
-
-## Features
-
-### Multi-Source Research
-
-- **News search** through Tavily
-- **Stock data** through YFinance
-- **SEC filings** through EDGAR APIs
-- **Filing-section retrieval** for business, risk factors, MD&A, and market-risk sections
-
-### Evidence-Centered RAG
-
-- backend-agnostic retrieval contract
-- metadata-rich filing chunks
-- section-aware retrieval filters
-- normalized `EvidencePacket` objects
-- citation-friendly memo generation
-- grounding and citation verification
-
-### Evaluation and Observability
-
-- retrieval fixtures and benchmark result files
-- paired retrieval comparison tooling
-- precision, recall, MRR, NDCG, section-recall, first-rank, and latency-oriented metrics
-- health, stats, and metrics endpoints
-- LangSmith / RAGAS / DeepEval-oriented evaluation direction
-
-### Service Layer
-
-- FastAPI sync and async analysis endpoints
-- file-backed async run state
-- graceful handling of partial tool failures
-- environment-driven configuration
-- Docker/local-stack support
-
-## Architecture
-
-![System Architecture](assets/images/architecture.jpg)
-
-### Agent Workflow
-
-![Agent Workflow](assets/images/agent-workflow.jpg)
-
-### Architecture at a Glance
-
-```text
-Ticker Request
-  -> Validate request and runtime configuration
-  -> Fetch market data and recent news
-  -> Retrieve SEC filing evidence
-  -> Build structured evidence packets
-  -> Run sentiment and structured analysis
-  -> Draft memo with citations
-  -> Verify grounding and citation coverage
-  -> Return memo, evidence, citations, and verification payload
+```mermaid
+flowchart TD
+    S([START]) --> N[research_news<br/>Tavily news]
+    N --> K[fetch_stock<br/>yfinance snapshot]
+    K --> F[retrieve_filings<br/>10-K sections from vector store]
+    F --> A[analyze_sentiment<br/>FinBERT]
+    A --> D[draft_memo<br/>citation registry + LLM]
+    D --> V[verify_memo<br/>claim-level grounding check]
+    V --> E([END])
+    N -. fatal error .-> D
+    K -. fatal error .-> D
+    F -. fatal error .-> D
 ```
 
-## Repository Layout
+### Component diagrams
 
-```text
-Financial-Analyst-Agent/
-├── agents/
-├── api/
-│   ├── main.py
-│   ├── run_store.py
-│   └── schemas.py
-├── configs/
-├── evaluation/
-│   ├── fixtures/
-│   ├── results/
-│   └── compare_retrieval_results.py
-├── models/
-├── monitoring/
-├── observability/
-├── rag/
-│   ├── embeddings.py
-│   ├── evidence.py
-│   ├── ingestion.py
-│   └── vector_store.py
-├── scripts/
-├── tests/
-├── tools/
-├── Dockerfile
-├── Makefile
-├── docker-compose.yml
-├── docker-compose.qdrant.yml
-└── pyproject.toml
-```
+<details>
+<summary><b>Evidence pipeline</b>: how filings, news and market data become citable evidence packets</summary>
 
-## Requirements
+![Evidence pipeline](assets/images/evidence-pipeline.png)
+</details>
 
-- Python 3.12+
-- Ollama running locally
-- Tavily API key for web/news search
-- SEC-compliant user agent string
-- local write access for vector-store persistence and file-backed run storage
-- Qdrant local stack when running Qdrant-backed retrieval experiments
+<details>
+<summary><b>Retriever architecture</b>: section-aware, hybrid and reranked retrieval behind one store interface</summary>
 
-## Local Setup
+![Retriever architecture](assets/images/retriever-arch.png)
+</details>
 
-### 1. Clone the repository
+<details>
+<summary><b>Memo generation</b>: evidence sources merged into a cited memo</summary>
+
+![Memo generation](assets/images/memo-generation.png)
+</details>
+
+<details>
+<summary><b>Verification flow</b>: claim extraction, number matching and semantic grounding</summary>
+
+![Verification flow](assets/images/verification-flow.png)
+</details>
+
+<details>
+<summary><b>Evaluation architecture</b>: retrieval benchmarks, quality baselines and LLM-judge metrics</summary>
+
+![Evaluation architecture](assets/images/evaluation-arch.png)
+</details>
+
+<details>
+<summary><b>Low-level architecture</b></summary>
+
+![Low-level architecture](assets/images/low-level-architect-diagram.png)
+</details>
+
+### Target architecture (proposed, not yet implemented)
+
+These diagrams show where the sprint plan is heading: evidence snapshots with replay, a job queue with workers, guardrails, a bounded repair loop and an evaluation registry. They describe a design, not the code as it stands.
+
+| Diagram | Image | Editable source |
+|---|---|---|
+| High-level design | [`docs/png/hld.png`](docs/png/hld.png) | [`hld.excalidraw`](docs/System-design/hld.excalidraw) |
+| System design | [`docs/png/system-design.png`](docs/png/system-design.png) | [`system-design.excalidraw`](docs/System-design/system-design.excalidraw) |
+| Low-level design | [`docs/png/lld.png`](docs/png/lld.png) | [`lld.excalidraw`](docs/System-design/lld.excalidraw) |
+| Critical request flow | [`docs/png/critical-flow.png`](docs/png/critical-flow.png) | [`critical-flow.excalidraw`](docs/System-design/critical-flow.excalidraw) |
+
+Large-scale variants of the same four diagrams are in [`docs/png/production/`](docs/png/production/), with SVGs in [`docs/svg/production/`](docs/svg/production/). Their sizing figures are projections, not measurements.
+
+![Target high-level architecture](docs/png/hld.png)
+
+---
+
+## Installation Instructions
+
+### Prerequisites
+
+| Requirement | Needed for |
+|---|---|
+| Python 3.12 and [`uv`](https://docs.astral.sh/uv/) | everything |
+| [Ollama](https://ollama.com) with `qwen3-embedding:4b` | embeddings for ingestion and retrieval; optionally the chat model too |
+| AWS credentials with Amazon Bedrock access | the default chat-model provider (`LLM_PROVIDER=bedrock`) |
+| Docker | Qdrant, and the optional API + Prometheus + Grafana stack |
+| Tavily API key | news search |
+| An SEC contact string (`Name email@example.com`) | SEC EDGAR access |
+
+The offline unit tests need none of the external services.
+
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/nilesh-auradkar05/Financial-Analyst-Agent.git
 cd Financial-Analyst-Agent
+uv python install 3.12
+uv sync --python 3.12
 ```
 
-### 2. Install dependencies
+### 2. Configure the environment
+
+Create a `.env` file in the repository root. Settings are read by [`app/config.py`](app/config.py).
 
 ```bash
-uv install
-```
+# Chat model: Bedrock (default) or Ollama
+LLM_PROVIDER=bedrock
+LLM_MODEL=anthropic.claude-sonnet-4-6
+AWS_REGION=us-east-1
+LLM_THINKING_MODE=off            # off | enabled | adaptive
 
-Optional full local setup:
-
-```bash
-make install
-```
-
-### 3. Pull local models
-
-```bash
-ollama pull qwen3-vl:8b
-ollama pull qwen3-embedding:4b
-```
-
-### 4. Configure environment
-
-Create a `.env` file with at least:
-
-```bash
-TAVILY_API_KEY=tvly-xxxxxxxxxxxxx
+# Ollama (embeddings always; chat model when LLM_PROVIDER=ollama)
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_LLM_MODEL=qwen3-vl:8b
 OLLAMA_EMBED_MODEL=qwen3-embedding:4b
-SEC_USER_AGENT="your-name your-email@example.com"
-CHROMA_PERSIST_DIR=./data/chroma
-VECTOR_BACKEND=qdrant
+OLLAMA_LLM_MODEL=qwen3.5:9b
+
+# Vector store
+VECTOR_BACKEND=qdrant            # or chroma
 QDRANT_URL=http://localhost:6333
+
+# Evidence sources
+TAVILY_API_KEY=tvly-...
+SEC_USER_AGENT="Your Name your-email@example.com"
+EDGAR_IDENTITY="Your Name your-email@example.com"
+
+# Optional tracing
+LANGSMITH_API_KEY=
 ```
 
-Use `VECTOR_BACKEND=chroma` when comparing against the Chroma baseline.
+AWS credentials come from the standard AWS chain (environment variables, `~/.aws`, or an instance role). Do not commit `.env`.
 
-## Running the API
-
-### Development server
+### 3. Start the local services
 
 ```bash
-make serve
+docker compose -f docker-compose.qdrant.yml up -d   # Qdrant on :6333
+ollama pull qwen3-embedding:4b                        # embedding model
 ```
 
-Equivalent direct command:
+To skip Qdrant, set `VECTOR_BACKEND=chroma`, which stores data locally on disk.
+
+### 4. Check the install
 
 ```bash
-uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uv run pytest tests/unit -q
 ```
 
-### Production-style local run
+The full setup and test walkthrough, including troubleshooting, is in [`docs/setup-and-test.md`](docs/setup-and-test.md).
+
+---
+
+## Usage
+
+### Run the API
 
 ```bash
-make serve-prod
+make serve          # uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+make serve-prod     # 4 workers, no reload
 ```
 
-## Docker and Local Stack
+Interactive API docs: <http://localhost:8000/docs>
 
-Bring up the default stack:
+To run the API with Prometheus (`:9090`) and Grafana (`:3000`) in Docker instead:
 
 ```bash
 make docker-up
-```
-
-Bring up Qdrant locally when running Qdrant experiments:
-
-```bash
-docker compose -f docker-compose.qdrant.yml up -d
-```
-
-Stop services:
-
-```bash
+make docker-logs
 make docker-down
 ```
 
-View logs:
+### Endpoints
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/` | Service info |
+| `GET` | `/health` | Component health |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/stats` | Vector-store and run-store statistics |
+| `POST` | `/ingest` | Ingest a company's SEC filing |
+| `GET` | `/ingest/{ticker}` | Check whether a ticker is indexed |
+| `POST` | `/analyze` | Run an analysis and wait for the memo |
+| `POST` | `/analyze/async` | Start an analysis job; returns a `job_id` |
+| `GET` | `/jobs/{job_id}` | Poll a job's status and result |
+
+### Typical flow
+
+1. **Ingest** the ticker's 10-K once. Without this step, the memo has no SEC evidence.
+2. **Analyze** the ticker, either synchronously or as a job.
+3. Read the `verification` block in the response to see how well the memo is grounded.
+
+**Analysis request options** (`POST /analyze`, `POST /analyze/async`):
+
+| Field | Default | Meaning |
+|---|---|---|
+| `ticker` | required | 1–10 characters, e.g. `AAPL` |
+| `company_name` | looked up | Optional override |
+| `include_filing_analysis` | `true` | Use SEC filing evidence |
+| `include_news_sentiment` | `true` | Run FinBERT on the news |
+| `max_news_articles` | `10` | 1–50 |
+
+**Ingestion request options** (`POST /ingest`): `ticker` (required), `filing_type` (default `10-K`), `force_refresh` (default `false`).
+
+### Developer commands
 
 ```bash
-make docker-logs
+make test           # full test suite
+make lint           # ruff
+make typecheck      # mypy
+make smoke-test     # live end-to-end pipeline for AAPL (needs all services)
 ```
 
-## API Reference
+---
 
-### Base URL
+## Examples / Demos
 
-```text
-http://localhost:8000
-```
-
-### Core Endpoints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/` | Basic API info |
-| `GET` | `/health` | Component health check |
-| `GET` | `/metrics` | Prometheus metrics |
-| `GET` | `/stats` | Vector store and run-store stats |
-| `POST` | `/analyze` | Run synchronous analysis |
-| `POST` | `/analyze/async` | Start async analysis job |
-| `GET` | `/jobs/{job_id}` | Fetch async job status/result |
-| `POST` | `/ingest` | Ingest SEC filing data |
-| `GET` | `/ingest/{ticker}` | Check whether a ticker is indexed |
-| `GET` | `/docs` | Swagger UI |
-
-## Example Usage
-
-### Ingest a ticker
+### Ingest, then analyze
 
 ```bash
 curl -X POST http://localhost:8000/ingest \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL"}'
-```
 
-### Run synchronous analysis
+curl http://localhost:8000/ingest/AAPL
 
-```bash
 curl -X POST http://localhost:8000/analyze \
   -H "Content-Type: application/json" \
-  -d '{"ticker": "AAPL"}'
+  -d '{"ticker": "AAPL", "max_news_articles": 5}'
 ```
 
-### Run async analysis
+### Run it as a background job
 
 ```bash
 curl -X POST http://localhost:8000/analyze/async \
   -H "Content-Type: application/json" \
-  -d '{"ticker": "MSFT"}'
-```
+  -d '{"ticker": "MSFT", "include_news_sentiment": false}'
 
-Then poll:
-
-```bash
 curl http://localhost:8000/jobs/<job_id>
 ```
 
-### Use optional analysis controls
+### Response shape
 
-```bash
-curl -X POST http://localhost:8000/analyze \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ticker": "AAPL",
-    "include_filing_analysis": true,
-    "include_news_sentiment": false,
-    "max_news_articles": 5
-  }'
-```
-
-## Retrieval and Ingestion Notes
-
-The retrieval layer is designed around a backend-facing abstraction in `rag/vector_store.py`, not direct ad hoc calls into one database.
-
-Supported retrieval concepts include:
-
-- metadata-rich `IndexDocument` objects
-- `SearchFilters` for ticker, filing type, section key/name, and filing date
-- section-focused retrieval helpers
-- vector-store stats and document counting
-- `EvidencePacket` as the atomic retrieval unit for downstream grounding
-
-The ingestion path tracks:
-
-- filing date
-- total chunks
-- requested sections
-- sections found
-- sections skipped
-- documents written
-
-## Testing
-
-Run focused API and run-store tests:
-
-```bash
-uv run pytest tests/test_run_store.py tests/test_api_integration.py
-```
-
-Run the full test suite:
-
-```bash
-make test
-```
-
-Equivalent direct command:
-
-```bash
-uv run pytest tests/ -v
-```
-
-Run unit tests only:
-
-```bash
-uv run pytest tests/unit -v
-```
-
-Run integration tests that need external services/API keys:
-
-```bash
-uv run pytest tests/integration -v --run-integration
-```
-
-## Retrieval Evaluation
-
-The next sprint task is to run every retrieval method against the same shared benchmark fixture:
-
-```bash
-uv run python evaluation/retrieval_main.py \
-  --fixture evaluation/fixtures/retrieval_shared_benchmark_v1.json \
-  --mode section_aware \
-  --output evaluation/results/qdrant_section_aware_shared_v1.json
-```
-
-Repeat the run for each retrieval mode, then compare paired results:
-
-```bash
-uv run python evaluation/compare_retrieval_results.py \
-  evaluation/results/qdrant_section_aware_shared_v1.json \
-  evaluation/results/qdrant_reranked_hybrid_shared_v1.json \
-  --baseline-mode section_aware \
-  --candidate-mode reranked_hybrid \
-  --candidate-method dense_bm25_cross_encoder_rerank \
-  --strict-case-ids
-```
-
-Result files should identify their source fixture and retrieval method. Anything less is how fake benchmarks are born, and they grow up to become slide-deck lies.
-
-Expected result metadata:
+The response is abridged below; the values are placeholders, not real output. The full schema is `AnalysisResponse` in [`app/models.py`](app/models.py).
 
 ```json
 {
-  "fixture_file": "evaluation/fixtures/retrieval_shared_benchmark_v1.json",
-  "mode": "section_aware",
-  "retrieval_method": "qdrant_section_aware"
+  "ticker": "AAPL",
+  "company_name": "Apple Inc.",
+  "status": "completed",
+  "executive_summary": "…",
+  "investment_memo": "## Executive Summary\n… [1][4] …",
+  "stock_data": { "current_price": 0.0, "pe_ratio": 0.0, "sector": "…" },
+  "sentiment": { "overall_sentiment": "…", "positive_count": 0, "negative_count": 0 },
+  "citations": [
+    { "index": 1, "source_type": "sec_filing", "title": "…", "url": "…", "date": "…" }
+  ],
+  "verification": {
+    "passed": true,
+    "total_claims": 0,
+    "citation_coverage_rate": 0.0,
+    "grounded_claim_rate": 0.0,
+    "orphan_citations": []
+  },
+  "errors": [],
+  "execution_time_ms": 0.0
 }
 ```
 
-### Retrieval Decision Rules
+### Measured results
 
-- Keep the section-aware baseline if hybrid/reranked methods reduce recall or section coverage.
-- Do not adopt a method just because precision@5 improves while recall@5 collapses.
-- Treat latency, first relevant rank, section recall, and pass@k as first-class metrics.
-- Compare only shared `case_id` values with paired deltas.
-- Separate retrieval-method improvements from answer-generation prompt improvements.
+These numbers come from committed artifacts. Each one holds only for the model and inputs listed next to it.
 
-## Current Sprint Checklist
+| Measurement | Result | Setup | Source |
+|---|---|---|---|
+| Grounded-claim rate | **0.935 ± 0.045** | 30 memos (two replay runs of AAPL, MSFT, NVDA × 5), frozen evidence release `alpha-evidence:0.1.0`, `deepseek.v3.2` at temperature 0.3, commit `89265b8` | [`quality_baselines/alpha-quality-baseline__0.1.0.json`](artifacts/dataops/quality_baselines/alpha-quality-baseline__0.1.0.json) |
+| Citation coverage | **0.923 ± 0.047** | same run | same file |
+| End-to-end latency (warm, sequential) | p50 **32.6 s**, p95 **37.7 s** | 12 warm runs, Ollama `minimax-m3:cloud`, commit `2a47dd1` | [`evaluation/latency_res/`](evaluation/latency_res/) |
 
-- [x] Shared retrieval fixture, paired comparator, measured baseline selected
-- [x] Grounding instrument fixed at root cause (tolerance number match, heading-aware claim extraction) and unit-tested
-- [x] Production-readiness review applied: SPEC v1.3 canonical; ADR-0008 records the application
-- [ ] S2-T00a — docs tracked, CI governance job, hooks committed
-- [ ] S2-T00c — fan-out and event-loop hygiene
-- [ ] S2-T00b — evidence snapshot freeze/replay, zero-network assertion
-- [ ] S2-T00d — verification/evidence-completeness status semantics
-- [ ] S2 execution — anchored fixture v3 → Gate A
+### Reproduce the evaluations
 
-## Roadmap Direction
+```bash
+# Memo quality against the frozen evidence release (no live data sources)
+uv run python -m evaluation.quality_baseline --evidence-release alpha-evidence:0.1.0
 
-Steps 1–3 above, then S2 (Gate A), then S6 eval hardening + repair loop, then S7 service readiness. Multi-agent decomposition, frontend, and cloud remain deferred; each is gated on a documented exit criterion, not on enthusiasm.
+# Sequential latency baseline
+uv run python -m evaluation.latency_baseline --tickers AAPL MSFT NVDA --repeats 5
 
-Explicitly **not** planned: semantic caching of memo outputs (unsafe for time-sensitive financial content — caching is keyed on the evidence snapshot hash instead) and Kafka (no second consumer type exists; Redis Streams behind a `JobQueue` protocol until one does).
+# Run every retrieval method on the shared benchmark, then compare two result files case by case
+uv run python -m evaluation.run_shared_retrieval_benchmark --dry-run
+uv run python evaluation/compare_retrieval_results.py <baseline.json> <candidate.json> --strict-case-ids
+```
 
-## Agent-Tooling Hooks
+Comparisons change one thing at a time: the same fixture, and either the backend or the method, never both. The methodology is in [`docs/retrieval-benchmark.md`](docs/retrieval-benchmark.md).
 
-Governance rules that can be checked mechanically are enforced at the coding-agent boundary by `.claude/settings.json` and the scripts in `.claude/hooks/` (Claude Code; the same scripts register for Codex CLI's six-event subset). Blocking hooks exist only on `PreToolUse`, `UserPromptSubmit`, and `Stop`.
-
-| Id | Event | Rule |
-| --- | --- | --- |
-| H1 | SessionStart | inject `tasks/lessons.md`, recent commits, active sprint task, tree status |
-| H2 | UserPromptSubmit | implementation prompts require an unchecked plan item in `tasks/todo.md` |
-| H3 | PreToolUse Edit/Write | governance docs read-only unless `ALLOW_SPEC_EDIT=1` |
-| H4 | PreToolUse Edit/Write | frozen fixtures and datasets immutable |
-| H5 | PreToolUse Edit/Write | eval result files must carry lineage keys |
-| H6 | PreToolUse Bash | benchmark runs refused when uncommitted changes span more than one axis |
-| H7 | PreToolUse Bash | replay test commands rewritten to run without network |
-| H8 | PreToolUse Bash/Read | secrets files and credential patterns blocked |
-| H9 | PreToolUse Bash | force-push, hard reset, destructive `rm`, collection deletion blocked |
-| H10 | PostToolUse Edit/Write | `ruff` + `mypy` on the written file; failures fed back |
-| H11 | PostToolUse Bash | after a user correction followed by a failure, stub appended to `tasks/lessons.md` |
-| H12 | Stop | turn cannot end with a dirty tree, failing unit tests, or failing doc-sync |
-
-Smoke-test any hook with `echo '<event json>' | .claude/hooks/<script>`; see `docs/test-plan.md §15` for the cases.
-
-## Recommended Repo Status Statement
-
-> Financial Analyst Agent is a single-agent, evidence-grounded financial analysis system (LangGraph, FastAPI, SEC/news/market tools, citation registry, heuristic verifier, backend-abstracted retrieval) with a measured grounding baseline of 0.90 ± 0.06 on live evidence. It is a prototype, not a production service: a 2026-08 review recorded the gaps (silent evidence omission, unenforced verification, serial nodes, no guardrails/caching/queue) and an eight-step, evidence-gated order for closing them, starting with governance-in-CI and evidence-snapshot replay.
+---
 
 ## License
 
-MIT License.
+Released under the [MIT License](LICENSE). Copyright (c) 2025 Nilesh Auradkar.
+
+---
+
+## Contributors and contacts
+
+**Nilesh Auradkar**, author and maintainer
+- GitHub: [@nilesh-auradkar05](https://github.com/nilesh-auradkar05)
+- Email: nilesh.auradkar14@gmail.com
+
+Bug reports and ideas are welcome as [GitHub issues](https://github.com/nilesh-auradkar05/Financial-Analyst-Agent/issues). Before opening a pull request, read [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md). Every change must trace to the SPEC, include a behavior test from [`docs/test-plan.md`](docs/test-plan.md), and pass the governance checks in `scripts/ci/`.
