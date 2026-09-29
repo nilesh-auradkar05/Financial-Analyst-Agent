@@ -22,6 +22,10 @@ services:
       - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-600}
       - OLLAMA_TEMPERATURE=${OLLAMA_TEMPERATURE:-0.7}
 
+      # Retrieval backend (service DNS, not container-local localhost)
+      - VECTOR_BACKEND=${VECTOR_BACKEND:-qdrant}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+
       # Tavily
       - TAVILY_API_KEY=${TAVILY_API_KEY}
 
@@ -50,9 +54,31 @@ services:
     restart: unless-stopped
     networks:
       - financial-analyst-network
+    depends_on:
+      qdrant:
+        condition: service_healthy
     # For Mac/Windows to access host's ollama
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  # Default retrieval backend
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant-financial-analyst-agent-system
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/6333"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - financial-analyst-network
 
   # Ollama Service (Optional if want to add ollama in docker)
   # =========================================================================
@@ -124,6 +150,8 @@ volumes:
     name: financial-analyst-prometheus
   grafana-data:
     name: financial-analyst-grafana
+  qdrant-data:
+    name: qdrant-financial-analyst-agent-system
   # ollama-data:
   #   name: financial-analyst-ollama
 

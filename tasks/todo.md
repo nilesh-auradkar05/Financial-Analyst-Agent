@@ -467,3 +467,15 @@ Plan (behaviour-first tests from test-plan §10 written first, each failing befo
 Open decisions (user):
 - D1 Latency verification. The sprint-plan says "latency on the frozen release before/after" plus "4 concurrent /analyze on replay < 1.5× single". But the frozen-release replay (`quality_baseline._run_frozen_evidence`) skips the evidence nodes entirely, `latency_baseline.py` has no replay, and runtime replay is S2-T00b, which is sequenced AFTER this task. So the fan-out cannot be measured on frozen evidence yet: a source-of-truth sequencing conflict.
 - D2 Retrieval query text. `retrieve_filings` builds queries from `company_name`, which today comes from `fetch_stock` (yfinance) because it runs first. A true 3-way fan-out (required by the §10 "< 1.6 s" oracle) removes that dependency, so without a caller-supplied name the queries change → a retrieval-axis change bundled into a latency task.
+
+
+## DOCKER-QDRANT — make `make docker-up` start a reachable default backend (2026-09-29)
+
+Authorization: user reported `/ingest` failing with Qdrant connection refused, then requested the Docker Compose Qdrant errors be fixed. Trace: accepted ADR-0003 (Qdrant default), SPEC §6 retrieval boundary, sprint-plan S3-T01 operational contract. Bug fix only; no backend or API contract change.
+
+- [x] Add Qdrant to the main `docker-compose.yml` stack on `financial-analyst-network`.
+- [x] Set API `VECTOR_BACKEND=qdrant` and container URL `QDRANT_URL=http://qdrant:6333`; wait for Qdrant health.
+- [x] Recreate the stack; prove API-container → Qdrant connectivity and retry `POST /ingest`.
+- [x] Run lint/tests/Doc Sync, record results, commit cleanly.
+
+Verification (2026-09-29): `docker compose config --quiet` PASS; services = qdrant/api/prometheus/grafana. Recreated qdrant + API: Qdrant healthy before API start, no orphan warning. Inside API: `VECTOR_BACKEND=qdrant`, `QDRANT_URL=http://qdrant:6333`, service DNS returned Qdrant root metadata. Exact reported request `POST /ingest {"ticker":"NFLX"}` → success, 191 chunks, sections business/risk_factors/md&a/market_risk, filing date 2026-01-23. `make docker-up` PASS with Qdrant healthy and no orphan warning. `uv run ruff check .` PASS; `uv run mypy .` 128 files PASS; `uv run pytest -q` 262 passed, 2 skipped; all four governance checks PASS; IDE lints clean. LangSmith export attempts logged network errors during tests but did not fail the suite.
