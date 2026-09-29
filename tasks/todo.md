@@ -445,3 +445,25 @@ Verification (2026-09-29, local, branch `frontend-impl`): `uv run ruff check .` 
 - Dependency drift (outside the plan, fixed): deepeval 4.0.0 → 4.2.6 in `uv.lock` (commit `439ab5e`) widened `LLMTestCase.retrieval_context` to `list[str | RetrievedContextData]`, so mypy flagged `evaluation/run_rag_quality_eval.py:243` (list invariance). Fixed by annotating the local list; no runtime change; the rag-quality/judge unit tests pass (7).
 - Housekeeping: two hook-generated "(fill in)" stubs removed from `tasks/lessons.md` (no user correction occurred).
 - Pending after local completion: push and confirm `gh run view --job governance` green on GitHub.
+- Remote (2026-09-29, user screenshot): GitHub Actions `governance`, `build (3.11)`, `build (3.12)` all green (governance 5s; 1 warning + 1 notice annotation, not inspected). S2-T00a closed.
+
+
+## S2-T00c — Fan-out and event-loop hygiene (step 2) — PLAN (2026-09-29, awaiting user confirmation)
+
+Authorization: user asked to plan S2-T00c after S2-T00a closed green on GitHub. Trace: sprint-plan S2-T00c; SPEC §8.1–8.4; gap G12; test-plan §10 (oracle). Non-goals (sprint-plan): no multi-agent, no caching, no repair loop. No API contract change (`AnalysisResponse` unchanged).
+
+Current state (read 2026-09-29): graph is serial `research_news → fetch_stock → retrieve_filings → analyze_sentiment → draft_memo → verify_memo` with `_route_after_node` fatal-skip routers; the only non-recoverable error is raised by `draft_memo` itself, so those routers never fire. `add_error` mutates `state["errors"]` in place; `draft_memo`/`verify_memo` return full copied lists. `create_agent()` compiles per request (`graph.py` run_agent). `get_llm(settings)` builds a client per draft. `analyze_sentiment_batch` (FinBERT, CPU) and `store.search_by_ticker` run synchronously inside async nodes. Retrieval keeps top-10 chunks, but the registry and LLM context use 5. FinBERT lazy-loads through an unlocked global (`sentiment.py:271`).
+
+Plan (behaviour-first tests from test-plan §10 written first, each failing before its change):
+- [ ] T1 State: `errors: Annotated[list[dict], operator.add]`; `current_step` gets a last-write reducer (parallel branches all write it). `add_error` returns only the new entry (never mutates). `draft_memo`/`verify_memo` return only their new errors. Update `tests/unit/test_state.py` add_error cases to the reducer contract (§10 "Errors accumulate under fan-out", G12).
+- [ ] T2 Graph: `START → {research_news, fetch_stock, retrieve_filings}` in parallel, joined by a multi-source edge into `analyze_sentiment`, then `draft_memo → verify_memo → END`. Remove the dead fatal-skip routers (they only ever returned the next node). Company-name handling per decision D2.
+- [ ] T3 Event loop: `await asyncio.to_thread(...)` for `analyze_sentiment_batch` and `store.search_by_ticker`; make the FinBERT default-analyzer init thread-safe (lock), so concurrent requests don't double-load the model.
+- [ ] T4 Singletons: module-level `AGENT = create_agent()` used by `run_agent`; process-cached LLM for `draft_memo` (cache keyed to the global settings only, so `get_llm(config)` stays uncached for explicit configs).
+- [ ] T5 Retrieval sizing: one constant for filing chunks used by retrieval top-k, `_build_citation_registry` and `get_context_for_llm`, so `filing_chunks` length == registry filing count.
+- [ ] T6 Harness merge: `evaluation/quality_baseline.py` `_run_frozen_evidence` merges node updates with `{**state, **update}`. Under the append reducer this would drop earlier errors, so it uses a shared `apply_update` helper from `app/agents/state.py`. Artifacts keep the same fields.
+- [ ] Tests (`tests/unit/test_graph_fanout.py`, §10): fan-out wall-time < 1.6 s with three 1 s sleeping fakes; `fetch_stock` failure → `stock_data == {}`, one error, other branches present; two failing branches → exactly two errors; `GET /health` < 200 ms while sentiment scores 50 snippets (blocking fake); `AGENT` identity stable across two `run_agent` calls; retrieval sizing. Fakes are faithful (compute outputs from inputs), with no network or real LLM.
+- [ ] Verify: ruff, mypy, full pytest, 4 governance checks; latency before/after per decision D1; record `Result:` in sprint-plan (H3-protected, needs user approval).
+
+Open decisions (user):
+- D1 Latency verification. The sprint-plan says "latency on the frozen release before/after" plus "4 concurrent /analyze on replay < 1.5× single". But the frozen-release replay (`quality_baseline._run_frozen_evidence`) skips the evidence nodes entirely, `latency_baseline.py` has no replay, and runtime replay is S2-T00b, which is sequenced AFTER this task. So the fan-out cannot be measured on frozen evidence yet: a source-of-truth sequencing conflict.
+- D2 Retrieval query text. `retrieve_filings` builds queries from `company_name`, which today comes from `fetch_stock` (yfinance) because it runs first. A true 3-way fan-out (required by the §10 "< 1.6 s" oracle) removes that dependency, so without a caller-supplied name the queries change → a retrieval-axis change bundled into a latency task.
