@@ -20,6 +20,10 @@ class RunRecord:
     company_name: Optional[str] = None
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+    idempotency_identity: Optional[str] = None
+    request_fingerprint: Optional[str] = None
+    request_id: Optional[str] = None
+    trace_id: Optional[str] = None
 
 class FileBackedRunStore:
     """
@@ -32,12 +36,13 @@ class FileBackedRunStore:
         if not self.path.exists():
             self._write_all({})
 
-    def create_run(self, job_id: str, ticker: str, company_name: Optional[str] = None) -> RunRecord:
+    def create_run(self, job_id: str, ticker: str, company_name: Optional[str] = None, *, request_id: str | None = None, trace_id: str | None = None) -> RunRecord:
         now = datetime.now(timezone.utc).isoformat()
         record = RunRecord(
             job_id=job_id,
             ticker=ticker.upper(),
             company_name=company_name,
+            request_id=request_id, trace_id=trace_id,
             status="pending",
             started_at=now,
         )
@@ -47,6 +52,42 @@ class FileBackedRunStore:
             self._write_all(data)
         return record
 
+    def create_idempotent_run(
+        self,
+        job_id: str,
+        ticker: str,
+        *,
+        principal: str,
+        idempotency_key: str,
+        request_fingerprint: str,
+        company_name: Optional[str] = None,
+        request_id: str | None = None,
+        trace_id: str | None = None,
+    ) -> tuple[RunRecord, bool]:
+        identity = f"{principal}:{idempotency_key}"
+        with self._lock:
+            data = self._read_all()
+            for payload in data.values():
+                if payload.get("idempotency_identity") != identity:
+                    continue
+                if payload.get("request_fingerprint") != request_fingerprint:
+                    raise ValueError("Idempotency-Key was already used for a different request")
+                return RunRecord(**payload), False
+
+            record = RunRecord(
+                job_id=job_id,
+                ticker=ticker.upper(),
+                company_name=company_name,
+            request_id=request_id, trace_id=trace_id,
+                status="pending",
+                started_at=datetime.now(timezone.utc).isoformat(),
+                idempotency_identity=identity,
+                request_fingerprint=request_fingerprint,
+            )
+            data[job_id] = asdict(record)
+            self._write_all(data)
+            return record, True
+
     def mark_running(self, job_id: str) -> RunRecord:
         return self._update(job_id, status="running")
 
@@ -54,6 +95,15 @@ class FileBackedRunStore:
         return self._update(
             job_id,
             status="completed",
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            result=result,
+            error=None,
+        )
+
+    def mark_finished(self, job_id: str, status: str, result: dict[str, Any]) -> RunRecord:
+        return self._update(
+            job_id,
+            status=status,
             completed_at=datetime.now(timezone.utc).isoformat(),
             result=result,
             error=None,
@@ -85,6 +135,8 @@ class FileBackedRunStore:
             "pending": sum(1 for r in runs if r.status == "pending"),
             "running": sum(1 for r in runs if r.status == "running"),
             "completed": sum(1 for r in runs if r.status == "completed"),
+            "degraded": sum(1 for r in runs if r.status == "degraded"),
+            "evidence_missing": sum(1 for r in runs if r.status == "evidence_missing"),
             "failed": sum(1 for r in runs if r.status == "failed"),
             "path": str(self.path),
         }

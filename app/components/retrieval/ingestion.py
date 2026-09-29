@@ -30,7 +30,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langsmith import traceable
 from loguru import logger
 
 from app.components.retrieval.sections import (
@@ -45,6 +44,7 @@ from app.components.retrieval.vector_store import (
     SearchFilters,
     get_vector_store,
 )
+from app.observability.langsmith import app_traceable, mark_trace_failed
 from app.services.tools.sec_filings_tool import Filing, get_latest_10k
 
 # Data Models
@@ -229,7 +229,7 @@ def _write_documents(store: RetrievalStore, documents: list[IndexDocument]) -> i
 
 # Ingestion functions
 
-@traceable(name="ingest_filing", run_type="chain", tags=["rag", "ingestion"])
+@app_traceable(name="ingest_filing", run_type="chain", tags=["rag", "ingestion"])
 def ingest_filing(
     filing: Filing,
     sections: list[str] | None = None,
@@ -314,7 +314,7 @@ def ingest_filing(
         documents_written=documents_written,
     )
 
-@traceable(name="ingest_10k_for_ticker", run_type="chain", tags=["rag", "10k"])
+@app_traceable(name="ingest_10k_for_ticker", run_type="chain", tags=["rag", "10k"])
 async def ingest_10k_for_ticker(
     ticker: str,
     sections: Optional[list[str]] = None,
@@ -342,16 +342,18 @@ async def ingest_10k_for_ticker(
     normalized_ticker = ticker.upper().strip()
     try:
         filing = await get_latest_10k(normalized_ticker)
+        assert filing is not None
         return ingest_filing(
             filing=filing,
             sections=sections,
             replace_existing=replace_existing,
         )
-    except Exception as exc:
-        logger.exception(f"Failed to ingest 10-K for {normalized_ticker}")
+    except Exception:
+        logger.error(f"Failed to ingest 10-K for {normalized_ticker}")
+        mark_trace_failed("ingestion_failed")
 
         return IngestionResult(
             ticker=normalized_ticker,
             filing_type="10-K",
-            error=f"{type(exc).__name__}: {exc}",
+            error="10-K ingestion failed.",
         )

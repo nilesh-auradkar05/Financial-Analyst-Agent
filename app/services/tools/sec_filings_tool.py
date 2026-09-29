@@ -43,11 +43,11 @@ from typing import Any, Optional, cast
 
 import httpx
 from bs4 import XMLParsedAsHTMLWarning
-from langsmith import traceable
 from loguru import logger
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.observability.langsmith import app_traceable, mark_trace_failed
 
 # Suppress XMLParsedAsHTMLWarning from BeautifulSoup
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -242,7 +242,7 @@ class SECClient:
         resp.raise_for_status()
         return resp
 
-    @traceable(name="sec_get_cik", run_type="tool", tags=["sec"])
+    @app_traceable(name="sec_get_cik", run_type="tool", tags=["sec"])
     async def get_cik(self, ticker: str) -> Optional[str]:
         """Get CIK number for a ticker."""
         try:
@@ -266,11 +266,12 @@ class SECClient:
 
             return None
 
-        except Exception as e:
-            logger.error(f"CIK lookup failed: {e}")
+        except Exception:
+            logger.error("CIK lookup failed")
+            mark_trace_failed("sec_cik_lookup_failed")
             return None
 
-    @traceable(name="sec_get_filings", run_type="tool", tags=["sec"])
+    @app_traceable(name="sec_get_filings", run_type="tool", tags=["sec"])
     async def get_recent_filings(
         self,
         ticker: str,
@@ -310,11 +311,12 @@ class SECClient:
 
             return results
 
-        except Exception as e:
-            logger.error(f"Filing lookup failed: {e}")
+        except Exception:
+            logger.error("Filing lookup failed")
+            mark_trace_failed("sec_filings_lookup_failed")
             return []
 
-    @traceable(name="sec_download_filing", run_type="tool", tags=["sec"])
+    @app_traceable(name="sec_download_filing", run_type="tool", tags=["sec"])
     async def download_filing(self, metadata: FilingMetaData) -> Filing:
         """Download and parse a filing."""
         logger.info(f"Downloading {metadata.filing_type} for {metadata.ticker}")
@@ -329,9 +331,10 @@ class SECClient:
 
             return Filing(metadata=metadata, sections=sections)
 
-        except Exception as e:
-            logger.error(f"Download failed: {e}")
-            return Filing(metadata=metadata, error=str(e))
+        except Exception:
+            logger.error("Filing download failed")
+            mark_trace_failed("sec_filing_download_failed")
+            return Filing(metadata=metadata, error="SEC filing download failed.")
 
     def _parse_sections(self, text: str) -> dict[str, FilingSection]:
         """Extract sections from filing HTML/text."""
@@ -373,7 +376,7 @@ class SECClient:
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-@traceable(name="get_latest_10k", run_type="tool", tags=["sec", "10k"])
+@app_traceable(name="get_latest_10k", run_type="tool", tags=["sec", "10k"])
 async def get_latest_10k(
     ticker: str,
 ) -> Optional[Filing]:

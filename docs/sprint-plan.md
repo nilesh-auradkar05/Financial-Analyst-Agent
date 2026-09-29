@@ -439,3 +439,12 @@ Exit = Gate B.
 - **S8 — Frontend MVP.** Thin API-driven SPA against the hardened API. Unchanged.
 - **S9 — Portfolio polish.** README, measured results, honest limitations, benchmark report, demo, fresh-clone smoke. Unchanged.
 - **S10 — Cloud (INTEGRATION_PLAN_v2 Phases 4–5). Step 8 (remote).** Gated on ADR-0006 + SPEC §3 amendment. Kafka is explicitly *not* adopted until a second consumer type exists for the same event stream (review 2026-08-24).
+
+
+### Authorized REST/tracing sequencing exception — 2026-09-21
+
+The user authorized the focused S7 API authorization, rate limits, async idempotency,
+REST/error contracts and provider-aware health slice, plus S2-T00d response status
+corrections and request correlation. See `tasks/rest-tracing-plan.md`. This does
+not open caching, queue replacement, repair loops, or unrelated sprint work.
+The service remains a single process with its existing file-backed run store.

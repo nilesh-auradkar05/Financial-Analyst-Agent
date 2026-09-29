@@ -28,6 +28,11 @@ This is an **instrumented prototype** that is being made production-ready. The e
 - There is no authentication, rate limiting, guardrails or caching, and async jobs run in-process.
 
 The ordered plan for closing these gaps is in [`docs/sprint-plan.md`](docs/sprint-plan.md). Scope and source-of-truth rules are in [`docs/SPEC.md`](docs/SPEC.md).
+- A ticker that was never ingested produces a memo with no SEC evidence and still reports `completed`
+- Verification failure is logged, not enforced; there is no repair loop
+- Evidence nodes run serially; FinBERT inference blocks the event loop
+- No full guardrail layer or caching; single-process auth/rate limits, in-process background jobs
+- Eval results carry no lineage (commit, model, snapshot) and no eval runs in CI
 
 ---
 

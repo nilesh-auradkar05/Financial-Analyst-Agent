@@ -38,11 +38,12 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from langsmith import traceable
+from langsmith import get_current_run_tree
 from loguru import logger
 from transformers import PreTrainedTokenizerBase
 
 from app.config import settings
+from app.observability.langsmith import app_traceable
 
 # DATA Models
 
@@ -196,7 +197,7 @@ class SentimentAnalyzer:
             f"(model={self.model_name}, device={self.device})"
         )
 
-    @traceable(name="sentiment_analyze_batch", run_type="chain", tags=["sentiment"])
+    @app_traceable(name="sentiment_analyze_batch", run_type="chain", tags=["sentiment"])
     def analyze_batch(self, texts: list[str], batch_size: int = 16) -> list[SentimentResult]:
         """
         Analyze sentiment of multiple texts.
@@ -211,6 +212,8 @@ class SentimentAnalyzer:
         if not texts:
             return []
 
+        if run := get_current_run_tree():
+            run.metadata.update(model=self.model_name, provider="huggingface", model_role="sentiment")
         import torch
         self._load_model()
         if self._tokenizer is None or self._model is None:
@@ -273,7 +276,7 @@ def _get_default_analyzer() -> SentimentAnalyzer:
         _default_analyzer = SentimentAnalyzer()
     return _default_analyzer
 
-@traceable(name="analyze_sentiment_batch", run_type="chain", tags=["sentiment"])
+@app_traceable(name="analyze_sentiment_batch", run_type="chain", tags=["sentiment"])
 def analyze_sentiment_batch(
     texts: list[str],
     *,

@@ -6,6 +6,7 @@ Uses FastAPI's TestClient — no live server needed.
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main as api_main
 from app.components.retrieval.vector_store import ChromaDBVectorStore
 from app.main import _get_store, app
 
@@ -20,10 +21,12 @@ def mock_store():
 
 
 @pytest.fixture
-def client(mock_store):
+def client(mock_store, monkeypatch):
     """TestClient with vector store overridden via DI."""
     app.dependency_overrides[_get_store] = lambda: mock_store
-    yield TestClient(app)
+    monkeypatch.setattr(api_main.settings, "api_key", "test-secret")
+    test_client = TestClient(app, headers={"X-API-Key": "test-secret"})
+    yield test_client
     app.dependency_overrides.clear()
 
 

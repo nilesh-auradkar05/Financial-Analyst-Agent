@@ -33,8 +33,9 @@ def get_llm(config: Settings = settings) -> BaseChatModel:
 # =============================================================================
 
 
-async def check_ollama_health(*, log_failure: bool = False) -> bool:
+async def check_ollama_health(*, log_failure: bool = False, model: str | None = None) -> bool:
     """Check if Ollama server is running and model is available."""
+    model = model or settings.ollama.llm_model
     tags_url = f"{settings.ollama.base_url.rstrip('/')}/api/tags"
     try:
         async with httpx.AsyncClient() as client:
@@ -54,10 +55,10 @@ async def check_ollama_health(*, log_failure: bool = False) -> bool:
             data = response.json()
             models = [m.get("name", "") for m in data.get("models", [])]
 
-            model_available = any(settings.ollama.llm_model in m for m in models)
+            model_available = any(m == model or m == f"{model}:latest" for m in models)
             if not model_available and log_failure:
                 logger.warning(
-                    f"Ollama model {settings.ollama.llm_model!r} not found. "
+                    f"Ollama model {model!r} not found. "
                     f"Available models: {models}"
                 )
             return model_available

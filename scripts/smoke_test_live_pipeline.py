@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from typing import Any, cast
@@ -41,7 +42,7 @@ def poll_job(client: httpx.Client, base_url: str, job_id: str, timeout_s: int, i
         last_payload = require_ok(response, "poll_job")
         status = last_payload.get("status")
         print(f"[poll] job_id={job_id} status={status}")
-        if status in {"completed", "failed"}:
+        if status in {"completed", "degraded", "evidence_missing", "failed"}:
             return last_payload
         time.sleep(interval_s)
 
@@ -58,7 +59,11 @@ def main() -> None:
     parser.add_argument("--skip-ingest", action="store_true", help="Skip /ingest step")
     parser.add_argument("--timeout", type=int, default=180, help="Async polling timeout in seconds")
     parser.add_argument("--interval", type=float, default=2.0, help="Polling interval in seconds")
+    parser.add_argument("--async-only", action="store_true", help="Submit one async analysis and skip synchronous analysis")
     args = parser.parse_args()
+    api_key = os.environ.get("API_KEY")
+    if not api_key:
+        parser.error("Set API_KEY in the process environment")
 
     analysis_payload = {
         "ticker": args.ticker,
@@ -74,7 +79,7 @@ def main() -> None:
         "force_refresh": False,
     }
 
-    with httpx.Client(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+    with httpx.Client(timeout=httpx.Timeout(120.0, connect=10.0), headers={"Authorization": f"Bearer {api_key}"}) as client:
         root = require_ok(client.get(f"{args.base_url}/"), "root")
         pretty("Root", root)
 
@@ -88,11 +93,12 @@ def main() -> None:
             )
             pretty("Ingest", ingest)
 
-        sync_analysis = require_ok(
-            client.post(f"{args.base_url}/analyze", json=analysis_payload),
-            "analyze_sync",
-        )
-        pretty("Synchronous analysis", sync_analysis)
+        if not args.async_only:
+            sync_analysis = require_ok(
+                client.post(f"{args.base_url}/analyze", json=analysis_payload),
+                "analyze_sync",
+            )
+            pretty("Synchronous analysis", sync_analysis)
 
         async_analysis = require_ok(
             client.post(f"{args.base_url}/analyze/async", json=analysis_payload),
@@ -123,6 +129,10 @@ def main() -> None:
         print("=" * 80)
         print("Metrics endpoint returned data successfully.")
 
+    final_status = final_job.get("status")
+    if final_status != "completed":
+        print(f"\nLive smoke request finished with status={final_status}; verified completion was not achieved.")
+        raise SystemExit(1)
     print("\nLive smoke test finished successfully.")
 
 

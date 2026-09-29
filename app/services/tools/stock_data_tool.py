@@ -28,11 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from langsmith import traceable
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.observability.langsmith import app_traceable, mark_trace_failed
 
 try:
     import yfinance as yf
@@ -117,7 +117,7 @@ def _with_retry(func):
 # =============================================================================
 
 
-@traceable(name="get_stock_data", run_type="tool", tags=["stock", "yfinance"])
+@app_traceable(name="get_stock_data", run_type="tool", tags=["stock", "yfinance"])
 async def get_stock_data(
     ticker: str,
     *,
@@ -173,9 +173,10 @@ async def get_stock_data(
         logger.info(f"{ticker}: ${stock_info.current_price}")
         return stock_info
 
-    except Exception as e:
-        logger.error(f"Failed to fetch {ticker}: {e}")
-        return StockInfo(ticker=ticker, company_name=ticker, error=str(e))
+    except Exception:
+        logger.error(f"Failed to fetch {ticker}")
+        mark_trace_failed("stock_fetch_failed")
+        return StockInfo(ticker=ticker, company_name=ticker, error="Stock data unavailable.")
 
 
 def _record_stock_snapshot(

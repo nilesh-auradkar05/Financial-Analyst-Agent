@@ -430,3 +430,18 @@ Proposed or planned ADRs:
 
 - ADR-0006: production cloud deployment. Proposed only until accepted.
 - ADR-0007: production interview scale design. Proposed; interview companion only.
+
+
+## REST service contract clarification — 2026-09-21
+
+Under §§3/5/8/11/12, the authorized focused service-readiness slice protects
+analysis, ingestion, jobs, stats and metrics with a configured API key. Root and
+health are public. Async acceptance is 202 with Location; terminal job/result
+statuses agree and distinguish fatal failure, missing required evidence, failed
+or absent verification, and verified completion in that precedence order.
+Errors share a safe typed envelope and financial/job/error responses forbid
+caching. Per-key submission limits and atomic async idempotency apply within the
+existing single-process service; no distributed execution guarantee is claimed.
+Health distinguishes model availability from configuration-only Bedrock checks;
+no paid inference probe or successful-inference claim is made. Sequencing is
+recorded in sprint-plan's authorized exception; broader S7 work remains gated.

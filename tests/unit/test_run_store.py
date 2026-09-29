@@ -109,3 +109,37 @@ class TestEdgeCases:
             completed_at=None,
         )
         assert record.completed_at is None
+
+
+def test_idempotent_run_creation_is_atomic_and_detects_changed_body(tmp_store):
+    first, created = tmp_store.create_idempotent_run(
+        "job-1", "AAPL", principal="principal-hash", idempotency_key="key-hash",
+        request_fingerprint="body-a",
+    )
+    same, created_again = tmp_store.create_idempotent_run(
+        "job-2", "AAPL", principal="principal-hash", idempotency_key="key-hash",
+        request_fingerprint="body-a",
+    )
+
+    assert created is True
+    assert created_again is False
+    assert same.job_id == first.job_id
+
+    with pytest.raises(ValueError, match="different request"):
+        tmp_store.create_idempotent_run(
+            "job-3", "MSFT", principal="principal-hash", idempotency_key="key-hash",
+            request_fingerprint="body-b",
+        )
+
+
+# Trace: docs/test-plan.md §1 atomic async idempotency.
+def test_concurrent_idempotency_submissions_create_one_persisted_job(tmp_store):
+    from concurrent.futures import ThreadPoolExecutor
+    def create(index):
+        return tmp_store.create_idempotent_run(str(index), "AAPL", principal="hash", idempotency_key="key", request_fingerprint="body")
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(create, range(16)))
+    assert len({record.job_id for record, created in results}) == 1
+    assert sum(created for record, created in results) == 1
+    restored = FileBackedRunStore(tmp_store.path)
+    assert len(restored.list_runs()) == 1

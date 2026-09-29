@@ -479,3 +479,21 @@ Authorization: user reported `/ingest` failing with Qdrant connection refused, t
 - [x] Run lint/tests/Doc Sync, record results, commit cleanly.
 
 Verification (2026-09-29): `docker compose config --quiet` PASS; services = qdrant/api/prometheus/grafana. Recreated qdrant + API: Qdrant healthy before API start, no orphan warning. Inside API: `VECTOR_BACKEND=qdrant`, `QDRANT_URL=http://qdrant:6333`, service DNS returned Qdrant root metadata. Exact reported request `POST /ingest {"ticker":"NFLX"}` → success, 191 chunks, sections business/risk_factors/md&a/market_risk, filing date 2026-01-23. `make docker-up` PASS with Qdrant healthy and no orphan warning. `uv run ruff check .` PASS; `uv run mypy .` 128 files PASS; `uv run pytest -q` 262 passed, 2 skipped; all four governance checks PASS; IDE lints clean. LangSmith export attempts logged network errors during tests but did not fail the suite.
+## REST API and complete request tracing — resumed 2026-09-22
+
+Authorization: user requested sub-agent REST fixes, complete request tracing, an all-route audit and one real request; resumed with Sol high effort. Trace: SPEC §§3/5/8/11/12, test-plan §§1/2/8/11/12, S2-T00d and S7. Plan: `tasks/rest-tracing-plan.md`. Focused sequencing exception; no queue/cache/cloud redesign.
+
+- [x] REST implementation and prior independent all-nine-route review: `7199ff1`, `a3c487c`.
+- [x] Finish tracing implementation and bounded offline review; implementation `a7e558a`, timeout correction `7ba7216`, sanitization `969667c`, second correction preserved.
+- [x] Final local all-route audit and verification; prior independent task review retained. User restricted further agents to unavailable gpt-6-sol, so no final substitute reviewer was spawned.
+- [ ] Run one real request and verify exported hierarchy; runtime `.env` access requires explicit approval under AGENTS §5.
+
+Recovery: the `/tmp` worktree was removed between sessions. Saved commits restored in `.worktrees/rest-tracing` on `codex/rest-tracing-resume`; original main/user changes preserved. No live request executed. Earlier broad tests imported an evaluation module that auto-loads dotenv; no values were displayed, but implicit loading cannot be excluded. Final offline verification disabled dotenv before collection.
+
+Fresh verification at `969667c` (report `ade4924`): full pytest **278 passed, 1 failed, 2 skipped** with `PYTHON_DOTENV_DISABLED=1` and all legacy/modern tracing switches false. Sole failure is inherited `TestGetEmbeddings.test_custom_model`. Focused REST/tracing/workflow **85 passed**; leak/timeout regressions **3 passed**; focused Ruff **PASS**; full mypy **5 inherited errors** (web search, quality baseline ×3, latency baseline), duplicate smoke module resolved. Four Doc Sync checks **PASS**. Independent review pending; results and route inventory in `tasks/rest-tracing-review.md`.
+
+2026-09-23 bounded completion: user capped runtime corrections at two attempts; second attempt already has69focusedpasses. Controller final full suite **279passed,1inheritedfailure,2skipped**; exact nine-route OpenAPI/security/status/schema/Location check **PASS**. No further correction loop. Minor final-send timing and existing embedding/type/lint failures remain disclosed in `tasks/rest-tracing-review.md`. Live request remains unchecked pending credential approval.
+
+Final explicit offline integration command: `python -m pytest tests/integration --run-integration -q` with the same dotenv-disabled environment -> **1 passed, 1 failed** in13.29s. Remaining failure is `test_runtime_hardened_pipeline_end_to_end`: its `fake_check_ollama_health` rejects the new `model` keyword at startup. This stale integration fixture is unresolved; no third correction attempt was made. The other real-graph verification integration passed. The branch is not fully green or claimed production-ready.
+
+Final Doc Sync Check2026-09-23: scope-residue, sprint-map, doc-sync and test-hygiene all **PASS**; CRLF-aware git diff whitespace check **PASS**. No scope, benchmark methodology, architecture or sprint-map change in the bounded second correction.
