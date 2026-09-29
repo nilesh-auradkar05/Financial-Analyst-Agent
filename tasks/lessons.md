@@ -90,3 +90,15 @@ L: `.claude/hooks/stop_gate.py` blocks the turn on any dirty tree. The "or state
 **Applied:** Yes. Revised the interview, all four production diagrams and proposed ADR-0007 to distinguish affordable measured experiments from large-scale interview projections.
 
 **Verification:** 63 Q&A entries and four SVG embeds; local links, source/export consistency, offline SVG display and visual inspection pass. Scope/sprint/doc-sync checks pass; existing test-hygiene failures at tests/unit/test_llm.py:25,32 remain recorded in the task ledger. No scale tests or runtime changes were claimed.
+
+## 2026-09-28 — S8 frontend pulled forward by explicit user override
+
+**Correction:** User asked for the frontend while S8 was marked "Horizon: do not start; gated". Surfaced as a §6 hard stop; user chose to override and start S8 now without re-sequencing SPEC/sprint-plan.
+
+**Root cause:** Not an agent error; a sequencing override. Recorded so later sessions don't treat `frontend/` as scope drift or re-open the gate question.
+
+**Prevention rule:** Gated sprint work starts only on an explicit, recorded user override naming the sprint; the override does not alter SPEC §3 scope or sprint order unless the user asks for that too.
+
+**Applied:** Yes. Task S8-FE added to tasks/todo.md with the trace and user-confirmed decisions.
+
+**Verification:** Recorded in the S8-FE entry in tasks/todo.md.

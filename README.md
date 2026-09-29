@@ -31,6 +31,34 @@ The ordered plan for closing these gaps is in [`docs/sprint-plan.md`](docs/sprin
 
 ---
 
+### Measured results
+
+These numbers come from committed artifacts. Each one holds only for the model and inputs listed next to it.
+
+| Measurement | Result | Setup | Source |
+|---|---|---|---|
+| Grounded-claim rate | **0.935 ± 0.045** | 30 memos (two replay runs of AAPL, MSFT, NVDA × 5), frozen evidence release `alpha-evidence:0.1.0`, `deepseek.v3.2` at temperature 0.3, commit `89265b8` | [`quality_baselines/alpha-quality-baseline__0.1.0.json`](artifacts/dataops/quality_baselines/alpha-quality-baseline__0.1.0.json) |
+| Citation coverage | **0.923 ± 0.047** | same run | same file |
+| End-to-end latency (warm, sequential) | p50 **32.6 s**, p95 **37.7 s** | 12 warm runs, Ollama `minimax-m3:cloud`, commit `2a47dd1` | [`evaluation/latency_res/`](evaluation/latency_res/) |
+
+### Reproduce the evaluations
+
+```bash
+# Memo quality against the frozen evidence release (no live data sources)
+uv run python -m evaluation.quality_baseline --evidence-release alpha-evidence:0.1.0
+
+# Sequential latency baseline
+uv run python -m evaluation.latency_baseline --tickers AAPL MSFT NVDA --repeats 5
+
+# Run every retrieval method on the shared benchmark, then compare two result files case by case
+uv run python -m evaluation.run_shared_retrieval_benchmark --dry-run
+uv run python evaluation/compare_retrieval_results.py <baseline.json> <candidate.json> --strict-case-ids
+```
+
+Comparisons change one thing at a time: the same fixture, and either the backend or the method, never both. The methodology is in [`docs/retrieval-benchmark.md`](docs/retrieval-benchmark.md).
+
+---
+
 ## Diagrams
 
 ### Agent workflow (current code)
@@ -295,32 +323,6 @@ The response is abridged below; the values are placeholders, not real output. Th
   "execution_time_ms": 0.0
 }
 ```
-
-### Measured results
-
-These numbers come from committed artifacts. Each one holds only for the model and inputs listed next to it.
-
-| Measurement | Result | Setup | Source |
-|---|---|---|---|
-| Grounded-claim rate | **0.935 ± 0.045** | 30 memos (two replay runs of AAPL, MSFT, NVDA × 5), frozen evidence release `alpha-evidence:0.1.0`, `deepseek.v3.2` at temperature 0.3, commit `89265b8` | [`quality_baselines/alpha-quality-baseline__0.1.0.json`](artifacts/dataops/quality_baselines/alpha-quality-baseline__0.1.0.json) |
-| Citation coverage | **0.923 ± 0.047** | same run | same file |
-| End-to-end latency (warm, sequential) | p50 **32.6 s**, p95 **37.7 s** | 12 warm runs, Ollama `minimax-m3:cloud`, commit `2a47dd1` | [`evaluation/latency_res/`](evaluation/latency_res/) |
-
-### Reproduce the evaluations
-
-```bash
-# Memo quality against the frozen evidence release (no live data sources)
-uv run python -m evaluation.quality_baseline --evidence-release alpha-evidence:0.1.0
-
-# Sequential latency baseline
-uv run python -m evaluation.latency_baseline --tickers AAPL MSFT NVDA --repeats 5
-
-# Run every retrieval method on the shared benchmark, then compare two result files case by case
-uv run python -m evaluation.run_shared_retrieval_benchmark --dry-run
-uv run python evaluation/compare_retrieval_results.py <baseline.json> <candidate.json> --strict-case-ids
-```
-
-Comparisons change one thing at a time: the same fixture, and either the backend or the method, never both. The methodology is in [`docs/retrieval-benchmark.md`](docs/retrieval-benchmark.md).
 
 ---
 

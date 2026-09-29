@@ -42,7 +42,7 @@
 
 | Sprint / Phase | Purpose (SPEC §12) | Status | Notes |
 | --- | --- | --- | --- |
-| S0 | Spec coherence + baseline verification | `DONE*` | Closed green 2026-06-04. The quality bar has since regressed (UPD-01..03) |
+| S0 | Spec coherence + baseline verification | `DONE` (green bar restored 2026-09-29) | Closed green 2026-06-04. The quality bar has since regressed (UPD-01..03) |
 | S1 | SEC ingestion identity + section coverage | `DONE` | `tests/ingestion` green in this run |
 | Phase 0 (v2 plan) | Governance docs into repo + CI | `DONE` | Maps to S2-T00a, which is only partial (see below) |
 | Phase 1 (v2 plan) | Evidence snapshot + replay + approved baseline | `DONE` | Maps to S2-T00b, which is only partial (see below) |
@@ -53,7 +53,8 @@
 | S5 (Gate C) | Hybrid / rerank | `GATED` + `AHEAD` | Hybrid, reranked, and section-aware code already exists |
 | S6 (Gate D) | Eval registry, regression gate, repair loop | `GATED` | Memo-grounding instrument (BENCH-FIX) and RAGAS/DeepEval harness exist |
 | S7 | Guardrails, caching, queue, auth | `GATED` | None implemented |
-| S8 / S9 / S10 | Frontend / polish / cloud | `GATED` | ADR-0006 is still Proposed |
+| S8 | Frontend MVP | `DONE` | Pulled forward by user override 2026-09-28 (todo.md S8-FE); API-gap screens use fixtures |
+| S9 / S10 | Polish / cloud | `GATED` | ADR-0006 is still Proposed |
 
 ---
 
@@ -69,8 +70,8 @@ Columns: **ID** · **Task / context** · **Trace** · **Status** · **Evidence**
 | S0-T01 | Doc topology, dedup, residue removal, doc-check scripts | SPEC §0/§3/§13 | `DONE` | 3 doc scripts PASS (this run) | — | — |
 | S0-T02 | `retrieval-benchmark.md` comparison policy | SPEC §10; test-plan §6 | `DONE-DOC` | Doc §8 present; SPEC §10 points to it | Implementation is S2 (G6) | — |
 | S0-T03 | Sprint map S0–S10 consistent | SPEC §12 | `DONE` | `check_sprint_map.py` PASS (this run) | — | — |
-| S0-T04 | Baseline verification; C0–C3 classified | SPEC §1.1 | `DONE*` | 2026-06-04: pytest 178 pass, ruff clean, mypy success. **This run:** 1 failed + 1 collection error, ruff 4, mypy 6 | Restore the green bar: UPD-01, UPD-02, UPD-03 | — |
-| GOV-TH | `check_test_hygiene.py` call-order guard | test-plan Principles; CLAUDE §5 | `PARTIAL` | Script exists, FAILS on `test_llm.py:25,32` | Fix via UPD-01; then wire into CI (S2-T00a) | UPD-01 |
+| S0-T04 | Baseline verification; C0–C3 classified | SPEC §1.1 | `DONE` (re-greened 2026-09-29, todo GREEN-BAR) | 2026-06-04: pytest 178 pass, ruff clean, mypy success. **This run:** 1 failed + 1 collection error, ruff 4, mypy 6 | Restore the green bar: UPD-01, UPD-02, UPD-03 | — |
+| GOV-TH | `check_test_hygiene.py` call-order guard | test-plan Principles; CLAUDE §5 | `PARTIAL` (script PASS 2026-09-29; CI wiring pending) | Script exists, FAILS on `test_llm.py:25,32` | Fix via UPD-01; then wire into CI (S2-T00a) | UPD-01 |
 
 ### S1 — SEC ingestion & section-coverage lock
 
@@ -166,7 +167,7 @@ Columns: **ID** · **Task / context** · **Trace** · **Status** · **Evidence**
 | S7-d | JobQueue→Redis Streams, RunStore→Postgres, checkpointer | SPEC §12 | `GATED` | `BackgroundTasks` + `.runtime/run_store.json` | — | S7-c |
 | S7-e | FinBERT out-of-process; provider circuit breaker | SPEC §8.2/§12 | `GATED` | — | — | S7-d |
 | S7-f | G13: `/health` degraded on Ollama outage regardless of provider | SPEC §12 G13 | `GATED` | `app/main.py:193–198` checks only Ollama | — | — |
-| S8 | Frontend MVP | SPEC §1.2 | `GATED` | — | — | S7 |
+| S8 | Frontend MVP | SPEC §1.2 | `DONE` (pulled forward by user override 2026-09-28; S7 not yet done) | `frontend/` Next.js app; todo.md S8-FE verification 2026-09-29 (lint/typecheck/build/7 tests PASS; parity 1.6–2.6% vs `frontend-ref/`) | Live FastAPI path unverified; runs list, trace, per-chunk evidence, cost and replay are fixtures until the API exposes them | S7 (overridden) |
 | S9 | Portfolio polish | SPEC §12 | `GATED` | — | — | S8 |
 | S10 | Cloud (v2 Phases 4–5) | SPEC §3.y; ADR-0006 | `GATED` | ADR-0006 Proposed | — | ADR-0006 Accepted |
 
@@ -178,13 +179,13 @@ These close drift in work that is marked done. They are small and should come **
 
 | ID | Component | Problem (evidence) | Needed update | Trace | Priority |
 | --- | --- | --- | --- | --- | --- |
-| ENV-01 | Local `.venv` | Shebangs point to `/media/…/git/prj/…` after the repo move, so `uv run pytest`/`mypy` fail to spawn and hook H12 cannot run tests | Recreate the venv (`uv sync --reinstall`, or remove `.venv` then `uv sync`). Local-only; nothing to commit | CLAUDE §4, §8 | P0 |
-| UPD-01 | `tests/unit/test_llm.py` | Collection `ImportError: MEMO_TEMPLATE`; call-order spies at L25/L32 fail `check_test_hygiene.py`; mypy L11 | Rewrite against the current `app/services/llm.py` public surface with behaviour assertions (test-plan §7), or delete if it has no oracle case. Do not weaken the hygiene check | test-plan Principles; S0-T04 | P0 |
-| UPD-02 | `app/components/retrieval/embeddings.py:91` (`get_embeddings`) | **Code bug; the test is correct.** `model = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:4b")` overwrites the explicit `model` argument and bypasses `settings.ollama.embed_model`, so `get_embeddings(model="nomic-embed-text")` returns `qwen3-embedding:4b`. This undermines embedding identity for the S3-T05/S4 backend comparison | Honour the argument first, then settings (`model or settings.ollama.embed_model`); keep `test_custom_model` unchanged | test-plan §8 (embedding identity) | P0 |
-| UPD-03 | Lint + types | ruff 4 (2 in `app/llm/*_check.py`, 1 hook, 1 vendored skill); mypy 6 (`web_search_tool.py:159`, `quality_baseline.py:354/359/363`, `latency_baseline.py:211`, `test_llm.py:11`) | Fix the `app/` and `evaluation/` errors. Exclude `.claude/skills/` from ruff or fix it. Rename `l` in `stop_gate.py` | CLAUDE §5/§8 | P0 |
+| ENV-01 ✅ DONE 2026-09-29 | Local `.venv` | Shebangs point to `/media/…/git/prj/…` after the repo move, so `uv run pytest`/`mypy` fail to spawn and hook H12 cannot run tests | Recreate the venv (`uv sync --reinstall`, or remove `.venv` then `uv sync`). Local-only; nothing to commit | CLAUDE §4, §8 | P0 |
+| UPD-01 ✅ DONE 2026-09-29 | `tests/unit/test_llm.py` | Collection `ImportError: MEMO_TEMPLATE`; call-order spies at L25/L32 fail `check_test_hygiene.py`; mypy L11 | Rewrite against the current `app/services/llm.py` public surface with behaviour assertions (test-plan §7), or delete if it has no oracle case. Do not weaken the hygiene check | test-plan Principles; S0-T04 | P0 |
+| UPD-02 ✅ DONE 2026-09-29 | `app/components/retrieval/embeddings.py:91` (`get_embeddings`) | **Code bug; the test is correct.** `model = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:4b")` overwrites the explicit `model` argument and bypasses `settings.ollama.embed_model`, so `get_embeddings(model="nomic-embed-text")` returns `qwen3-embedding:4b`. This undermines embedding identity for the S3-T05/S4 backend comparison | Honour the argument first, then settings (`model or settings.ollama.embed_model`); keep `test_custom_model` unchanged | test-plan §8 (embedding identity) | P0 |
+| UPD-03 ✅ DONE 2026-09-29 | Lint + types | ruff 4 (2 in `app/llm/*_check.py`, 1 hook, 1 vendored skill); mypy 6 (`web_search_tool.py:159`, `quality_baseline.py:354/359/363`, `latency_baseline.py:211`, `test_llm.py:11`) | Fix the `app/` and `evaluation/` errors. Exclude `.claude/skills/` from ruff or fix it. Rename `l` in `stop_gate.py` | CLAUDE §5/§8 | P0 |
 | UPD-04 | CI workflow (P0-T02) | `check_test_hygiene.py` not run; no separate `governance` job; `.runtime/run_store.json` and `test_image/` still tracked | Finish S2-T00a scope items (1)–(2) | S2-T00a | P1 |
 | UPD-05 | Active-sprint markers | `CLAUDE.md §1` says "S1 now active". The sprint-plan S0 header still says "active". The `tasks/todo.md` header says Phase 0→1 active, but both phases exited. S2-T00a/T00b `Result: Pending` hides the Phase 0/1 delivery | Name one active step: **S2-T00a (finish)**. Record partial Results for T00a/T00b and a `Result:` for S2-T01. Mirror in AGENTS.md; run Doc Sync. CLAUDE/AGENTS/sprint-plan edits need `ALLOW_SPEC_EDIT=1` where protected | lessons "confirm active plan doc"; CLAUDE §2 | P1 |
-| UPD-06 | `tasks/todo.md` checkboxes | BENCH-FIX is still `[ ]` though its Result is PASS; two 2026-09-06 items are waiting on governance-green | Tick BENCH-FIX; close the two items after UPD-01 turns hygiene green | CLAUDE §3.10 | P2 |
+| UPD-06 ✅ DONE 2026-09-29 | `tasks/todo.md` checkboxes | BENCH-FIX is still `[ ]` though its Result is PASS; two 2026-09-06 items are waiting on governance-green | Tick BENCH-FIX; close the two items after UPD-01 turns hygiene green | CLAUDE §3.10 | P2 |
 | UPD-07 | Path drift, DataOps + retrieval layout | SPEC §5 `app/dataops/` vs `dataops/`; sprint-plan `evaluation/evidence_releases/` vs `artifacts/dataops/`; sprint-plan S3 and CLAUDE §5 say `rag/` and `tests/rag/`, but code is `app/components/retrieval/` (G8 remnant) | Decide the canonical paths in S2-T00b (move code or amend docs via ADR/SPEC edit); update the CLAUDE/AGENTS "never escape `rag/`" rule to the real package | SPEC §5; G8 | P1 |
 | UPD-08 | SPEC §2.1 #7 | Says CI wiring "is G11 / S2-T00a", but 3 of 4 checks are already wired | Update after S2-T00a closes (SPEC edit under H3) | SPEC §2.1 | P2 |
 | UPD-09 | Memo-grounding artifact naming | `evaluation/results/retrieval_baseline_00N_*.json` are memo-grounding runs, easy to confuse with the S2 retrieval oracle; they also lack the §11.2 lineage keys | Rename the prefix (e.g. `memo_grounding_baseline_`) when S6-a lands; don't rename the approved artifacts in place | SPEC §10/§11.2 | P3 |

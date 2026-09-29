@@ -7,6 +7,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from app.agents.graph import create_agent
 from app.agents.state import create_initial_state
@@ -170,7 +171,7 @@ async def main() -> None:
     projected_savings = serial_total_p50 - projection["projected_total_ms"]
     projected_pct = (projected_savings / serial_total_p50 * 100.0) if serial_total_p50 else 0.0
 
-    artifact = {
+    artifact: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_commit(),
         "provider": settings.llm.provider,

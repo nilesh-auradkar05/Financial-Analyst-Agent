@@ -20,6 +20,7 @@ import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from app.agents.graph import create_agent, draft_memo_node, verify_memo_node
 from app.agents.state import AgentState, create_initial_state, has_fatal_error
@@ -347,7 +348,7 @@ def _aggregate(runs: list[dict]) -> dict:
     keys = ["grounded_claim_rate", "citation_coverage_rate", "total_claims", "cited_claims",
             "grounded_claims", "orphan_citations", "evidence_count", "filing_chunks",
             "news_articles", "memo_words", "run_ms", "borderline_claims"]
-    out = {"n_runs": n,
+    out: dict[str, Any] = {"n_runs": n,
            "pass_rate": sum(1 for r in runs if r["passed"]) / n if n else 0.0,
            "fatal_error_rate": sum(1 for r in runs if r["fatal_error"]) / n if n else 0.0}
     for k in keys:

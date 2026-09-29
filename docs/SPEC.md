@@ -28,7 +28,7 @@ This section is the only canonical conflict-resolution order.
 3. `docs/sprint-plan.md` — sequencing and task definitions.
 4. `docs/retrieval-benchmark.md` — benchmark fixture schema, matcher, metrics, validator, and comparison policy.
 5. `docs/adr/*.md` — accepted architecture decisions.
-6. `docs/design-md/*.md` and `docs/design-html/*.html` — diagram companions.
+6. `docs/System-design/**/*.excalidraw` (editable source) with `docs/png/**/*.png` and `docs/svg/production/*.svg` renders — diagram companions.
 7. `tasks/todo.md` — active task state and verification ledger.
 8. `tasks/lessons.md` — correction log.
 9. Code comments and stale TODOs — lowest authority.

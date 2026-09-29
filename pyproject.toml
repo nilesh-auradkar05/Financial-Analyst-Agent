@@ -35,6 +35,7 @@ dependencies = [
     "sentence-transformers>=5.4.1",
     "edgartools>=5.31.1",
     "pyright>=1.1.410",
+    "mypy>=2.1.0",
 ]
 
 [project.scripts]

@@ -179,7 +179,7 @@ Definitions live in `retrieval-benchmark.md`.
 | No scope residue | `check_no_scope_residue.py` passes against core Alpha docs |
 | Sprint map sync | `check_sprint_map.py` confirms SPEC and sprint-plan use S0–S10 |
 | Agent manuals sync | `check_doc_sync.py` confirms CLAUDE/AGENTS preserve equivalent task loop, hard stops, coding conventions, verification, correction handling |
-| Diagram folder split | HTML files live in `docs/design-html`; Markdown companions live in `docs/design-md` |
+| Diagram folder split | Editable Excalidraw sources live in `docs/System-design`; PNG renders in `docs/png` (SVG renders for production variants in `docs/svg/production`) |
 
 ---
 

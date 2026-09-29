@@ -156,7 +156,8 @@ async def search_company_news(
         }
         if settings.tavily.topic == "news":
             search_kwargs["days"] = settings.tavily.news_recency_days
-        return await client.search(**search_kwargs)
+        response: dict[str, Any] = await client.search(**search_kwargs)
+        return response
 
     try:
         response = await _do_search()

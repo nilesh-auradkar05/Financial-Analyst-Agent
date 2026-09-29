@@ -1,95 +1,96 @@
-"""Tests for app.services.llm — replaces the old ``_main()`` smoke test.
+"""Tests for app.services.llm.
 
-Mocks the Ollama server; no GPU needed for CI.
+Public surface: ``get_llm``, ``check_ollama_health`` and ``ANALYST_SYSTEM_PROMPT``.
+The Ollama HTTP server is the only external boundary; it is faked with a real
+``httpx.MockTransport`` and assertions stay on returned values. No GPU or server needed.
 """
 
-from unittest.mock import AsyncMock, patch
+from collections.abc import Callable, Iterator
+from typing import Any
 
+import httpx
 import pytest
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.config import settings
-from app.services.llm import (
-    ANALYST_SYSTEM_PROMPT,
-    MEMO_TEMPLATE,
-    check_ollama_health,
-    get_llm,
-)
+from app.services.llm import ANALYST_SYSTEM_PROMPT, check_ollama_health, get_llm
+
+_RealAsyncClient = httpx.AsyncClient
+
+
+@pytest.fixture
+def ollama_server(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[Callable[[httpx.Request], httpx.Response]], None]]:
+    """Install a fake Ollama server behind ``httpx.AsyncClient`` (the external boundary)."""
+
+    def install(handler: Callable[[httpx.Request], httpx.Response]) -> None:
+        def factory(*args: Any, **kwargs: Any) -> httpx.AsyncClient:
+            return _RealAsyncClient(*args, transport=httpx.MockTransport(handler), **kwargs)
+
+        monkeypatch.setattr(httpx, "AsyncClient", factory)
+
+    yield install
+
+
+def _tags_server(model_names: list[str], status: int = 200) -> Callable[[httpx.Request], httpx.Response]:
+    """Faithful /api/tags fake: answers only that route, from the given model list."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/api/tags":
+            return httpx.Response(404)
+        return httpx.Response(status, json={"models": [{"name": n} for n in model_names]})
+
+    return handler
 
 
 class TestGetLLM:
-    def test_delegates_to_provider(self):
-        sentinel = object()
-        with patch("app.services.llm.get_provider_llm", return_value=sentinel) as mock_get:
-            llm = get_llm()
-        assert llm is sentinel
-        mock_get.assert_called_once()
+    """test-plan §8 Config: "Typed settings load" / provider selection via typed settings."""
 
-    def test_accepts_explicit_settings(self):
-        sentinel = object()
-        with patch("app.services.llm.get_provider_llm", return_value=sentinel) as mock_get:
-            llm = get_llm(settings)
-        assert llm is sentinel
-        mock_get.assert_called_once_with(settings)
+    def test_ollama_provider_returns_chat_model(self) -> None:
+        config = settings.model_copy(deep=True)
+        config.llm.provider = "ollama"
+        assert isinstance(get_llm(config), BaseChatModel)
+
+    def test_unsupported_provider_fails_fast(self) -> None:
+        config = settings.model_copy(deep=True)
+        object.__setattr__(config.llm, "provider", "nonsense")
+        with pytest.raises(ValueError, match="Unsupported LLM provider"):
+            get_llm(config)
 
 
-class TestPrompts:
-    def test_system_prompt_has_citation_guidance(self):
-        assert "[N]" in ANALYST_SYSTEM_PROMPT
+class TestAnalystPrompt:
+    """test-plan §7 RAG/memo: "Citation mapping" and "Missing evidence" (prompt-level contract)."""
 
-    def test_memo_template_has_placeholders(self):
-        assert "{company_name}" in MEMO_TEMPLATE
-        assert "{ticker}" in MEMO_TEMPLATE
-        assert "{context}" in MEMO_TEMPLATE
+    def test_requires_numbered_citations(self) -> None:
+        assert "[N]" in ANALYST_SYSTEM_PROMPT or "[1]" in ANALYST_SYSTEM_PROMPT
+
+    def test_forbids_unsupported_facts_and_invented_citations(self) -> None:
+        text = ANALYST_SYSTEM_PROMPT.lower()
+        assert "never invent citation numbers" in text
+        assert "unsupported" in text
 
 
 class TestHealthCheck:
-    @pytest.mark.asyncio
-    async def test_healthy_server(self):
-        # httpx.Response.json() is SYNC — use MagicMock for it
-        from unittest.mock import MagicMock
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "models": [{"name": "qwen3.5:9b"}],
-        }
-
-        with patch("app.services.llm.httpx.AsyncClient") as mockclient:
-            # The key: __aenter__ must return the SAME instance
-            # we configure, otherwise async-with creates a new one
-            instance = AsyncMock()
-            instance.get = AsyncMock(return_value=mock_resp)
-            instance.__aenter__.return_value = instance
-            mockclient.return_value = instance
-
-            result = await check_ollama_health()
-            # Behavior: a 200 response listing the configured model → healthy.
-            assert result is True
+    """test-plan §1 API endpoints: ``GET /health`` returns service health (Ollama probe)."""
 
     @pytest.mark.asyncio
-    async def test_unhealthy_server(self):
-        with patch("app.services.llm.httpx.AsyncClient") as mockclient:
-            instance = AsyncMock()
-            instance.get = AsyncMock(side_effect=Exception("connection refused"))
-            instance.__aenter__.return_value = instance
-            mockclient.return_value = instance
-
-            result = await check_ollama_health()
-            assert result is False
+    async def test_healthy_when_configured_model_listed(self, ollama_server: Any) -> None:
+        ollama_server(_tags_server([settings.ollama.llm_model]))
+        assert await check_ollama_health() is True
 
     @pytest.mark.asyncio
-    async def test_model_not_found(self):
-        from unittest.mock import MagicMock
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "models": [{"name": "llama2:7b"}],
-        }
+    async def test_unhealthy_when_model_missing(self, ollama_server: Any) -> None:
+        ollama_server(_tags_server(["some-other-model:1b"]))
+        assert await check_ollama_health() is False
 
-        with patch("app.services.llm.httpx.AsyncClient") as mockclient:
-            instance = AsyncMock()
-            instance.get = AsyncMock(return_value=mock_resp)
-            instance.__aenter__.return_value = instance
-            mockclient.return_value = instance
+    @pytest.mark.asyncio
+    async def test_unhealthy_on_http_error(self, ollama_server: Any) -> None:
+        ollama_server(_tags_server([settings.ollama.llm_model], status=500))
+        assert await check_ollama_health() is False
 
-            result = await check_ollama_health()
-            assert result is False
+    @pytest.mark.asyncio
+    async def test_unhealthy_when_server_unreachable(self, ollama_server: Any) -> None:
+        def refuse(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("connection refused", request=request)
+
+        ollama_server(refuse)
+        assert await check_ollama_health() is False

@@ -88,8 +88,8 @@ def get_embeddings(
         # Embed query
         query_vector = embeddings.embed_query("search query")
     """
-    model = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:4b")
-    base_url = os.getenv("OLLAMA_EMBED_BASE_URL", "http://localhost:11434")
+    model = model or settings.ollama.embed_model
+    base_url = base_url or os.getenv("OLLAMA_EMBED_BASE_URL") or settings.ollama.base_url
 
     logger.info(f"Creating OllamaEmbeddings (model={model})")
 
