@@ -115,3 +115,15 @@ L: `.claude/hooks/stop_gate.py` blocks the turn on any dirty tree. The "or state
 
 **Verification:** Recorded in the S8-FE entry in tasks/todo.md.
 
+
+## 2026-09-29 — Preserve credential names through deployment configuration
+
+**Correction:** User wanted LANGCHAIN and LANGSMITH keys kept under their existing names instead of renaming the LangSmith key.
+
+**Root cause:** The app already accepted modern LANGSMITH aliases, but Compose forwarded only legacy LANGCHAIN variables. Earlier guidance treated that deployment omission as a reason to rename user configuration.
+
+**Prevention rule:** Check each configuration boundary and forward supported names intact. Do not recommend moving credentials between variable names when the application already supports the intended name. Preserve legacy fallback without injecting blank higher-priority aliases.
+
+**Applied:** Yes. Added optional LANGSMITH_TRACING, LANGSMITH_API_KEY and LANGSMITH_PROJECT pass-through entries on frontend-impl; retained all legacy entries. No credential files read or changed.
+
+**Verification:** Dummy-only Compose check reproduced the failure before the fix and passed all five configuration cases afterward; all four Doc Sync checks passed.

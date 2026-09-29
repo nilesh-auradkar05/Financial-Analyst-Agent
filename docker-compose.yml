@@ -38,6 +38,10 @@ services:
       - SEC_USER_AGENT=${SEC_USER_AGENT:-AlphaAnalyst/1.0 (contact@example.com)}
       
       # LangSmith (optional)
+      # Pass through modern names only when supplied; preserve legacy aliases below.
+      - LANGSMITH_TRACING
+      - LANGSMITH_API_KEY
+      - LANGSMITH_PROJECT
       - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
       - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-alpha-analyst}

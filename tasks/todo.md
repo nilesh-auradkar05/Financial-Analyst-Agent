@@ -497,3 +497,13 @@ Fresh verification at `969667c` (report `ade4924`): full pytest **278 passed, 1 
 Final explicit offline integration command: `python -m pytest tests/integration --run-integration -q` with the same dotenv-disabled environment -> **1 passed, 1 failed** in13.29s. Remaining failure is `test_runtime_hardened_pipeline_end_to_end`: its `fake_check_ollama_health` rejects the new `model` keyword at startup. This stale integration fixture is unresolved; no third correction attempt was made. The other real-graph verification integration passed. The branch is not fully green or claimed production-ready.
 
 Final Doc Sync Check2026-09-23: scope-residue, sprint-map, doc-sync and test-hygiene all **PASS**; CRLF-aware git diff whitespace check **PASS**. No scope, benchmark methodology, architecture or sprint-map change in the bounded second correction.
+
+## Compose LangSmith variable forwarding — 2026-09-29
+
+Authorization: user asked to keep LANGCHAIN and LANGSMITH keys under their existing names. Trace: correlated tracing T2-05 in docs/test-plan.md; authorized REST/tracing sequencing exception in sprint-plan; SPEC service-readiness scope. App aliases already support this; Compose forwards only legacy names. Minimal deployment-config correction, no credential-file access and no runtime/container restart.
+
+- [x] Verify missing modern-variable forwarding using dummy-only Compose environment files.
+- [x] Pass through modern tracing/key/project names without rewriting legacy values or inserting blank modern aliases.
+- [x] Verify modern-only, legacy-only, both, missing and explicit-disabled cases; run Doc Sync; record correction and results.
+
+Verification: `python3 /tmp/check_compose_langsmith_passthrough.py` failed before the fix (`modern-only: LANGSMITH_API_KEY was not preserved`), then **5/5 cases passed** after four Compose lines were added. The check supplies isolated dummy environment files via `docker compose --env-file ... config --format json`; no real `.env` or credentials were read. Modern-only, legacy-only, both-distinct, neither, and explicit modern false are preserved correctly; unset modern keys remain absent/null rather than empty overrides. Scope-residue/sprint-map/doc-sync/test-hygiene **PASS**. No scope, methodology, sprint-order or application-runtime change. Active API container was not recreated; user can apply normal Compose recreation after the current job finishes.
