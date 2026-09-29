@@ -189,7 +189,7 @@ Verification:
 - Deliberately break a sprint ID in a throwaway branch → governance job must fail.
 Done: all three verification outputs recorded below; hooks H3/H4/H8/H9/H12 pass manual stdin smoke tests.
 Non-goals: no app code; no doc content changes beyond path fixes.
-Result: Pending
+Result: DONE locally (2026-09-29) — governance job runs all four checks; 35 hook subprocess tests cover H2–H9/H12; ruff clean; mypy 128 files clean; pytest 262 passed, 2 skipped; four governance checks pass; 36 docs tracked; `.runtime/` and `test_image/` ignored/untracked. Local red paths pass. Remote GitHub `governance` job confirmation remains pending until push.
 ```
 
 ```text

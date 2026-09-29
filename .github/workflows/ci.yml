@@ -5,7 +5,31 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: no job needs to write to the repo.
+permissions:
+  contents: read
+
 jobs:
+  # S2-T00a / G11: every governance rule the repo claims is enforced here.
+  # Stdlib-only scripts, so no dependency install is needed.
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run governance checks
+        run: |
+          python scripts/ci/check_no_scope_residue.py
+          python scripts/ci/check_sprint_map.py
+          python scripts/ci/check_doc_sync.py
+          python scripts/ci/check_test_hygiene.py
+
   build:
     runs-on: ubuntu-latest
     strategy:
@@ -15,6 +39,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -24,12 +50,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --frozen --group api --group dev
-
-      - name: Run document governance checks
-        run: |
-          uv run python scripts/ci/check_no_scope_residue.py
-          uv run python scripts/ci/check_sprint_map.py
-          uv run python scripts/ci/check_doc_sync.py
 
       - name: Run linter
         run: uv run ruff check .

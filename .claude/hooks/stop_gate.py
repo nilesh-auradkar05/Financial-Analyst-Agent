@@ -18,18 +18,21 @@ if os.environ.get("SKIP_STOP_GATE") == "1":
     raise SystemExit(0)
 
 problems: list[str] = []
-dirty = git("status", "--porcelain").strip()
+# rstrip only: a leading space is part of the porcelain status column (" M path").
+dirty = git("status", "--porcelain").rstrip("\n")
 if dirty:
-    files = [l[3:] for l in dirty.splitlines()]
+    files = [line[3:] for line in dirty.splitlines()]
     problems.append("working tree has uncommitted changes:\n    " + "\n    ".join(files[:15])
                     + "\n  → commit with the task's verification evidence, or state explicitly why it stays uncommitted.")
 
 code_changed = any(f.startswith(("app/", "evaluation/", "tests/")) for f in
                    (git("diff", "--name-only", "HEAD~1..HEAD") + dirty).split())
 if code_changed and (REPO / "tests" / "unit").exists():
-    r = sh("uv run pytest tests/unit -q -x -p no:cacheprovider 2>&1 | tail -15", timeout=270)
+    # No shell pipe: `| tail` would replace pytest's exit status with tail's (always 0).
+    r = sh("uv run pytest tests/unit -q -x -p no:cacheprovider", timeout=270)
     if r.returncode != 0:
-        problems.append("unit tests failing:\n" + r.stdout.strip())
+        tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-15:])
+        problems.append("unit tests failing:\n" + tail)
 
 for script in ("scripts/ci/check_doc_sync.py", "scripts/ci/check_sprint_map.py"):
     if (REPO / script).exists() and Path(REPO / "docs").exists():

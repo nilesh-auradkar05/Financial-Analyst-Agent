@@ -187,7 +187,7 @@ def run_deepeval(
             ContextualRelevancyMetric,
             FaithfulnessMetric,
         )
-        from deepeval.test_case import LLMTestCase
+        from deepeval.test_case import LLMTestCase, RetrievedContextData
     except ImportError as exc:
         return [
             MetricScore(
@@ -235,15 +235,16 @@ def run_deepeval(
 
     scores: list[MetricScore] = []
     for sample_index, sample in enumerate(samples):
+        # deepeval>=4.2 types this as list[str | RetrievedContextData]; list is invariant.
+        retrieval_context: list[str | RetrievedContextData] = [
+            *_truncate_context(sample.retrieval_context, max_chars=max_context_chars)
+        ]
         test_case = LLMTestCase(
             input=sample.input,
             actual_output=sample.actual_output,
             expected_output=sample.expected_output,
             context=sample.context or [sample.expected_output],
-            retrieval_context=_truncate_context(
-                sample.retrieval_context,
-                max_chars=max_context_chars,
-            ),
+            retrieval_context=retrieval_context,
         )
 
         for metric_index, metric in enumerate(metrics):

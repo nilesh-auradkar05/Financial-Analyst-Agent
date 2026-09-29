@@ -425,3 +425,23 @@ Authorization: user asked to delete stale system-design files from `docs/`; `doc
 - Kept: `docs/png/**`, `docs/System-design/**`, `docs/svg/production/*` (README and production-readiness-interview.md link them).
 
 Verification (2026-09-29): Doc Sync via `uv run python` (bare `python` is not on PATH): scope-residue PASS, sprint-map PASS, doc-sync PASS, test-hygiene PASS. No remaining `design-html`/`design-md` references outside `.worktrees/`.
+
+
+## S2-T00a-FINISH — CI governance gate + tracking hygiene + hook tests (2026-09-29)
+
+Authorization: user said "continue where you left off" after GREEN-BAR; the next pending item is the rest of S2-T00a (TASKS.md register; sprint-plan S2-T00a). `.claude/` is tracked again on `frontend-impl` (commit `439ab5e`), so SPEC §14 hook items apply. Trace: sprint-plan S2-T00a; SPEC §0/§13/§14; gap G11; test-plan §9 and §15; TASKS.md UPD-04/UPD-10. Non-goals (sprint-plan): no app code; no doc content changes beyond path fixes.
+
+- [x] CI: add a `governance` job to `.github/workflows/ci.yml` running all four `scripts/ci/check_*.py` (moves the three doc checks out of `build`), with least-privilege `permissions: contents: read`.
+- [x] Tracking: remove `test_image/` from the index (files stay on disk) and add it to `.gitignore`; confirm `.runtime/` is ignored and untracked.
+- [x] Lint: fix ruff E741 in `.claude/hooks/stop_gate.py:23` (rename `l`), behaviour unchanged.
+- [x] Tests: `tests/unit/test_hooks.py` covering test-plan §15 H2–H9 and H12 deny/allow cases, invoking the hook scripts as subprocesses with sample event JSON.
+- [x] Verify: ruff, mypy, full pytest, four Doc Sync scripts, `git ls-files docs/ | wc -l` ≥ 5; record local `Result:` for S2-T00a in `docs/sprint-plan.md` (protected, H3). Remote `gh run view --job governance` remains pending until push.
+
+Verification (2026-09-29, local, branch `frontend-impl`): `uv run ruff check .` All checks passed · `uv run mypy .` Success, no issues in 128 source files · `uv run pytest -q` **262 passed, 2 skipped**, 0 failed · governance scripts: scope-residue, sprint-map, doc-sync, test-hygiene all exit 0 · `git ls-files docs/ | wc -l` = 36 (≥ 5) · `ci.yml` parses (jobs `governance`, `build`; top-level `permissions: contents: read`).
+- CI: new `governance` job (stdlib-only scripts, `actions/setup-python`, no dependency install) runs all four checks, including `check_test_hygiene.py` for the first time in CI; the three doc checks moved out of `build`. `persist-credentials: false` on both checkouts. Actions are tag-pinned (`@v4`/`@v5`), not SHA-pinned.
+- Red path (local stand-in for the throwaway-branch step): a scratch copy with every `S8` removed from sprint-plan → `check_sprint_map.py` exit 1 ("sprint-plan missing S8"); an injected `assert_called_once()` spy test → `check_test_hygiene.py` exit 1. Weakness found, not changed: `check_sprint_map.py` only checks that each ID appears somewhere in each file, so renaming one row is not caught.
+- Tracking: `test_image/` removed from the index (file kept on disk) and added to `.gitignore`; `.runtime/` was already ignored and untracked.
+- Hooks: `tests/unit/test_hooks.py` (Sonnet agent, reviewed) has 35 hermetic subprocess tests covering test-plan §15 H2–H9 and H12 deny/allow cases, using temp git repos and a `uv` shim for H12 so the real suite is never re-entered. It found two real `stop_gate.py` (H12) bugs, both fixed at the root and covered by tests confirmed to FAIL on the old hook: (1) `git status --porcelain` was `.strip()`ped, dropping the first path's leading character (`.claude/…` reported as `claude/…`); (2) `uv run pytest … | tail -15` via the shell made the exit status tail's, so failing unit tests never blocked. Also renamed the ambiguous `l` (ruff E741).
+- Dependency drift (outside the plan, fixed): deepeval 4.0.0 → 4.2.6 in `uv.lock` (commit `439ab5e`) widened `LLMTestCase.retrieval_context` to `list[str | RetrievedContextData]`, so mypy flagged `evaluation/run_rag_quality_eval.py:243` (list invariance). Fixed by annotating the local list; no runtime change; the rag-quality/judge unit tests pass (7).
+- Housekeeping: two hook-generated "(fill in)" stubs removed from `tasks/lessons.md` (no user correction occurred).
+- Pending after local completion: push and confirm `gh run view --job governance` green on GitHub.
