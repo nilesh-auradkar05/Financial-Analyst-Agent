@@ -42,7 +42,9 @@ class TestSettingsDefaults:
     def test_llm_timeout_default(self):
         assert settings.llm.request_timeout_seconds > 0
 
-    def test_api_security_defaults_fail_closed(self):
+    def test_api_security_defaults_fail_closed(self, monkeypatch):
+        # deepeval's pytest plugin autoloads .env into os.environ; isolate from it.
+        monkeypatch.delenv("API_KEY", raising=False)
         custom = Settings(_env_file=None)
         assert custom.api_key is None
         assert custom.api_rate_limit == 10
