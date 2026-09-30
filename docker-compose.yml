@@ -118,6 +118,8 @@ services:
     volumes:
       - ./monitoring/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    secrets:
+      - api_key
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -145,6 +147,11 @@ services:
       - financial-analyst-network
     depends_on:
       - prometheus
+
+secrets:
+  # Same key the API enforces; read from API_KEY in the shell or .env.
+  api_key:
+    environment: API_KEY
 
 volumes:
   chroma-data:
