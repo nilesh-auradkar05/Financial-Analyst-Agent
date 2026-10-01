@@ -1,4 +1,4 @@
-"""Trace: docs/test-plan.md §1 Correlated tracing (T2-01 through T2-07)."""
+"""Trace: docs/test-plan.md §1 Correlated tracing (T2-01 through T2-09)."""
 from uuid import UUID, uuid4
 
 import pytest
@@ -38,6 +38,10 @@ class RunCollector:
         self.runs[str(payload["id"])] = dict(payload)
 
     def update_run(self, run_id, **payload):
+        # Client.update_run treats None as omitted for these optional fields.
+        for field in ("inputs", "outputs", "error"):
+            if payload.get(field) is None:
+                payload.pop(field, None)
         self.runs.setdefault(str(run_id), {"id": run_id}).update(payload)
 
     def flush(self, timeout=None):
@@ -196,8 +200,11 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     assert llms[0]["inputs"]
     assert "available_tools" in roots[0]["extra"]["metadata"]
     assert "tools" not in roots[0]["extra"]["metadata"]
-    draft = next(run for run in children if run["name"] == "draft_memo" and run["extra"]["metadata"].get("model") == "offline-evidence-model")
-    assert draft["extra"]["metadata"]["temperature"] == 0.0
+    draft = next(run for run in children if str(run["id"]) == str(llms[0]["parent_run_id"]))
+    assert draft["name"] == "draft_memo"
+    assert draft["extra"]["metadata"]["provider"] == "bedrock"
+    assert llms[0]["extra"]["metadata"]["ls_model_name"] == "offline-evidence-model"
+    assert llms[0]["extra"]["metadata"]["ls_temperature"] == 0.0
     exported = str(runs)
     assert all(secret not in exported for secret in ("private-auth-value", "private-cookie-value", "private-export-key"))
 
@@ -242,6 +249,8 @@ def test_verifier_failure_never_exports_raw_error(traced, evidence, monkeypatch)
 
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"
+    root = next(run for run in traced.runs.values() if not run.get("parent_run_id"))
+    assert root.get("error") is None
     assert response.json()["verification"]["passed"] is False
     assert any(error["step"] == "verify_memo" for error in response.json()["errors"])
     assert "private-verifier-exception-secret" not in str(traced.runs)
@@ -250,6 +259,52 @@ def test_verifier_failure_never_exports_raw_error(traced, evidence, monkeypatch)
         for run in traced.runs.values()
         if run["name"] == "verify_memo"
     )
+
+
+@pytest.mark.parametrize("path", ["/health", "/metrics"])
+def test_probe_routes_get_request_id_but_no_span(traced, path):
+    request_id = str(uuid4())
+    headers = {"X-API-Key": "private-auth-value"}
+    with TestClient(api.app, raise_server_exceptions=False) as client:
+        supplied = client.get(path, headers={**headers, "X-Request-ID": request_id})
+        generated = client.get(path, headers=headers)
+        invalid = client.get(path, headers={**headers, "X-Request-ID": "bad identifier"})
+        traced_route = client.get("/")
+    assert supplied.headers["X-Request-ID"] == request_id
+    assert str(UUID(generated.headers["X-Request-ID"])) == generated.headers["X-Request-ID"]
+    assert invalid.status_code == 400
+    assert str(UUID(invalid.headers["X-Request-ID"])) == invalid.headers["X-Request-ID"]
+    assert "X-Trace-ID" not in supplied.headers and "X-Trace-ID" not in generated.headers
+    assert traced_route.headers["X-Trace-ID"] in traced.runs
+    assert [run["name"] for run in traced.runs.values()] == ["HTTP GET /"]
+
+
+def test_fatal_draft_failure_marks_draft_span_and_failed_root(traced, evidence, monkeypatch):
+    from langchain_core.language_models.chat_models import BaseChatModel
+
+    from app.agents import graph
+
+    class BrokenChat(BaseChatModel):
+        @property
+        def _llm_type(self):
+            return "offline-broken"
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            raise RuntimeError("private-draft-exception-secret")
+
+    monkeypatch.setattr(graph, "get_llm", lambda settings: BrokenChat())
+    with TestClient(api.app) as client:
+        response = client.post("/analyze", json={"ticker": "AAPL"},
+                               headers={"X-API-Key": "private-auth-value"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "failed"
+    runs = list(traced.runs.values())
+    drafts = [run for run in runs if run["name"] == "draft_memo"]
+    assert [run.get("error") for run in drafts].count("draft_memo_failed") == 1
+    root = next(run for run in runs if str(run["id"]) == response.headers["X-Trace-ID"])
+    assert root["error"] == "analysis_failed"
+    # Native model spans are the provider's own record (T2-06); app spans stay safe.
+    assert "private-draft-exception-secret" not in str([run for run in runs if run["run_type"] != "llm"])
 
 
 def test_async_original_correlation_survives_parent_end_replay_and_poll(traced, evidence):
@@ -450,6 +505,9 @@ def test_safe_error_correlation_and_failed_job(traced, monkeypatch):
     assert [r.status_code for r in responses] == [404, 422, 500, 500]
     for response in responses:
         assert UUID(response.headers["X-Request-ID"])
+        if response is responses[2]:  # T2-08: /metrics is an untraced probe route
+            assert "X-Trace-ID" not in response.headers
+            continue
         metadata = traced.runs[response.headers["X-Trace-ID"]]["extra"]["metadata"]
         assert metadata["code"] == response.json()["error"]["code"]
         assert metadata["error_id"] == response.json()["error"]["error_id"]

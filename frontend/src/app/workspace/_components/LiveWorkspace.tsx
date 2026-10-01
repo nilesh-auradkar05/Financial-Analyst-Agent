@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { JobPollResponse } from "@/lib/api-types";
+import { isTerminalJobStatus, type JobPollResponse } from "@/lib/api-types";
 import { toWorkspaceRun } from "../_data";
 import { WorkspaceView } from "./WorkspaceView";
 
@@ -23,7 +23,7 @@ export function LiveWorkspace({ jobId }: { jobId: string }) {
           const j = (await res.json()) as JobPollResponse;
           setJob(j);
           setError(null);
-          done = j.status === "completed" || j.status === "failed";
+          done = isTerminalJobStatus(j.status);
         } else if (res.status === 400 || res.status === 404) {
           setError("Job not found.");
           done = true;

@@ -1,6 +1,6 @@
-"""Runtime chat-model provider factory.
+"""Runtime chat-model factory: Bedrock primary, then personal Claude and OpenAI fallbacks.
 
-Converse-API families (provider == "bedrock"):
+Bedrock Converse-API families:
   - Anthropic Claude  -> additionalModelRequestFields={"thinking": {...}}  (enabled/adaptive)
   - DeepSeek V3.2     -> additionalModelRequestFields={"thinking": {"type": "enabled"}}  (hybrid thinking)
   - OpenAI gpt-oss    -> reasoning effort low|medium|high
@@ -8,10 +8,18 @@ Converse-API families (provider == "bedrock"):
 
 from __future__ import annotations
 
-import os
+import asyncio
+import math
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from functools import partial
+from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda
 from loguru import logger
+from pydantic import SecretStr
 
 from app.config import Settings
 
@@ -21,9 +29,6 @@ MODEL_PRESETS: dict[str, str] = {
     "deepseek-v3": "deepseek.v3.2",
     "gpt-oss-120b": "openai.gpt-oss-120b-1:0",
     "gpt-oss-20b": "openai.gpt-oss-20b-1:0",
-    # frontier (provider must be "bedrock_openai"):
-    "gpt-5.5": "openai.gpt-5.5",
-    "gpt-5.4": "openai.gpt-5.4",
 }
 
 
@@ -40,144 +45,153 @@ def _model_family(model_id: str) -> str:
 
 def model_metadata(settings: Settings) -> dict:
     """Effective factory settings; native model spans remain authoritative."""
-    provider = settings.llm.provider.lower()
-    model = settings.ollama.llm_model if provider == "ollama" else MODEL_PRESETS.get(settings.llm.model, settings.llm.model)
+    model = MODEL_PRESETS.get(settings.llm.model, settings.llm.model)
     family = _model_family(model)
-    omit_temperature = provider == "bedrock_openai" or (
-        provider == "bedrock" and (
-            family == "claude" and settings.llm.thinking_mode in {"enabled", "adaptive"}
-            or family == "deepseek" and settings.llm.thinking_mode != "off"
+    omit_temperature = (
+        family == "claude" and (
+            settings.llm.thinking_mode in {"enabled", "adaptive"}
+            or "claude-sonnet-5" in model.lower()
         )
+        or family == "deepseek" and settings.llm.thinking_mode != "off"
     )
-    return {"provider": provider, "model": model,
+    return {"provider": "bedrock", "model": model,
             "temperature": None if omit_temperature else settings.llm.temperature}
 
 
-def get_llm(settings: Settings) -> BaseChatModel:
-    """Return a configured chat model using the active provider settings."""
-    provider = settings.llm.provider.lower()
+def _bedrock_model(settings: Settings) -> BaseChatModel:
+    """Return the configured Bedrock Converse chat model."""
     model_id = MODEL_PRESETS.get(settings.llm.model, settings.llm.model)
     mode = settings.llm.thinking_mode.lower()
 
-    # --- OpenAI frontier (gpt-5.x) via Responses API on the mantle endpoint -----------------
-    if provider == "bedrock_openai":
-        try:
-            from langchain_openai import ChatOpenAI
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("bedrock_openai provider requires `langchain-openai`.") from exc
+    if not settings.llm.aws_region:
+        raise ValueError("Bedrock AWS region is missing. Set AWS_REGION.")
+    try:
+        from langchain_aws import ChatBedrockConverse
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "Bedrock provider requires `langchain-aws` and `awscrt`."
+        ) from exc
 
-        token = os.environ.get("AWS_BEARER_TOKEN_BEDROCK")
-        if not token:
-            raise ValueError(
-                "OpenAI frontier models need a Bedrock API key. "
-                "Generate one and set AWS_BEARER_TOKEN_BEDROCK."
-            )
-        region = settings.llm.aws_region or "us-east-2"
-        base_url = f"https://bedrock-mantle.{region}.api.aws/openai/v1"
+    family = _model_family(model_id)
+    kwargs: dict[str, Any] = {
+        "model": model_id,
+        "max_tokens": settings.llm.max_tokens,
+        "region_name": settings.llm.aws_region,
+        "timeout": math.ceil(settings.llm.request_timeout_seconds),
+        "max_retries": 0,
+    }
+    token = settings.llm.aws_bearer_token_bedrock
+    if token and token.get_secret_value().strip():
+        kwargs["bedrock_api_key"] = token
 
-        kwargs: dict = {
-            "model": model_id,
-            "base_url": base_url,
-            "api_key": token,
-            "use_responses_api": True,
-            "max_tokens": settings.llm.max_tokens,
-        }
-        if mode != "off":
-            kwargs["reasoning_effort"] = settings.llm.thinking_effort
-        logger.info(
-            "Bedrock-OpenAI (Responses) model='{}' region={} effort={} | VERIFY interop",
-            model_id,
-            region,
-            settings.llm.thinking_effort if mode != "off" else "off",
-        )
-        return ChatOpenAI(**kwargs)
-
-    # --- Converse-API families: Claude / DeepSeek / gpt-oss ---------------------------------
-    if provider == "bedrock":
-        if not settings.llm.aws_region:
-            raise ValueError(
-                "LLM provider is bedrock but AWS region is missing. Set AWS_REGION."
-            )
-        try:
-            from langchain_aws import ChatBedrockConverse
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(
-                "Bedrock provider requires `langchain-aws` and `awscrt`."
-            ) from exc
-
-        family = _model_family(model_id)
-        kwargs = {
-            "model": model_id,
-            "max_tokens": settings.llm.max_tokens,
-            "region_name": settings.llm.aws_region,
-        }
-
-        if family == "claude" and mode in {"enabled", "adaptive"}:
-            if mode == "enabled":
-                if settings.llm.thinking_budget_tokens < 1024:
-                    raise ValueError("thinking_budget_tokens must be >= 1024")
-                if settings.llm.thinking_budget_tokens >= settings.llm.max_tokens:
-                    raise ValueError(
-                        "thinking_budget_tokens must be < max_tokens "
-                        f"({settings.llm.thinking_budget_tokens} >= {settings.llm.max_tokens})"
-                    )
-                kwargs["additional_model_request_fields"] = {
-                    "thinking": {"type": "enabled", "budget_tokens": settings.llm.thinking_budget_tokens}
-                }
-            else:  # adaptive
-                kwargs["additional_model_request_fields"] = {
-                    "thinking": {"type": "adaptive"},
-                    "output_config": {"effort": settings.llm.thinking_effort},
-                }
-            reasoning_desc = f"claude/thinking={mode}"  # temperature omitted (model default)
-
-        elif family == "deepseek" and mode != "off":
-            # DeepSeek V3.2 hybrid thinking. Native enable field is {"thinking": {"type": "enabled"}}.
-            # Thinking mode ignores temperature; reasoning returns as reasoning_content.
-            # VERIFY: confirm the response carries a reasoning block (see smoke check).
-            kwargs["additional_model_request_fields"] = {"thinking": {"type": "enabled"}}
-            reasoning_desc = "deepseek/thinking=enabled (verify field)"
-
-        elif family == "openai_oss" and mode != "off":
-            # gpt-oss adjustable reasoning effort (low|medium|high). VERIFY exact Converse field.
-            kwargs["additional_model_request_fields"] = {"reasoning_effort": settings.llm.thinking_effort}
-            kwargs["temperature"] = settings.llm.temperature
-            reasoning_desc = f"gpt-oss/effort={settings.llm.thinking_effort} (verify field)"
-
-        else:
-            if mode != "off" and family == "other":
-                logger.warning(
-                    "thinking_mode={} requested but model family '{}' has no known reasoning "
-                    "config here; ignoring it (no reasoning override applied).",
-                    mode,
-                    family,
+    if family == "claude" and mode in {"enabled", "adaptive"}:
+        if mode == "enabled":
+            if settings.llm.thinking_budget_tokens < 1024:
+                raise ValueError("thinking_budget_tokens must be >= 1024")
+            if settings.llm.thinking_budget_tokens >= settings.llm.max_tokens:
+                raise ValueError(
+                    "thinking_budget_tokens must be < max_tokens "
+                    f"({settings.llm.thinking_budget_tokens} >= {settings.llm.max_tokens})"
                 )
+            kwargs["additional_model_request_fields"] = {
+                "thinking": {"type": "enabled", "budget_tokens": settings.llm.thinking_budget_tokens}
+            }
+        else:  # adaptive
+            kwargs["additional_model_request_fields"] = {
+                "thinking": {"type": "adaptive"},
+                "output_config": {"effort": settings.llm.thinking_effort},
+            }
+        reasoning_desc = f"claude/thinking={mode}"  # temperature omitted (model default)
+
+    elif family == "deepseek" and mode != "off":
+        # DeepSeek V3.2 hybrid thinking. Native enable field is {"thinking": {"type": "enabled"}}.
+        # Thinking mode ignores temperature; reasoning returns as reasoning_content.
+        # VERIFY: confirm the response carries a reasoning block (see smoke check).
+        kwargs["additional_model_request_fields"] = {"thinking": {"type": "enabled"}}
+        reasoning_desc = "deepseek/thinking=enabled (verify field)"
+
+    elif family == "openai_oss" and mode != "off":
+        # gpt-oss adjustable reasoning effort (low|medium|high). VERIFY exact Converse field.
+        kwargs["additional_model_request_fields"] = {"reasoning_effort": settings.llm.thinking_effort}
+        kwargs["temperature"] = settings.llm.temperature
+        reasoning_desc = f"gpt-oss/effort={settings.llm.thinking_effort} (verify field)"
+
+    else:
+        if mode != "off" and family == "other":
+            logger.warning(
+                "thinking_mode={} requested but model family '{}' has no known reasoning "
+                "config here; ignoring it (no reasoning override applied).",
+                mode,
+                family,
+            )
+        if "claude-sonnet-5" not in model_id.lower():
             kwargs["temperature"] = settings.llm.temperature
-            reasoning_desc = f"{family}/thinking=off"
+        reasoning_desc = f"{family}/thinking=off"
 
-        logger.info(
-            "Bedrock model='{}' family={} | {} | max_tokens={}",
-            model_id,
-            family,
-            reasoning_desc,
-            settings.llm.max_tokens,
-        )
-        return ChatBedrockConverse(**kwargs)
-
-    if provider == "ollama":
-        from langchain_ollama import ChatOllama
-
-        logger.info("Using Ollama chat model '{}' via '{}'", settings.ollama.llm_model, settings.ollama.base_url)
-        return ChatOllama(
-            model=settings.ollama.llm_model,
-            base_url=settings.ollama.base_url,
-            temperature=settings.llm.temperature,
-        )
-
-    raise ValueError(
-        f"Unsupported LLM provider: {settings.llm.provider!r}. "
-        "Supported: 'bedrock' (Claude/DeepSeek/gpt-oss), 'bedrock_openai' (gpt-5.x), 'ollama'."
+    logger.info(
+        "Bedrock model='{}' family={} | {} | max_tokens={}",
+        model_id,
+        family,
+        reasoning_desc,
+        settings.llm.max_tokens,
     )
+    return ChatBedrockConverse(**kwargs)
+
+
+def fallback_count(settings: Settings) -> int:
+    """Number of bounded cloud attempts, including Bedrock."""
+    return 1 + len(settings.llm.personal_fallbacks())
+
+
+def _personal_model(settings: Settings, provider: str, model: str, key: SecretStr) -> BaseChatModel:
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "api_key": key.get_secret_value(),
+        "max_tokens": settings.llm.max_tokens,
+        "timeout": settings.llm.request_timeout_seconds,
+        "max_retries": 0,
+    }
+    if provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(**kwargs)
+    from langchain_openai import ChatOpenAI
+
+    return ChatOpenAI(**kwargs)
+
+
+def get_llm(settings: Settings) -> Runnable[Any, Any]:
+    """Use Bedrock first, then personal Claude, then personal OpenAI (each only with a key)."""
+    providers: list[tuple[str, Callable[[], BaseChatModel]]] = [("bedrock", lambda: _bedrock_model(settings))]
+    for name, model, key in settings.llm.personal_fallbacks():
+        providers.append((name, partial(_personal_model, settings, name, model, key)))
+
+    timeout = settings.llm.request_timeout_seconds
+
+    def lazy_model(name: str, build: Callable[[], BaseChatModel]) -> Runnable[Any, Any]:
+        def invoke(input: Any, config: RunnableConfig) -> Any:
+            pool = ThreadPoolExecutor(max_workers=1)
+            try:
+                return pool.submit(lambda: build().invoke(input, config=config)).result(timeout=timeout)
+            except FutureTimeoutError as exc:
+                raise TimeoutError(f"{name} attempt timed out") from exc
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
+
+        async def ainvoke(input: Any, config: RunnableConfig) -> Any:
+            async def attempt() -> Any:
+                model = await asyncio.to_thread(build)
+                return await model.ainvoke(input, config=config)
+
+            try:
+                return await asyncio.wait_for(attempt(), timeout=timeout)
+            except asyncio.TimeoutError as exc:
+                raise TimeoutError(f"{name} attempt timed out") from exc
+
+        return RunnableLambda(invoke, afunc=ainvoke).with_config(run_name=f"{name}_attempt")
+
+    attempts = [lazy_model(name, build) for name, build in providers]
+    return attempts[0].with_fallbacks(attempts[1:])
 
 
 __all__ = ["get_llm", "MODEL_PRESETS"]

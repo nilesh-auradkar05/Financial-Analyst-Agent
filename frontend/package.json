@@ -9,7 +9,7 @@
     "lint": "eslint",
     "parity": "node scripts/parity.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\""
+    "test": "node --test --conditions=react-server --experimental-strip-types \"src/**/*.test.ts\""
   },
   "dependencies": {
     "next": "16.3.6",

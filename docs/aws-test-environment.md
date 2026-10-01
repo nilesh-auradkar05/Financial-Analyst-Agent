@@ -219,7 +219,6 @@ Create `.env` without secrets you do not need:
 ```bash
 cat > .env <<'EOF'
 OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_LLM_MODEL=qwen3.5:9b
 OLLAMA_EMBED_MODEL=qwen3-embedding:4b
 OLLAMA_TIMEOUT=600
 OLLAMA_TEMPERATURE=0.7

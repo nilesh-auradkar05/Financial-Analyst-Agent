@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Set `API_KEY` in the frontend server environment to the backend's `API_KEY`. The server forwards it as a Bearer token when calling the protected analysis API; browser requests and responses never include it. `ALPHA_API_URL` selects the backend URL (default `http://localhost:8000`).
+
 First, run the development server:
 
 ```bash

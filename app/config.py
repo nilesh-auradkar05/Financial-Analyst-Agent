@@ -5,7 +5,7 @@ This file contains the configuration for the Financial Analyst Agent.
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 """ PATHS CONFIGURATION """
@@ -32,7 +32,6 @@ class OllamaSettings(BaseSettings):
 
     ENVIRONMENT VARIABLES:
            OLLAMA_BASE_URL: URL WHERE OLLAMA SERVER IS RUNNING
-           OLLAMA_LLM_MODEL: MODEL TO USE FOR REASONING (eg: qwen3-vl 8B)
            OLLAMA_EMBED_MODEL: MODEL TO USE FOR EMBEDDINGS
            OLLAMA_TIMEOUT: REQUEST TIMEOUT IN SECONDS
     """
@@ -50,11 +49,6 @@ class OllamaSettings(BaseSettings):
         description="Ollama server URL",
     )
 
-    # Main LLM model to use for reasoning tasks
-    llm_model: str = Field(
-        default="qwen3.5:9b", description="Ollama model for reasoning"
-    )
-
     embed_model: str = Field(
         default="qwen3-embedding:4b", description="Ollama model for embeddings"
     )
@@ -70,7 +64,7 @@ class OllamaSettings(BaseSettings):
 
 
 class LLMSettings(BaseSettings):
-    """Configuration for runtime chat-model provider selection."""
+    """Chat models: Bedrock primary, then personal Claude, then personal OpenAI."""
 
     model_config = SettingsConfigDict(
         env_prefix="LLM_",
@@ -79,14 +73,27 @@ class LLMSettings(BaseSettings):
         extra="ignore",
     )
 
-    provider: Literal["bedrock", "ollama"] = Field(
-        default="bedrock",
-        description="Chat model provider used by agent runtime.",
-    )
     model: str = Field(
-        default="anthropic.claude-sonnet-4-6",
-        description="Default chat model id for the selected provider.",
+        default="global.anthropic.claude-sonnet-4-6",
+        validation_alias="AWS_BEDROCK_MODEL",
+        description="Bedrock primary model id or inference profile.",
     )
+    claude_model: str = Field(
+        default="claude-sonnet-4-5",
+        validation_alias="CLAUDE_LLM_MODEL",
+        description="Personal Anthropic API fallback model.",
+    )
+    openai_model: str = Field(
+        default="gpt-4.1",
+        validation_alias="OPENAI_LLM_MODEL",
+        description="Personal OpenAI API fallback model.",
+    )
+    aws_bearer_token_bedrock: Optional[SecretStr] = Field(
+        default=None,
+        validation_alias=AliasChoices("AWS_BEARER_TOKEN_BEDROCK", "AWS_BEARER_TOKEN"),
+    )
+    anthropic_api_key: Optional[SecretStr] = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    openai_api_key: Optional[SecretStr] = Field(default=None, validation_alias="OPENAI_API_KEY")
     temperature: float = Field(
         default=1.0,
         description="Default chat-model temperature.",
@@ -103,7 +110,7 @@ class LLMSettings(BaseSettings):
     aws_region: Optional[str] = Field(
         default="us-east-1",
         validation_alias="AWS_REGION",
-        description="AWS region used when provider is Bedrock.",
+        description="AWS region for Bedrock.",
     )
     thinking_mode: Literal["off", "enabled", "adaptive"] = Field(
         default="off",
@@ -119,6 +126,14 @@ class LLMSettings(BaseSettings):
         default="low",
         description="Thinking effort to be used by LLM."
     )
+
+    def personal_fallbacks(self) -> list[tuple[str, str, SecretStr]]:
+        """(provider, model, key) for each personal fallback whose API key is configured, in call order."""
+        candidates = [
+            ("anthropic", self.claude_model, self.anthropic_api_key),
+            ("openai", self.openai_model, self.openai_api_key),
+        ]
+        return [(name, model, key) for name, model, key in candidates if key and key.get_secret_value().strip()]
 
 
 class TavilySettings(BaseSettings):

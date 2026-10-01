@@ -435,7 +435,7 @@ Exit = Gate B.
 
 - **S5 — Retrieval quality diagnostics → hybrid/rerank (Gate C).** Per-query diagnostics and failure taxonomy first; optional section prior, hybrid dense+sparse, and rerank candidates evaluated on same fixture. Unchanged.
 - **S6 — Answer quality & eval hardening (Gate D). Steps 4–5.** (a) Eval registry `evaluation/registry/runs/*.json` with lineage keys (SPEC §11.2); hook H5 + CI reject unlineaged results. (b) `eval-replay` CI job on the frozen release, fails on >2σ regression of grounded_claim_rate / citation_coverage. (c) Verifier↔judge agreement on ≥50 claims; κ recorded. (d) Bounded draft→verify→revise loop (max 2), `attempts` in response, paired vs no-loop on the same snapshot/model/temperature. (e) Then LLM-as-judge/RAGAS, then GEPA on holdout. Order inside S6 is fixed: (a)→(b)→(c)→(d)→(e).
-- **S7 — Service readiness. Steps 6–8 (local).** (a) Guardrails per SPEC §11.4 with adversarial fixture in CI. (b) API auth + rate limit + idempotency key. (c) Caching per SPEC §11.3 with hit/miss metrics. (d) `JobQueue` protocol → Redis Streams; `RunStore` protocol → Postgres; LangGraph checkpointer. (e) FinBERT out-of-process; provider circuit breaker (Bedrock→Ollama at runtime, not config). (f) Fix G13. CI matrix, correlation IDs, structured logs retained from prior S7 scope.
+- **S7 — Service readiness. Steps 6–8 (local).** (a) Guardrails per SPEC §11.4 with adversarial fixture in CI. (b) API auth + rate limit + idempotency key. (c) Caching per SPEC §11.3 with hit/miss metrics. (d) `JobQueue` protocol → Redis Streams; `RunStore` protocol → Postgres; LangGraph checkpointer. (e) FinBERT out-of-process; provider circuit breaker (separate from ADR-0009 fallback; Ollama development-only). (f) Fix G13. CI matrix, correlation IDs, structured logs retained from prior S7 scope.
 - **S8 — Frontend MVP.** Thin API-driven SPA against the hardened API. Unchanged.
 - **S9 — Portfolio polish.** README, measured results, honest limitations, benchmark report, demo, fresh-clone smoke. Unchanged.
 - **S10 — Cloud (INTEGRATION_PLAN_v2 Phases 4–5). Step 8 (remote).** Gated on ADR-0006 + SPEC §3 amendment. Kafka is explicitly *not* adopted until a second consumer type exists for the same event stream (review 2026-08-24).
@@ -448,3 +448,10 @@ REST/error contracts and provider-aware health slice, plus S2-T00d response stat
 corrections and request correlation. See `tasks/rest-tracing-plan.md`. This does
 not open caching, queue replacement, repair loops, or unrelated sprint work.
 The service remains a single process with its existing file-backed run store.
+
+
+### Authorized provider and missing-filing slice (2026-09-29)
+
+User authorizes PROVIDER-FALLBACK / FILING-DEGRADATION before remaining S7 gates, traced to SPEC §4 runtime provider policy, §8.5, test-plan §16 and ADR-0009. Implement Bedrock → configured personal Anthropic → configured personal OpenAI, bounded attempts and native traces; explicit Ollama development mode. Missing filings preserve usable evidence and memo with evidence_missing status. Azure invocation remains deferred as S7-AZURE-FALLBACK until its deployment/model configuration is specified. Other sequencing and benchmark gates stay unchanged.
+
+Result as of 2026-09-30: implementation in frontend-impl, focused provider checks 26 passed, filing checks 14 passed, frontend 10 tests plus type/lint/build passed, Compose 4 cases passed. Final backend suite: 344 passed, 1 failed, 2 skipped; residual tracing assertion expects the old draft-span model label. Full lint, mypy app/evaluation and four Doc Sync checks pass. Overall verification remains open at the user's two-correction limit. Changes are uncommitted; no deployment/live-inference success is claimed. Azure remains deferred. Detailed commands and findings belong to tasks/todo.md.

@@ -1,7 +1,6 @@
 import os
 
-os.environ["LLM_PROVIDER"] = "bedrock"
-os.environ["LLM_MODEL"] = "us.anthropic.claude-sonnet-4-6"
+os.environ["AWS_BEDROCK_MODEL"] = "us.anthropic.claude-sonnet-4-6"
 os.environ["AWS_REGION"] = "us-east-1"
 
 from app.config import Settings

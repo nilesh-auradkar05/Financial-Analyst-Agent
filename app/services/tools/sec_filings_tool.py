@@ -215,6 +215,7 @@ class SECClient:
         self.user_agent = settings.sec.user_agent
         self._timeout = settings.retry.http_timeout_seconds
         self._client: Optional[httpx.AsyncClient] = None
+        self._lookup_failed = False
 
     async def __aenter__(self):
         self._client = httpx.AsyncClient(
@@ -269,6 +270,7 @@ class SECClient:
         except Exception:
             logger.error("CIK lookup failed")
             mark_trace_failed("sec_cik_lookup_failed")
+            self._lookup_failed = True
             return None
 
     @app_traceable(name="sec_get_filings", run_type="tool", tags=["sec"])
@@ -279,6 +281,7 @@ class SECClient:
         count: int = 1,
     ) -> list[FilingMetaData]:
         """Get recent filings for a company."""
+        self._lookup_failed = False
         cik = await self.get_cik(ticker)
         if not cik:
             logger.error(f"CIK not found for {ticker}")
@@ -314,6 +317,7 @@ class SECClient:
         except Exception:
             logger.error("Filing lookup failed")
             mark_trace_failed("sec_filings_lookup_failed")
+            self._lookup_failed = True
             return []
 
     @app_traceable(name="sec_download_filing", run_type="tool", tags=["sec"])
@@ -410,6 +414,8 @@ async def get_latest_10k(
         )
 
         if not filings:
+            if client._lookup_failed:
+                raise RuntimeError("SEC filing lookup failed.")
             logger.warning("No 10-K filings found for %s", normalized_ticker)
             return None
 

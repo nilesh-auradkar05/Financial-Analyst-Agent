@@ -241,8 +241,6 @@ async def lifespan(app: FastAPI):
     embeddings_ok = await check_ollama_health(model=settings.ollama.embed_model, log_failure=True)
     if not embeddings_ok:
         logger.warning("Ollama embedding model not available")
-    if settings.llm.provider == "ollama":
-        await check_ollama_health(log_failure=True)
 
     try:
         store = get_vector_store()
@@ -343,10 +341,7 @@ async def root():
 async def health():
     """Health check endpoint."""
     embedding_ok = await check_ollama_health(model=settings.ollama.embed_model)
-    local_chat = settings.llm.provider == "ollama"
-    chat_ok = (await check_ollama_health()) if local_chat else bool(
-        settings.llm.aws_region and settings.llm.model
-    )
+    chat_ok = bool(settings.llm.aws_region and settings.llm.model) or bool(settings.llm.personal_fallbacks())
     try:
         vector_ok = get_vector_store().count >= 0
     except Exception:
@@ -358,7 +353,7 @@ async def health():
         version="1.1.0",
         timestamp=datetime.now(timezone.utc).isoformat(),
         components={
-            "chat_model": {"ok": chat_ok, "provider": settings.llm.provider, "check": "model_available" if local_chat else "configuration_only", "inference_verified": False},
+            "chat_model": {"ok": chat_ok, "provider": "bedrock", "check": "configuration_only", "inference_verified": False},
             "ollama_embeddings": {"ok": embedding_ok},
             "vector_store": {"ok": vector_ok},
             "langsmith": {"connected": langsmith_status.get("connected", False)},
@@ -555,7 +550,11 @@ def _format_response(state: AgentState) -> AnalysisResponse:
     errors = [
         ErrorDetail(
             step=error.get("step", ""),
-            message="A workflow step failed.",
+            message=(
+                error.get("message", "A workflow step failed.")
+                if error.get("code") in {"filing_not_found", "filing_retrieval_failed"}
+                else "A workflow step failed."
+            ),
             timestamp=error.get("timestamp", ""),
             recoverable=error.get("recoverable", True),
         )
@@ -689,7 +688,7 @@ def _normalize_sections_processed(value: object) -> list[str]:
 # =============================================================================
 
 
-@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 429, 502, 503)})
+@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], responses={code: ERROR_RESPONSES[code] for code in (401, 404, 422, 429, 502, 503)})
 async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_limit_submission)):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
@@ -704,6 +703,12 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
             )
 
             if not result.success:
+                if getattr(result, "error_code", None) == "filing_not_found":
+                    raise HTTPException(status_code=404, detail={
+                        "code": "filing_not_found",
+                        "message": f"No 10-K filings found for {ticker}.",
+                        "error_id": _new_error_id(),
+                    })
                 raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": _new_error_id()})
             return IngestionResponse(
                 ticker=ticker,

@@ -4,6 +4,21 @@
 > **Authority:** Derived, non-canonical view. It ranks *below* `tasks/todo.md` (SPEC §0 #7). Task definitions stay in `docs/sprint-plan.md`, behaviour oracle in `docs/test-plan.md`, and scope in SPEC §3. If this file disagrees with those docs, those docs win, and this file needs refreshing.
 > **Sources read:** `docs/SPEC.md` v1.3, `docs/sprint-plan.md`, `docs/test-plan.md`, `docs/retrieval-benchmark.md`, `tasks/todo.md`, `tasks/sprint-review.md`, `tasks/test-suite-audit.md`, `.github/workflows/ci.yml`, `.claude/hooks/*`, and the code under `app/`, `dataops/`, `evaluation/`, `tests/`.
 
+## Scoped update — 2026-09-30
+
+This update supersedes conflicting historical rows below for the listed work only. The September 12 snapshot is historical, not a fresh whole-project audit. Changes are uncommitted in the frontend-impl working tree; final combined verification has one residual failure. Canonical execution record: tasks/todo.md, PROVIDER-FALLBACK / FILING-DEGRADATION; behavior: test-plan §16; decision: ADR-0009.
+
+| Task | Current status | Recorded evidence / remaining work |
+| --- | --- | --- |
+| Provider fallback | Implemented; focused verification passed | Bedrock → configured Anthropic → OpenAI, bounded attempts, model/token aliases, explicit Ollama development selection; 26 focused tests, targeted types/lint, lock check passed |
+| Missing filings | Implemented; focused verification passed | Typed ingest 404 vs upstream 502, safe source reason, available evidence and memo retained with evidence_missing; 14 focused tests, targeted types/lint passed |
+| Frontend partial results/auth | Verified locally | Terminal status handling, Not Available display, server-only API_KEY forwarding; 10 tests, typecheck, lint, build passed |
+| Compose provider configuration | Verified configuration only | 4 dummy cases passed; 8 actual cloud settings forwarded unchanged without printing secrets; no credential/model-entitlement inference claimed |
+| S7-AZURE-FALLBACK | Deferred by explicit user request | Configuration pass-through only; deployment/model/API-version decision and runtime integration belong to the later task |
+| Integration/release | OPEN: one residual assertion | 344 passed, 1 failed, 2 optional integration skips; remaining tracing test expects old draft model metadata. Full lint, mypy app/evaluation and all four Doc Sync checks pass. Two-correction cap reached; no further fix loop, rebuild or paid execution |
+
+Prior REST/auth/correlation work is implemented under its explicit S7 slice; the historical “none implemented” S7 rows below do not describe the current branch. Remaining S7 queue/caching/circuit-breaker work stays gated; this fallback chain is not a circuit breaker.
+
 ## Status legend
 
 | Status | Meaning |

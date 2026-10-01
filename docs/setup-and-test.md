@@ -61,8 +61,12 @@ uv --cache-dir /tmp/uv-cache sync --python 3.12
 Create `.env` from this template and fill in only the values needed for the workflow you are running:
 
 ```bash
+AWS_BEDROCK_MODEL=global.anthropic.claude-sonnet-4-6   # chat primary
+AWS_REGION=us-east-1
+AWS_BEARER_TOKEN_BEDROCK=
+CLAUDE_LLM_MODEL=claude-sonnet-4-5    # personal fallback 1 (needs ANTHROPIC_API_KEY)
+OPENAI_LLM_MODEL=gpt-4.1               # personal fallback 2 (needs OPENAI_API_KEY)
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_LLM_MODEL=qwen3.5:9b
 OLLAMA_EMBED_MODEL=qwen3-embedding:4b
 OLLAMA_TIMEOUT=600
 OLLAMA_TEMPERATURE=0.7
@@ -100,7 +104,6 @@ docker logs qdrant-financial-analyst-agent-system
 Install Ollama and pull the configured models if you want to run live ingestion, embedding, or analysis flows:
 
 ```bash
-ollama pull qwen3.5:9b
 ollama pull qwen3-embedding:4b
 ollama list
 ```

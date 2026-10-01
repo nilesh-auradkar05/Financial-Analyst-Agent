@@ -7,7 +7,7 @@ A single-agent financial research system: give it a stock ticker and it gathers 
 [![FastAPI](https://img.shields.io/badge/FastAPI-service-teal.svg)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Ollama embeddings · Amazon Bedrock or Ollama chat models · FinBERT · edgartools · Tavily · yfinance · Prometheus · LangSmith
+**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Ollama embeddings · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · FinBERT · edgartools · Tavily · yfinance · Prometheus · LangSmith
 
 ### What it does
 
@@ -146,8 +146,8 @@ Large-scale variants of the same four diagrams are in [`docs/png/production/`](d
 | Requirement | Needed for |
 |---|---|
 | Python 3.12 and [`uv`](https://docs.astral.sh/uv/) | everything |
-| [Ollama](https://ollama.com) with `qwen3-embedding:4b` | embeddings for ingestion and retrieval; optionally the chat model too |
-| AWS credentials with Amazon Bedrock access | the default chat-model provider (`LLM_PROVIDER=bedrock`) |
+| [Ollama](https://ollama.com) with `qwen3-embedding:4b` | embeddings for ingestion and retrieval |
+| AWS credentials with Amazon Bedrock access | the primary chat model (`AWS_BEDROCK_MODEL`) |
 | Docker | Qdrant, and the optional API + Prometheus + Grafana stack |
 | Tavily API key | news search |
 | An SEC contact string (`Name email@example.com`) | SEC EDGAR access |
@@ -168,16 +168,24 @@ uv sync --python 3.12
 Create a `.env` file in the repository root. Settings are read by [`app/config.py`](app/config.py).
 
 ```bash
-# Chat model: Bedrock (default) or Ollama
-LLM_PROVIDER=bedrock
-LLM_MODEL=anthropic.claude-sonnet-4-6
+# Primary chat model: Bedrock
+AWS_BEDROCK_MODEL=global.anthropic.claude-sonnet-4-6
 AWS_REGION=us-east-1
+AWS_BEARER_TOKEN_BEDROCK=
+
+# Personal fallbacks: Claude, then OpenAI; each is used only when its key is set
+CLAUDE_LLM_MODEL=claude-sonnet-4-5
+ANTHROPIC_API_KEY=
+OPENAI_LLM_MODEL=gpt-4.1
+OPENAI_API_KEY=
 LLM_THINKING_MODE=off            # off | enabled | adaptive
 
-# Ollama (embeddings always; chat model when LLM_PROVIDER=ollama)
+# Azure fallback (reserved; not invoked until S7-AZURE-FALLBACK)
+AZURE_FOUNDRY_MODEL=
+
+# Ollama (embeddings only)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_EMBED_MODEL=qwen3-embedding:4b
-OLLAMA_LLM_MODEL=qwen3.5:9b
 
 # Vector store
 VECTOR_BACKEND=qdrant            # or chroma
@@ -192,7 +200,15 @@ EDGAR_IDENTITY="Your Name your-email@example.com"
 LANGSMITH_API_KEY=
 ```
 
-AWS credentials come from the standard AWS chain (environment variables, `~/.aws`, or an instance role). Do not commit `.env`.
+Set `AWS_BEARER_TOKEN_BEDROCK` for Bedrock API-key authentication (`AWS_BEARER_TOKEN` is an alias), or use the standard AWS credential chain. `CLAUDE_LLM_MODEL` and `OPENAI_LLM_MODEL` select the personal Anthropic and OpenAI fallback models; a fallback whose key is missing is skipped. Each provider attempt is bounded by `LLM_REQUEST_TIMEOUT_SECONDS`. Native traces identify actual attempted models.
+
+There is no provider selector: `AWS_BEDROCK_MODEL` is the only Bedrock model variable and Ollama serves embeddings only. Azure variables (`AZURE_API_KEY`, `AZURE_PROJECT_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_FOUNDRY_MODEL`) are preserved in Compose, but Azure invocation is deferred to S7-AZURE-FALLBACK. Do not commit `.env`.
+
+Apply code/config changes with `docker compose up -d --build --no-deps api` once active jobs finish. Editing `.env` alone does not update an existing container. Missing filings return a specific ingestion error; analysis can still return available news, prices, sentiment and a memo stating **SEC Filings: Not Available**, with terminal status `evidence_missing`.
+
+For Sonnet 5.5 through Bedrock Converse in `us-east-1`, AWS documents the global inference profile `global.anthropic.claude-sonnet-5-5`; set that explicitly when using global routing. See the [AWS model card](https://docs.aws.amazon.com/us_en/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-5-5.html). Sonnet 5 models use adaptive thinking and do not accept non-default sampling temperatures; the factory omits temperature for them.
+
+Set `API_KEY` in the frontend server environment to the same shared key as the API. The server forwards it to protected backend routes; never expose it through a `NEXT_PUBLIC_` variable.
 
 ### 3. Start the local services
 

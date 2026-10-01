@@ -40,8 +40,8 @@ from app.agents.state import (
 )
 from app.components.retrieval.vector_store import RetrievalStore, SearchResult, get_vector_store
 from app.config import settings
-from app.llm.provider import get_llm, model_metadata
-from app.observability.langsmith import app_traceable
+from app.llm.provider import fallback_count, get_llm, model_metadata
+from app.observability.langsmith import app_traceable, mark_trace_failed
 from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
@@ -248,14 +248,32 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         ]
         logger.info(f"[retrieve_filings] Retrieved {len(filing_chunks)} chunks")
 
-        return {
+        update = {
             "filing_chunks": filing_chunks,
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
         }
+        if not filing_chunks:
+            update["errors"] = [*state.get("errors", []), {
+                "step": "retrieve_filings",
+                "code": "filing_not_found",
+                "message": f"No indexed filings found for {ticker}.",
+                "recoverable": True,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }]
+        return update
 
     except Exception:
         logger.error(f"[{ticker}] Filing retrieval failed")
-        return add_error(state, "retrieve_filings", "Workflow step failed.")
+        return {
+            "filing_chunks": [],
+            "errors": [*state.get("errors", []), {
+                "step": "retrieve_filings",
+                "code": "filing_retrieval_failed",
+                "message": f"Filing retrieval failed for {ticker}.",
+                "recoverable": True,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }],
+        }
 
 @app_traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
 async def analyze_sentiment_node(state: AgentState) -> dict:
@@ -484,7 +502,16 @@ async def draft_memo_node(state: AgentState) -> dict:
     try:
         # 1. Data-availability check
         availability = get_data_availability(state)
-        missing = [k.replace("has_", "") for k, v in availability.items() if not v]
+        missing = [
+            k.replace("has_", "") for k, v in availability.items()
+            if not v and (k != "has_filings" or state.get("include_filing_analysis", True))
+        ]
+        filing_reason = next(
+            (error["message"] for error in state.get("errors", [])
+             if error.get("step") == "retrieve_filings"
+             and error.get("code") in {"filing_not_found", "filing_retrieval_failed"}),
+            f"No indexed filings found for {ticker}.",
+        )
 
         # 2. Build citation registry BEFORE LLM call
         registry = _build_citation_registry(state)
@@ -505,6 +532,8 @@ async def draft_memo_node(state: AgentState) -> dict:
                 + ". Do NOT fabricate information for them. "
                 "State explicitly that the data was unavailable."
             )
+        if "filings" in missing:
+            disclaimer += f" Include the exact line 'SEC Filings: Not Available. {filing_reason}'"
 
         user_prompt = (
             f"Write a comprehensive investment memo for {company_name} ({ticker}).\n\n"
@@ -535,11 +564,11 @@ async def draft_memo_node(state: AgentState) -> dict:
         llm = get_llm(settings)
         if run := get_current_run_tree():
             run.metadata.update({
-                "provider": settings.llm.provider,
-                "model": getattr(llm, "model_id", None) or getattr(llm, "model_name", None) or getattr(llm, "model", None),
-                "temperature": getattr(llm, "temperature", None),
+                **model_metadata(settings),
+                "provider_policy": "bedrock_then_configured_personal",
             })
         timeout_seconds = settings.llm.request_timeout_seconds
+        total_timeout_seconds = timeout_seconds * fallback_count(settings) + 1
         logger.info(
             f"[{ticker}] Invoking LLM for memo generation (timeout={timeout_seconds}s)..."
         )
@@ -551,9 +580,11 @@ async def draft_memo_node(state: AgentState) -> dict:
                         {"role": "user", "content": user_prompt},
                     ]
                 ),
-                timeout=timeout_seconds,
+                timeout=total_timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError as exc:
+            logger.error("[{}] draft_memo failed: {}", ticker, type(exc).__name__)
+            mark_trace_failed("draft_memo_failed")
             return add_error(state, "draft_memo", "LLM memo generation timed out.", recoverable=False)
 
         content = getattr(response, "content", "")
@@ -562,6 +593,8 @@ async def draft_memo_node(state: AgentState) -> dict:
             for block in content
             if isinstance(block, str) or isinstance(block, dict) and block.get("type") == "text"
         )
+        if memo.strip() and "filings" in missing and f"SEC Filings: Not Available. {filing_reason}" not in memo:
+            memo = f"{memo.rstrip()}\n\nSEC Filings: Not Available. {filing_reason}"
 
         used_citations = _extract_used_citations(memo)
         valid_indices = {entry["index"] for entry in registry}
@@ -601,8 +634,9 @@ async def draft_memo_node(state: AgentState) -> dict:
             "current_step": AgentStep.DRAFT_MEMO.value,
         }
 
-    except Exception:
-        logger.error(f"[{ticker}] Memo generation failed")
+    except Exception as exc:
+        logger.error("[{}] draft_memo failed: {}", ticker, type(exc).__name__)
+        mark_trace_failed("draft_memo_failed")
         return add_error(state, "draft_memo", "Workflow step failed.", recoverable=False)
 
 @app_traceable(name="verify_memo", run_type="chain", tags=["agent"])

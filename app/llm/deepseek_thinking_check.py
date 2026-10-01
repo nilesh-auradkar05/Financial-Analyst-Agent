@@ -1,7 +1,6 @@
 import os
 
-os.environ["LLM_PROVIDER"] = "bedrock"
-os.environ["LLM_MODEL"] = "deepseek.v3.2"
+os.environ["AWS_BEDROCK_MODEL"] = "deepseek.v3.2"
 os.environ["LLM_THINKING_MODE"] = "enabled"
 os.environ["AWS_REGION"] = "us-east-1"
 from app.config import Settings

@@ -69,6 +69,8 @@ Allowed:
 - T2-05: Boolean false/0/no/off and absent/blank keys disable export, even with inherited tracing environment enabled. Modern LANGSMITH aliases take precedence over legacy LANGCHAIN aliases. Defaults are off. One lifespan client is reused and shutdown flush is bounded; initialization/create/update/flush failures cannot fail successful business requests.
 - T2-06: Native model spans retain raw messages, prompts, token metadata and provider-exposed reasoning blocks when supplied. Memo/API text includes only text content blocks. No hidden reasoning is claimed.
 - T2-07: Error spans/records retain safe public codes/error IDs and correlation, excluding raw app exception text, credentials and cookies. Failed async jobs remain pollable under original correlation. Verifier execution errors produce an explicit safe `verification_failed` marker and a degraded response; raw evaluator exceptions never enter native graph spans. Caught tool and ingestion failures return stable safe fallback values and finish their spans with stable safe error codes; legitimate empty evidence remains successful.
+- T2-08 (2026-09-30): Probe routes `GET /health` and `GET /metrics` still return `X-Request-ID` but create no exported LangSmith span, so polling cannot bury analysis traces. All other routes remain traced per T2-01.
+- T2-09 (2026-09-30): A fatal draft failure (all providers failed or bounded timeout) finishes the `draft_memo` span with safe error code `draft_memo_failed` and logs the failing stage plus exception class name only (no raw text). An HTTP root whose outcome is `failed` records that safe error code, so error-filtered views surface it even when status is 200.
 
 ## 2. Workflow behavior
 
@@ -284,3 +286,23 @@ Each hook is tested by piping a sample event JSON to the script and asserting st
 | H8 secrets | `cat .env` → deny; `AKIA…` in command → deny | `cat README.md` → allow |
 | H9 destructive | `git push --force`, `rm -rf /home` → deny | `rm -rf /tmp/x` → allow |
 | H12 stop gate | dirty tree or failing unit tests → block with reasons; `stop_hook_active=true` → exit 0 immediately | clean tree, tests green → allow |
+
+
+## 16. Provider fallback and unavailable filings (authorized 2026-09-29)
+
+| Case | Expected behavior |
+| --- | --- |
+| Cloud defaults | Bedrock primary without generic selector; default model is an invocable inference profile (`global.anthropic.claude-sonnet-4-6`), never a bare on-demand-unsupported ID; only AWS_BEDROCK_MODEL selects it (LLM_MODEL / CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL never change it) |
+| Personal models | CLAUDE_LLM_MODEL reaches the Anthropic client and OPENAI_LLM_MODEL the OpenAI client, tried Claude then OpenAI; a fallback without its key is skipped |
+| Bearer authentication | Canonical AWS_BEARER_TOKEN_BEDROCK or short alias reaches SDK without secret output; AWS_REGION reaches client |
+| Sonnet 5 configuration | Bedrock Sonnet 5/5.5 requests omit unsupported sampling temperature; explicit model/profile selection is preserved |
+| Fallback success | Primary construction/invocation/timeout failure reaches configured Anthropic then OpenAI; primary success invokes no fallback |
+| Bounded failure | Each attempt bounded; all failed returns safe fatal draft error and no fabricated memo |
+| Unconfigured providers | Missing personal keys skipped; Azure variables do not enable Azure calls |
+| Tracing | Native child LLM spans identify actual attempted providers/models under original trace |
+| Compose | Bedrock/Claude/OpenAI model, token and Azure (incl. AZURE_FOUNDRY_MODEL) values survive rendering; absent optional variables do not mask aliases |
+| Ingest no 10-K | Typed 404 filing_not_found with ticker-specific safe reason; real upstream failure remains safe 502 |
+| Analysis no filings | Available news/stock/sentiment preserved; memo states SEC Filings: Not Available; no fabricated SEC citations; evidence_missing/missing includes filings |
+| Retrieval failure | Safe failure reason differs from no filings; available evidence survives and verification executes |
+| Filings disabled | No missing-filings warning or evidence_missing status caused by disabled stage |
+| Frontend partial result | degraded/evidence_missing are terminal; available memo/evidence displayed; server forwards configured API_KEY without exposing it to the browser |

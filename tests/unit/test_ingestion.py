@@ -3,9 +3,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
 
 import app.components.retrieval.ingestion as ingestion
+import app.services.tools.sec_filings_tool as sec_tool
 
 
 class StubVectorStore:
@@ -149,3 +151,52 @@ def test_ingest_filing_short_circuits_when_existing_documents_present(
     assert result.documents_written == 0
     assert result.sections_processed == []
     assert len(store.documents) == 1
+
+
+# Trace: docs/test-plan.md §16, Ingest no 10-K.
+@pytest.mark.asyncio
+async def test_ingest_10k_distinguishes_missing_filing_from_upstream_failure(monkeypatch):
+    async def absent(_ticker):
+        return None
+
+    monkeypatch.setattr(ingestion, "get_latest_10k", absent)
+    missing = await ingestion.ingest_10k_for_ticker(" aapl ")
+    assert missing.success is False
+    assert missing.error_code == "filing_not_found"
+    assert missing.error == "No 10-K filings found for AAPL."
+
+    async def unavailable(_ticker):
+        raise RuntimeError("private upstream details")
+
+    monkeypatch.setattr(ingestion, "get_latest_10k", unavailable)
+    failure = await ingestion.ingest_10k_for_ticker("AAPL")
+    assert failure.success is False
+    assert failure.error_code != "filing_not_found"
+    assert "private" not in str(failure.error)
+
+
+# Trace: docs/test-plan.md §16, Ingest no 10-K.
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lookup_fails", [False, True])
+async def test_sec_lookup_distinguishes_no_filing_from_upstream_failure(monkeypatch, lookup_fails):
+    async def no_edgartools(_ticker):
+        return None
+
+    def respond(request):
+        if request.url.path.endswith("/CIKAAPL.json"):
+            return httpx.Response(200, json={"cik": 123})
+        recent = {"form": ["10-K"]} if lookup_fails else {"form": []}
+        return httpx.Response(200, json={"filings": {"recent": recent}})
+
+    client_type = httpx.AsyncClient
+    monkeypatch.setattr(sec_tool, "_get_latest_10k_with_edgartools", no_edgartools)
+    monkeypatch.setattr(
+        sec_tool.httpx,
+        "AsyncClient",
+        lambda **kwargs: client_type(transport=httpx.MockTransport(respond), **kwargs),
+    )
+
+    result = await ingestion.ingest_10k_for_ticker("AAPL")
+    assert result.success is False
+    assert result.error_code == (None if lookup_fails else "filing_not_found")
+    assert result.error == ("10-K ingestion failed." if lookup_fails else "No 10-K filings found for AAPL.")

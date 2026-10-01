@@ -22,7 +22,6 @@ class TestSettingsDefaults:
 
     def test_ollama_defaults(self):
         assert settings.ollama.base_url == "http://localhost:11434"
-        assert settings.ollama.llm_model == "qwen3.5:9b"
         assert settings.ollama.embed_model == "qwen3-embedding:4b"
 
     def test_chroma_defaults(self):
@@ -56,11 +55,9 @@ class TestSettingsCustomValues:
     def test_ollama_custom_values(self):
         custom = OllamaSettings(
             base_url="http://custom:11434",
-            llm_model="llama2",
             temperature=0.5,
         )
         assert custom.base_url == "http://custom:11434"
-        assert custom.llm_model == "llama2"
         assert custom.temperature == 0.5
 
     def test_retry_custom_values(self):

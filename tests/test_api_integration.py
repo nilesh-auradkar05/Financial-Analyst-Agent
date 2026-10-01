@@ -61,7 +61,7 @@ class StubIngestResult:
     total_chunks = 8
     sections_processed = ["business", "risk_factors", "md&a"]
     filing_date = "2025-09-28"
-    error = None
+    error: str | None = None
 
 
 async def fake_check_ollama_health(*, log_failure: bool = False, model: str | None = None) -> bool:
@@ -486,8 +486,78 @@ def test_ingestion_refresh_changes_existing_content_and_failures_are_safe(client
     assert "secret" not in response.text
 
 
+# Trace: docs/test-plan.md §16, Ingest no 10-K.
+def test_ingestion_returns_typed_missing_filing_reason(client, monkeypatch):
+    from app.components.retrieval.ingestion import IngestionResult
+
+    async def absent(ticker, replace_existing=False):
+        return IngestionResult(
+            ticker=ticker,
+            filing_type="10-K",
+            error=f"No 10-K filings found for {ticker}.",
+            error_code="filing_not_found",
+        )
+
+    monkeypatch.setattr(api_main, "ingest_10k_for_ticker", absent)
+    response = client.post("/ingest", json={"ticker": "aapl"})
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "filing_not_found"
+    assert response.json()["error"]["message"] == "No 10-K filings found for AAPL."
+
+
+# Trace: docs/test-plan.md §16, analysis without filings and retrieval failure.
+@pytest.mark.parametrize("retrieval_fails", [False, True])
+@pytest.mark.parametrize("memo_text", ["# Investment Memo\n\nMarket evidence is limited.", ""])
+def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkeypatch, retrieval_fails, memo_text):
+    from types import SimpleNamespace
+
+    from app.agents import graph
+    from app.agents.state import create_initial_state
+
+    def search(*_args):
+        if retrieval_fails:
+            raise RuntimeError("private retrieval details")
+        return SimpleNamespace(chunks=[])
+
+    class MemoLLM:
+        async def ainvoke(self, _messages):
+            return SimpleNamespace(content=memo_text)
+
+    monkeypatch.setattr(graph, "get_vector_store", lambda: object())
+    monkeypatch.setattr(graph, "_search_filing_chunks", search)
+    monkeypatch.setattr(graph, "get_llm", lambda _settings: MemoLLM())
+
+    async def run(ticker, company_name, **_kwargs):
+        state = create_initial_state(ticker, company_name)
+        state["stock_data"] = {"ticker": ticker, "current_price": 123.0}
+        state["news_articles"] = [{"title": "Market update", "snippet": "Shares rose.", "source": "Wire"}]
+        state["sentiment_result"] = {"overall_sentiment": "positive", "positive_count": 1}
+        state.update(await graph.retrieve_sec_filings_node(state))
+        state.update(await graph.draft_memo_node(state))
+        state.update(await graph.verify_memo_node(state))
+        return state
+
+    monkeypatch.setattr(api_main, "run_agent", run)
+    response = client.post("/analyze", json={"ticker": "AAPL"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == ("evidence_missing" if memo_text else "failed")
+    assert payload["missing"] == ["filings"]
+    assert payload["stock_data"]["current_price"] == 123.0
+    assert len(payload["news_articles"]) == 1
+    assert payload["sentiment"]["overall_sentiment"] == "positive"
+    if memo_text:
+        assert "SEC Filings: Not Available" in payload["investment_memo"]
+    else:
+        assert not payload["investment_memo"]
+    assert all(item["source_type"] != "sec_filing" for item in payload["citations"])
+    assert payload["verification"] is not None
+    reason = next(error["message"] for error in payload["errors"] if error["step"] == "retrieve_filings")
+    assert reason == ("Filing retrieval failed for AAPL." if retrieval_fails else "No indexed filings found for AAPL.")
+    assert "private" not in response.text
+
+
 def test_health_reports_unavailable_retrieval_and_configuration_only_bedrock(client, monkeypatch):
-    monkeypatch.setattr(api_main.settings.llm, "provider", "bedrock")
     response = client.get("/health")
     assert response.json()["components"]["chat_model"]["check"] == "configuration_only"
     def unavailable():
@@ -533,12 +603,10 @@ def test_bedrock_does_not_depend_on_ollama_chat_model(client, monkeypatch):
     async def available(*, model=None, log_failure=False):
         return model == api_main.settings.ollama.embed_model
     monkeypatch.setattr(api_main, "check_ollama_health", available)
-    monkeypatch.setattr(api_main.settings.llm, "provider", "bedrock")
     assert client.get("/health").status_code == 200
-    monkeypatch.setattr(api_main.settings.llm, "provider", "ollama")
-    assert client.get("/health").status_code == 503
-    monkeypatch.setattr(api_main.settings.llm, "provider", "bedrock")
     monkeypatch.setattr(api_main.settings.llm, "aws_region", None)
+    monkeypatch.setattr(api_main.settings.llm, "anthropic_api_key", None)
+    monkeypatch.setattr(api_main.settings.llm, "openai_api_key", None)
     assert client.get("/health").status_code == 503
 
 

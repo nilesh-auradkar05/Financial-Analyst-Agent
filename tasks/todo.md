@@ -507,3 +507,126 @@ Authorization: user asked to keep LANGCHAIN and LANGSMITH keys under their exist
 - [x] Verify modern-only, legacy-only, both, missing and explicit-disabled cases; run Doc Sync; record correction and results.
 
 Verification: `python3 /tmp/check_compose_langsmith_passthrough.py` failed before the fix (`modern-only: LANGSMITH_API_KEY was not preserved`), then **5/5 cases passed** after four Compose lines were added. The check supplies isolated dummy environment files via `docker compose --env-file ... config --format json`; no real `.env` or credentials were read. Modern-only, legacy-only, both-distinct, neither, and explicit modern false are preserved correctly; unset modern keys remain absent/null rather than empty overrides. Scope-residue/sprint-map/doc-sync/test-hygiene **PASS**. No scope, methodology, sprint-order or application-runtime change. Active API container was not recreated; user can apply normal Compose recreation after the current job finishes.
+
+
+## PROVIDER-FALLBACK / FILING-DEGRADATION — authorized 2026-09-29
+
+User explicitly requests this runtime slice now with gpt-6-sol/high implementation agents and main-agent review. This overrides S7 timing for these items only. Trace: SPEC §§3, 8.5 and runtime provider policy; test-plan §16; ADR-0009. User authorized reviewing updated .env: inspect presence/validity, never print credentials or alter the file.
+
+Plan confirmed against requested behavior before implementation:
+- [x] Inspect config/Compose, provider callers and missing-filing failure paths; document behavior and decision.
+- [x] Implement Bedrock primary with provider-specific settings and bounded personal Anthropic then OpenAI fallback; explicit Ollama development mode (focused verification below).
+- [x] Return precise no-filings ingestion error; continue analysis with available evidence and memo stating SEC Filings: Not Available (focused verification below).
+- [ ] Review implementation, validate redacted actual Compose configuration and dummy cases, run behavior/static/full-suite and Doc Sync checks.
+
+Verification: pending. Existing blocker: committed conflict markers in tests/unit/test_llm.py prevent collection; preserve compatible tests from both sides. No container recreation or paid inference planned; user executes live requests. At most two correction attempts.
+
+Integration review: frontend polling only recognized completed/failed; extend terminal handling for degraded/evidence_missing. Existing frontend/src/lib sources were hidden by the Python lib/ ignore rule; a narrow exception makes required sources reviewable. Frontend backend calls also need the server-only API_KEY. Bedrock model review found configured Sonnet 5.5 with temperature 0.3: omit unsupported temperature, preserve model selection, and document AWS's global inference profile for us-east-1. No credential values printed or .env changes made.
+
+- [ ] **S7-AZURE-FALLBACK — Deferred by user:** insert Azure after Bedrock when deployment/model/API-version configuration is specified; verify auth, timeout fallback and native traces. Current Azure variables are pass-through only.
+
+Configuration review results (2026-09-29, resumed 2026-09-30): all eight supplied cloud variables are nonempty and forwarded unchanged by rendered Compose; Azure endpoint HTTPS syntax passes. Canonical AWS_BEARER_TOKEN_BEDROCK is present (short alias absent). No credentials printed or environment files changed. Dummy-only Compose cases **4 passed**: complete provider/Azure configuration, legacy alias, explicit Ollama, and absent cloud settings. Initial Doc Sync **4/4 passed**. Frontend initial partial-status implementation: **9 tests passed**, typecheck/lint/build passed; subsequent server-auth correction awaits recheck. Backend integration verification pending; initial review correction covers SEC outage classification and ensuring an empty model response cannot become a memo through the missing-filings footer.
+
+2026-09-30 handoffs: provider **26 focused tests passed**, targeted Pyright/Ruff and offline lock check passed; filing **14 focused tests passed**, targeted Pyright/Ruff passed; frontend final **10 tests passed**, typecheck/lint/build passed including server-only API_KEY forwarding. Main full Ruff PASS and mypy app/evaluation PASS (52 files). Full backend suite running; final combined result not yet claimed. Updated lessons.md, TASKS.md and sprint-plan.md with these verified handoffs and explicit pending/deferred items at user request.
+
+Final bounded verification, 2026-09-30 (supersedes the pending results above): **344 passed, 1 failed, 2 skipped**. Command: `rtk proxy env PYTHON_DOTENV_DISABLED=1 LANGCHAIN_TRACING=false LANGCHAIN_HANDLER=false LANGSMITH_TRACING=false LANGSMITH_TRACING_V2=false LANGCHAIN_TRACING_V2=false ANTHROPIC_API_KEY= OPENAI_API_KEY= AWS_BEARER_TOKEN_BEDROCK= .venv/bin/python -m pytest -q --tb=short`. The two skips require the optional --run-integration flag; no live inference executed. Initial run with incomplete legacy-switch isolation had 14 failures/331 passes; disabling all legacy switches left 3 collector failures/342 passes. Correction batch 2 aligned the offline collector with the installed SDK's public update_run semantics (None inputs/outputs/error mean omitted); inputs and correlation checks recovered without weakening assertions. Independent gpt-6-sol/high reviewer confirmed the SDK behavior and found no critical fallback regression.
+
+Residual: `tests/test_request_tracing.py::test_real_graph_has_native_model_tools_verifier_and_text_only_memo` still selects the draft span by `model=offline-evidence-model`; draft now records configured-primary metadata and native model spans carry actual identity. This assertion/contract alignment remains unresolved. The user's two-correction cap is reached; no third fix loop. Overall verification stays OPEN, not green or production-ready.
+
+Final checks: `ruff check .` PASS; `mypy app evaluation` PASS (52 files); four Doc Sync scripts PASS; `git diff --check` PASS. Changes remain **uncommitted in frontend-impl** for review because combined verification has one residual failure. No .env edits, container rebuild/recreation, credential-validation request or paid model execution performed. Deployment note: selected Sonnet 5.5 in us-east-1 should use AWS's documented global inference profile explicitly; model access remains unverified.
+
+
+## MU job tracing audit — 2026-09-30
+
+Authorization: user requested inspection of job `6aa7d53c-fa89-4027-b064-456d2bd1d92d`, request `945ad475-e0bf-407d-a360-f8ac83b86eae`, trace `01a0f0f6-8441-71f1-97e9-4183e859b524`. Trace: docs/test-plan.md T2-01–T2-07; tasks/rest-tracing-plan.md; authorized REST/tracing exception in docs/sprint-plan.md. Read-only runtime audit; no new inference or runtime edits.
+
+- [x] Inspect persisted job, container logs and deployed code identity.
+- [ ] Compare native span lineage with tracing contract; authenticated read-only queries require existing-credential approval under AGENTS.md §6.
+- [x] Record verified findings, limitations, focused tests and Doc Sync results.
+
+Audit evidence: container `financial-analyst-agent-system-api`, image `sha256:4d35c4ff51d72366ea72197c868a6a0bbe6e6d4f22d6fd254af4d2b3ed4def92`, created 2026-09-30T06:14:39.881207389Z. Its `/app/.runtime/run_store.json` contains the exact job; the host store does not. Original job/request/trace IDs match in job and nested result. Terminal status **failed**, completed 2026-09-30T06:18:57.102450+00:00; workflow execution 54,387.18 ms, empty memo/citations, fatal draft_memo error and recoverable verify_memo error. Top-level error is null; nested result.errors carries the failure. Supplied pending JSON was initial acceptance.
+
+Logs: accepting POST returned 202 at 06:18:02.697 UTC with exact IDs. Ten news articles, stock data, seven filing chunks and FinBERT analysis completed. Draft invoked Bedrock `anthropic.claude-sonnet-5-5` at 06:18:55.811 and failed at 06:18:57.089. Verifier ran empty-memo path; no successful generation/grounding verification. Exact provider error is not established from sanitized logs. POST to job polling URL returned 405 at 06:20:22; polling requires GET.
+
+Deployment drift: SHA-256 confirms deployed main.py, graph.py and provider.py differ from workspace; observability/langsmith.py matches. Deployed draft calls single get_llm/ainvoke with 120s timeout; provider lacks workspace bounded Bedrock → Anthropic → OpenAI fallback. This job cannot validate newest provider changes. Container mounts data/chroma and data/filings only; run store lives in container writable layer.
+
+Verification: dotenv disabled and all tracing switches false, `.venv/bin/python -m pytest -q tests/test_request_tracing.py` → **24 passed, 1 failed**, 21.29s. Sole failure is known StopIteration at tests/test_request_tracing.py:203 (draft configured-primary versus native-model label); preceding hierarchy/native payload assertions passed. Four governance scripts via python3 → **PASS**. Initial python unavailable; python3 retry worked. Root SPEC.md absent; canonical docs/SPEC.md read. Ledger append initially blocked by sandbox loopback error; escalated retry. Independent helper static review confirms intended chain and that caught failures may appear in outputs rather than span error flags.
+
+Verdict: local correlation and failed execution verified; remote LangSmith export, native parent tree, model error and span completeness **UNVERIFIED** pending explicit read-only use of existing container API/LangSmith credentials. Approval requested under AGENTS.md §6 and tasks/rest-tracing-plan.md. No credentials/.env read, no new inference, runtime edits or restarts. Ledger remains uncommitted with pre-existing user changes.
+
+
+### Follow-up sync MU request — 2026-09-30
+
+User supplied request `259d3c21-df71-438e-9a9f-d1f2d6112f99`, trace `01a0f106-db0d-7130-8cb1-e1766b54d3e2`, reporting no LangSmith traces. Same T2 read-only audit scope. Container restarted at 06:35:44 but still runs old provider/draft code. Successful news/stock/seven filing chunks/FinBERT followed by Bedrock invocation at 06:36:45.167 and generic memo failure at 06:36:46.641 (~1.47 seconds), not configured 120-second timeout. Verifier received empty memo. Exact provider exception suppressed by deployed catch.
+
+Non-secret allowlisted configuration: bedrock, anthropic.claude-sonnet-5-5, us-east-1, temperature 0.3. Old provider passes temperature with thinking off; workspace already contains model-specific omission correction. Parameter mismatch is a suspect, not confirmed remote cause. LangSmith tracing true; both project aliases financial-analyst-system; no endpoint/workspace override. Installed SDK default https://api.smith.langchain.com. No export/auth/connection errors in current logs. Local IDs do not prove remote delivery. Existing read-only credential permission remains unanswered; no .env/credentials read or authenticated trace query/inference performed. All four governance checks PASS; latest tracing tests remain 24 passed/1 known failure. Log search and ledger append hit sandbox loopback failures and required escalated retries. No runtime changes.
+
+### Authenticated exact-trace verification — 2026-09-30
+
+User explicitly approved authenticated lookup of sync trace `01a0f106-db0d-7130-8cb1-e1766b54d3e2`. Used existing container LangSmith credential for read-only queries; no .env read, credential values displayed, new inference, or runtime change. Initial span query with limit 300 returned HTTP 400 (maximum 100); limit 100 succeeded. Sandbox loopback failures required approved escalated retries.
+
+**Confirmed:** 28 remote spans, one root, every span ended, all share exact trace ID and request `259d3c21-df71-438e-9a9f-d1f2d6112f99`, no missing parent IDs. Chain includes HTTP POST /analyze → run_financial_analysis → financial_analyst_graph → news/stock/four filing queries/sentiment → draft_memo → native ChatBedrockConverse → verify_memo. Sentiment model metadata identifies ProsusAI/finbert; filing queries retain evidence IDs/counts. No separate embedding span appeared in this run, so this evidence confirms the core failed execution chain rather than every planned instrumentation detail or successful generation.
+
+**Root cause:** native model span `01a0f107-a4f0-7402-9d3f-abf178675817` records `AccessDeniedException` on Bedrock Converse: `anthropic.claude-sonnet-5-5 is not available for this account.` Model span duration 1.472 seconds, zero reported tokens. This supersedes the temperature hypothesis for this request; it does not establish whether other configuration issues would appear after access is resolved.
+
+Verification: authenticated exact-run read, span query and project read PASS; actual project name confirmed financial-analyst-system. Four Doc Sync checks and `git diff --check -- tasks/todo.md` PASS. No implementation changes or additional test runs; existing tracing-test failure remains disclosed above.
+
+Project ID `1f5dd858-5258-4ff8-9471-a9cfe88e7fb3`, workspace/tenant ID `f5946faf-232d-492a-9570-64c4d421c4cc`. Direct private trace: https://smith.langchain.com/o/f5946faf-232d-492a-9570-64c4d421c4cc/projects/p/1f5dd858-5258-4ff8-9471-a9cfe88e7fb3/r/01a0f106-db0d-7130-8cb1-e1766b54d3e2?poll=true . Export succeeded. Exact reason user UI omitted it is not established. Root span has error=null and HTTP 200 but metadata/output outcome=failed; native Bedrock child holds the error, so an error-only root filter may hide it. No deployment/fallback success claimed. Original async job is not re-queried by this sync-only lookup.
+
+
+## RUNTIME-FIX: container memo failure + LangSmith visibility — 2026-09-30
+
+Authorization: user reported container memo failure and missing LangSmith traces; requested doc-verified Bedrock/Azure review and Sonnet-5.5 high-effort implementation sub-agents. Trace: test-plan §16 (Cloud defaults), T2-01/T2-07/T2-08/T2-09; ADR-0009; authorized PROVIDER-FALLBACK and REST/tracing exceptions in sprint-plan.md.
+
+Root-cause evidence (read-only, inside running container, no secrets printed):
+- Bedrock `anthropic.claude-sonnet-5-5` → AccessDeniedException "not available for this account" (bare and `global.`; `us.` invalid ID). Account-side gating, not code. Invocable: `global./us.anthropic.claude-sonnet-4-6`, sonnet-4-5, `global.anthropic.claude-opus-4-6-v1`, haiku-4-5, gpt-oss-120b, deepseek.v3.2, nova-pro. Code default bare `anthropic.claude-sonnet-4-6` fails (on-demand throughput unsupported).
+- Running image predates fallback chain → no fallback attempted. Anthropic and OpenAI personal keys verified working in-container.
+- Azure: key valid on `https://<resource>.services.ai.azure.com/openai/v1/` (v1 API, no api-version); `*.openai.azure.com` endpoint 404. Deployment name unknown → S7-AZURE-FALLBACK stays deferred (user decision).
+- LangSmith export works (project financial-analyst-system, /analyze tree present). Visibility problem: ~1,123 /health+/metrics root traces in ~15h vs 1 /analyze; failed draft/root recorded error=null.
+
+User decisions: primary model `global.anthropic.claude-sonnet-4-6` (user edits their env file; agent does not); Azure deferred; rebuild api + one live /analyze authorized.
+
+Plan:
+- [x] Default Bedrock model → `global.anthropic.claude-sonnet-4-6` (config.py) with §16 test.
+- [x] T2-08: skip trace export for /health and /metrics, keep X-Request-ID.
+- [x] T2-09: draft_memo fatal failure → safe error code on span + stage/exception-class log; failed-outcome root carries error code.
+- [x] Align residual `test_real_graph_has_native_model_tools_verifier_and_text_only_memo` with configured-primary draft metadata (select draft span by name, not model).
+- [x] Ruff, mypy, full pytest (dotenv/tracing disabled), Doc Sync.
+- [x] Rebuild api, one live /analyze, verify memo + LangSmith trace/fallback spans.
+
+Implementation (Sonnet sub-agent, main-agent verified): app/config.py default model; app/observability/langsmith.py UNTRACED_PROBES + failed-outcome root error; app/agents/graph.py draft_memo failure logs class name only + mark_trace_failed("draft_memo_failed"); tests in tests/unit/test_provider_fallback.py (§16 Cloud defaults) and tests/test_request_tracing.py (T2-08, T2-09, residual T2-02 alignment; test_safe_error_correlation_and_failed_job updated because /metrics is now untraced by T2-08).
+
+Verification (main agent re-ran, 2026-09-30): full pytest with dotenv/tracing/keys disabled **349 passed, 2 skipped, 0 failed** (baseline 344/1/2); `ruff check .` PASS; `mypy app evaluation` PASS (52 files); four Doc Sync scripts PASS.
+
+Live verification: the first rebuild failed because the root disk was full (0 B free). With user approval, ran `docker builder prune -f` (27.72 GB) and `docker image prune -f`, leaving 20 GB free. The rebuild succeeded; SHA-256 of graph.py, langsmith.py, provider.py and config.py match between the container and the workspace. The user's env still had AWS_BEDROCK_MODEL=anthropic.claude-sonnet-5-5, so the live run exercised the fallback path. POST /analyze MU → 200 in 101.8 s, status completed, memo 12,084 chars, errors []. request df89f932-1a2b-487a-ae0a-177730329fbb, trace 01a0f44d-c500-72a1-90a4-0990d4946765. LangSmith: 32 spans; bedrock_attempt/ChatBedrockConverse error AccessDeniedException → anthropic_attempt/ChatAnthropic (claude-sonnet-4-5) success. Root traces exported since container start (21:51:27Z): only `HTTP POST /analyze` (1), with zero /health and /metrics, so T2-08 is verified live. T2-09 failure marking is verified offline only (no live failure induced).
+
+Open: the user sets AWS_BEDROCK_MODEL=global.anthropic.claude-sonnet-4-6 and recreates the api container so Bedrock serves as primary (verified invocable in-container). S7-AZURE-FALLBACK remains deferred pending the deployment name; the working endpoint form is https://<resource>.services.ai.azure.com/openai/v1/. Changes remain uncommitted in frontend-impl alongside the user's pre-existing uncommitted slice.
+
+Follow-up 2026-09-30: user sees no traces in the web UI. Container key owner is a separate LangSmith account (org Personal, workspace f5946faf-232d-492a-9570-64c4d421c4cc, project 1f5dd858-5258-4ff8-9471-a9cfe88e7fb3), which holds the traces. The user's UI shows an empty same-named project, probably in a different account. Fix is user-side: sign in to the key-owner account, or generate a key in the viewed account and recreate api. Pending user confirmation.
+
+Decision 2026-09-30: user keeps the LangSmith key on the nauradkar72649 account. No configuration or key change is needed. Traces are viewed by signing in to that account (workspace f5946faf…, project 1f5dd858…).
+
+## CONFIG-CLEANUP: one variable per provider tier — 2026-09-30
+
+Trace: SPEC §4 runtime provider policy; ADR-0009; test-plan §16 (Cloud defaults, Fallback success, Unconfigured providers, Development, Compose). User decisions 2026-09-30 (AskUserQuestion):
+- AWS_BEDROCK_MODEL is the only Bedrock model variable (LLM_MODEL alias removed).
+- LLM_MODEL is an ordered, comma-separated personal fallback list; provider inferred from name (claude-* → Anthropic, gpt-*/o* → OpenAI); entries without a configured key are skipped; unknown names rejected at settings load. ANTHROPIC_MODEL / OPENAI_MODEL removed.
+- LLM_PROVIDER removed: no local Ollama chat path (Ollama stays for embeddings); OLLAMA_LLM_MODEL and the unreachable bedrock_openai branch removed with it.
+- AZURE_FOUNDRY_MODEL reserved only (Compose pass-through + docs); Azure invocation stays deferred to S7-AZURE-FALLBACK.
+
+Plan:
+- [x] Docs first: SPEC §4 policy, ADR-0009 amendment, test-plan §16 rows (Cloud defaults, new Personal models, Development removed, Compose)
+- [x] app/config.py: LLM_MODEL list field + validator; drop provider/anthropic_model/openai_model/ollama.llm_model
+- [x] app/llm/provider.py: personal chain from LLM_MODEL; delete ollama + bedrock_openai paths
+- [x] Call sites: main.py lifespan/health, graph.py policy/timeout, services/llm.py health default, evaluation baselines metadata, provider_check scripts
+- [x] docker-compose.yml: drop LLM_PROVIDER/ANTHROPIC_MODEL/OPENAI_MODEL/OLLAMA_LLM_MODEL; add AZURE_FOUNDRY_MODEL
+- [x] README / setup-and-test / aws-test-environment env templates
+- [x] Tests: provider_fallback, compose, llm, config, api_integration health
+- [x] Ruff, mypy, pytest, Doc Sync; rebuild api; live /analyze
+
+Verification (2026-09-30): with LLM_MODEL overridden in the shell (the user's local LLM_MODEL still holds a Bedrock ID and now fails validation at load): `ruff check .` PASS; `mypy app evaluation` PASS (52 files); pytest **351 passed, 2 skipped, 0 failed**; four Doc Sync scripts PASS. The new test `test_llm_model_never_selects_bedrock_model` caught a real leak (env_prefix LLM_ + populate_by_name let LLM_MODEL still set the Bedrock field), fixed by dropping populate_by_name. Nothing constructs LLMSettings by aliased field name.
+Live: rebuilt api with LLM_MODEL=claude-sonnet-4-5,gpt-4.1 from the shell. POST /analyze MU → 200 in 102.2 s, completed, memo 14,766 chars, errors []. Trace 01a0f4cf-9b23-7a80-b10c-c1fc901be92d: bedrock_attempt success on global.anthropic.claude-sonnet-4-6 (no fallback needed). The personal-fallback ordering is verified offline only.
+Open: (1) the user changes LLM_MODEL locally to a personal list; otherwise the next container recreate fails at startup by design. (2) The two evaluation baseline scripts picked up formatter-hook churn on Edit; the shell guard blocks restoring them, so the user runs the provided restore+sed command. (3) Disk is at 3.5 GB free after the rebuild (dangling image + build cache); pruning is pending user approval.
+
+### Revision 2026-09-30: CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL replace the LLM_MODEL list
+User decision after the cleanup above: personal fallback models are split into CLAUDE_LLM_MODEL (Anthropic API) and OPENAI_LLM_MODEL (OpenAI API), called in that order after Bedrock. The LLM_MODEL list, name-based provider inference and its load-time validator are removed; LLM_MODEL is now ignored. Updated config, provider docstrings, Compose, SPEC §4, the ADR-0009 amendment, test-plan §16, README, setup-and-test, and the provider/compose tests.

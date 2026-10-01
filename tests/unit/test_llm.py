@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """Tests for app.services.llm.
 
 Public surface: ``get_llm``, ``check_ollama_health`` and ``ANALYST_SYSTEM_PROMPT``.
@@ -11,9 +10,9 @@ from typing import Any
 
 import httpx
 import pytest
-from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.runnables import Runnable
 
-from app.config import settings
+from app.config import Settings
 from app.services.llm import ANALYST_SYSTEM_PROMPT, check_ollama_health, get_llm
 
 _RealAsyncClient = httpx.AsyncClient
@@ -46,16 +45,8 @@ def _tags_server(model_names: list[str], status: int = 200) -> Callable[[httpx.R
 class TestGetLLM:
     """test-plan §8 Config: "Typed settings load" / provider selection via typed settings."""
 
-    def test_ollama_provider_returns_chat_model(self) -> None:
-        config = settings.model_copy(deep=True)
-        config.llm.provider = "ollama"
-        assert isinstance(get_llm(config), BaseChatModel)
-
-    def test_unsupported_provider_fails_fast(self) -> None:
-        config = settings.model_copy(deep=True)
-        object.__setattr__(config.llm, "provider", "nonsense")
-        with pytest.raises(ValueError, match="Unsupported LLM provider"):
-            get_llm(config)
+    def test_cloud_chain_needs_no_provider_selector(self) -> None:
+        assert isinstance(get_llm(Settings(_env_file=None)), Runnable)  # pyright: ignore[reportCallIssue]
 
 
 class TestAnalystPrompt:
@@ -75,18 +66,18 @@ class TestHealthCheck:
 
     @pytest.mark.asyncio
     async def test_healthy_when_configured_model_listed(self, ollama_server: Any) -> None:
-        ollama_server(_tags_server([settings.ollama.llm_model]))
-        assert await check_ollama_health() is True
+        ollama_server(_tags_server(["embed-test"]))
+        assert await check_ollama_health(model="embed-test") is True
 
     @pytest.mark.asyncio
     async def test_unhealthy_when_model_missing(self, ollama_server: Any) -> None:
         ollama_server(_tags_server(["some-other-model:1b"]))
-        assert await check_ollama_health() is False
+        assert await check_ollama_health(model="embed-test") is False
 
     @pytest.mark.asyncio
     async def test_unhealthy_on_http_error(self, ollama_server: Any) -> None:
-        ollama_server(_tags_server([settings.ollama.llm_model], status=500))
-        assert await check_ollama_health() is False
+        ollama_server(_tags_server(["embed-test"], status=500))
+        assert await check_ollama_health(model="embed-test") is False
 
     @pytest.mark.asyncio
     async def test_unhealthy_when_server_unreachable(self, ollama_server: Any) -> None:
@@ -94,27 +85,7 @@ class TestHealthCheck:
             raise httpx.ConnectError("connection refused", request=request)
 
         ollama_server(refuse)
-        assert await check_ollama_health() is False
-=======
-"""Public model construction and health behavior: docs/test-plan.md §§1, 8."""
-
-import httpx
-import pytest
-
-from app.config import Settings, settings
-from app.services.llm import ANALYST_SYSTEM_PROMPT, check_ollama_health, get_llm
-
-
-def test_local_model_uses_explicit_configuration():
-    config = Settings(_env_file=None)
-    config.llm.provider = "ollama"
-    config.ollama.llm_model = "test-local"
-    config.llm.temperature = 0.2
-    model = get_llm(config)
-    assert model.model == "test-local"
-    assert model.temperature == 0.2
-
-
+        assert await check_ollama_health(model="embed-test") is False
 def test_system_prompt_requires_citations():
     assert "[N]" in ANALYST_SYSTEM_PROMPT
 
@@ -127,11 +98,10 @@ def test_system_prompt_requires_citations():
     ([], 200, False),
 ])
 async def test_model_health_uses_exact_available_model(monkeypatch, models, status, expected):
-    monkeypatch.setattr(settings.ollama, "llm_model", "chat-test")
     client_type = httpx.AsyncClient
     transport = httpx.MockTransport(lambda request: httpx.Response(status, json={"models": [{"name": name} for name in models]}))
     monkeypatch.setattr("app.services.llm.httpx.AsyncClient", lambda: client_type(transport=transport))
-    assert await check_ollama_health() is expected
+    assert await check_ollama_health(model="chat-test") is expected
 
 
 @pytest.mark.asyncio
@@ -150,5 +120,4 @@ async def test_unreachable_model_server_is_unhealthy(monkeypatch):
         raise httpx.ConnectError("unavailable", request=request)
     transport = httpx.MockTransport(unavailable)
     monkeypatch.setattr("app.services.llm.httpx.AsyncClient", lambda: client_type(transport=transport))
-    assert await check_ollama_health() is False
->>>>>>> codex/rest-tracing-resume
+    assert await check_ollama_health(model="embedding-test") is False

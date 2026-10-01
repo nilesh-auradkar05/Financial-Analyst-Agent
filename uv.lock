@@ -148,10 +148,12 @@ dependencies = [
     { name = "edgartools" },
     { name = "httpx" },
     { name = "langchain" },
+    { name = "langchain-anthropic" },
     { name = "langchain-aws" },
     { name = "langchain-classic" },
     { name = "langchain-community" },
     { name = "langchain-ollama" },
+    { name = "langchain-openai" },
     { name = "langchain-text-splitters" },
     { name = "langgraph" },
     { name = "loguru" },
@@ -190,7 +192,6 @@ eval = [
     { name = "anthropic" },
     { name = "datasets" },
     { name = "deepeval" },
-    { name = "langchain-anthropic" },
     { name = "ragas" },
 ]
 
@@ -201,10 +202,12 @@ requires-dist = [
     { name = "edgartools", specifier = ">=5.31.1" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "langchain", specifier = ">=1.2" },
+    { name = "langchain-anthropic", specifier = ">=1.4.3" },
     { name = "langchain-aws" },
     { name = "langchain-classic", specifier = ">=1.0.5" },
     { name = "langchain-community", specifier = ">=0.4" },
     { name = "langchain-ollama", specifier = ">=1.0.1" },
+    { name = "langchain-openai", specifier = ">=1.1" },
     { name = "langchain-text-splitters", specifier = ">=1.1" },
     { name = "langgraph", specifier = ">=1.0" },
     { name = "loguru", specifier = ">=0.7,<0.8" },
@@ -243,7 +246,6 @@ eval = [
     { name = "anthropic", specifier = ">=0.100.0" },
     { name = "datasets", specifier = ">=4.5" },
     { name = "deepeval", specifier = ">=3.9.9" },
-    { name = "langchain-anthropic", specifier = ">=1.4.3" },
     { name = "ragas", specifier = ">=0.4.3" },
 ]
 

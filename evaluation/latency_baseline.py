@@ -27,6 +27,7 @@ NODE_ORDER = [
 RETRIEVAL_PHASE = {"research_news", "fetch_stock", "retrieve_filings", "analyze_sentiment"}
 SERIAL_TAIL = {"draft_memo", "verify_memo"}
 
+
 def _percentile(values: list[float], pct: float) -> float:
     if not values:
         return 0.0
@@ -40,6 +41,7 @@ def _percentile(values: list[float], pct: float) -> float:
     hi = min(lo + 1, len(s) - 1)
     return s[lo] + (s[hi] - s[lo]) * (k - lo)
 
+
 def _git_commit() -> str:
     try:
         out = subprocess.run(
@@ -51,6 +53,7 @@ def _git_commit() -> str:
         return out.stdout.strip()
     except Exception:
         return "unknown"
+
 
 async def time_single_run(
     agent,
@@ -89,6 +92,7 @@ async def time_single_run(
     total_ms = (time.perf_counter() - t_start) * 1000.0
     return {"total_ms": total_ms, "nodes": node_durations}
 
+
 def _projected_parallel_total(node_p50: dict[str, float]) -> dict[str, float]:
     """Dependency-respecting best-case parallel projection from warm p50s.
 
@@ -110,6 +114,7 @@ def _projected_parallel_total(node_p50: dict[str, float]) -> dict[str, float]:
         "serial_tail_ms": tail,
         "projected_total_ms": parallel_phase + tail,
     }
+
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Serial latency baseline")
@@ -174,8 +179,8 @@ async def main() -> None:
     artifact: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_commit(),
-        "provider": settings.llm.provider,
-        "model": settings.llm.model if settings.llm.provider == "bedrock" else settings.ollama.llm_model,
+        "provider": "bedrock",
+        "model": settings.llm.model,
         "config": {
             "tickers": args.tickers,
             "repeats": args.repeats,
@@ -209,7 +214,9 @@ async def main() -> None:
 
     print("\n=== SERIAL LATENCY BASELINE (warm) ===")
     print(f"provider/model : {artifact['provider']} / {artifact['model']}")
-    print(f"warm total     : p50 {serial_total_p50:.0f} ms | p95 {artifact['warm']['total_p95_ms']:.0f} ms (n={len(warm)})")
+    print(
+        f"warm total     : p50 {serial_total_p50:.0f} ms | p95 {artifact['warm']['total_p95_ms']:.0f} ms (n={len(warm)})"
+    )
     print(f"cold total     : {', '.join(f'{v:.0f}' for v in totals_cold)} ms")
     print("\nper-node (warm p50 / p95 ms):")
     for node in NODE_ORDER:
@@ -224,6 +231,7 @@ async def main() -> None:
     print(f"projected savings                : {projected_savings:.0f} ms ({projected_pct:.1f}%)")
 
     print(f"\nartifact: {out_path}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

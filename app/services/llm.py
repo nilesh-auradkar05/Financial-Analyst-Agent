@@ -11,8 +11,10 @@ Usage:
     response = llm.invoke("Explain P/E ration")
 """
 
+from typing import Any
+
 import httpx
-from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.runnables import Runnable
 from loguru import logger
 
 from app.config import Settings, settings
@@ -23,7 +25,7 @@ from app.llm.provider import get_llm as get_provider_llm
 # =============================================================================
 
 
-def get_llm(config: Settings = settings) -> BaseChatModel:
+def get_llm(config: Settings = settings) -> Runnable[Any, Any]:
     """Backward-compatible wrapper for provider-based LLM construction."""
     return get_provider_llm(config)
 
@@ -33,9 +35,8 @@ def get_llm(config: Settings = settings) -> BaseChatModel:
 # =============================================================================
 
 
-async def check_ollama_health(*, log_failure: bool = False, model: str | None = None) -> bool:
+async def check_ollama_health(*, model: str, log_failure: bool = False) -> bool:
     """Check if Ollama server is running and model is available."""
-    model = model or settings.ollama.llm_model
     tags_url = f"{settings.ollama.base_url.rstrip('/')}/api/tags"
     try:
         async with httpx.AsyncClient() as client:

@@ -1,4 +1,4 @@
-import type { JobPollResponse } from "@/lib/api-types";
+import { isTerminalJobStatus, type JobPollResponse } from "../../lib/api-types.ts";
 
 export type NodeStatus = "completed" | "running" | "degraded" | "queued";
 export type NodeVariant = "default" | "sealed" | "progress" | "gate";
@@ -193,7 +193,7 @@ export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): 
         ? DASH
         : `${(Math.max(0, (job.completed_at ? new Date(job.completed_at).getTime() : now) - startedMs) / 1000).toFixed(1)}s elapsed`;
   const s = r?.sentiment;
-  const terminal = job.status === "completed" || job.status === "failed";
+  const terminal = isTerminalJobStatus(job.status);
   const statusLabel = job.status.charAt(0).toUpperCase() + job.status.slice(1);
   return {
     live: true,
@@ -211,8 +211,8 @@ export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): 
     reviseLabel: DASH,
     gateLabel: "on pass",
     evidence: {
-      typesLabel: DASH,
-      sec: DASH,
+      typesLabel: r?.missing?.length ? `Missing ${r.missing.join(", ")}` : DASH,
+      sec: r?.missing?.includes("filings") ? "Not Available" : DASH,
       newsCount: r ? String(r.news_articles.length) : DASH,
       newsOf: null,
       newsWarn: false,

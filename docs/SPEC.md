@@ -167,6 +167,10 @@ Out of scope unless this section is explicitly changed and backed by an ADR:
 
 ## 4. Architecture Overview
 
+Runtime provider policy (authorized 2026-09-29, ADR-0009; configuration amended 2026-09-30): one variable per provider tier. AWS_BEDROCK_MODEL selects the Bedrock primary model. Bounded primary failures fall back to personal Anthropic (CLAUDE_LLM_MODEL with ANTHROPIC_API_KEY), then personal OpenAI (OPENAI_LLM_MODEL with OPENAI_API_KEY); a fallback without its key is skipped. AZURE_FOUNDRY_MODEL is reserved; Azure invocation is deferred to S7-AZURE-FALLBACK and its variables alone do not enable it. There is no generic provider selector and no Ollama chat path; Ollama serves embeddings only. Native traces identify actual attempted models.
+
+Unavailable filings: an absent 10-K yields a specific filing_not_found response. Analysis continues using available stock/news/sentiment and states SEC Filings: Not Available in the memo with a safe ticker-specific reason. Required absent filings retain §8.5 evidence_missing status; verification is never bypassed. Actual upstream failures remain distinct from absent data.
+
 Two paths share one evidence and retrieval spine:
 
 1. Runtime path: request -> workflow -> tools/retrieval -> evidence context -> memo -> verification -> response.

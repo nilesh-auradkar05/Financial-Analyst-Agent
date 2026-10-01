@@ -77,6 +77,7 @@ class IngestionResult:
     total_chunks: int = 0
     sections_processed: list[str] = field(default_factory=list)
     error: Optional[str] = None
+    error_code: Optional[str] = None
     sections_requested: list[str] = field(default_factory=list)
     sections_found: list[str] = field(default_factory=list)
     sections_skipped: list[str] = field(default_factory=list)
@@ -342,7 +343,13 @@ async def ingest_10k_for_ticker(
     normalized_ticker = ticker.upper().strip()
     try:
         filing = await get_latest_10k(normalized_ticker)
-        assert filing is not None
+        if filing is None:
+            return IngestionResult(
+                ticker=normalized_ticker,
+                filing_type="10-K",
+                error=f"No 10-K filings found for {normalized_ticker}.",
+                error_code="filing_not_found",
+            )
         return ingest_filing(
             filing=filing,
             sections=sections,

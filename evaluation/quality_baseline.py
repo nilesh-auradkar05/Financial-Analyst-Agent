@@ -46,7 +46,9 @@ def _cited_claims(claims: list[dict]) -> list[dict]:
     return [c for c in claims if not c.get("missing_citation")]
 
 
-def _threshold_sensitivity(claims: list[dict], thresholds: tuple[float, ...] = _THRESHOLD_SWEEP) -> dict[str, float]:
+def _threshold_sensitivity(
+    claims: list[dict], thresholds: tuple[float, ...] = _THRESHOLD_SWEEP
+) -> dict[str, float]:
     """Grounded rate at each similarity threshold, computed post-hoc from a single
     run's per-claim `overlap_score` (best cited similarity) + `numbers_ok` (union
     number gate). One run now answers the threshold-fragility question instead of
@@ -60,12 +62,15 @@ def _threshold_sensitivity(claims: list[dict], thresholds: tuple[float, ...] = _
     if not cited:
         return {f"{t:.2f}": 0.0 for t in thresholds}
     return {
-        f"{t:.2f}": sum(1 for c in cited if c["overlap_score"] >= t and c["numbers_ok"]) / len(cited)
+        f"{t:.2f}": sum(1 for c in cited if c["overlap_score"] >= t and c["numbers_ok"])
+        / len(cited)
         for t in thresholds
     }
 
 
-def _borderline_claims(claims: list[dict], min_similarity: float, band: float = _BORDERLINE_BAND) -> int:
+def _borderline_claims(
+    claims: list[dict], min_similarity: float, band: float = _BORDERLINE_BAND
+) -> int:
     """Count of cited claims within `band` of the active threshold -- claims whose
     grounded/ungrounded verdict would flip under a small recalibration."""
     cited = _cited_claims(claims)
@@ -125,7 +130,9 @@ def _company_name_from_records(ticker: str, records: list[SnapshotRecord]) -> st
     return None
 
 
-def _news_articles_from_records(records: list[SnapshotRecord], max_news_articles: int) -> list[dict]:
+def _news_articles_from_records(
+    records: list[SnapshotRecord], max_news_articles: int
+) -> list[dict]:
     articles: list[dict] = []
     for record in records:
         if record.snapshot.source_type != "news_article":
@@ -144,9 +151,7 @@ def _news_articles_from_records(records: list[SnapshotRecord], max_news_articles
 
 
 def _stock_data_from_records(records: list[SnapshotRecord]) -> dict:
-    market_records = [
-        record for record in records if record.snapshot.source_type == "market_quote"
-    ]
+    market_records = [record for record in records if record.snapshot.source_type == "market_quote"]
     if not market_records:
         return {}
     latest = max(market_records, key=lambda record: record.snapshot.fetched_at)
@@ -276,7 +281,9 @@ def _score_final_state(
     errors = final.get("errors", []) or []
 
     if checker == "semantic":
-        gr = evaluate_memo_grounding_semantic(memo, registry, min_similarity=min_similarity).to_dict()
+        gr = evaluate_memo_grounding_semantic(
+            memo, registry, min_similarity=min_similarity
+        ).to_dict()
     else:
         gr = evaluate_memo_grounding(memo, registry).to_dict()
 
@@ -300,18 +307,29 @@ def _score_final_state(
         "news_articles": len(final.get("news_articles", []) or []),
         "memo_words": len(memo.split()),
         "n_errors": len(errors),
-        "errors": [{"step": e.get("step"), "message": (e.get("message") or "")[:200]} for e in errors],
+        "errors": [
+            {"step": e.get("step"), "message": (e.get("message") or "")[:200]} for e in errors
+        ],
         "fatal_error": has_fatal_error(final),
         "run_ms": run_ms,
     }
 
 
-async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include_news_sentiment,
-                              max_news_articles, checker: str, min_similarity: float,
-                              evidence_records_by_ticker: dict[str, list[SnapshotRecord]] | None = None) -> dict:
+async def evaluate_single_run(
+    agent,
+    ticker,
+    *,
+    include_filing_analysis,
+    include_news_sentiment,
+    max_news_articles,
+    checker: str,
+    min_similarity: float,
+    evidence_records_by_ticker: dict[str, list[SnapshotRecord]] | None = None,
+) -> dict:
     if evidence_records_by_ticker is None:
         state = create_initial_state(
-            ticker, None,
+            ticker,
+            None,
             include_filing_analysis=include_filing_analysis,
             include_news_sentiment=include_news_sentiment,
             max_news_articles=max_news_articles,
@@ -344,13 +362,27 @@ async def evaluate_single_run(agent, ticker, *, include_filing_analysis, include
 def _aggregate(runs: list[dict]) -> dict:
     def col(key: str) -> list[float]:
         return [float(r[key]) for r in runs]
+
     n = len(runs)
-    keys = ["grounded_claim_rate", "citation_coverage_rate", "total_claims", "cited_claims",
-            "grounded_claims", "orphan_citations", "evidence_count", "filing_chunks",
-            "news_articles", "memo_words", "run_ms", "borderline_claims"]
-    out: dict[str, Any] = {"n_runs": n,
-           "pass_rate": sum(1 for r in runs if r["passed"]) / n if n else 0.0,
-           "fatal_error_rate": sum(1 for r in runs if r["fatal_error"]) / n if n else 0.0}
+    keys = [
+        "grounded_claim_rate",
+        "citation_coverage_rate",
+        "total_claims",
+        "cited_claims",
+        "grounded_claims",
+        "orphan_citations",
+        "evidence_count",
+        "filing_chunks",
+        "news_articles",
+        "memo_words",
+        "run_ms",
+        "borderline_claims",
+    ]
+    out: dict[str, Any] = {
+        "n_runs": n,
+        "pass_rate": sum(1 for r in runs if r["passed"]) / n if n else 0.0,
+        "fatal_error_rate": sum(1 for r in runs if r["fatal_error"]) / n if n else 0.0,
+    }
     for k in keys:
         out[k] = _stats(col(k))
     # Mean grounded rate per threshold across runs -- answers "how fragile is the
@@ -374,7 +406,9 @@ async def main() -> None:
     parser.add_argument("--no-filings", action="store_true")
     parser.add_argument("--no-sentiment", action="store_true")
     parser.add_argument("--max-news", type=int, default=10)
-    parser.add_argument("--evidence-release", help="Replay a frozen evidence release (<name:version>)")
+    parser.add_argument(
+        "--evidence-release", help="Replay a frozen evidence release (<name:version>)"
+    )
     parser.add_argument("--registry-root", default="artifacts/dataops")
     args = parser.parse_args()
 
@@ -392,18 +426,22 @@ async def main() -> None:
     for ticker in args.tickers:
         for i in range(args.repeats):
             r = await evaluate_single_run(
-                agent, ticker,
+                agent,
+                ticker,
                 include_filing_analysis=include_filing_analysis,
                 include_news_sentiment=include_news_sentiment,
                 max_news_articles=args.max_news,
-                checker=args.checker, min_similarity=args.min_similarity,
+                checker=args.checker,
+                min_similarity=args.min_similarity,
                 evidence_records_by_ticker=(
                     evidence_bundle.records_by_ticker if evidence_bundle else None
                 ),
             )
             runs.append(r)
-            print(f"  {ticker} run {i}: grounded={r['grounded_claim_rate']:.2f} "
-                  f"coverage={r['citation_coverage_rate']:.2f} claims={r['total_claims']} passed={r['passed']}")
+            print(
+                f"  {ticker} run {i}: grounded={r['grounded_claim_rate']:.2f} "
+                f"coverage={r['citation_coverage_rate']:.2f} claims={r['total_claims']} passed={r['passed']}"
+            )
 
     overall = _aggregate(runs)
     error_steps = Counter(e["step"] for r in runs for e in r["errors"])
@@ -412,9 +450,9 @@ async def main() -> None:
     artifact = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "git": _git_state(),
-        "provider": settings.llm.provider,
+        "provider": "bedrock",
         "model": model_id,
-        "model_family": _model_family(model_id) if settings.llm.provider == "bedrock" else settings.llm.provider,
+        "model_family": _model_family(model_id),
         "temperature": settings.llm.temperature,
         "thinking_mode": settings.llm.thinking_mode,
         "grounding_checker": args.checker,
@@ -431,11 +469,19 @@ async def main() -> None:
             if evidence_bundle
             else None
         ),
-        "thresholds": {"min_citation_coverage": MIN_CITATION_COVERAGE, "min_grounded_claim_rate": MIN_GROUNDED_CLAIM_RATE},
-        "config": {"tickers": args.tickers, "repeats": args.repeats,
-                   "include_filing_analysis": include_filing_analysis,
-                   "include_news_sentiment": include_news_sentiment, "max_news_articles": args.max_news,
-                   "evidence_release": args.evidence_release, "registry_root": args.registry_root},
+        "thresholds": {
+            "min_citation_coverage": MIN_CITATION_COVERAGE,
+            "min_grounded_claim_rate": MIN_GROUNDED_CLAIM_RATE,
+        },
+        "config": {
+            "tickers": args.tickers,
+            "repeats": args.repeats,
+            "include_filing_analysis": include_filing_analysis,
+            "include_news_sentiment": include_news_sentiment,
+            "max_news_articles": args.max_news,
+            "evidence_release": args.evidence_release,
+            "registry_root": args.registry_root,
+        },
         "overall": overall,
         "error_steps": dict(error_steps),
         "per_ticker": {t: _aggregate([r for r in runs if r["ticker"] == t]) for t in args.tickers},
@@ -449,9 +495,16 @@ async def main() -> None:
     g, c = overall["grounded_claim_rate"], overall["citation_coverage_rate"]
     dirty = " (WORKING TREE DIRTY)" if artifact["git"]["dirty"] else ""
     print("\n=== QUALITY BASELINE ===")
-    print(f"model/family/temp   : {model_id} / {artifact['model_family']} / {artifact['temperature']}")
-    print(f"grounding_checker   : {args.checker}" + (f" (min_similarity={args.min_similarity})" if args.checker == 'semantic' else ""))
-    print(f"thinking_mode       : {artifact['thinking_mode']}   commit {artifact['git']['commit']}{dirty}")
+    print(
+        f"model/family/temp   : {model_id} / {artifact['model_family']} / {artifact['temperature']}"
+    )
+    print(
+        f"grounding_checker   : {args.checker}"
+        + (f" (min_similarity={args.min_similarity})" if args.checker == "semantic" else "")
+    )
+    print(
+        f"thinking_mode       : {artifact['thinking_mode']}   commit {artifact['git']['commit']}{dirty}"
+    )
     print(f"runs                : {overall['n_runs']}  (pass_rate {overall['pass_rate']:.2f})")
     print(f"grounded_claim_rate : {g['mean']:.3f} +/- {g['stdev']:.3f}")
     print(f"citation_coverage   : {c['mean']:.3f} +/- {c['stdev']:.3f}")

@@ -127,3 +127,39 @@ L: `.claude/hooks/stop_gate.py` blocks the turn on any dirty tree. The "or state
 **Applied:** Yes. Added optional LANGSMITH_TRACING, LANGSMITH_API_KEY and LANGSMITH_PROJECT pass-through entries on frontend-impl; retained all legacy entries. No credential files read or changed.
 
 **Verification:** Dummy-only Compose check reproduced the failure before the fix and passed all five configuration cases afterward; all four Doc Sync checks passed.
+
+## 2026-09-30 — Keep implementation and progress records synchronized
+
+**Correction:** User asked whether lessons.md, sprint-plan.md, todo.md and TASKS.md were updated with the work and lessons learned.
+
+**Root cause:** The implementation plan and canonical behavior documents were updated first, while the lessons log and derived TASKS.md register lagged during interrupted agent handoffs. That left historical status rows looking current.
+
+**Prevention rule:** Record each verified handoff in todo.md, mirror scoped status and deferred tasks into TASKS.md, and capture lessons before reporting completion. Keep historical test results distinct from current verification; interruptions do not make pending work complete.
+
+**Applied:** Yes. Added the current scoped TASKS.md update, recorded implementation/verification evidence in todo.md and sprint-plan.md, and kept Azure explicitly deferred. Final results distinguish passing focused checks from the residual full-suite failure.
+
+**Verification:** Provider focused tests 26 passed; filing focused tests 14 passed; frontend 10 tests, typecheck, lint and build passed; Compose checks 4 passed. Main full lint and mypy app/evaluation passed. Final backend suite: 344 passed, 1 tracing model-label assertion failed, 2 skipped. Four Doc Sync checks passed. Stopped corrections at the user's two-attempt limit and left overall verification open.
+
+### Technical lessons from this slice
+
+- Trace configuration through environment, Compose and typed settings. Forwarding AWS_BEDROCK_MODEL alone did not make existing LLM_MODEL consumers use it; resolve aliases once in settings.
+- Keep provider construction inside the bounded fallback attempt. Give the outer workflow enough time for all configured attempts and retain native model tracing.
+- Distinguish confirmed absent filings from SEC transport failures. Continue with available evidence, but never convert an empty LLM response into a memo by appending a limitation footer.
+- Treat degraded/evidence_missing as terminal in every client. Server-to-server API auth and ignored source files are part of integration verification, not just backend unit behavior.
+- Validate the selected model's actual request contract: Sonnet 5.5 rejects non-default temperature, and its us-east-1 documented Converse example uses a global inference profile. Do not silently change routing policy or claim credential access from config-only checks.
+- SDK test transports must reproduce update semantics: LangSmith omits None input/output updates; merging them erased recorded inputs in the offline collector. Separate configured-primary metadata from actual invoked-model identity, and align trace contract tests when introducing fallback wrappers.
+
+## 2026-09-30 — Runtime-fix: prove the deployed runtime before debugging it
+
+- Correction: none from the user. The capture_lesson hook had appended 8 empty stubs, triggered by stop-hook/test output rather than by real corrections. They were replaced by this entry.
+- Failure seen: memo generation failed in the container and "no traces in LangSmith". Earlier sessions hypothesized temperature, then Bedrock, and left the rest unverified.
+- Root cause: (1) Bedrock account has no access to Sonnet 5.5 (AccessDenied); (2) the container ran an image built before the fallback chain; (3) traces WERE exported but buried under ~1,100 /health+/metrics root traces, and failed runs recorded error=null.
+- Rule for next time: before theorizing, (a) compare the deployed image against the workspace, (b) probe each provider in-container with a one-shot script that prints only the exception class and message, never secrets, and (c) count root traces by name in the project before concluding "traces missing". Probe routes must not export traces.
+- Applied: yes. Default model is now an invocable inference profile, probe routes are untraced, and failed draft/root spans carry safe error codes. Full suite: 349 passed, 2 skipped.
+
+## 2026-09-30 — "Trace visible" was claimed from the API, not the user's UI
+
+- Correction: user reported no traces in their LangSmith web UI after I said the trace "shows up in LangSmith".
+- Root cause: I verified export only through the container's API key. That key belongs to a different LangSmith account (org "Personal", workspace f5946faf…, project 1f5dd858…) than the one the user views; every free org is named "Personal", and both have a project called financial-analyst-system.
+- Rule for next time: when claiming trace visibility, name the account/workspace/project ID the key writes to and give the direct run URL; do not say "visible in your UI" until the user confirms the IDs match.
+- Applied: yes. The user got the direct link, the key-owner account and two fix options. Verification pending user confirmation.

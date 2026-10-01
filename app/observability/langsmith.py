@@ -144,6 +144,10 @@ async def trace_boundary(
                         logger.warning("Trace exporter finalization failed")
 
 
+# Probe routes are polled constantly; they get a request ID but no exported span.
+UNTRACED_PROBES = frozenset({("GET", "/health"), ("GET", "/metrics")})
+
+
 class RequestTracingMiddleware:
     """End HTTP timing at the response body, before Starlette background jobs."""
 
@@ -169,6 +173,27 @@ class RequestTracingMiddleware:
         started = time.monotonic()
         status_code = 500
         sent = False
+        if (scope["method"], scope["path"]) in UNTRACED_PROBES:
+            async def probe_send(message: Message) -> None:
+                nonlocal sent
+                if message["type"] == "http.response.start":
+                    sent = True
+                    MutableHeaders(scope=message)["X-Request-ID"] = request_id
+                await send(message)
+
+            try:
+                if invalid:
+                    error = {"code": "invalid_request_id", "message": "X-Request-ID must be a canonical UUID.", "error_id": str(uuid4())}
+                    await JSONResponse({"error": error}, status_code=400, headers={"Cache-Control": "no-store"})(scope, receive, probe_send)
+                else:
+                    with tracing_context(enabled=False):
+                        await self.app(scope, receive, probe_send)
+            except Exception:
+                if sent:
+                    raise
+                error = {"code": "internal_error", "message": "Internal server error.", "error_id": str(uuid4())}
+                await JSONResponse({"error": error}, status_code=500, headers={"Cache-Control": "no-store"})(scope, receive, probe_send)
+            return
         async with trace_boundary("HTTP " + scope["method"], metadata={
             "request_id": request_id, "method": scope["method"], "app_version": "1.1.0",
         }) as run:
@@ -193,7 +218,9 @@ class RequestTracingMiddleware:
                                              "duration_ms": (time.monotonic() - started) * 1000,
                                              "outcome": outcome, **state.get("trace_error", {})})
                         run.end(outputs={"status_code": status_code, "outcome": outcome},
-                                error=state.get("trace_error", {}).get("code") if status_code >= 500 else None)
+                                error=(state.get("trace_error", {}).get("code") if status_code >= 500
+                                       else state.get("trace_error", {}).get("code", "analysis_failed")
+                                       if outcome == "failed" else None))
                     logger.info("HTTP request | request_id={} | trace_id={} | route={} | status={}",
                                 request_id, state["trace_id"], route, status_code)
                 await send(message)
