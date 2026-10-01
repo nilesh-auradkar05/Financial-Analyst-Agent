@@ -46,7 +46,7 @@ class TestGetLLM:
     """test-plan §8 Config: "Typed settings load" / provider selection via typed settings."""
 
     def test_cloud_chain_needs_no_provider_selector(self) -> None:
-        assert isinstance(get_llm(Settings(_env_file=None)), Runnable)  # pyright: ignore[reportCallIssue]
+        assert isinstance(get_llm(Settings(_env_file=None)), Runnable)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
 
 class TestAnalystPrompt:

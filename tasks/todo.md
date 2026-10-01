@@ -630,3 +630,13 @@ Open: (1) the user changes LLM_MODEL locally to a personal list; otherwise the n
 
 ### Revision 2026-09-30: CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL replace the LLM_MODEL list
 User decision after the cleanup above: personal fallback models are split into CLAUDE_LLM_MODEL (Anthropic API) and OPENAI_LLM_MODEL (OpenAI API), called in that order after Bedrock. The LLM_MODEL list, name-based provider inference and its load-time validator are removed; LLM_MODEL is now ignored. Updated config, provider docstrings, Compose, SPEC §4, the ADR-0009 amendment, test-plan §16, README, setup-and-test, and the provider/compose tests.
+
+## MYPY-CLEAN — Pydantic Settings test-source overrides (2026-09-30)
+
+Authorization: user requested `uv run mypy .` and all reported errors fixed. Trace: test-plan §8 typed settings and §16 provider fallback. Tests intentionally pass Pydantic Settings' runtime-only `_env_file=None` to isolate them from local `.env`; mypy's generated constructor omits that private settings-source keyword.
+
+- [x] Preserve `_env_file=None` isolation and add narrow `type: ignore[call-arg]` annotations alongside the existing Pyright annotations at the eight reported calls.
+- [x] Revert unrelated formatter-hook churn; only the targeted annotations remain.
+- [x] `uv run mypy .` → Success, no issues in 134 source files.
+- [x] `uv run ruff check tests/unit/test_llm.py tests/unit/test_provider_fallback.py` → PASS.
+- [x] Focused pytest → 27 passed; IDE lints clean.

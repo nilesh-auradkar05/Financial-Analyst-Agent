@@ -57,21 +57,21 @@ class TraceEvents(BaseCallbackHandler):
 
 
 def _settings() -> Settings:
-    llm = LLMSettings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
     llm.aws_region = "us-east-1"
     llm.model = "anthropic.claude-sonnet-5-5"
     llm.aws_bearer_token_bedrock = None
     llm.anthropic_api_key = None
     llm.openai_api_key = None
     llm.request_timeout_seconds = 0.05
-    return Settings(llm=llm, _env_file=None)  # pyright: ignore[reportCallIssue]
+    return Settings(llm=llm, _env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
 
 def test_bedrock_model_variable_and_bearer_alias_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_BEDROCK_MODEL", "canonical-model")
     monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "canonical-dummy")
     monkeypatch.setenv("AWS_BEARER_TOKEN", "legacy-dummy")
-    config = LLMSettings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    config = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
     assert config.model == "canonical-model"
     assert config.aws_bearer_token_bedrock == SecretStr("canonical-dummy")
 
@@ -80,7 +80,7 @@ def test_bedrock_model_variable_and_bearer_alias_precedence(monkeypatch: pytest.
 def test_personal_model_variables_never_select_bedrock_model(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
     monkeypatch.delenv("AWS_BEDROCK_MODEL", raising=False)
     monkeypatch.setenv(name, "personal-model")
-    assert LLMSettings(_env_file=None).model == "global.anthropic.claude-sonnet-4-6"  # pyright: ignore[reportCallIssue]
+    assert LLMSettings(_env_file=None).model == "global.anthropic.claude-sonnet-4-6"  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
 
 @pytest.mark.asyncio
@@ -90,11 +90,11 @@ async def test_personal_model_variables_reach_their_provider_in_order(
 ) -> None:
     monkeypatch.setenv("CLAUDE_LLM_MODEL", "claude-personal")
     monkeypatch.setenv("OPENAI_LLM_MODEL", "gpt-personal")
-    llm = LLMSettings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
     llm.aws_region = "us-east-1"
     llm.anthropic_api_key = SecretStr(anthropic_key) if anthropic_key else None
     llm.openai_api_key = SecretStr("dummy")
-    settings = Settings(llm=llm, _env_file=None)  # pyright: ignore[reportCallIssue]
+    settings = Settings(llm=llm, _env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
     def broken_bedrock(_: Settings) -> EchoModel:
         raise RuntimeError("unavailable")
@@ -109,7 +109,7 @@ async def test_personal_model_variables_reach_their_provider_in_order(
 def test_default_model_is_invocable_inference_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ("AWS_BEDROCK_MODEL", "CLAUDE_LLM_MODEL", "OPENAI_LLM_MODEL"):
         monkeypatch.delenv(name, raising=False)
-    config = LLMSettings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    config = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
     assert config.model == "global.anthropic.claude-sonnet-4-6"
 
 
