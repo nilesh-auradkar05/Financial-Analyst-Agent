@@ -209,3 +209,26 @@ async def test_health_accepts_configured_personal_fallback(monkeypatch: pytest.M
 
     response = await main.health()
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_chat_model_is_built_once_and_a_failed_build_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Trace: docs/test-plan.md §10, chat model built once per process (S2-T00c)."""
+    settings = _settings()
+    settings.llm.request_timeout_seconds = 1
+    built: list[EchoModel] = []
+
+    def bedrock(_: Settings) -> EchoModel:
+        built.append(EchoModel(provider_name=f"bedrock-build-{len(built)}"))
+        if len(built) == 1:
+            raise RuntimeError("cold-start failure")
+        return built[-1]
+
+    monkeypatch.setattr(provider, "_bedrock_model", bedrock)
+
+    with pytest.raises(RuntimeError):
+        await provider.get_llm(settings).ainvoke("check")
+    first = await provider.get_llm(settings).ainvoke("check")
+    second = await provider.get_llm(settings).ainvoke("check")
+
+    assert first.content == second.content == "bedrock-build-1: check"

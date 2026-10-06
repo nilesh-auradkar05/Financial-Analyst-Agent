@@ -160,15 +160,31 @@ def _personal_model(settings: Settings, provider: str, model: str, key: SecretSt
     return ChatOpenAI(**kwargs)
 
 
+# One fallback chain per Settings object, so each provider's client is built once per process.
+# ponytail: keyed by object identity and never evicted; the app has one Settings. Key by
+# value if settings ever become per-request.
+_chains: dict[int, tuple[Settings, Runnable[Any, Any]]] = {}
+
+
 def get_llm(settings: Settings) -> Runnable[Any, Any]:
     """Use Bedrock first, then personal Claude, then personal OpenAI (each only with a key)."""
+    if cached := _chains.get(id(settings)):
+        return cached[1]
     providers: list[tuple[str, Callable[[], BaseChatModel]]] = [("bedrock", lambda: _bedrock_model(settings))]
     for name, model, key in settings.llm.personal_fallbacks():
         providers.append((name, partial(_personal_model, settings, name, model, key)))
 
     timeout = settings.llm.request_timeout_seconds
 
-    def lazy_model(name: str, build: Callable[[], BaseChatModel]) -> Runnable[Any, Any]:
+    def lazy_model(name: str, build_model: Callable[[], BaseChatModel]) -> Runnable[Any, Any]:
+        built: list[BaseChatModel] = []
+
+        def build() -> BaseChatModel:
+            # A failed build raises before the append, so it is retried on the next request.
+            if not built:
+                built.append(build_model())
+            return built[0]
+
         def invoke(input: Any, config: RunnableConfig) -> Any:
             pool = ThreadPoolExecutor(max_workers=1)
             try:
@@ -191,7 +207,9 @@ def get_llm(settings: Settings) -> Runnable[Any, Any]:
         return RunnableLambda(invoke, afunc=ainvoke).with_config(run_name=f"{name}_attempt")
 
     attempts = [lazy_model(name, build) for name, build in providers]
-    return attempts[0].with_fallbacks(attempts[1:])
+    chain = attempts[0].with_fallbacks(attempts[1:])
+    _chains[id(settings)] = (settings, chain)
+    return chain
 
 
 __all__ = ["get_llm", "MODEL_PRESETS"]
