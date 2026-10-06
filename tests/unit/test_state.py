@@ -6,6 +6,7 @@ Replaces the inline test logic that was in graph.py's old _main() block.
 from app.agents.state import (
     AgentStep,
     add_error,
+    apply_update,
     create_initial_state,
     get_context_for_llm,
     get_data_availability,
@@ -73,13 +74,26 @@ class TestAddError:
         update = add_error(state, "fetch_stock", "rate limited", recoverable=True)
         assert update["current_step"] == AgentStep.FETCH_STOCK.value
 
+    def test_returns_only_the_new_error_and_leaves_state_untouched(self):
+        """test-plan §10 (G12): safe when parallel branches share one state."""
+        state = create_initial_state("AAPL")
+        state["errors"] = [{"step": "earlier", "message": "m", "recoverable": True}]
+        update = add_error(state, "fetch_stock", "timeout")
+        assert [error["step"] for error in update["errors"]] == ["fetch_stock"]
+        assert [error["step"] for error in state["errors"]] == ["earlier"]
+
     def test_multiple_errors_accumulate(self):
         state = create_initial_state("AAPL")
-        update1 = add_error(state, "step1", "err1")
-        # Simulate LangGraph merging update1 into state
-        state["errors"] = update1["errors"]
-        update2 = add_error(state, "step2", "err2")
-        assert len(update2["errors"]) == 2
+        state = apply_update(state, add_error(state, "step1", "err1"))
+        state = apply_update(state, add_error(state, "step2", "err2"))
+        assert [error["step"] for error in state["errors"]] == ["step1", "step2"]
+
+    def test_update_without_errors_keeps_earlier_errors(self):
+        state = create_initial_state("AAPL")
+        state = apply_update(state, add_error(state, "step1", "err1"))
+        state = apply_update(state, {"stock_data": {"current_price": 1.0}})
+        assert [error["step"] for error in state["errors"]] == ["step1"]
+        assert state["stock_data"] == {"current_price": 1.0}
 
 
 # Hard

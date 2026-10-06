@@ -189,7 +189,7 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     assert names.count("financial_analyst_graph") == 1
     assert {"get_stock_data", "search_company_news", "retrieve_filings", "verify_memo"} <= set(names)
     searches = [run for run in children if run["name"] == "search_filing_chunks"]
-    assert len(searches) == 4
+    assert len(searches) == 5  # four topic queries plus the company-name lookup (S2-T00c D2)
     assert all(set(run["inputs"]) == {"query", "ticker", "n_results"} for run in searches)
     assert all(run["outputs"] == {"count": 1, "evidence_ids": ["AAPL-business"]} for run in searches)
     assert all(run["run_type"] == "chain" for run in children if run["name"] == "draft_memo")

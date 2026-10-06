@@ -33,6 +33,7 @@ Usage:
 """
 
 import hashlib
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -268,12 +269,16 @@ class SentimentAnalyzer:
 # Wrapper Convenience Functions
 
 _default_analyzer: Optional[SentimentAnalyzer] = None
+_default_analyzer_lock = threading.Lock()
 
 def _get_default_analyzer() -> SentimentAnalyzer:
-    """Get default analyzer instance."""
+    """Get the default analyzer with its model loaded, once, even under concurrent requests."""
     global _default_analyzer
-    if _default_analyzer is None:
-        _default_analyzer = SentimentAnalyzer()
+    with _default_analyzer_lock:
+        if _default_analyzer is None:
+            analyzer = SentimentAnalyzer()
+            analyzer._load_model()
+            _default_analyzer = analyzer
     return _default_analyzer
 
 @app_traceable(name="analyze_sentiment_batch", run_type="chain", tags=["sentiment"])

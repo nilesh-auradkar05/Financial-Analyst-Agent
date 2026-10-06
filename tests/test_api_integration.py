@@ -512,7 +512,7 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkey
     from types import SimpleNamespace
 
     from app.agents import graph
-    from app.agents.state import create_initial_state
+    from app.agents.state import apply_update, create_initial_state
 
     def search(*_args):
         if retrieval_fails:
@@ -532,9 +532,8 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkey
         state["stock_data"] = {"ticker": ticker, "current_price": 123.0}
         state["news_articles"] = [{"title": "Market update", "snippet": "Shares rose.", "source": "Wire"}]
         state["sentiment_result"] = {"overall_sentiment": "positive", "positive_count": 1}
-        state.update(await graph.retrieve_sec_filings_node(state))
-        state.update(await graph.draft_memo_node(state))
-        state.update(await graph.verify_memo_node(state))
+        for node in (graph.retrieve_sec_filings_node, graph.draft_memo_node, graph.verify_memo_node):
+            state = apply_update(state, await node(state))
         return state
 
     monkeypatch.setattr(api_main, "run_agent", run)

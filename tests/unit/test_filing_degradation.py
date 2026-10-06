@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.agents import graph
-from app.agents.state import create_initial_state
+from app.agents.state import apply_update, create_initial_state
 
 
 @pytest.mark.asyncio
@@ -23,16 +23,14 @@ async def test_missing_filing_keeps_available_evidence_and_verifies(monkeypatch,
         return SimpleNamespace(chunks=[])
     monkeypatch.setattr(graph, "_search_filing_chunks", search)
 
-    retrieval = await graph.retrieve_sec_filings_node(state)
-    state.update(retrieval)
+    state = apply_update(state, await graph.retrieve_sec_filings_node(state))
 
     class MemoLLM:
         async def ainvoke(self, _messages):
             return SimpleNamespace(content="# Investment Memo\n\nMarket evidence is limited.")
 
     monkeypatch.setattr(graph, "get_llm", lambda _settings: MemoLLM())
-    draft = await graph.draft_memo_node(state)
-    state.update(draft)
+    state = apply_update(state, await graph.draft_memo_node(state))
     verification = await graph.verify_memo_node(state)
 
     assert state["stock_data"]["current_price"] == 123.0

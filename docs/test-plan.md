@@ -221,6 +221,8 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 | Event loop not blocked | During `analyze_sentiment` on 50 snippets, a concurrent `GET /health` returns within 200 ms |
 | Graph is a singleton | `create_agent` is not invoked per request (observed via public `AGENT` module attribute identity across two runs) |
 | Retrieval sizing | `filing_chunks` length == citation-registry filing count; no retrieved chunk is silently dropped |
+| Filing queries independent of the stock branch | With no caller-supplied `company_name`, filing queries use the name in the indexed filing metadata, or the ticker when none is indexed; a caller-supplied name wins; `fetch_stock` failing does not change them |
+| Chat model built once per process | Two requests on the same settings reuse one built provider client; a failed build is not cached and is retried on the next request |
 
 ## 11. Verification enforcement and evidence-completeness: S2-T00d, S6
 

@@ -68,20 +68,19 @@ Comparisons change one thing at a time: the same fixture, and either the backend
 
 ### Agent workflow (current code)
 
-Drawn from `create_agent()` in [`app/agents/graph.py`](app/agents/graph.py). If a node records a fatal error, the graph skips straight to `draft_memo`, and the memo states which data was unavailable. The request's `include_*` options are handled inside the nodes.
+Drawn from `create_agent()` in [`app/agents/graph.py`](app/agents/graph.py). The three evidence nodes run in parallel and join before sentiment. A node that fails records an error and leaves its data empty, and the memo states which data was unavailable. The request's `include_*` options are handled inside the nodes.
 
 ```mermaid
 flowchart TD
     S([START]) --> N[research_news<br/>Tavily news]
-    N --> K[fetch_stock<br/>yfinance snapshot]
-    K --> F[retrieve_filings<br/>10-K sections from vector store]
-    F --> A[analyze_sentiment<br/>FinBERT]
+    S --> K[fetch_stock<br/>yfinance snapshot]
+    S --> F[retrieve_filings<br/>10-K sections from vector store]
+    N --> A[analyze_sentiment<br/>FinBERT]
+    K --> A
+    F --> A
     A --> D[draft_memo<br/>citation registry + LLM]
     D --> V[verify_memo<br/>claim-level grounding check]
     V --> E([END])
-    N -. fatal error .-> D
-    K -. fatal error .-> D
-    F -. fatal error .-> D
 ```
 
 ### Component diagrams

@@ -3,7 +3,7 @@ Financial Analyst Agent Workflow Graph
 
 This module defines the LangGraph workflow for the Financial Analyst Agent.
 Design Pattern:
-    - Conditional routing after each node for graceful degradation
+    - Independent evidence nodes fan out in parallel and join before sentiment
     - Citation registry built *before* LLM call so indices are gounded
 
 Usage:
@@ -30,13 +30,13 @@ from langsmith import get_current_run_tree
 from loguru import logger
 
 from app.agents.state import (
+    MAX_FILING_CHUNKS,
     AgentState,
     AgentStep,
     add_error,
     create_initial_state,
     get_context_for_llm,
     get_data_availability,
-    has_fatal_error,
 )
 from app.components.retrieval.vector_store import RetrievalStore, SearchResult, get_vector_store
 from app.config import settings
@@ -197,7 +197,6 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         Partial state update with filing_chunks
     """
     ticker = state["ticker"]
-    company_name = state.get("company_name", ticker)
     logger.info(f"[retrieve_filings] Searching filings for {ticker}")
 
     if not state.get("include_filing_analysis", True):
@@ -211,6 +210,16 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
     try:
         store = get_vector_store()
 
+        # This node runs beside fetch_stock, so a missing name comes from the indexed
+        # filing metadata instead of the quote provider; the ticker is the last resort.
+        company_name = state.get("company_name")
+        if not company_name:
+            indexed = await asyncio.to_thread(_search_filing_chunks, store, ticker, ticker, 1)
+            company_name = next(
+                (c.metadata.get("company_name") for c in indexed.chunks if c.metadata.get("company_name")),
+                ticker,
+            )
+
         # Multiple queries for comprehensive retrieval
         queries = [
             f"{company_name} business description overview",
@@ -223,7 +232,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         seen_texts: set[str] = set()
 
         for query in queries:
-            result = _search_filing_chunks(store, query, ticker, 3)
+            result = await asyncio.to_thread(_search_filing_chunks, store, query, ticker, 3)
 
             for chunk in result.chunks:
                 # Deduplicate by text
@@ -234,7 +243,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
 
         # Sort by relevance and take top chunks
         all_chunks.sort(key=lambda x: x.relevance_score, reverse=True)
-        top_chunks = all_chunks[:10]
+        top_chunks = all_chunks[:MAX_FILING_CHUNKS]
 
         filing_chunks = [
             {
@@ -253,7 +262,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
         }
         if not filing_chunks:
-            update["errors"] = [*state.get("errors", []), {
+            update["errors"] = [{
                 "step": "retrieve_filings",
                 "code": "filing_not_found",
                 "message": f"No indexed filings found for {ticker}.",
@@ -266,7 +275,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Filing retrieval failed")
         return {
             "filing_chunks": [],
-            "errors": [*state.get("errors", []), {
+            "errors": [{
                 "step": "retrieve_filings",
                 "code": "filing_retrieval_failed",
                 "message": f"Filing retrieval failed for {ticker}.",
@@ -309,7 +318,7 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
 
     try:
         texts = [a["snippet"] for a in articles if a.get("snippet")]
-        results = analyze_sentiment_batch(texts)
+        results = await asyncio.to_thread(analyze_sentiment_batch, texts)
 
         positive = sum(1 for r in results if r.label == "positive")
         negative = sum(1 for r in results if r.label == "negative")
@@ -383,7 +392,9 @@ def _format_sentiment_text(sentiment: dict) -> str:
     return " ".join(parts)
 
 
-def _build_citation_registry(state: "AgentState", *, max_filing_chunks: int = 5) -> list[dict]:
+def _build_citation_registry(
+    state: "AgentState", *, max_filing_chunks: int = MAX_FILING_CHUNKS,
+) -> list[dict]:
     """Build an ordered list of citable sources from the state."""
     registry: list[dict] = []
     idx = 1
@@ -600,7 +611,7 @@ async def draft_memo_node(state: AgentState) -> dict:
         valid_indices = {entry["index"] for entry in registry}
         invalid_citations = sorted(used_citations - valid_indices)
 
-        errors = list(state.get("errors", []))
+        errors: list[dict] = []
         if invalid_citations:
             errors.append(
                 {
@@ -659,18 +670,14 @@ async def verify_memo_node(state: AgentState) -> dict:
             "claims": [],
             "orphan_citations": [],
         }
-        errors = list(state.get("errors", []))
-        errors.append(
-            {
+        return {
+            "verification_result": verification_result,
+            "errors": [{
                 "step": "verify_memo",
                 "message": "No memo was available for verification.",
                 "recoverable": True,
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        return {
-            "verification_result": verification_result,
-            "errors": errors,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }],
             "current_step": AgentStep.COMPLETE.value,
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -692,7 +699,7 @@ async def verify_memo_node(state: AgentState) -> dict:
     verification_result = grounding.to_dict()
     verification_result["orphan_citations"] = orphan_indices
 
-    errors = list(state.get("errors", []))
+    errors: list[dict] = []
 
     if orphan_indices:
         errors.append(
@@ -737,17 +744,6 @@ async def verify_memo_node(state: AgentState) -> dict:
 
 # Graph Construction
 
-def _route_after_node(next_node: str):
-    def router(state: AgentState) -> str:
-        if has_fatal_error(state):
-            logger.warning(
-                "Fatal error - skipping to draft_memo"
-                f"(would have gone to {next_node})"
-            )
-            return "draft_memo"
-        return next_node
-    return router
-
 def create_agent() -> Runnable[AgentState, AgentState]:
     """
     Create the LangGraph agent workflow.
@@ -768,37 +764,24 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     workflow.add_node("draft_memo", draft_memo_node)
     workflow.add_node("verify_memo", verify_memo_node)
 
-    # Define edges
-    workflow.add_edge(START, "research_news")
-
-    workflow.add_conditional_edges(
-        "research_news",
-        _route_after_node("fetch_stock"),
-        {"fetch_stock": "fetch_stock", "draft_memo": "draft_memo"},
-    )
-    workflow.add_conditional_edges(
-        "fetch_stock",
-        _route_after_node("retrieve_filings"),
-        {"retrieve_filings": "retrieve_filings", "draft_memo": "draft_memo"},
-    )
-    workflow.add_conditional_edges(
-        "retrieve_filings",
-        _route_after_node("analyze_sentiment"),
-        {"analyze_sentiment": "analyze_sentiment", "draft_memo": "draft_memo"},
-    )
-    workflow.add_conditional_edges(
-        "analyze_sentiment",
-        _route_after_node("draft_memo"),
-        {"draft_memo": "draft_memo"},
-    )
+    # Evidence nodes are independent: run them in parallel, join before sentiment.
+    evidence_nodes = ["research_news", "fetch_stock", "retrieve_filings"]
+    for node in evidence_nodes:
+        workflow.add_edge(START, node)
+    workflow.add_edge(evidence_nodes, "analyze_sentiment")
+    workflow.add_edge("analyze_sentiment", "draft_memo")
     workflow.add_edge("draft_memo", "verify_memo")
     workflow.add_edge("verify_memo", END)
 
     # Compile the graph
     agent = workflow.compile()
-    logger.info("Agent Created with Conditional error routing Successfully")
+    logger.info("Agent created with parallel evidence fan-out")
 
     return agent
+
+
+# Compiled once per process; the graph holds no per-request state.
+AGENT = create_agent()
 
 # AGENT EXECUTION
 
@@ -838,9 +821,6 @@ async def run_agent(
         max_news_articles=max_news_articles,
     )
 
-    # Create agent
-    agent = create_agent()
-
     metadata = {"agent": "financial_analyst", "agent_version": "1.1.0", **model_metadata(settings)}
     if run := get_current_run_tree():
         run.metadata.update(metadata)
@@ -848,7 +828,7 @@ async def run_agent(
 
     # Excecute
     start_time = datetime.now(timezone.utc)
-    final_state = await agent.ainvoke(state, config=config)
+    final_state = await AGENT.ainvoke(state, config=config)
 
     # Calculate execution time
     exec_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000

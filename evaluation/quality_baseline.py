@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.graph import create_agent, draft_memo_node, verify_memo_node
-from app.agents.state import AgentState, create_initial_state, has_fatal_error
+from app.agents.state import AgentState, apply_update, create_initial_state, has_fatal_error
 from app.config import settings
 from app.llm.provider import MODEL_PRESETS, _model_family
 from dataops.evidence_release import SnapshotRecord
@@ -261,9 +261,9 @@ async def _run_frozen_evidence(
     )
     t0 = time.perf_counter()
     draft_update = await draft_memo_node(state)
-    merged = AgentState(**{**state, **draft_update})
+    merged = apply_update(state, draft_update)
     verify_update = await verify_memo_node(merged)
-    final = AgentState(**{**merged, **verify_update})
+    final = apply_update(merged, verify_update)
     run_ms = (time.perf_counter() - t0) * 1000.0
     return final, run_ms
 

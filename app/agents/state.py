@@ -4,9 +4,10 @@ Agent State Management Module
 This module defines the state that flows through the LangGraph agent.
 """
 
+import operator
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, Required, TypedDict
+from typing import Annotated, Any, Mapping, Optional, Required, TypedDict, cast
 
 from langsmith import get_current_run_tree
 
@@ -26,6 +27,13 @@ class AgentStep(str, Enum):
     VERIFY_MEMO = "verify_memo"
     COMPLETE = "complete"
     ERROR = "error"
+
+# Filing chunks kept by retrieval, cited in the registry and shown in the LLM context.
+MAX_FILING_CHUNKS = 5
+
+
+def _last_write(_current: str, new: str) -> str:
+    return new
 
 # MAIN AGENT STATE
 
@@ -80,8 +88,9 @@ class AgentState(TypedDict, total=False):
     verification_result: dict
 
     # Metadata Fields
-    current_step: str
-    errors: list[dict]
+    # Reducers: the evidence nodes run in parallel and all write these two keys.
+    current_step: Annotated[str, _last_write]
+    errors: Annotated[list[dict], operator.add]
     started_at: str
     completed_at: str
     execution_time_ms: float
@@ -123,22 +132,26 @@ def add_error(
     message: str,
     recoverable: bool = True,
 ) -> dict:
-    """Add error to state. Returns partial state update."""
+    """Build the partial update for one error; the `errors` reducer appends it."""
     timed_out = message == "LLM memo generation timed out."
     if run := get_current_run_tree():
         run.metadata.update(outcome="failed", error_code="llm_timeout" if timed_out else "workflow_step_failed")
-    errors = state.get("errors", [])
-    errors.append({
-        "step": step,
-        "message": "LLM memo generation timed out." if timed_out else "Workflow step failed.",
-        "recoverable": recoverable,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
-
     return {
-        "errors": errors,
+        "errors": [{
+            "step": step,
+            "message": "LLM memo generation timed out." if timed_out else "Workflow step failed.",
+            "recoverable": recoverable,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }],
         "current_step": AgentStep.ERROR.value if not recoverable else state.get("current_step"),
     }
+
+
+def apply_update(state: AgentState, update: Mapping[str, Any]) -> AgentState:
+    """Merge one node update the way the graph does: `errors` append, other keys overwrite."""
+    merged: dict[str, Any] = {**state, **update}
+    merged["errors"] = [*state.get("errors", []), *update.get("errors", [])]
+    return cast(AgentState, merged)
 
 def has_fatal_error(state: AgentState) -> bool:
     """True when any non-recoverable error has been recorded."""
@@ -202,7 +215,7 @@ def get_context_for_llm(state: AgentState) -> str:
     chunks = state.get("filing_chunks", [])
     if chunks:
         parts.append("## SEC Filing Excerpts")
-        for chunk in chunks[:5]:  # Limit to top 5
+        for chunk in chunks[:MAX_FILING_CHUNKS]:
             parts.append(f"- {chunk.get('section', 'Unknown Section')}")
             parts.append(f"  {chunk.get('text', '')[:500]}")
             parts.append("")
