@@ -75,7 +75,12 @@ function toCitation(c: CitationResponse): CitationView {
   };
 }
 
-const clean = (s: string) => s.replace(/\*\*|__/g, "").trim();
+const clean = (s: string) =>
+  s
+    .replace(/\*\*|__/g, "")
+    .trim()
+    .replace(/^\*(.+)\*$/, "$1");
+const RULE = /^-{3,}$/;
 const HEADING_HASH = /^#{1,6}\s+(.*)$/;
 const HEADING_BOLD = /^(?:\d+[.)]\s*)?\*\*([^*]+?)\*\*:?$/;
 const HEADING_NUM = /^\d+[.)]\s+([^.!?\[\]]{2,60})$/;
@@ -95,7 +100,7 @@ export function parseMemo(memo: string): Section[] {
   };
   for (const raw of memo.split(/\r?\n/)) {
     const line = raw.trim();
-    if (!line) {
+    if (!line || RULE.test(line)) {
       endPara();
       continue;
     }
@@ -103,7 +108,7 @@ export function parseMemo(memo: string): Section[] {
     if (h) {
       endPara();
       flush();
-      cur = { heading: clean(h), blocks: [] };
+      cur = { heading: clean(h).replace(/^\d+[.)]\s*/, ""), blocks: [] };
       continue;
     }
     const b = BULLET.exec(line);
@@ -123,11 +128,31 @@ export function parseMemo(memo: string): Section[] {
 
 function firstSentence(s: string | null | undefined): string | null {
   if (!s) return null;
-  const plain = clean(s).replace(MARKER, "").replace(/\s+/g, " ").trim();
+  const plain = clean(s).replace(MARKER, "").replace(/\s+/g, " ").replace(/ ([.,;:!?])/g, "$1").trim();
   const m = /^.*?[.!?](?=\s|$)/.exec(plain);
   const out = (m ? m[0] : plain).slice(0, 200);
   return out || null;
 }
+
+/** Model-written legal boilerplate; rendered as a warning, not body text. */
+export function isDisclaimer(text: string): boolean {
+  return /^(disclaimer|important caveat)\b|does not constitute|informational purposes only/i.test(text);
+}
+
+/**
+ * The memo's own Executive Summary paragraph. The API's `executive_summary` is used only as a
+ * fallback because the backend currently fills it with "Analysis completed for <company>".
+ */
+export function executiveSummary(r: AnalysisResponse): string | null {
+  const section = parseMemo(r.investment_memo ?? "").find((s) => /executive summary/i.test(s.heading));
+  const para = section?.blocks.find((b) => b.kind === "p");
+  if (para?.kind === "p") return para.text;
+  const api = r.executive_summary?.trim();
+  return api && !/^Analysis completed for /i.test(api) ? api : null;
+}
+
+const MISSING_LABEL: Record<string, string> = { filings: "SEC filings", stock: "market data", news: "news", sentiment: "sentiment" };
+const rate = (n: number | undefined) => (n == null ? "—" : n.toFixed(2));
 
 /** Pure AnalysisResponse -> MemoView. Fields the API does not provide render as "—". */
 export function toMemoView(r: AnalysisResponse): MemoView {
@@ -135,18 +160,23 @@ export function toMemoView(r: AnalysisResponse): MemoView {
   const counts: Record<Group, number> = { sec: 0, news: 0, market: 0, sentiment: 0 };
   for (const c of citations) counts[c.group]++;
   const v = r.verification;
-  const stats: Stat[] = [
-    { label: "Stance", value: "—", tone: "ink" },
-    { label: "Confidence", value: "—", tone: "ink" },
-    { label: "Snapshot", value: "—", tone: "navy", mono: true },
-    r.errors.length
-      ? { label: "Evidence", value: `Degraded · ${[...new Set(r.errors.map((e) => e.step))].join(", ")}`, tone: "amber" }
-      : { label: "Evidence", value: "Complete", tone: "green" },
-  ];
   const jobId = r.job_id ?? null;
+  const missing = r.missing.map((m) => MISSING_LABEL[m] ?? m);
+  // Stance, confidence and snapshot id are not exposed by the API; show what is.
+  const stats: Stat[] = [
+    { label: "Status", value: r.status.replace("_", " "), tone: r.status === "completed" ? "green" : "amber" },
+    { label: "Grounded claims", value: rate(v?.grounded_claim_rate), tone: "ink", mono: true },
+    { label: "Citation coverage", value: rate(v?.citation_coverage_rate), tone: "ink", mono: true },
+    {
+      label: "Evidence",
+      value: missing.length ? `Missing · ${missing.join(", ")}` : r.errors.length ? "Degraded" : "Complete",
+      tone: missing.length || r.errors.length ? "amber" : "green",
+      href: jobId ? `/evidence?job=${encodeURIComponent(jobId)}` : undefined,
+    },
+  ];
   return {
     title: r.company_name || r.ticker,
-    subtitle: firstSentence(r.executive_summary),
+    subtitle: firstSentence(executiveSummary(r)),
     runLabel: jobId ? `Run ${jobId.slice(0, 8)}` : `Run ${r.ticker}`,
     runHref: jobId ? `/workspace?job=${encodeURIComponent(jobId)}` : "/workspace",
     draft: null,

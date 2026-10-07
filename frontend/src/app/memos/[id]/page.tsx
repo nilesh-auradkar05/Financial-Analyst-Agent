@@ -17,13 +17,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   try {
     job = await getJob(id);
   } catch (e) {
-    if (e instanceof UpstreamError && e.status === 404) notFound();
+    const gone = e instanceof UpstreamError && e.status === 404;
     return (
       <>
         <AppHeader active="memos" />
         <main className="mx-auto max-w-[720px] px-6 pt-16">
-          <h1 className="font-serif text-[32px] text-ink">Memo unavailable</h1>
-          <p className="mt-3 text-body">We couldn&rsquo;t load this memo right now. Please try again shortly.</p>
+          <h1 className="font-serif text-[32px] text-ink">{gone ? "This run no longer exists" : "Memo unavailable"}</h1>
+          <p className="mt-3 text-body">
+            {gone
+              ? "The analysis service has no record of this run. Start a new analysis from the Workspace."
+              : "We couldn\u2019t load this memo right now. Please try again shortly."}
+          </p>
         </main>
       </>
     );

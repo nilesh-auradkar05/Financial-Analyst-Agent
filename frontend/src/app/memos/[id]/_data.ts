@@ -53,6 +53,7 @@ export interface Stat {
   value: string;
   tone: Tone;
   mono?: boolean;
+  href?: string;
 }
 
 export interface MemoView {

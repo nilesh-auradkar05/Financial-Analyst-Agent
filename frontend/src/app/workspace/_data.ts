@@ -1,4 +1,5 @@
-import { isTerminalJobStatus, type JobPollResponse } from "../../lib/api-types.ts";
+import { isTerminalJobStatus, type AnalysisResponse, type JobPollResponse } from "../../lib/api-types.ts";
+import { executiveSummary, groupOf } from "../memos/[id]/_map.ts";
 
 export type NodeStatus = "completed" | "running" | "degraded" | "queued";
 export type NodeVariant = "default" | "sealed" | "progress" | "gate";
@@ -51,7 +52,8 @@ export interface WorkspaceRun {
     newsCount: string;
     newsOf: string | null;
     newsWarn: boolean;
-    priceBars: string;
+    /** Third tile: price bars in the sample; cited sources for live runs (bars are not exposed). */
+    third: { value: string; label: string };
     sentiment: string;
   };
   grounding: {
@@ -105,7 +107,7 @@ export const FIXTURE_RUN: WorkspaceRun = {
     newsCount: "13",
     newsOf: "/14",
     newsWarn: true,
-    priceBars: "252",
+    third: { value: "252", label: "Price bars" },
     sentiment: "13",
   },
   grounding: { badge: "candidate", grounded: 0.91, citation: 0.93, gate: 0.85 },
@@ -172,8 +174,47 @@ const PLACEHOLDER_NODES: GraphNodeData[] = FIXTURE_RUN.graph.map((n) => ({
   meta: n.id === "publish" ? FIXTURE_RUN.graph.find((g) => g.id === "publish")!.meta : DASH,
   status: "queued",
   progress: undefined,
-  variant: n.variant === "progress" ? "default" : n.variant,
+  variant: n.variant === "gate" ? "gate" : "default",
 }));
+
+/**
+ * Node states the job result can prove. The API reports no per-node progress, so a job in
+ * flight shows only the orchestrator as running; outcomes fill in when the result arrives.
+ */
+function liveGraph(job: JobPollResponse): GraphNodeData[] {
+  const r: AnalysisResponse | null = job.result ?? null;
+  if (!r) {
+    return PLACEHOLDER_NODES.map((n) =>
+      n.id === "orchestrator" && job.status === "running" ? { ...n, status: "running", badge: "running", meta: "per-node progress not exposed" } : n,
+    );
+  }
+  const miss = new Set(r.missing);
+  const v = r.verification;
+  const secCount = r.citations.filter((c) => groupOf(c.source_type) === "sec").length;
+  const price = r.stock_data?.current_price;
+  const facts: Record<GraphNodeData["id"], { ok: boolean; meta: string; badge?: string }> = {
+    orchestrator: { ok: true, meta: "fan-out 4" },
+    market: { ok: !miss.has("stock"), meta: price != null ? `quote $${price.toFixed(2)}` : "not available" },
+    sec: { ok: !miss.has("filings"), meta: miss.has("filings") ? "not available" : `${secCount} chunks` },
+    news: { ok: !miss.has("news"), meta: `${r.news_articles.length} articles` },
+    sentiment: { ok: !miss.has("sentiment"), meta: r.sentiment ? `FinBERT · ${r.sentiment.overall_sentiment}` : "not available" },
+    snapshot: { ok: true, meta: `${r.citations.length} sources`, badge: "sealed" },
+    writer: { ok: !!r.investment_memo, meta: v ? `${v.total_claims} claims · ${r.citations.length} sources` : DASH },
+    verifier: { ok: v?.passed === true, meta: v ? `grounded ${v.grounded_claim_rate.toFixed(2)}` : "not run", badge: v ? `${v.grounded_claims}/${v.total_claims}` : undefined },
+    publish: { ok: job.status === "completed", meta: job.status === "completed" ? "published" : `held · ${job.status}` },
+  };
+  return PLACEHOLDER_NODES.map((n) => {
+    const f = facts[n.id];
+    const status: NodeStatus = f.ok ? "completed" : n.id === "publish" ? "queued" : "degraded";
+    return {
+      ...n,
+      status,
+      meta: f.meta,
+      badge: f.badge ?? (status === "degraded" ? "degraded" : ""),
+      variant: n.id === "snapshot" ? "sealed" : n.variant,
+    };
+  });
+}
 
 /**
  * Overlay a real job onto the view model. Anything the API does not expose
@@ -207,16 +248,20 @@ export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): 
     elapsed: elapsed.replace(/ elapsed$/, ""),
     pill: `Status · ${statusLabel}`,
     graphSubtitle: "langgraph · 8 nodes · reviewer loop",
-    graph: PLACEHOLDER_NODES,
+    graph: liveGraph(job),
     reviseLabel: DASH,
     gateLabel: "on pass",
     evidence: {
-      typesLabel: r?.missing?.length ? `Missing ${r.missing.join(", ")}` : DASH,
-      sec: r?.missing?.includes("filings") ? "Not Available" : DASH,
+      typesLabel: !r ? DASH : r.missing.length ? `Missing ${r.missing.join(", ")}` : "4 of 4 types",
+      sec: !r
+        ? DASH
+        : r.missing.includes("filings")
+          ? "Not Available"
+          : String(r.citations.filter((c) => groupOf(c.source_type) === "sec").length),
       newsCount: r ? String(r.news_articles.length) : DASH,
       newsOf: null,
       newsWarn: false,
-      priceBars: DASH,
+      third: { value: r ? String(r.citations.length) : DASH, label: "Cited sources" },
       sentiment: s ? String(s.positive_count + s.negative_count + s.neutral_count) : DASH,
     },
     grounding: {
@@ -232,7 +277,7 @@ export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): 
     memo: {
       version: DASH,
       headline: null,
-      body: [{ kind: "text", text: r?.executive_summary ?? DASH }],
+      body: [{ kind: "text", text: (r && executiveSummary(r)) ?? DASH }],
       href: `/memos/${job.job_id}`,
     },
   };

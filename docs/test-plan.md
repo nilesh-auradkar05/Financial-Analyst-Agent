@@ -308,3 +308,18 @@ Each hook is tested by piping a sample event JSON to the script and asserting st
 | Retrieval failure | Safe failure reason differs from no filings; available evidence survives and verification executes |
 | Filings disabled | No missing-filings warning or evidence_missing status caused by disabled stage |
 | Frontend partial result | degraded/evidence_missing are terminal; available memo/evidence displayed; server forwards configured API_KEY without exposing it to the browser |
+
+## 17. Frontend live-run fidelity (FE-LIVE-FIDELITY, 2026-10-07)
+
+Traces to SPEC §1.2 / §12 S8. Live screens show only values the job proves; design fixtures appear only as labeled sample data.
+
+| Behavior | Expected |
+|---|---|
+| Summary source | The memo's Executive Summary paragraph is shown; the API placeholder "Analysis completed for …" is never shown as a summary |
+| Memo header stats | Status, grounded rate, citation coverage and evidence completeness come from the result; missing evidence classes are named |
+| Disclaimer | Model-written disclaimer/caveat paragraphs are classified for warning styling; ordinary paragraphs are not |
+| Graph in flight | A pending/running job shows no node as completed |
+| Graph at completion | Each node reflects the result: missing filings mark the SEC node degraded, verifier shows grounded/total, publish stays queued unless status is completed |
+| Evidence tiles | SEC count equals SEC sources in the citation registry; "Not Available" when filings are missing |
+| Own runs | Submitted job ids are remembered newest-first without duplicates, capped, and malformed ids are dropped |
+| Runs summary | Mean grounded rate, outcome counts and below-gate flags are computed from the listed runs |

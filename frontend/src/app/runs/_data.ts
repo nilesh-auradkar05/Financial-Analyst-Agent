@@ -1,20 +1,66 @@
-// ponytail: fixture until the API exposes a runs registry endpoint (evaluation/registry/)
+import type { JobPollResponse, JobStatus } from "../../lib/api-types.ts";
 
-export type RunStatus = "completed" | "degraded" | "evidence_missing";
+// RUNS/SUMMARY/OUTCOMES/GROUNDED_BARS are the design sample, shown only when this browser has no
+// runs. Real rows come from toRunRow(); model, cost and snapshot id are not exposed by the API.
 
-export const STATUSES: readonly RunStatus[] = ["completed", "degraded", "evidence_missing"];
+export type RunStatus = JobStatus;
+
+export const STATUSES: readonly RunStatus[] = ["completed", "degraded", "evidence_missing", "failed", "running"];
 
 export type RunRow = {
   id: string;
   ticker: string;
   snapshot: string | null;
-  model: string;
+  model: string | null;
   status: RunStatus;
   grounded: number | null;
   coverage: number | null;
-  latencyS: number;
-  costUsd: number;
+  latencyS: number | null;
+  costUsd: number | null;
+  /** Live runs link to their workspace and memo; sample rows do not. */
+  jobId?: string;
 };
+
+export function toRunRow(job: JobPollResponse): RunRow {
+  const v = job.result?.verification;
+  const ms = job.result?.execution_time_ms;
+  return {
+    id: job.job_id.slice(0, 8),
+    jobId: job.job_id,
+    ticker: job.ticker,
+    snapshot: null,
+    model: null,
+    status: job.status,
+    grounded: v?.grounded_claim_rate ?? null,
+    coverage: v?.citation_coverage_rate ?? null,
+    latencyS: ms != null ? ms / 1000 : null,
+    costUsd: null,
+  };
+}
+
+const COLOR: Partial<Record<RunStatus, string>> = { completed: "#0b7a55", degraded: "#c47a0a", evidence_missing: "#b42318", failed: "#7a271a" };
+export const GATE = 0.85;
+
+function meanSd(xs: number[]): { value: string; pm: string } {
+  if (!xs.length) return { value: "—", pm: "" };
+  const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length);
+  return { value: mean.toFixed(3), pm: xs.length > 1 ? `± ${sd.toFixed(3)}` : "" };
+}
+
+/** Summary tiles computed from real rows (newest first). Bars are oldest → newest, 50px tall at 1.0. */
+export function summarize(rows: readonly RunRow[]) {
+  const nums = (k: "grounded" | "coverage") => rows.flatMap((r) => (r[k] == null ? [] : [r[k]]));
+  return {
+    groundedClaimRate: meanSd(nums("grounded")),
+    citationCoverage: meanSd(nums("coverage")),
+    tag: `${rows.length} run${rows.length === 1 ? "" : "s"} · this browser`,
+    outcomes: Object.entries(COLOR)
+      .map(([status, color]) => ({ status, color, weight: rows.filter((r) => r.status === status).length }))
+      .filter((o) => o.weight > 0),
+    bars: nums("grounded").slice(0, 12).reverse().map((g) => ({ h: g * 50, bad: g < GATE })),
+  };
+}
 
 export const RUNS: readonly RunRow[] = [
   { id: "r_0f3a91", ticker: "NWSC", snapshot: "9f3a…c21e", model: "Bedrock · Claude", status: "degraded", grounded: 0.91, coverage: 0.93, latencyS: 31.8, costUsd: 0.112 },

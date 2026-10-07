@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { recentJobIds } from "@/lib/jobs.server";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -11,7 +12,10 @@ const NAV = [
 export type NavKey = (typeof NAV)[number]["key"];
 
 /** App nav (56px incl. bottom border). `children` fills the right-hand slot. */
-export function AppHeader({ active, children }: { active?: NavKey; children?: React.ReactNode }) {
+export async function AppHeader({ active, children }: { active?: NavKey; children?: React.ReactNode }) {
+  // Memos opens this browser's latest run; the sample only when there is none.
+  const latest = (await recentJobIds())[0];
+  const hrefOf = (n: (typeof NAV)[number]) => (n.key === "memos" && latest ? `/memos/${latest}` : n.href);
   return (
     <header className="sticky top-0 z-30 flex h-14 items-stretch border-b border-border bg-surface px-6">
       <Link href="/" className="mr-[27.5px] flex items-center" aria-label="Alpha Analyst home">
@@ -21,7 +25,7 @@ export function AppHeader({ active, children }: { active?: NavKey; children?: Re
         {NAV.map((n) => (
           <Link
             key={n.key}
-            href={n.href}
+            href={hrefOf(n)}
             aria-current={n.key === active ? "page" : undefined}
             className={`relative flex items-center px-3 text-[14px] ${
               n.key === active

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { parseInline } from "../_map";
+import { Disclaimer } from "@/components/Disclaimer";
+import { isDisclaimer, parseInline } from "../_map";
 import { GROUP_LABEL, GROUP_ORDER, type Block, type CitationView, type Group, type MemoView } from "../_data";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy";
@@ -51,7 +52,14 @@ function Text({
 function Blocks({ blocks, ...rest }: { blocks: Block[] } & Omit<Parameters<typeof Text>[0], "text">) {
   return blocks.map((b, i) =>
     b.kind === "p" ? (
-      <p key={i} className="font-serif text-[18.06px] leading-[32px] text-[#1f2a3a]">
+      <p
+        key={i}
+        className={
+          isDisclaimer(b.text)
+            ? "font-sans text-[16px] font-bold leading-[26px] text-red"
+            : "font-serif text-[18.06px] leading-[32px] text-[#1f2a3a]"
+        }
+      >
         <Text text={b.text} {...rest} />
       </p>
     ) : (
@@ -133,6 +141,7 @@ export function Reader({ view, head }: { view: MemoView; head: ReactNode }) {
               </div>
             </section>
           ))}
+          <Disclaimer className="mt-[32px] border-t-2 border-red pt-[14px] text-[17px] leading-[26px]" />
           {view.callout && (
             <aside
               aria-label="Reviewer note"

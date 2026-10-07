@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Disclaimer } from "@/components/Disclaimer";
 import type { MemoView, Tone } from "../_data";
 
 const TONE: Record<Tone, string> = {
@@ -47,12 +48,20 @@ export function MemoHead({ view }: { view: MemoView }) {
         <p className="mt-[16.5px] font-serif text-[22.5px] italic leading-[30px] text-body">{view.subtitle}</p>
       )}
 
-      <dl className="mt-[29.5px] grid grid-cols-4 overflow-hidden rounded-xl border border-border bg-surface">
+      <Disclaimer className="mt-[18px] text-[16px] leading-[24px]" />
+
+      <dl className="mt-[22px] grid grid-cols-4 overflow-hidden rounded-xl border border-border bg-surface">
         {view.stats.map((s, i) => (
-          <div key={s.label} className={`h-[67px] px-[18px] pt-[11.5px] ${i < 3 ? "border-r border-[#efede7]" : ""}`}>
+          <div key={s.label} className={`min-h-[67px] px-[18px] pt-[11.5px] pb-[10px] ${i < 3 ? "border-r border-[#efede7]" : ""}`}>
             <dt className="text-[11px] uppercase leading-[16px] tracking-[0.06em] text-muted">{s.label}</dt>
-            <dd className={`mt-[1px] text-[15px] leading-[24px] ${s.mono ? "font-mono text-[14px] font-medium" : "font-semibold"} ${TONE[s.tone]}`}>
-              {s.value}
+            <dd className={`mt-[1px] text-[15px] leading-[24px] ${s.mono ? "font-mono text-[14px] font-medium" : "font-semibold"} ${TONE[s.tone]} break-words`}>
+              {s.href ? (
+                <Link href={s.href} className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-navy">
+                  {s.value}
+                </Link>
+              ) : (
+                s.value
+              )}
             </dd>
           </div>
         ))}

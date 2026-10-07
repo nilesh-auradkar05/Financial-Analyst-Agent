@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Disclaimer } from "@/components/Disclaimer";
 import type { BarTone, MemoSegment, TraceTone, WorkspaceRun } from "../_data";
 import { AgentGraph } from "./AgentGraph";
 
@@ -76,7 +77,7 @@ function Meter({ name, value, gate }: { name: string; value: number | null; gate
 
 function Memo({ segs }: { segs: MemoSegment[] }) {
   return (
-    <p className="mt-[13px] text-[13px] leading-[22px] tracking-[-0.2px] text-[#3a4556]">
+    <p className="mt-[13px] line-clamp-[8] text-[13px] leading-[22px] tracking-[-0.2px] text-[#3a4556]">
       {segs.map((s, i) => {
         if (s.kind === "text") return <span key={i}>{s.text}</span>;
         if (s.kind === "cursor")
@@ -103,6 +104,11 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
           <div className="flex items-center gap-3.5 pt-[9px]">
             <h1 className="m-0 font-serif text-[33px] font-normal leading-[40px] tracking-[-0.005em] text-ink">{run.company}</h1>
             <span className="rounded-[6px] border border-border bg-surface px-2 py-[3px] font-mono text-[12px] tracking-[0.2px] leading-[15px] text-body">{run.ticker}</span>
+            {!run.live && (
+              <span className="rounded-[6px] bg-amber-tint px-2 py-[3px] text-[12px] font-semibold leading-[15px] text-[#8a4b06]">
+                Sample data · enter a ticker above to run a live analysis
+              </span>
+            )}
           </div>
           <p className="m-0 mt-[8.5px] flex items-center text-[13px] leading-[20px] text-muted">
             <span className="mr-[14px] font-mono text-[13px] tracking-[-0.2px] font-medium text-ink">{run.price}</span>
@@ -142,7 +148,7 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
             <div className="mt-[16px] grid grid-cols-2 content-start gap-x-4 gap-y-[13px]">
               <Stat value={ev.sec} label="SEC chunks" />
               <Stat value={ev.newsCount} suffix={ev.newsOf} warn={ev.newsWarn} label="News articles" />
-              <Stat value={ev.priceBars} label="Price bars" />
+              <Stat value={ev.third.value} label={ev.third.label} />
               <Stat value={ev.sentiment} label="Sentiment scores" />
             </div>
           </section>
@@ -207,7 +213,7 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
           )}
         </section>
 
-        <section aria-label="Memo draft" className={`h-[377.5px] px-[19.5px] pt-5 ${CARD}`}>
+        <section aria-label="Memo draft" className={`h-[377.5px] overflow-hidden px-[19.5px] pt-5 ${CARD}`}>
           <header className="flex h-4 items-center justify-between">
             <h2 className="m-0 text-[13px] font-semibold text-ink">
               Memo draft <span className="text-[11px] font-normal text-muted">{run.memo.version}</span>
@@ -220,6 +226,7 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
             <p className="m-0 mt-[12px] font-serif text-[20px] font-medium leading-[27.5px] text-ink">{run.memo.headline}</p>
           )}
           <Memo segs={run.memo.body} />
+          <Disclaimer className="mt-[12px] text-[13.5px] leading-[19px]" />
         </section>
       </aside>
     </main>
