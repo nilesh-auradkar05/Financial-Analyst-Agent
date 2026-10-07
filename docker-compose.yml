@@ -89,6 +89,24 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Web UI -> http://localhost:3001 (Grafana holds host port 3000)
+  frontend:
+    build:
+      context: ./frontend
+    container_name: financial-analyst-agent-system-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      # Server-side only; the browser never talks to the API directly.
+      - ALPHA_API_URL=http://api:8000
+      - API_KEY=${API_KEY:-}
+    restart: unless-stopped
+    networks:
+      - financial-analyst-network
+    depends_on:
+      api:
+        condition: service_healthy
+
   # Default retrieval backend
   qdrant:
     image: qdrant/qdrant:latest

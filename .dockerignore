@@ -42,3 +42,6 @@ docs/
 
 # Tests (not needed in production image)
 tests/
+
+# Frontend has its own image (frontend/Dockerfile)
+frontend/

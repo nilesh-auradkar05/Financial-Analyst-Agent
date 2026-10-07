@@ -238,6 +238,7 @@ make serve-prod     # 4 workers, no reload
 ```
 
 Interactive API docs: <http://localhost:8000/docs>
+Web UI (Compose): <http://localhost:3001>
 
 To run the API with Prometheus (`:9090`) and Grafana (`:3000`) in Docker instead:
 

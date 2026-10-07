@@ -227,7 +227,7 @@ app/**/__pycache__/
 tests/__pycache__/
 .deepeval/
 frontend-ref/
-old-artifacts/
+old_artifacts/
 .superpowers/
 tasks/
 .codegraph
