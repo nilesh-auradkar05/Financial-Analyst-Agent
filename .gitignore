@@ -233,3 +233,4 @@ FILES-README.md
 
 # graphify knowledge-graph output (regenerable via /graphify)
 graphify-out/
+frontend-ref/
