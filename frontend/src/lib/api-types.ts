@@ -76,6 +76,21 @@ export interface VerificationResponse {
   orphan_citations: number[];
 }
 
+export interface UsageResponse {
+  model?: string | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+}
+
+/** One workflow node's execution; `ended_at`/`duration_ms` are absent while it runs. */
+export interface NodeProgress {
+  node: string;
+  status: "running" | "completed" | "degraded";
+  started_at: string;
+  ended_at?: string | null;
+  duration_ms?: number | null;
+}
+
 export interface ErrorDetail {
   step: string;
   message: string;
@@ -92,6 +107,8 @@ export interface AnalysisResponse {
   status: JobStatus;
   executive_summary?: string | null;
   investment_memo?: string | null;
+  filing_chunk_count?: number | null;
+  usage?: UsageResponse | null;
   stock_data?: StockDataResponse | null;
   sentiment?: SentimentResponse | null;
   news_articles: NewsArticleResponse[];
@@ -123,6 +140,7 @@ export interface JobPollResponse {
   started_at: string;
   completed_at?: string | null;
   error?: string | null;
+  progress?: NodeProgress[];
   result?: AnalysisResponse | null;
 }
 

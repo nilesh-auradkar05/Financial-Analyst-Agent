@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -24,6 +24,7 @@ class RunRecord:
     request_fingerprint: Optional[str] = None
     request_id: Optional[str] = None
     trace_id: Optional[str] = None
+    progress: list[dict[str, Any]] = field(default_factory=list)
 
 class FileBackedRunStore:
     """
@@ -116,6 +117,9 @@ class FileBackedRunStore:
             completed_at=datetime.now(timezone.utc).isoformat(),
             error=error,
         )
+
+    def record_progress(self, job_id: str, progress: list[dict[str, Any]]) -> RunRecord:
+        return self._update(job_id, progress=progress)
 
     def get_run(self, job_id: str) -> Optional[RunRecord]:
         with self._lock:

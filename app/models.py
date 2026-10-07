@@ -5,7 +5,7 @@ This module defines the Pydantic models for the API request/response validation.
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -206,6 +206,24 @@ class ErrorDetail(BaseModel):
 
 # Response MODELS
 
+class UsageResponse(BaseModel):
+    """Memo-generation usage as reported by the provider; null when not reported."""
+
+    model: Optional[str] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+
+
+class NodeProgress(BaseModel):
+    """One workflow node's execution within a job."""
+
+    node: str
+    status: Literal["running", "completed", "degraded"]
+    started_at: str
+    ended_at: Optional[str] = None
+    duration_ms: Optional[float] = None
+
+
 class AnalysisResponse(BaseModel):
     """Complete analysis response.
 
@@ -225,6 +243,8 @@ class AnalysisResponse(BaseModel):
     # Results
     executive_summary: Optional[str] = None
     investment_memo: Optional[str] = None
+    filing_chunk_count: Optional[int] = None
+    usage: Optional[UsageResponse] = None
 
     # Supporting data
     stock_data: Optional[StockDataResponse] = None
@@ -281,6 +301,7 @@ class JobPollResponse(BaseModel):
     started_at: str
     completed_at: Optional[str] = None
     error: Optional[str] = None
+    progress: list[NodeProgress] = Field(default_factory=list)
     result: Optional[AnalysisResponse] = None
 
 class IngestionResponse(BaseModel):

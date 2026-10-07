@@ -449,3 +449,12 @@ existing single-process service; no distributed execution guarantee is claimed.
 Health distinguishes model availability from configuration-only Bedrock checks;
 no paid inference probe or successful-inference claim is made. Sequencing is
 recorded in sprint-plan's authorized exception; broader S7 work remains gated.
+
+## Run telemetry contract — 2026-10-07 (API-RUN-TELEMETRY)
+
+Authorized by the user on 2026-10-07 as S7 service-readiness support for the S8 frontend. Additive and optional; existing fields and statuses are unchanged.
+
+- `GET /jobs/{job_id}` returns `progress`: one entry per workflow node that has started, in start order, with `node`, `status` (`running`, `completed`, `degraded`), `started_at`, and, once finished, `ended_at` and `duration_ms`. A node whose update reports an error is `degraded`. Entries appear while the job is running and remain after it finishes. Jobs recorded before this contract return an empty list.
+- `AnalysisResponse` adds `filing_chunk_count` (chunks retrieved for the run) and `usage` (`model`, `input_tokens`, `output_tokens` as reported by the provider that produced the memo; absent values are null, never estimated).
+- `executive_summary` is the memo's Executive Summary paragraph; the "Analysis completed for …" text is only the fallback when the memo has no such section.
+- Out of scope here: cost (needs a price table decision), stance/confidence (prompt change, S6), evidence snapshot id (S2-T00b/S7), per-citation source text.

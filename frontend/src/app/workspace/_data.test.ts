@@ -44,17 +44,38 @@ test("missing filings still render available analysis", () => {
   assert.deepEqual(view.memo.body, [{ kind: "text", text: "Available news supports a cautious outlook." }]);
 });
 
-// test-plan §17: graph in flight / at completion, evidence tiles.
+// test-plan §17 (graph, evidence tiles) and §18 (frontend from progress).
 const statusOf = (view: ReturnType<typeof toWorkspaceRun>) => Object.fromEntries(view.graph.map((n) => [n.id, n.status]));
+const JOB = "11111111-1111-4111-8111-111111111111";
+const at = (s: number) => `2026-09-29T12:00:${String(s).padStart(2, "0")}.000Z`;
 
-test("a job in flight shows no node as completed", () => {
+test("a job in flight shows only what progress reports; nothing is invented without it", () => {
   for (const status of ["pending", "running"] satisfies JobStatus[]) {
-    const view = toWorkspaceRun({ job_id: "11111111-1111-4111-8111-111111111111", ticker: "ACME", status, started_at: "2026-09-29T12:00:00Z" });
-    assert.ok(!view.graph.some((n) => n.status === "completed" || n.variant === "sealed"), status);
+    const view = toWorkspaceRun({ job_id: JOB, ticker: "ACME", status, started_at: at(0) });
+    assert.ok(view.graph.every((n) => n.status === "queued"), status);
+    assert.deepEqual(view.time.bars, []);
+    assert.deepEqual(view.trace, []);
   }
+  const view = toWorkspaceRun({
+    job_id: JOB, ticker: "ACME", status: "running", started_at: at(0),
+    progress: [
+      { node: "fetch_stock", status: "completed", started_at: at(0), ended_at: at(1), duration_ms: 1000 },
+      { node: "retrieve_filings", status: "degraded", started_at: at(0), ended_at: at(2), duration_ms: 2000 },
+      { node: "research_news", status: "running", started_at: at(0) },
+    ],
+  });
+  assert.deepEqual(statusOf(view), {
+    research_news: "running", fetch_stock: "completed", retrieve_filings: "degraded",
+    analyze_sentiment: "queued", draft_memo: "queued", verify_memo: "queued",
+  });
+  assert.equal(view.graph.find((n) => n.id === "fetch_stock")?.badge, "1.0s");
+  assert.deepEqual(view.time.bars, [{ h: 0.5, tone: "green", label: "stock" }, { h: 1, tone: "amber", label: "filings" }]);
+  assert.deepEqual(view.trace.map((t) => `${t.agent} ${t.message}`), [
+    "stock started", "filings started", "news started", "stock completed · 1.0s", "filings degraded · 2.0s",
+  ]);
 });
 
-test("finished graph and evidence tiles reflect the result", () => {
+test("finished graph, evidence tiles and usage reflect the result", () => {
   const result: NonNullable<JobPollResponse["result"]> = {
     ticker: "ACME",
     company_name: "Acme",
@@ -68,22 +89,29 @@ test("finished graph and evidence tiles reflect the result", () => {
     errors: [],
     missing: ["filings"],
   };
-  const job: JobPollResponse = { job_id: "11111111-1111-4111-8111-111111111111", ticker: "ACME", status: "evidence_missing", started_at: "2026-09-29T12:00:00Z", result };
+  const job: JobPollResponse = { job_id: JOB, ticker: "ACME", status: "evidence_missing", started_at: at(0), result };
+  // A run recorded before progress existed still resolves every node from its result.
   const missing = toWorkspaceRun(job);
   assert.deepEqual(statusOf(missing), {
-    orchestrator: "completed", market: "completed", sec: "degraded", news: "completed", sentiment: "completed",
-    snapshot: "completed", writer: "completed", verifier: "completed", publish: "queued",
+    research_news: "completed", fetch_stock: "completed", retrieve_filings: "degraded",
+    analyze_sentiment: "completed", draft_memo: "completed", verify_memo: "completed",
   });
-  assert.equal(missing.graph.find((n) => n.id === "verifier")?.badge, "3/4");
+  assert.equal(missing.graph.find((n) => n.id === "verify_memo")?.meta, "3/4 grounded");
   assert.equal(missing.memo.body[0].kind === "text" && missing.memo.body[0].text, "Acme grew [1].");
+  assert.equal(missing.time.tokens, "—");
 
   const full = toWorkspaceRun({
     ...job,
     status: "completed",
-    result: { ...result, status: "completed", missing: [], citations: [...result.citations, { index: 2, source_type: "sec_filing", title: "10-K" }, { index: 3, source_type: "sec_filing", title: "10-K" }] },
+    result: {
+      ...result, status: "completed", missing: [], filing_chunk_count: 7,
+      usage: { model: "echo-1", input_tokens: 1200, output_tokens: 300 },
+      citations: [...result.citations, { index: 2, source_type: "sec_filing", title: "10-K" }, { index: 3, source_type: "sec_filing", title: "10-K" }],
+    },
   });
-  assert.equal(full.evidence.sec, "2");
+  assert.equal(full.evidence.sec, "7");
   assert.equal(full.evidence.third.value, "3");
-  assert.equal(statusOf(full).sec, "completed");
-  assert.equal(statusOf(full).publish, "completed");
+  assert.equal(statusOf(full).retrieve_filings, "completed");
+  assert.equal(full.time.tokens, "1.5k");
+  assert.equal(full.time.cap, "echo-1");
 });

@@ -21,8 +21,10 @@ Usage:
 import asyncio
 import hashlib
 import re
+from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -622,13 +624,20 @@ async def draft_memo_node(state: AgentState) -> dict:
                 }
             )
 
-        # 5. Extract executive summary
+        # 5. Extract executive summary: the first paragraph after the heading.
         exec_summary = ""
         if "Executive Summary" in memo:
-            parts = memo.split("Executive Summary")
-            if len(parts) > 1:
-                summary = parts[1].split("\n\n")[0]
-                exec_summary = summary.strip().strip("#").strip()[:500]
+            summary = memo.split("Executive Summary", 1)[1].lstrip(" :*#\n").split("\n\n")[0]
+            exec_summary = summary.strip().strip("#").strip()[:500]
+
+        # Usage as the answering provider reported it; never estimated.
+        usage = getattr(response, "usage_metadata", None) or {}
+        response_metadata = getattr(response, "response_metadata", None) or {}
+        llm_usage = {
+            "model": response_metadata.get("model_name") or response_metadata.get("model"),
+            "input_tokens": usage.get("input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+        }
 
         logger.info(
             f"[{ticker}] Memo generated ({len(memo)} chars, used_citations={sorted(used_citations)})"
@@ -639,6 +648,7 @@ async def draft_memo_node(state: AgentState) -> dict:
             "executive_summary": (
                 exec_summary or f"Analysis completed for {company_name}"
             ),
+            "llm_usage": llm_usage,
             "citations": api_citations,
             "citation_evidence": registry,
             "errors": errors,
@@ -783,6 +793,9 @@ def create_agent() -> Runnable[AgentState, AgentState]:
 # Compiled once per process; the graph holds no per-request state.
 AGENT = create_agent()
 
+# Optional per-run observer: receives the full node-progress list after every node start/finish.
+progress_sink: ContextVar[Callable[[list[dict]], object] | None] = ContextVar("progress_sink", default=None)
+
 # AGENT EXECUTION
 
 @app_traceable(name="run_financial_analysis", tags=['agent', "main"])
@@ -828,7 +841,28 @@ async def run_agent(
 
     # Excecute
     start_time = datetime.now(timezone.utc)
-    final_state = await AGENT.ainvoke(state, config=config)
+    sink = progress_sink.get()
+    steps: dict[str, dict] = {}
+    final_state: AgentState = state
+    async for event in AGENT.astream(state, config=config, stream_mode=["tasks", "values"]):
+        mode, chunk = cast(tuple[str, Any], event)
+        if mode == "values":
+            final_state = chunk
+            continue
+        if sink is None:
+            continue
+        now = datetime.now(timezone.utc)
+        if "input" in chunk:
+            steps[chunk["name"]] = {"node": chunk["name"], "status": "running", "started_at": now.isoformat()}
+        elif step := steps.get(chunk["name"]):
+            result = chunk.get("result")
+            failed = chunk.get("error") or (isinstance(result, dict) and result.get("errors"))
+            step.update(
+                status="degraded" if failed else "completed",
+                ended_at=now.isoformat(),
+                duration_ms=(now - datetime.fromisoformat(step["started_at"])).total_seconds() * 1000,
+            )
+        sink([dict(step) for step in steps.values()])
 
     # Calculate execution time
     exec_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000

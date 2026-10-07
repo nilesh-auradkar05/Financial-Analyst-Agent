@@ -63,7 +63,7 @@ from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # Local Imports
-from app.agents.graph import run_agent
+from app.agents.graph import progress_sink, run_agent
 from app.agents.state import AgentState
 from app.components.retrieval.ingestion import ingest_10k_for_ticker
 from app.components.retrieval.vector_store import RetrievalStore, SearchFilters, get_vector_store
@@ -83,9 +83,11 @@ from app.models import (
     JobPollResponse,
     JobStatus,
     NewsArticleResponse,
+    NodeProgress,
     SentimentResponse,
     StatsResponse,
     StockDataResponse,
+    UsageResponse,
     VerificationClaimResponse,
     VerificationResponse,
 )
@@ -499,6 +501,7 @@ async def get_job_status(job_id: uuid.UUID, _principal: str = Depends(_authentic
         started_at=record.started_at,
         completed_at=record.completed_at,
         error=record.error,
+        progress=[NodeProgress(**step) for step in record.progress],
         result=result,
     )
 
@@ -520,6 +523,7 @@ async def _run_analysis_job(
     }) as run:
         try:
             run_store.mark_running(job_id)
+            progress_sink.set(lambda progress: run_store.record_progress(job_id, progress))
             with track_agent_run(ticker):
                 result = await run_agent(
                     ticker, company_name,
@@ -653,6 +657,8 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         ) if verification else None,
         errors=errors,
         missing=missing,
+        filing_chunk_count=len(state.get("filing_chunks") or []),
+        usage=UsageResponse(**usage) if (usage := state.get("llm_usage")) else None,
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         execution_time_ms=state.get("execution_time_ms"),

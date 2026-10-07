@@ -136,7 +136,7 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
               <Legend />
             </div>
           </header>
-          <AgentGraph nodes={run.graph} reviseLabel={run.reviseLabel} gateLabel={run.gateLabel} />
+          <AgentGraph nodes={run.graph} />
         </section>
 
         <div className="mt-[23px] grid grid-cols-3 gap-4">
@@ -170,9 +170,14 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
               <h3 className={`m-0 ${EYEBROW}`}>Time by node</h3>
               <span className="font-mono text-[12px] leading-none tracking-[0.2px] text-muted">{t.cap}</span>
             </div>
-            <div role="img" aria-label="Bar chart of time spent per node" className="mt-[12px] flex h-[62.5px] items-end gap-1">
+            <div role="img" aria-label={`Time per node: ${t.bars.map((b) => `${b.label} ${Math.round(b.h * 100)}% of the longest`).join(", ") || "not recorded"}`} className="mt-[12px] flex h-[62.5px] items-end gap-1">
               {t.bars.map((b, i) => (
-                <div key={i} className={`flex-1 rounded-t-[2px] ${BAR_COLOR[b.tone]}`} style={{ height: `${b.h * 100}%` }} />
+                <div key={i} className={`min-h-px flex-1 rounded-t-[2px] ${BAR_COLOR[b.tone]}`} style={{ height: `${b.h * 100}%` }} />
+              ))}
+            </div>
+            <div aria-hidden className="mt-1 flex gap-1 font-mono text-[9.5px] text-muted">
+              {t.bars.map((b, i) => (
+                <span key={i} className="flex-1 truncate text-center">{b.label}</span>
               ))}
             </div>
             <div className="mt-[14px] flex items-baseline justify-between text-[12.5px] leading-[16px] text-body">
@@ -180,7 +185,7 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
                 <span className="font-mono text-[12px] tracking-[0.2px] text-ink">{t.tokens}</span> tokens
               </span>
               <span>
-                <span className="font-mono text-[12px] tracking-[0.2px] text-ink">{t.cost}</span> so far
+                <span className="font-mono text-[12px] tracking-[0.2px] text-ink">{t.cost}</span> cost
               </span>
             </div>
           </section>
@@ -188,7 +193,7 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
       </div>
 
       <aside className="flex flex-col gap-[21px]" aria-label="Run details">
-        <section aria-label="Trace" className={`h-[521.5px] overflow-hidden ${CARD}`}>
+        <section aria-label="Trace" className={`min-h-[300px] overflow-hidden ${CARD}`}>
           <header className="flex h-[47px] items-center justify-between border-b border-border px-[18px]">
             <h2 className="m-0 text-[13px] font-semibold text-ink">Trace</h2>
             {run.streaming && (
@@ -202,8 +207,8 @@ export function WorkspaceView({ run }: { run: WorkspaceRun }) {
             <p className="m-0 px-[18px] py-4 text-[13px] text-muted">{run.traceNote}</p>
           ) : (
             <ol className="m-0 list-none p-0">
-              {run.trace.map((r) => (
-                <li key={r.time} className="grid grid-cols-[90px_80px_1fr] border-b border-[#f0eee9] px-[18px] py-[7.5px] font-mono text-[11px] tracking-[-0.4px] leading-[16px]">
+              {run.trace.map((r, i) => (
+                <li key={i} className="grid grid-cols-[90px_80px_1fr] border-b border-[#f0eee9] px-[18px] py-[7.5px] font-mono text-[11px] tracking-[-0.4px] leading-[16px]">
                   <time className="text-[#8b93a1]">{r.time}</time>
                   <span className={`font-medium ${TRACE_COLOR[r.tone]}`}>{r.agent}</span>
                   <span className="text-[#3a4556]">{r.message}</span>

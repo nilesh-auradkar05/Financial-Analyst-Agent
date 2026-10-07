@@ -2,18 +2,18 @@ import { isTerminalJobStatus, type AnalysisResponse, type JobPollResponse } from
 import { executiveSummary, groupOf } from "../memos/[id]/_map.ts";
 
 export type NodeStatus = "completed" | "running" | "degraded" | "queued";
-export type NodeVariant = "default" | "sealed" | "progress" | "gate";
+
+/** The workflow as built in app/agents/graph.py: three parallel evidence nodes, then three in sequence. */
+export const NODE_IDS = ["research_news", "fetch_stock", "retrieve_filings", "analyze_sentiment", "draft_memo", "verify_memo"] as const;
+export type NodeId = (typeof NODE_IDS)[number];
 
 export interface GraphNodeData {
-  id: "orchestrator" | "market" | "sec" | "news" | "sentiment" | "snapshot" | "writer" | "verifier" | "publish";
+  id: NodeId;
   title: string;
-  /** Right-aligned mono badge (timing, version, "degraded", "sealed", "14/22"). */
+  /** Right-aligned mono badge: duration, "running" or "degraded". */
   badge: string;
   meta: string;
   status: NodeStatus;
-  variant: NodeVariant;
-  /** 0..1 progress bar (verifier). */
-  progress?: number;
 }
 
 export type TraceTone = "green" | "amber" | "navy" | "blue" | "body";
@@ -44,8 +44,6 @@ export interface WorkspaceRun {
   pill: string;
   graphSubtitle: string;
   graph: GraphNodeData[];
-  reviseLabel: string;
-  gateLabel: string;
   evidence: {
     typesLabel: string;
     sec: string;
@@ -62,7 +60,7 @@ export interface WorkspaceRun {
     citation: number | null;
     gate: number;
   };
-  time: { cap: string; bars: { h: number; tone: BarTone }[]; tokens: string; cost: string };
+  time: { cap: string; bars: { h: number; tone: BarTone; label: string }[]; tokens: string; cost: string };
   trace: TraceRow[];
   traceNote: string | null;
   streaming: boolean;
@@ -87,20 +85,15 @@ export const FIXTURE_RUN: WorkspaceRun = {
   started: "14:02:07",
   elapsed: "21.4s",
   pill: "Verifier · pass 2 of 3",
-  graphSubtitle: "langgraph · 8 nodes · reviewer loop",
+  graphSubtitle: "langgraph · 6 nodes",
   graph: [
-    { id: "orchestrator", title: "Orchestrator", badge: "0.2s", meta: "plan · fan-out 4", status: "completed", variant: "default" },
-    { id: "market", title: "Market data", badge: "0.6s", meta: "yfinance · 252d OHLCV", status: "completed", variant: "default" },
-    { id: "sec", title: "SEC filings", badge: "1.8s", meta: "edgartools · 184 chunks", status: "completed", variant: "default" },
-    { id: "news", title: "News", badge: "degraded", meta: "tavily · 14 art · 1 timeout", status: "degraded", variant: "default" },
-    { id: "sentiment", title: "Sentiment", badge: "1.1s", meta: "FinBERT · net +0.31", status: "completed", variant: "default" },
-    { id: "snapshot", title: "EvidenceSnapshot", badge: "sealed", meta: "sha 9f3a…c21e · RAG top-k 12", status: "completed", variant: "sealed" },
-    { id: "writer", title: "Memo writer", badge: "v2", meta: "22 claims · 31 cites", status: "completed", variant: "default" },
-    { id: "verifier", title: "Verifier", badge: "14/22", meta: "", status: "running", variant: "progress", progress: 14 / 22 },
-    { id: "publish", title: "Publish memo", badge: "", meta: "gate: grounded ≥ 0.85", status: "queued", variant: "gate" },
+    { id: "research_news", title: "News", badge: "degraded", meta: "tavily · 13 articles · 1 timeout", status: "degraded" },
+    { id: "fetch_stock", title: "Market data", badge: "0.6s", meta: "yfinance · quote $142.18", status: "completed" },
+    { id: "retrieve_filings", title: "SEC filings", badge: "1.8s", meta: "184 chunks", status: "completed" },
+    { id: "analyze_sentiment", title: "Sentiment", badge: "1.1s", meta: "FinBERT · positive", status: "completed" },
+    { id: "draft_memo", title: "Memo writer", badge: "9.9s", meta: "22 claims · 31 sources", status: "completed" },
+    { id: "verify_memo", title: "Verifier", badge: "running", meta: "checking claims", status: "running" },
   ],
-  reviseLabel: "revise · 2 claims",
-  gateLabel: "on pass",
   evidence: {
     typesLabel: "4 of 4 types",
     sec: "184",
@@ -112,32 +105,29 @@ export const FIXTURE_RUN: WorkspaceRun = {
   },
   grounding: { badge: "candidate", grounded: 0.91, citation: 0.93, gate: 0.85 },
   time: {
-    cap: "90s cap",
-    // h = fraction of the chart height (62.5px in the reference).
+    cap: "21.4s",
+    // h = fraction of the chart height.
     bars: [
-      { h: 0.048, tone: "green" },
-      { h: 0.2, tone: "green" },
-      { h: 0.312, tone: "amber" },
-      { h: 0.152, tone: "green" },
-      { h: 0.96, tone: "navy" },
-      { h: 0.416, tone: "navy" },
-      { h: 0.688, tone: "navy" },
-      { h: 0.28, tone: "blue" },
+      { h: 0.31, tone: "amber", label: "news" },
+      { h: 0.06, tone: "green", label: "stock" },
+      { h: 0.18, tone: "green", label: "filings" },
+      { h: 0.11, tone: "green", label: "sent." },
+      { h: 1, tone: "green", label: "draft" },
+      { h: 0.5, tone: "blue", label: "verify" },
     ],
     tokens: "41.2k",
     cost: "$0.084",
   },
   trace: [
-    { time: "14:02:07.112", agent: "orchestr", tone: "body", message: "plan → market, sec, news, sentiment" },
-    { time: "14:02:07.340", agent: "market", tone: "green", message: "OHLCV 252d · 1 evidence item" },
-    { time: "14:02:08.901", agent: "sec", tone: "green", message: "10-Q 2026Q2 parsed · 184 chunks" },
-    { time: "14:02:09.455", agent: "news", tone: "amber", message: "14 fetched · 1 timeout → degraded" },
-    { time: "14:02:11.020", agent: "sentiment", tone: "green", message: "FinBERT 13/13 · net +0.31" },
-    { time: "14:02:11.207", agent: "snapshot", tone: "navy", message: "sealed 9f3a…c21e (4 types)" },
-    { time: "14:02:18.644", agent: "writer", tone: "navy", message: "draft v1 · 23 claims" },
-    { time: "14:02:21.930", agent: "verifier", tone: "amber", message: "2 claims < 0.45 cos → revise" },
-    { time: "14:02:27.415", agent: "writer", tone: "navy", message: "draft v2 · 22 claims · 31 cites" },
-    { time: "14:02:28.002", agent: "verifier", tone: "blue", message: "checking claim 14/22 …" },
+    { time: "14:02:07.112", agent: "stock", tone: "body", message: "started" },
+    { time: "14:02:07.113", agent: "filings", tone: "body", message: "started" },
+    { time: "14:02:07.113", agent: "news", tone: "body", message: "started" },
+    { time: "14:02:07.740", agent: "stock", tone: "green", message: "completed · 0.6s" },
+    { time: "14:02:08.901", agent: "filings", tone: "green", message: "completed · 1.8s" },
+    { time: "14:02:10.220", agent: "news", tone: "amber", message: "degraded · 3.1s" },
+    { time: "14:02:11.320", agent: "sent.", tone: "green", message: "completed · 1.1s" },
+    { time: "14:02:21.207", agent: "draft", tone: "green", message: "completed · 9.9s" },
+    { time: "14:02:21.210", agent: "verify", tone: "blue", message: "started" },
   ],
   traceNote: null,
   streaming: true,
@@ -168,58 +158,82 @@ function fmtChange(pct: number | null | undefined): { text: string; tone: Worksp
   return { text: `${sign}${pct.toFixed(2)}%`, tone: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
 }
 
-const PLACEHOLDER_NODES: GraphNodeData[] = FIXTURE_RUN.graph.map((n) => ({
-  ...n,
-  badge: n.id === "publish" ? "" : DASH,
-  meta: n.id === "publish" ? FIXTURE_RUN.graph.find((g) => g.id === "publish")!.meta : DASH,
-  status: "queued",
-  progress: undefined,
-  variant: n.variant === "gate" ? "gate" : "default",
-}));
+const NODE: Record<NodeId, { title: string; short: string }> = {
+  research_news: { title: "News", short: "news" },
+  fetch_stock: { title: "Market data", short: "stock" },
+  retrieve_filings: { title: "SEC filings", short: "filings" },
+  analyze_sentiment: { title: "Sentiment", short: "sent." },
+  draft_memo: { title: "Memo writer", short: "draft" },
+  verify_memo: { title: "Verifier", short: "verify" },
+};
+const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+const fmtMs = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? DASH : `${d.toLocaleTimeString("en-GB", { hour12: false })}.${String(d.getMilliseconds()).padStart(3, "0")}`;
+};
 
-/**
- * Node states the job result can prove. The API reports no per-node progress, so a job in
- * flight shows only the orchestrator as running; outcomes fill in when the result arrives.
- */
-function liveGraph(job: JobPollResponse): GraphNodeData[] {
-  const r: AnalysisResponse | null = job.result ?? null;
-  if (!r) {
-    return PLACEHOLDER_NODES.map((n) =>
-      n.id === "orchestrator" && job.status === "running" ? { ...n, status: "running", badge: "running", meta: "per-node progress not exposed" } : n,
-    );
-  }
+const secChunks = (r: AnalysisResponse) => r.filing_chunk_count ?? r.citations.filter((c) => groupOf(c.source_type) === "sec").length;
+
+/** What the finished result proves about each node (used for meta text, and for status on runs with no progress). */
+function facts(r: AnalysisResponse): Record<NodeId, { ok: boolean; meta: string }> {
   const miss = new Set(r.missing);
   const v = r.verification;
-  const secCount = r.citations.filter((c) => groupOf(c.source_type) === "sec").length;
   const price = r.stock_data?.current_price;
-  const facts: Record<GraphNodeData["id"], { ok: boolean; meta: string; badge?: string }> = {
-    orchestrator: { ok: true, meta: "fan-out 4" },
-    market: { ok: !miss.has("stock"), meta: price != null ? `quote $${price.toFixed(2)}` : "not available" },
-    sec: { ok: !miss.has("filings"), meta: miss.has("filings") ? "not available" : `${secCount} chunks` },
-    news: { ok: !miss.has("news"), meta: `${r.news_articles.length} articles` },
-    sentiment: { ok: !miss.has("sentiment"), meta: r.sentiment ? `FinBERT · ${r.sentiment.overall_sentiment}` : "not available" },
-    snapshot: { ok: true, meta: `${r.citations.length} sources`, badge: "sealed" },
-    writer: { ok: !!r.investment_memo, meta: v ? `${v.total_claims} claims · ${r.citations.length} sources` : DASH },
-    verifier: { ok: v?.passed === true, meta: v ? `grounded ${v.grounded_claim_rate.toFixed(2)}` : "not run", badge: v ? `${v.grounded_claims}/${v.total_claims}` : undefined },
-    publish: { ok: job.status === "completed", meta: job.status === "completed" ? "published" : `held · ${job.status}` },
+  return {
+    research_news: { ok: !miss.has("news"), meta: `${r.news_articles.length} articles` },
+    fetch_stock: { ok: !miss.has("stock"), meta: price != null ? `quote $${price.toFixed(2)}` : "not available" },
+    retrieve_filings: { ok: !miss.has("filings"), meta: miss.has("filings") ? "not available" : `${secChunks(r)} chunks` },
+    analyze_sentiment: { ok: !miss.has("sentiment"), meta: r.sentiment ? `FinBERT · ${r.sentiment.overall_sentiment}` : "not available" },
+    draft_memo: { ok: !!r.investment_memo, meta: v ? `${v.total_claims} claims · ${r.citations.length} sources` : DASH },
+    verify_memo: { ok: v?.passed === true, meta: v ? `${v.grounded_claims}/${v.total_claims} grounded` : "not run" },
   };
-  return PLACEHOLDER_NODES.map((n) => {
-    const f = facts[n.id];
-    const status: NodeStatus = f.ok ? "completed" : n.id === "publish" ? "queued" : "degraded";
+}
+
+/** Node state from the job's recorded progress; nodes that have not started are queued. */
+function liveGraph(job: JobPollResponse): GraphNodeData[] {
+  const f = job.result ? facts(job.result) : null;
+  const byNode = new Map((job.progress ?? []).map((p) => [p.node, p]));
+  return NODE_IDS.map((id) => {
+    const p = byNode.get(id);
+    const status: NodeStatus =
+      p?.status === "running" ? "running" : f ? (f[id].ok && p?.status !== "degraded" ? "completed" : "degraded") : (p?.status ?? "queued");
     return {
-      ...n,
+      id,
+      title: NODE[id].title,
       status,
-      meta: f.meta,
-      badge: f.badge ?? (status === "degraded" ? "degraded" : ""),
-      variant: n.id === "snapshot" ? "sealed" : n.variant,
+      meta: f ? f[id].meta : DASH,
+      badge: status === "running" ? "running" : p?.duration_ms != null ? secs(p.duration_ms) : status === "degraded" ? "degraded" : "",
     };
   });
 }
 
+function liveTrace(job: JobPollResponse): TraceRow[] {
+  const rows = (job.progress ?? []).flatMap((p) => {
+    const agent = NODE[p.node as NodeId]?.short ?? p.node;
+    const start = { at: p.started_at, row: { time: fmtMs(p.started_at), agent, tone: "body" as TraceTone, message: "started" } };
+    if (!p.ended_at) return [start];
+    const tone: TraceTone = p.status === "degraded" ? "amber" : "green";
+    return [start, { at: p.ended_at, row: { time: fmtMs(p.ended_at), agent, tone, message: `${p.status}${p.duration_ms != null ? ` · ${secs(p.duration_ms)}` : ""}` } }];
+  });
+  return rows.sort((a, b) => a.at.localeCompare(b.at)).map((r) => r.row);
+}
+
+function liveTime(job: JobPollResponse): WorkspaceRun["time"] {
+  const done = (job.progress ?? []).filter((p) => p.duration_ms != null);
+  const max = Math.max(...done.map((p) => p.duration_ms!), 1);
+  const u = job.result?.usage;
+  const tokens = u?.input_tokens != null && u?.output_tokens != null ? u.input_tokens + u.output_tokens : null;
+  return {
+    cap: u?.model ?? DASH,
+    bars: done.map((p) => ({ h: p.duration_ms! / max, tone: p.status === "degraded" ? "amber" : "green", label: NODE[p.node as NodeId]?.short ?? p.node })),
+    tokens: tokens == null ? DASH : tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens),
+    cost: DASH, // not reported by the API
+  };
+}
+
 /**
  * Overlay a real job onto the view model. Anything the API does not expose
- * (trace events, per-node timings, tokens, hashes, graph state) is a neutral
- * placeholder — never a fixture number.
+ * (cost, snapshot hashes) is a neutral placeholder — never a fixture number.
  * `now` is injectable so the mapping stays pure.
  */
 export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): WorkspaceRun {
@@ -247,17 +261,11 @@ export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): 
     started: fmtTime(job.started_at),
     elapsed: elapsed.replace(/ elapsed$/, ""),
     pill: `Status · ${statusLabel}`,
-    graphSubtitle: "langgraph · 8 nodes · reviewer loop",
+    graphSubtitle: "langgraph · 6 nodes",
     graph: liveGraph(job),
-    reviseLabel: DASH,
-    gateLabel: "on pass",
-    evidence: {
+      evidence: {
       typesLabel: !r ? DASH : r.missing.length ? `Missing ${r.missing.join(", ")}` : "4 of 4 types",
-      sec: !r
-        ? DASH
-        : r.missing.includes("filings")
-          ? "Not Available"
-          : String(r.citations.filter((c) => groupOf(c.source_type) === "sec").length),
+      sec: !r ? DASH : r.missing.includes("filings") ? "Not Available" : String(secChunks(r)),
       newsCount: r ? String(r.news_articles.length) : DASH,
       newsOf: null,
       newsWarn: false,
@@ -270,9 +278,9 @@ export function toWorkspaceRun(job: JobPollResponse, now: number = Date.now()): 
       citation: r?.verification?.citation_coverage_rate ?? null,
       gate: 0.85,
     },
-    time: { cap: DASH, bars: [], tokens: DASH, cost: DASH },
-    trace: [],
-    traceNote: job.error ?? "Trace events are not exposed by the API yet.",
+    time: liveTime(job),
+    trace: liveTrace(job),
+    traceNote: job.error ?? (terminal ? "No step timings were recorded for this run." : "Waiting for the first step…"),
     streaming: !terminal,
     memo: {
       version: DASH,

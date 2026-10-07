@@ -85,6 +85,7 @@ class AgentState(TypedDict, total=False):
     citations: list[dict]
     citation_evidence: list[dict]
     executive_summary: str
+    llm_usage: dict
     verification_result: dict
 
     # Metadata Fields

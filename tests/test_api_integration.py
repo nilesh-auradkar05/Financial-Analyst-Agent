@@ -635,3 +635,19 @@ def test_all_nine_routes_document_actual_success_and_errors(client):
         else:
             assert content["application/json"]["schema"].get("$ref")
         assert operation["responses"]["405"]["content"]["application/json"]["schema"]["$ref"].endswith("ErrorResponse")
+
+
+def test_job_poll_serves_recorded_progress_and_result_counts(client: TestClient):
+    """Trace: docs/test-plan.md §18 (progress persisted and served; filing chunk count)."""
+    job_id = client.post("/analyze/async", json={"ticker": "AAPL"}).json()["job_id"]
+    polled = client.get(f"/jobs/{job_id}").json()
+    assert polled["progress"] == []
+    assert polled["result"]["filing_chunk_count"] == 1
+    assert polled["result"]["usage"] is None
+
+    step = {"node": "fetch_stock", "status": "completed", "started_at": "2026-10-07T12:00:00+00:00",
+            "ended_at": "2026-10-07T12:00:01+00:00", "duration_ms": 1000.0}
+    api_main.run_store.record_progress(job_id, [step, {"node": "draft_memo", "status": "running", "started_at": "2026-10-07T12:00:01+00:00"}])
+    progress = client.get(f"/jobs/{job_id}").json()["progress"]
+    assert progress[0] == step
+    assert progress[1] == {"node": "draft_memo", "status": "running", "started_at": "2026-10-07T12:00:01+00:00", "ended_at": None, "duration_ms": None}

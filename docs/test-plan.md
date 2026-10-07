@@ -323,3 +323,18 @@ Traces to SPEC §1.2 / §12 S8. Live screens show only values the job proves; de
 | Evidence tiles | SEC count equals SEC sources in the citation registry; "Not Available" when filings are missing |
 | Own runs | Submitted job ids are remembered newest-first without duplicates, capped, and malformed ids are dropped |
 | Runs summary | Mean grounded rate, outcome counts and below-gate flags are computed from the listed runs |
+
+## 18. Run telemetry (API-RUN-TELEMETRY, 2026-10-07)
+
+Traces to SPEC "Run telemetry contract — 2026-10-07".
+
+| Behavior | Expected |
+|---|---|
+| Progress while running | A progress observer sees a node as `running` before it sees that node finished; evidence nodes start before any of them is reported finished |
+| Progress at completion | All six nodes are present in start order with `ended_at` and non-negative `duration_ms`; a branch that reports an error is `degraded`, the others `completed` |
+| No observer | A run without a progress observer returns the same final state |
+| Progress persisted and served | Progress recorded for a job is returned by `GET /jobs/{job_id}`; a job with none returns an empty list |
+| Usage | Token counts and model reported by the memo provider appear on the result; a provider reporting none yields nulls |
+| Filing chunk count | Result reports the number of filing chunks retrieved |
+| Executive summary | A memo with a numbered/markdown "Executive Summary" heading yields that paragraph, not the fallback text |
+| Frontend from progress | Live graph, time-by-node and trace derive from `progress`; nodes not yet started are queued; nothing is invented when `progress` is empty |
