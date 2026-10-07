@@ -208,13 +208,8 @@ marimo/_lsp/
 __marimo__/
 
 # Custom files
-data/
-app/**/__pycache__/
-tests/__pycache__/
-.deepeval/
-
+production-scale-topic.txt
 agents/crew_agents.py
-Alpha-Financial-Analyst.zip
 old-readme.md
 README-new.md
 ALPHA_ANALYST_PROJECT_DOCUMENT_v4_STATUS_UPDATE.md
@@ -223,14 +218,28 @@ Nilesh_Auradkar_B01044448_CS-595-55_Project-Report.docx
 Nilesh_Auradkar_B01044448_CS-595-55_Project-Report.pdf
 Alpha_Analyst_Progressive_Project_Report_v2.docx
 .env.local
+LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md
+FILES-README.md
+
+# Custom folders
+data/
+app/**/__pycache__/
+tests/__pycache__/
+.deepeval/
+frontend-ref/
+old-artifacts/
+.superpowers/
+tasks/
 .codegraph
 .codex
 .cursor
 .runtime
 test_image/
-LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md
-FILES-README.md
+
+# Custom Zip files
+Alpha-Financial-Analyst.zip
 
 # graphify knowledge-graph output (regenerable via /graphify)
 graphify-out/
-frontend-ref/
+
+
