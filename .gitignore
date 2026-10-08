@@ -220,6 +220,7 @@ Alpha_Analyst_Progressive_Project_Report_v2.docx
 .env.local
 LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md
 FILES-README.md
+docker_desktop_log.txt
 
 # Custom folders
 data/
