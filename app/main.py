@@ -50,6 +50,7 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
     status,
@@ -84,6 +85,7 @@ from app.models import (
     JobStatus,
     NewsArticleResponse,
     NodeProgress,
+    RunSummary,
     SentimentResponse,
     StatsResponse,
     StockDataResponse,
@@ -481,6 +483,24 @@ async def analyze_async(
         started_at=record.started_at,
         error=record.error,
     )
+
+
+@app.get("/jobs", response_model=list[RunSummary], tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
+async def list_jobs(limit: int = Query(default=20, ge=1, le=100), _principal: str = Depends(_authenticate)):
+    """Stored runs, newest first. Lets a client show what still exists after data loss."""
+    records = sorted(run_store.list_runs(), key=lambda record: record.started_at, reverse=True)[:limit]
+    summaries = []
+    for record in records:
+        result = record.result or {}
+        verification = result.get("verification") or {}
+        summaries.append(RunSummary(
+            job_id=record.job_id, ticker=record.ticker, status=JobStatus(record.status),
+            started_at=record.started_at, completed_at=record.completed_at,
+            grounded_claim_rate=verification.get("grounded_claim_rate"),
+            citation_coverage_rate=verification.get("citation_coverage_rate"),
+            execution_time_ms=result.get("execution_time_ms"),
+        ))
+    return summaries
 
 
 @app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})

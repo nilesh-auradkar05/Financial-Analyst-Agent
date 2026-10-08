@@ -60,8 +60,8 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --chown=appuser:appgroup . .
 
 # Create data directories
-RUN mkdir -p /app/data/chroma /app/data/filings \
-    && chown -R appuser:appgroup /app/data
+RUN mkdir -p /app/data/chroma /app/data/filings /app/.runtime \
+    && chown -R appuser:appgroup /app/data /app/.runtime
 
 # Put the venv on PATH
 ENV PATH="/app/.venv/bin:$PATH"

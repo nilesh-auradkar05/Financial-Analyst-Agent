@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { recentJobIds } from "@/lib/jobs.server";
+import { resolveJobId } from "@/lib/jobs.server";
 import { Logo } from "./Logo";
 
 const NAV = [
@@ -13,8 +13,8 @@ export type NavKey = (typeof NAV)[number]["key"];
 
 /** App nav (56px incl. bottom border). `children` fills the right-hand slot. */
 export async function AppHeader({ active, children }: { active?: NavKey; children?: React.ReactNode }) {
-  // Memos opens this browser's latest run; the sample only when there is none.
-  const latest = (await recentJobIds())[0];
+  // Memos opens the newest run available to this viewer; the sample only when there is none.
+  const latest = await resolveJobId(undefined);
   const hrefOf = (n: (typeof NAV)[number]) => (n.key === "memos" && latest ? `/memos/${latest}` : n.href);
   return (
     <header className="sticky top-0 z-30 flex h-14 items-stretch border-b border-border bg-surface px-6">

@@ -276,6 +276,19 @@ class AnalysisResponse(BaseModel):
         },
     )
 
+class RunSummary(BaseModel):
+    """One stored run, without its memo or evidence."""
+
+    job_id: str
+    ticker: str
+    status: JobStatus
+    started_at: str
+    completed_at: Optional[str] = None
+    grounded_claim_rate: Optional[float] = None
+    citation_coverage_rate: Optional[float] = None
+    execution_time_ms: Optional[float] = None
+
+
 class JobAcceptedResponse(BaseModel):
     """Immediate response for async job acceptance."""
 

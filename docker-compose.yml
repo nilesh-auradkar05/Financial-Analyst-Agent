@@ -73,6 +73,8 @@ services:
       # Persist data between restarts
       - chroma-data:/app/data/chroma
       - filings-data:/app/data/filings
+      # Run history (jobs, memos, progress) survives image rebuilds
+      - runs-data:/app/.runtime
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -199,6 +201,8 @@ volumes:
     name: financial-analyst-chroma
   filings-data:
     name: financial-analyst-filings
+  runs-data:
+    name: financial-analyst-runs
   prometheus-data:
     name: financial-analyst-prometheus
   grafana-data:

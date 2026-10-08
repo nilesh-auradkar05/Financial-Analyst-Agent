@@ -1,5 +1,5 @@
 import "server-only";
-import type { JobAcceptedResponse, JobPollResponse } from "./api-types";
+import type { JobAcceptedResponse, JobPollResponse, RunSummary } from "./api-types";
 
 const BASE = (process.env.ALPHA_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 const TIMEOUT_MS = 15_000;
@@ -44,6 +44,11 @@ export function startAnalysis(ticker: string): Promise<JobAcceptedResponse> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ticker }),
   });
+}
+
+/** Runs the API still has, newest first. */
+export function listRuns(limit = 50): Promise<RunSummary[]> {
+  return call<RunSummary[]>(`/jobs?limit=${limit}`);
 }
 
 export function getJob(jobId: string): Promise<JobPollResponse> {

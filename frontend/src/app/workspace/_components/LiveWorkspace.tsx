@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { isTerminalJobStatus, type JobPollResponse } from "@/lib/api-types";
 import { toWorkspaceRun } from "../_data";
@@ -11,6 +12,7 @@ const POLL_MS = 2000;
 export function LiveWorkspace({ jobId }: { jobId: string }) {
   const [job, setJob] = useState<JobPollResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [gone, setGone] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -25,7 +27,7 @@ export function LiveWorkspace({ jobId }: { jobId: string }) {
           setError(null);
           done = isTerminalJobStatus(j.status);
         } else if (res.status === 400 || res.status === 404) {
-          setError("Job not found.");
+          setGone(true);
           done = true;
         } else {
           setError("Job service unavailable; retrying…");
@@ -42,6 +44,21 @@ export function LiveWorkspace({ jobId }: { jobId: string }) {
       clearTimeout(timer);
     };
   }, [jobId]);
+
+  if (gone) {
+    return (
+      <main className="mx-auto max-w-[720px] px-6 pt-16">
+        <h1 className="font-serif text-[32px] text-ink">This run is no longer available</h1>
+        <p className="mt-3 text-body">
+          The analysis service has no record of it, most likely because its data was reset.{" "}
+          <Link href="/workspace" className="font-medium text-navy underline underline-offset-2">
+            Open the latest available run
+          </Link>{" "}
+          or start a new analysis above.
+        </p>
+      </main>
+    );
+  }
 
   const run = job
     ? toWorkspaceRun(job)

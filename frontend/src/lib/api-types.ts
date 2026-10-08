@@ -144,6 +144,18 @@ export interface JobPollResponse {
   result?: AnalysisResponse | null;
 }
 
+/** One stored run from GET /jobs (no memo or evidence). */
+export interface RunSummary {
+  job_id: string;
+  ticker: string;
+  status: JobStatus;
+  started_at: string;
+  completed_at?: string | null;
+  grounded_claim_rate?: number | null;
+  citation_coverage_rate?: number | null;
+  execution_time_ms?: number | null;
+}
+
 /** Body of every non-2xx response from our own /api/* handlers. */
 export interface ApiError {
   error: string;

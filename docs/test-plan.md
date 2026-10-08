@@ -37,7 +37,7 @@ Allowed:
 | `POST /analyze/async` valid ticker | returns `job_id`; status reachable via `/jobs/{job_id}` |
 | `GET /jobs/{job_id}` running | returns status `running`; no partial memo claimed final |
 | `GET /jobs/{job_id}` terminal | returns final payload or safe error |
-| `GET /jobs` (run summaries) | **not implemented** — no list endpoint today; deferred to S7 service-readiness, not a current oracle case |
+| `GET /jobs` (run summaries) | returns stored runs newest first, capped by `limit` (1–100), without memo text; requires auth; empty store returns `[]` (see §19) |
 | `GET /health` | returns service + backend health |
 | `GET /stats` | returns documented runtime stats |
 | `GET /metrics` | returns runtime metrics |
@@ -338,3 +338,15 @@ Traces to SPEC "Run telemetry contract — 2026-10-07".
 | Filing chunk count | Result reports the number of filing chunks retrieved |
 | Executive summary | A memo with a numbered/markdown "Executive Summary" heading yields that paragraph, not the fallback text |
 | Frontend from progress | Live graph, time-by-node and trace derive from `progress`; nodes not yet started are queued; nothing is invented when `progress` is empty |
+
+## 19. Available runs after data loss (RUNS-AVAILABLE, 2026-10-07)
+
+Traces to SPEC "Run telemetry contract — 2026-10-07" (`GET /jobs`).
+
+| Behavior | Expected |
+|---|---|
+| List runs | `GET /jobs` returns summaries newest first with grounding rates and latency, honours `limit`, rejects out-of-range `limit`, requires auth, and never includes memo text |
+| Own runs that still exist | When some of this browser's remembered runs still exist, exactly those are shown, newest first; remembered runs the server lost are dropped |
+| Nothing of mine survives | When none of the browser's runs exist (or it has none), the server's available runs are shown and marked as not the viewer's own |
+| Nothing exists anywhere | No available runs → sample data, never an error |
+| Run store persistence | Compose mounts a named volume at the run-store directory |

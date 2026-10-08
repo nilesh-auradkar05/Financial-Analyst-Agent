@@ -651,3 +651,26 @@ def test_job_poll_serves_recorded_progress_and_result_counts(client: TestClient)
     progress = client.get(f"/jobs/{job_id}").json()["progress"]
     assert progress[0] == step
     assert progress[1] == {"node": "draft_memo", "status": "running", "started_at": "2026-10-07T12:00:01+00:00", "ended_at": None, "duration_ms": None}
+
+
+def test_job_list_returns_newest_first_summaries_without_memo(client: TestClient, monkeypatch):
+    """Trace: docs/test-plan.md §19 (list runs)."""
+    assert client.get("/jobs").json() == []
+    first = client.post("/analyze/async", json={"ticker": "AAPL"}).json()["job_id"]
+    second = client.post("/analyze/async", json={"ticker": "MSFT"}).json()["job_id"]
+
+    listed = client.get("/jobs").json()
+    assert [run["job_id"] for run in listed] == [second, first]
+    assert listed[0]["ticker"] == "MSFT" and listed[0]["status"] == "completed"
+    assert listed[0]["grounded_claim_rate"] == 1.0 and listed[0]["execution_time_ms"] == 2000
+    assert "result" not in listed[0] and "investment_memo" not in listed[0]
+
+    assert [run["job_id"] for run in client.get("/jobs", params={"limit": 1}).json()] == [second]
+    assert client.get("/jobs", params={"limit": 0}).status_code == 422
+    assert client.get("/jobs", headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+
+def test_compose_persists_the_run_store():
+    """Trace: docs/test-plan.md §19 (run store persistence)."""
+    compose = (Path(__file__).resolve().parents[1] / "docker-compose.yml").read_text()
+    assert f"runs-data:/app/{api_main.RUN_STORE_PATH.parent}" in compose

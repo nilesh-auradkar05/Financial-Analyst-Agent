@@ -45,3 +45,6 @@ tests/
 
 # Frontend has its own image (frontend/Dockerfile)
 frontend/
+
+# Run history lives in the runs-data volume, never in the image
+.runtime/

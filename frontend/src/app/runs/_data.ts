@@ -1,4 +1,4 @@
-import type { JobPollResponse, JobStatus } from "../../lib/api-types.ts";
+import type { JobStatus, RunSummary } from "../../lib/api-types.ts";
 
 // RUNS/SUMMARY/OUTCOMES/GROUNDED_BARS are the design sample, shown only when this browser has no
 // runs. Real rows come from toRunRow(); model, cost and snapshot id are not exposed by the API.
@@ -21,9 +21,8 @@ export type RunRow = {
   jobId?: string;
 };
 
-export function toRunRow(job: JobPollResponse): RunRow {
-  const v = job.result?.verification;
-  const ms = job.result?.execution_time_ms;
+export function toRunRow(job: RunSummary): RunRow {
+  const ms = job.execution_time_ms;
   return {
     id: job.job_id.slice(0, 8),
     jobId: job.job_id,
@@ -31,8 +30,8 @@ export function toRunRow(job: JobPollResponse): RunRow {
     snapshot: null,
     model: null,
     status: job.status,
-    grounded: v?.grounded_claim_rate ?? null,
-    coverage: v?.citation_coverage_rate ?? null,
+    grounded: job.grounded_claim_rate ?? null,
+    coverage: job.citation_coverage_rate ?? null,
     latencyS: ms != null ? ms / 1000 : null,
     costUsd: null,
   };
@@ -49,12 +48,12 @@ function meanSd(xs: number[]): { value: string; pm: string } {
 }
 
 /** Summary tiles computed from real rows (newest first). Bars are oldest → newest, 50px tall at 1.0. */
-export function summarize(rows: readonly RunRow[]) {
+export function summarize(rows: readonly RunRow[], own = true) {
   const nums = (k: "grounded" | "coverage") => rows.flatMap((r) => (r[k] == null ? [] : [r[k]]));
   return {
     groundedClaimRate: meanSd(nums("grounded")),
     citationCoverage: meanSd(nums("coverage")),
-    tag: `${rows.length} run${rows.length === 1 ? "" : "s"} · this browser`,
+    tag: `${rows.length} run${rows.length === 1 ? "" : "s"} · ${own ? "this browser" : "this server"}`,
     outcomes: Object.entries(COLOR)
       .map(([status, color]) => ({ status, color, weight: rows.filter((r) => r.status === status).length }))
       .filter((o) => o.weight > 0),

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AppHeader, Avatar } from "@/components/AppHeader";
-import { recentJobs } from "@/lib/jobs.server";
+import { availableRuns } from "@/lib/jobs.server";
 import { Filters } from "./_components/Filters";
 import { GATE, GROUNDED_BARS, OUTCOMES, RUNS, STATUSES, SUMMARY, summarize, toRunRow, type RunStatus } from "./_data";
 
@@ -26,14 +26,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const requested = Array.isArray(raw) ? raw[0] : raw;
   const status = STATUSES.find((s) => s === requested) ?? "";
 
-  // This browser's own runs; the design sample only when there are none.
-  const mine = (await recentJobs()).map(toRunRow);
+  // This browser's runs that still exist, else the server's remaining runs, else the design sample.
+  const { runs, own } = await availableRuns();
+  const mine = runs.map(toRunRow);
   const sample = mine.length === 0;
   const all = sample ? RUNS : mine;
   const rows = status ? all.filter((r) => r.status === status) : all;
   const summary = sample
     ? { ...SUMMARY, outcomes: OUTCOMES, bars: GROUNDED_BARS, gateTop: 4 }
-    : { ...summarize(mine), gateTop: 50 * (1 - GATE) };
+    : { ...summarize(mine, own), gateTop: 50 * (1 - GATE) };
   const totalW = summary.outcomes.reduce((a, o) => a + o.weight, 0);
 
   return (
@@ -51,7 +52,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                   Sample data · runs you start from this browser will appear here
                 </span>
               ) : (
-                "Analyses started from this browser. Model, cost and snapshot id are not reported by the API yet."
+                own ? (
+                "Analyses started from this browser."
+              ) : (
+                "None of your runs are stored on this server, so these are its most recent runs."
+              )
               )}
             </p>
           </div>

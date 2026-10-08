@@ -1,11 +1,11 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { getJob } from "./api.server";
-import type { JobPollResponse } from "./api-types";
-import { isJobId } from "./validate";
+import { listRuns } from "./api.server";
+import type { RunSummary } from "./api-types";
+import { isJobId, selectRuns } from "./validate";
 
-// ponytail: "my runs" = job ids this browser submitted, kept in a cookie (20 max, 30 days).
-// Move to account-scoped storage when the API gains users.
+// ponytail: "my runs" = job ids this browser submitted, kept in a cookie (20 max, 30 days),
+// with the server's remaining runs as the fallback. Replace both with account-scoped runs when auth lands.
 export const JOBS_COOKIE = "alpha_jobs";
 
 /** Job ids submitted from this browser, newest first. */
@@ -13,14 +13,17 @@ export async function recentJobIds(): Promise<string[]> {
   return ((await cookies()).get(JOBS_COOKIE)?.value ?? "").split(",").filter(isJobId);
 }
 
-/** This browser's runs that the API still knows about, newest first. */
-export async function recentJobs(): Promise<JobPollResponse[]> {
-  const settled = await Promise.allSettled((await recentJobIds()).map(getJob));
-  return settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+/**
+ * Runs to show this viewer, newest first: their own runs that still exist, otherwise whatever
+ * the server still has (`own: false`). Empty when nothing exists or the API is unreachable.
+ */
+export async function availableRuns(): Promise<{ runs: RunSummary[]; own: boolean }> {
+  const available = await listRuns().catch(() => []);
+  return selectRuns(await recentJobIds(), available);
 }
 
-/** `?job=` when valid, else this browser's latest run. */
+/** `?job=` when valid, else the newest run available to this viewer. */
 export async function resolveJobId(param: string | string[] | undefined): Promise<string | null> {
   if (typeof param === "string" && isJobId(param)) return param;
-  return (await recentJobIds())[0] ?? null;
+  return (await availableRuns()).runs[0]?.job_id ?? null;
 }
