@@ -281,6 +281,10 @@ def _get_default_analyzer() -> SentimentAnalyzer:
             _default_analyzer = analyzer
     return _default_analyzer
 
+def preload_sentiment_model() -> None:
+    """Load the default model now, so the first request does not wait for it."""
+    _get_default_analyzer()
+
 @app_traceable(name="analyze_sentiment_batch", run_type="chain", tags=["sentiment"])
 def analyze_sentiment_batch(
     texts: list[str],

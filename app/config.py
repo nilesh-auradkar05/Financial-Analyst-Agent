@@ -245,6 +245,7 @@ class FinBERTSettings(BaseSettings):
     Environment Variables:
            FINBERT_MODEL_NAME: HuggingFace model identifier
            DEVICE: Device to use for inference (cpu or cuda)
+           FINBERT_PRELOAD: load the model at API startup (default false)
     """
 
     model_config = SettingsConfigDict(
@@ -262,6 +263,11 @@ class FinBERTSettings(BaseSettings):
     # Device to use for inference (cpu or cuda)
     device: Optional[str] = Field(
         default=None, description="Device to use for inference"
+    )
+
+    preload: bool = Field(
+        default=False,
+        description="Load the model in the background at API startup instead of on the first request",
     )
 
 

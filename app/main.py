@@ -33,6 +33,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import secrets
@@ -108,6 +109,7 @@ from app.observability.metrics import (
 )
 from app.services.llm import check_ollama_health
 from app.services.run_store import FileBackedRunStore
+from app.services.sentiment import preload_sentiment_model
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
@@ -227,6 +229,14 @@ async def _limit_submission(principal: str = Depends(_authenticate)) -> str:
 # =============================================================================
 
 
+async def _preload_sentiment_model() -> None:
+    try:
+        await asyncio.to_thread(preload_sentiment_model)
+        logger.info("Sentiment model preloaded")
+    except Exception as exc:
+        logger.warning("Sentiment model preload failed: {}", type(exc).__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
@@ -252,6 +262,11 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Vector store unavailable; health endpoint will report degraded")
     logger.info(f"Run store: {RUN_STORE_PATH}")
+
+    if settings.finbert.preload:
+        # In the background, so startup is not delayed; a request that arrives
+        # mid-load waits on the same lock instead of loading a second copy.
+        app.state.sentiment_preload = asyncio.create_task(_preload_sentiment_model())
 
     logger.info("Financial Analyst Agent System API ready!")
 
