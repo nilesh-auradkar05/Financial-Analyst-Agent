@@ -20,6 +20,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
 from app.llm.provider import model_metadata
+from app.observability.metrics import record_error
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -144,8 +145,8 @@ async def trace_boundary(
                         logger.warning("Trace exporter finalization failed")
 
 
-# Probe routes are polled constantly; they get a request ID but no exported span.
-UNTRACED_PROBES = frozenset({("GET", "/health"), ("GET", "/metrics")})
+# Probe and job-polling routes are hit constantly; they get a request ID but no exported span.
+UNTRACED_PROBES = frozenset({("GET", "/health"), ("GET", "/metrics"), ("GET", "/jobs")})
 
 
 class RequestTracingMiddleware:
@@ -173,7 +174,9 @@ class RequestTracingMiddleware:
         started = time.monotonic()
         status_code = 500
         sent = False
-        if (scope["method"], scope["path"]) in UNTRACED_PROBES:
+        if (scope["method"], scope["path"]) in UNTRACED_PROBES or (
+            scope["method"] == "GET" and scope["path"].startswith("/jobs/")
+        ):
             async def probe_send(message: Message) -> None:
                 nonlocal sent
                 if message["type"] == "http.response.start":
@@ -189,6 +192,7 @@ class RequestTracingMiddleware:
                     with tracing_context(enabled=False):
                         await self.app(scope, receive, probe_send)
             except Exception:
+                record_error("api")
                 if sent:
                     raise
                 error = {"code": "internal_error", "message": "Internal server error.", "error_id": str(uuid4())}
@@ -233,6 +237,7 @@ class RequestTracingMiddleware:
                 else:
                     await self.app(scope, receive, traced_send)
             except Exception:
+                record_error("api")
                 if sent:
                     raise
                 error = {"code": "internal_error", "message": "Internal server error.", "error_id": str(uuid4())}

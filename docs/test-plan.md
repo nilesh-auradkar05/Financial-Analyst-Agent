@@ -41,6 +41,8 @@ Allowed:
 | `GET /health` | returns service + backend health |
 | `GET /stats` | returns documented runtime stats |
 | `GET /metrics` | returns runtime metrics |
+| Async submission counted (2026-10-10) | after `POST /analyze/async`, `/metrics` shows `alpha_analyst_requests_total{endpoint="/analyze/async"}` one higher and one more latency observation for that endpoint |
+| Errors counted by component (2026-10-10) | a crashed async job, a crashed sync analysis, a failed ingestion and an unhandled 500 each raise `alpha_analyst_errors_total{component=…}` (`analysis_job`, `analysis`, `ingestion`, `api`) by one; a successful request raises none |
 | Invalid ticker format | rejected with validation error; no run started |
 | Unsupported input | 4xx typed error, never stack trace |
 
@@ -64,12 +66,12 @@ Allowed:
 
 - T2-01: Canonical UUID `X-Request-ID` is accepted or generated on every response; invalid/duplicate/oversized IDs return safe 400 with a fresh ID. Traced responses expose `X-Trace-ID`, including validation, router and application errors. HTTP spans record resolved route, status, response duration and outcome without auth/cookies/full headers.
 - T2-02: Real compiled graph produces HTTP → run_financial_analysis → financial_analyst_graph → node/tool/retrieval/verifier/native model lineage. Only actual chat-model spans are LLM runs. Model metadata reflects effective provider/model/temperature; actual sentiment and embedding execution records its model identifier. Disabled stages record skipped outcomes; failed app stages use safe error text. Each filing-store query is a child retriever span with its query, returned count, and evidence identifiers; store/client objects and chunk text are excluded.
-- T2-03: Async acceptance ends HTTP timing at 202; analysis_job restores an explicit native carrier using the same lifespan client, even after the accepting context closes. Job and result persist original request/trace IDs; idempotent replay preserves them, while poll/replay HTTP headers identify their own requests.
+- T2-03: Async acceptance ends HTTP timing at 202; analysis_job restores an explicit native carrier using the same lifespan client, even after the accepting context closes. Job and result persist original request/trace IDs; idempotent replay preserves them, while poll/replay HTTP headers identify their own requests (a poll by `X-Request-ID` only; see T2-08).
 - T2-04: Concurrent HTTP requests have independent IDs, trees and ticker outputs. An in-memory public SDK create/update collector verifies hierarchy and original async correlation; offline tests deny network transport.
 - T2-05: Boolean false/0/no/off and absent/blank keys disable export, even with inherited tracing environment enabled. Modern LANGSMITH aliases take precedence over legacy LANGCHAIN aliases. Defaults are off. One lifespan client is reused and shutdown flush is bounded; initialization/create/update/flush failures cannot fail successful business requests.
 - T2-06: Native model spans retain raw messages, prompts, token metadata and provider-exposed reasoning blocks when supplied. Memo/API text includes only text content blocks. No hidden reasoning is claimed.
 - T2-07: Error spans/records retain safe public codes/error IDs and correlation, excluding raw app exception text, credentials and cookies. Failed async jobs remain pollable under original correlation. Verifier execution errors produce an explicit safe `verification_failed` marker and a degraded response; raw evaluator exceptions never enter native graph spans. Caught tool and ingestion failures return stable safe fallback values and finish their spans with stable safe error codes; legitimate empty evidence remains successful.
-- T2-08 (2026-09-30): Probe routes `GET /health` and `GET /metrics` still return `X-Request-ID` but create no exported LangSmith span, so polling cannot bury analysis traces. All other routes remain traced per T2-01.
+- T2-08 (2026-09-30): Probe routes `GET /health` and `GET /metrics` still return `X-Request-ID` but create no exported LangSmith span, so polling cannot bury analysis traces. All other routes remain traced per T2-01. Amended 2026-10-10: the polling routes `GET /jobs/{job_id}` and `GET /jobs` are untraced in the same way (request ID, no `X-Trace-ID`, no exported span); the job body still carries the original request and trace IDs.
 - T2-09 (2026-09-30): A fatal draft failure (all providers failed or bounded timeout) finishes the `draft_memo` span with safe error code `draft_memo_failed` and logs the failing stage plus exception class name only (no raw text). An HTTP root whose outcome is `failed` records that safe error code, so error-filtered views surface it even when status is 200.
 
 ## 2. Workflow behavior
