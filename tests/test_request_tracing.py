@@ -279,6 +279,18 @@ def test_probe_routes_get_request_id_but_no_span(traced, path):
     assert [run["name"] for run in traced.runs.values()] == ["HTTP GET /"]
 
 
+def test_poll_routes_get_request_id_but_no_span(traced):
+    headers = {"X-API-Key": "private-auth-value"}
+    with TestClient(api.app) as client:
+        listing = client.get("/jobs", headers=headers)
+        unknown = client.get(f"/jobs/{uuid4()}", headers=headers)
+    assert (listing.status_code, unknown.status_code) == (200, 404)
+    for response in (listing, unknown):
+        assert str(UUID(response.headers["X-Request-ID"])) == response.headers["X-Request-ID"]
+        assert "X-Trace-ID" not in response.headers
+    assert traced.runs == {}
+
+
 def test_fatal_draft_failure_marks_draft_span_and_failed_root(traced, evidence, monkeypatch):
     from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -322,7 +334,8 @@ def test_async_original_correlation_survives_parent_end_replay_and_poll(traced, 
         assert body["request_id"] == request_id
         assert body["trace_id"] == original["trace_id"]
     assert poll.headers["X-Request-ID"] != request_id
-    assert poll.headers["X-Trace-ID"] != original["trace_id"]
+    assert "X-Trace-ID" not in poll.headers  # T2-08: polling routes are untraced
+    assert not [run for run in traced.runs.values() if run["name"].startswith("HTTP GET")]
     assert replay.headers["X-Trace-ID"] != original["trace_id"]
     runs = list(traced.runs.values())
     jobs = [run for run in runs if run["name"] == "analysis_job"]

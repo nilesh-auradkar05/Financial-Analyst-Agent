@@ -104,6 +104,7 @@ from app.observability.langsmith import (
 from app.observability.metrics import (
     get_metrics,
     get_metrics_content_type,
+    record_error,
     track_agent_run,
     track_request,
 )
@@ -430,6 +431,7 @@ async def analyze(request: AnalysisRequest, http_request: Request, _principal: s
                 return formatted
 
             except Exception as exc:
+                record_error("analysis")
                 _raise_internal_error(
                     code="analysis_failed",
                     message="Analysis failed.",
@@ -452,52 +454,53 @@ async def analyze_async(
 
     Returns immediately with job_id. Poll /jobs/{job_id} for status.
     """
-    ticker = request.ticker.upper()
-    job_id = str(uuid.uuid4())
+    with track_request("POST", "/analyze/async"):
+        ticker = request.ticker.upper()
+        job_id = str(uuid.uuid4())
 
-    # Create job
-    created = True
-    if idempotency_key:
-        fingerprint = hashlib.sha256(json.dumps(request.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        try:
-            record, created = run_store.create_idempotent_run(
-                job_id, ticker, principal=principal,
-                idempotency_key=hashlib.sha256(idempotency_key.encode()).hexdigest(),
-                request_fingerprint=fingerprint, company_name=request.company_name,
-                request_id=http_request.state.request_id, trace_id=http_request.state.trace_id,
+        # Create job
+        created = True
+        if idempotency_key:
+            fingerprint = hashlib.sha256(json.dumps(request.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            try:
+                record, created = run_store.create_idempotent_run(
+                    job_id, ticker, principal=principal,
+                    idempotency_key=hashlib.sha256(idempotency_key.encode()).hexdigest(),
+                    request_fingerprint=fingerprint, company_name=request.company_name,
+                    request_id=http_request.state.request_id, trace_id=http_request.state.trace_id,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail={"code": "idempotency_conflict", "message": str(exc), "error_id": _new_error_id()}) from exc
+        else:
+            record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name,
+                                          request_id=http_request.state.request_id, trace_id=http_request.state.trace_id)
+
+        # Start background task
+        if created:
+            background_tasks.add_task(
+            _run_analysis_job,
+            record.job_id,
+            ticker,
+            request.company_name,
+            request.include_filing_analysis,
+            request.include_news_sentiment,
+            request.max_news_articles,
+            http_request.state.trace_parent,
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=409, detail={"code": "idempotency_conflict", "message": str(exc), "error_id": _new_error_id()}) from exc
-    else:
-        record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name,
-                                      request_id=http_request.state.request_id, trace_id=http_request.state.trace_id)
+            logger.info(f"Started async job {record.job_id} for {ticker}")
 
-    # Start background task
-    if created:
-        background_tasks.add_task(
-        _run_analysis_job,
-        record.job_id,
-        ticker,
-        request.company_name,
-        request.include_filing_analysis,
-        request.include_news_sentiment,
-        request.max_news_articles,
-        http_request.state.trace_parent,
+        http_request.state.trace_outcome = "accepted"
+        response.headers["Location"] = f"/jobs/{record.job_id}"
+
+        return JobAcceptedResponse(
+            job_id=record.job_id,
+            request_id=record.request_id,
+            trace_id=record.trace_id,
+            status=JobStatus(record.status),
+            ticker=record.ticker,
+            started_at=record.started_at,
+            error=record.error,
         )
-        logger.info(f"Started async job {record.job_id} for {ticker}")
-
-    http_request.state.trace_outcome = "accepted"
-    response.headers["Location"] = f"/jobs/{record.job_id}"
-
-    return JobAcceptedResponse(
-        job_id=record.job_id,
-        request_id=record.request_id,
-        trace_id=record.trace_id,
-        status=JobStatus(record.status),
-        ticker=record.ticker,
-        started_at=record.started_at,
-        error=record.error,
-    )
 
 
 @app.get("/jobs", response_model=list[RunSummary], tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
@@ -574,6 +577,7 @@ async def _run_analysis_job(
                     run.end(outputs={"outcome": formatted["status"], "job_id": job_id})
         except Exception:
             error_id = _new_error_id()
+            record_error("analysis_job")
             logger.error("Async analysis failed | job_id={} | error_id={}", job_id, error_id)
             run_store.mark_failed(job_id, error=_public_failure_message("Analysis job failed", error_id))
             if run:
@@ -750,6 +754,7 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
                         "message": f"No 10-K filings found for {ticker}.",
                         "error_id": _new_error_id(),
                     })
+                record_error("ingestion")
                 raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": _new_error_id()})
             return IngestionResponse(
                 ticker=ticker,
@@ -765,6 +770,7 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
             raise
         except Exception:
             error_id = _new_error_id()
+            record_error("ingestion")
             logger.error(
                 f"Ingestion failed | ticker={ticker} | error_id={error_id}",
             )
