@@ -264,7 +264,7 @@ make docker-down
 
 ### Typical flow
 
-1. **Ingest** the ticker's 10-K once. Without this step, the memo has no SEC evidence.
+1. **Ingest** the ticker's 10-K once (optional). If you skip it, the first analysis of a ticker with nothing indexed ingests the latest 10-K itself, which makes that first run slower.
 2. **Analyze** the ticker, either synchronously or as a job.
 3. Read the `verification` block in the response to see how well the memo is grounded.
 

@@ -40,7 +40,13 @@ from app.agents.state import (
     get_context_for_llm,
     get_data_availability,
 )
-from app.components.retrieval.vector_store import RetrievalStore, SearchResult, get_vector_store
+from app.components.retrieval.ingestion import ingest_10k_for_ticker
+from app.components.retrieval.vector_store import (
+    RetrievalStore,
+    SearchFilters,
+    SearchResult,
+    get_vector_store,
+)
 from app.config import settings
 from app.llm.provider import fallback_count, get_llm, model_metadata
 from app.observability.langsmith import app_traceable, mark_trace_failed
@@ -184,6 +190,72 @@ def _search_filing_chunks(
     return store.search_by_ticker(query, ticker=ticker, n_results=n_results)
 
 
+# ponytail: reuses the embedding timeout as the bound on one ingest-on-miss. Give it
+# its own setting once a real 10-K ingestion has been timed.
+INGEST_TIMEOUT_SECONDS: float = settings.ollama.timeout
+
+
+def _filing_error(code: str, message: str) -> dict:
+    return {
+        "step": "retrieve_filings",
+        "code": code,
+        "message": message,
+        "recoverable": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_name: str) -> list:
+    """Top filing chunks for the ticker across the four topic queries."""
+    # This node runs beside fetch_stock, so a missing name comes from the indexed
+    # filing metadata instead of the quote provider; the ticker is the last resort.
+    if not company_name:
+        indexed = await asyncio.to_thread(_search_filing_chunks, store, ticker, ticker, 1)
+        names = (c.metadata.get("company_name") for c in indexed.chunks)
+        company_name = next((str(name) for name in names if name), ticker)
+
+    # Multiple queries for comprehensive retrieval
+    queries = [
+        f"{company_name} business description overview",
+        f"{company_name} risk factors challenges",
+        f"{company_name} financial performance revenue",
+        f"{company_name} competition market position",
+    ]
+
+    all_chunks = []
+    seen_texts: set[str] = set()
+
+    for query in queries:
+        result = await asyncio.to_thread(_search_filing_chunks, store, query, ticker, 3)
+
+        for chunk in result.chunks:
+            # Deduplicate by text
+            text_hash = hashlib.md5(chunk.text[:100].encode("utf-8")).hexdigest()
+            if text_hash not in seen_texts:
+                seen_texts.add(text_hash)
+                all_chunks.append(chunk)
+
+    # Sort by relevance and take top chunks
+    all_chunks.sort(key=lambda x: x.relevance_score, reverse=True)
+    return all_chunks[:MAX_FILING_CHUNKS]
+
+
+async def _ingest_on_miss(ticker: str) -> str | None:
+    """Ingest the ticker's latest 10-K once. Returns an error code, or None on success."""
+    # ponytail: no per-ticker lock. Two first requests may both ingest; chunk ids are
+    # deterministic and Qdrant upserts, so that only repeats work. Chroma inserts, so
+    # there the second request reports filing_ingestion_failed; add a lock if that matters.
+    logger.info(f"[retrieve_filings] Nothing indexed for {ticker}; ingesting latest 10-K")
+    try:
+        result = await asyncio.wait_for(ingest_10k_for_ticker(ticker), timeout=INGEST_TIMEOUT_SECONDS)
+    except Exception as exc:
+        logger.error("[{}] ingest on miss failed: {}", ticker, type(exc).__name__)
+        return "filing_ingestion_failed"
+    if result.success:
+        return None
+    return "filing_not_found" if result.error_code == "filing_not_found" else "filing_ingestion_failed"
+
+
 @app_traceable(name="retrieve_filings", run_type="retriever", tags=["agent"])
 async def retrieve_sec_filings_node(state: AgentState) -> dict:
     """
@@ -211,41 +283,18 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
 
     try:
         store = get_vector_store()
+        company_name = state.get("company_name", "")
+        top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
 
-        # This node runs beside fetch_stock, so a missing name comes from the indexed
-        # filing metadata instead of the quote provider; the ticker is the last resort.
-        company_name = state.get("company_name")
-        if not company_name:
-            indexed = await asyncio.to_thread(_search_filing_chunks, store, ticker, ticker, 1)
-            company_name = next(
-                (c.metadata.get("company_name") for c in indexed.chunks if c.metadata.get("company_name")),
-                ticker,
-            )
-
-        # Multiple queries for comprehensive retrieval
-        queries = [
-            f"{company_name} business description overview",
-            f"{company_name} risk factors challenges",
-            f"{company_name} financial performance revenue",
-            f"{company_name} competition market position",
-        ]
-
-        all_chunks = []
-        seen_texts: set[str] = set()
-
-        for query in queries:
-            result = await asyncio.to_thread(_search_filing_chunks, store, query, ticker, 3)
-
-            for chunk in result.chunks:
-                # Deduplicate by text
-                text_hash = hashlib.md5(chunk.text[:100].encode("utf-8")).hexdigest()
-                if text_hash not in seen_texts:
-                    seen_texts.add(text_hash)
-                    all_chunks.append(chunk)
-
-        # Sort by relevance and take top chunks
-        all_chunks.sort(key=lambda x: x.relevance_score, reverse=True)
-        top_chunks = all_chunks[:MAX_FILING_CHUNKS]
+        failure = "filing_not_found"
+        if not top_chunks and await asyncio.to_thread(
+            store.count_documents, SearchFilters(ticker=ticker)
+        ) == 0:
+            ingest_error = await _ingest_on_miss(ticker)
+            if ingest_error:
+                failure = ingest_error
+            else:
+                top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
 
         filing_chunks = [
             {
@@ -264,26 +313,18 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
         }
         if not filing_chunks:
-            update["errors"] = [{
-                "step": "retrieve_filings",
-                "code": "filing_not_found",
-                "message": f"No indexed filings found for {ticker}.",
-                "recoverable": True,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }]
+            update["errors"] = [
+                _filing_error("filing_ingestion_failed", f"Filing ingestion failed for {ticker}.")
+                if failure == "filing_ingestion_failed"
+                else _filing_error("filing_not_found", f"No indexed filings found for {ticker}.")
+            ]
         return update
 
     except Exception:
         logger.error(f"[{ticker}] Filing retrieval failed")
         return {
             "filing_chunks": [],
-            "errors": [{
-                "step": "retrieve_filings",
-                "code": "filing_retrieval_failed",
-                "message": f"Filing retrieval failed for {ticker}.",
-                "recoverable": True,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }],
+            "errors": [_filing_error("filing_retrieval_failed", f"Filing retrieval failed for {ticker}.")],
         }
 
 @app_traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
@@ -522,7 +563,7 @@ async def draft_memo_node(state: AgentState) -> dict:
         filing_reason = next(
             (error["message"] for error in state.get("errors", [])
              if error.get("step") == "retrieve_filings"
-             and error.get("code") in {"filing_not_found", "filing_retrieval_failed"}),
+             and error.get("code") in {"filing_not_found", "filing_retrieval_failed", "filing_ingestion_failed"}),
             f"No indexed filings found for {ticker}.",
         )
 

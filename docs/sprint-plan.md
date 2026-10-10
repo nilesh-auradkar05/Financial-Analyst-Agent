@@ -227,7 +227,7 @@ Verification:
 - Concurrency probe: 4 simultaneous /analyze on replay → total wall-time < 1.5× single.
 Done: both artifacts recorded; unit tests for reducer + parallel routing green.
 Non-goals: no multi-agent; no caching; no repair loop.
-Result: Pending
+Result: Partial as of 2026-10-06. Implemented in 946f1de (fan-out, errors reducer, to_thread, AGENT singleton, retrieval sizing) and b407868 (provider client built once per process). Unit tests for reducer + parallel routing green (test-plan §10): three 1 s branches complete in 1.02 s (2.83 s before); /health answers in under 200 ms while sentiment scores 50 snippets (blocked 0.60 s before). Full suite 356 passed, 2 skipped; ruff, mypy and governance checks pass. NOT recorded: the latency artifacts and the 4-concurrent probe. Frozen-release latency cannot be measured until S2-T00b (replay skips the evidence nodes); the agreed substitute, one live run compared with LangSmith trace 01a0f4dc-8b2b-7021-b7de-5958220c0ad1 (66.73 s total, 8.65 s evidence phase), has not been run.
 ```
 
 ```text
@@ -455,3 +455,9 @@ The service remains a single process with its existing file-backed run store.
 User authorizes PROVIDER-FALLBACK / FILING-DEGRADATION before remaining S7 gates, traced to SPEC §4 runtime provider policy, §8.5, test-plan §16 and ADR-0009. Implement Bedrock → configured personal Anthropic → configured personal OpenAI, bounded attempts and native traces; explicit Ollama development mode. Missing filings preserve usable evidence and memo with evidence_missing status. Azure invocation remains deferred as S7-AZURE-FALLBACK until its deployment/model configuration is specified. Other sequencing and benchmark gates stay unchanged.
 
 Result as of 2026-09-30: implementation in frontend-impl, focused provider checks 26 passed, filing checks 14 passed, frontend 10 tests plus type/lint/build passed, Compose 4 cases passed. Final backend suite: 344 passed, 1 failed, 2 skipped; residual tracing assertion expects the old draft-span model label. Full lint, mypy app/evaluation and four Doc Sync checks pass. Overall verification remains open at the user's two-correction limit. Changes are uncommitted; no deployment/live-inference success is claimed. Azure remains deferred. Detailed commands and findings belong to tasks/todo.md.
+
+### Authorized ingest-on-miss slice (2026-10-10)
+
+User authorizes INGEST-ON-MISS after the Qdrant volume was found recreated empty (2026-10-08) and every analysis reported filings unavailable. Traced to SPEC §4 ingest on miss and unavailable filings, §8.2, §8.5 and test-plan §16. Analysis ingests a ticker's latest 10-K once when zero chunks are indexed for it, off the event loop and under a time bound; an ingestion failure is reported as filing_ingestion_failed, distinct from an absent 10-K.
+
+Result as of 2026-10-10: implementation on branch auto-ingest-on-miss. Full suite 371 passed, 2 skipped; ruff, mypy and the four governance checks pass. Live check (first analysis of an unindexed ticker ingests and returns filing chunks; a second run does not ingest; a ticker with no 10-K still reports filings unavailable) not yet run.

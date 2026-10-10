@@ -513,18 +513,23 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkey
 
     from app.agents import graph
     from app.agents.state import apply_update, create_initial_state
+    from app.components.retrieval.ingestion import IngestionResult
 
     def search(*_args):
         if retrieval_fails:
             raise RuntimeError("private retrieval details")
         return SimpleNamespace(chunks=[])
 
+    async def no_10k(ticker, **_kwargs):
+        return IngestionResult(ticker=ticker, filing_type="10-K", error="none", error_code="filing_not_found")
+
     class MemoLLM:
         async def ainvoke(self, _messages):
             return SimpleNamespace(content=memo_text)
 
-    monkeypatch.setattr(graph, "get_vector_store", lambda: object())
+    monkeypatch.setattr(graph, "get_vector_store", lambda: SimpleNamespace(count_documents=lambda _filters: 0))
     monkeypatch.setattr(graph, "_search_filing_chunks", search)
+    monkeypatch.setattr(graph, "ingest_10k_for_ticker", no_10k)
     monkeypatch.setattr(graph, "get_llm", lambda _settings: MemoLLM())
 
     async def run(ticker, company_name, **_kwargs):

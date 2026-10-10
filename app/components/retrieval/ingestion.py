@@ -24,6 +24,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -350,7 +351,9 @@ async def ingest_10k_for_ticker(
                 error=f"No 10-K filings found for {normalized_ticker}.",
                 error_code="filing_not_found",
             )
-        return ingest_filing(
+        # Embedding and store writes are blocking; keep them off the event loop.
+        return await asyncio.to_thread(
+            ingest_filing,
             filing=filing,
             sections=sections,
             replace_existing=replace_existing,
