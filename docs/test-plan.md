@@ -305,6 +305,11 @@ Each hook is tested by piping a sample event JSON to the script and asserting st
 | Compose | Bedrock/Claude/OpenAI model, token and Azure (incl. AZURE_FOUNDRY_MODEL) values survive rendering; absent optional variables do not mask aliases |
 | Ingest no 10-K | Typed 404 filing_not_found with ticker-specific safe reason; real upstream failure remains safe 502 |
 | Analysis no filings | Available news/stock/sentiment preserved; memo states SEC Filings: Not Available; no fabricated SEC citations; evidence_missing/missing includes filings |
+| Ingest on miss (2026-10-10) | Analysis of a ticker with zero indexed chunks ingests its latest 10-K once, then retrieves; filing chunks are present and no filing error is recorded |
+| Ingest on miss, no 10-K | Ingestion reports filing_not_found → Analysis no filings behaviour, code filing_not_found |
+| Ingest on miss, upstream failure | Ingestion fails, raises or exceeds its bound → code filing_ingestion_failed with a safe reason distinct from no filings; other evidence survives |
+| No needless ingestion | A ticker with indexed chunks (even when no query matches) or with filings disabled never triggers ingestion |
+| Ingestion off the event loop | While a filing is embedded and written, the event loop keeps serving other work |
 | Retrieval failure | Safe failure reason differs from no filings; available evidence survives and verification executes |
 | Filings disabled | No missing-filings warning or evidence_missing status caused by disabled stage |
 | Frontend partial result | degraded/evidence_missing are terminal; available memo/evidence displayed; server forwards configured API_KEY without exposing it to the browser |
