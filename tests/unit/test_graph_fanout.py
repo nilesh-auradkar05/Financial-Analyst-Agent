@@ -16,6 +16,7 @@ from app import main as api
 from app.agents import graph
 from app.agents.graph import run_agent
 from app.agents.state import create_initial_state
+from app.services import sentiment
 
 BRANCH_SECONDS = 1.0
 EVIDENCE_STEPS = {"research_news", "fetch_stock", "retrieve_filings"}
@@ -218,3 +219,45 @@ async def test_filing_queries_do_not_depend_on_the_stock_branch(
 
     assert final["filing_chunks"]
     assert all(f" {expected} " in chunk["text"] for chunk in final["filing_chunks"])
+
+
+MODEL_LOAD_SECONDS = 0.4
+
+
+class SlowLoadingAnalyzer:
+    """Stands in for FinBERT: loading is slow, scoring is computed from the text."""
+
+    model_name = "fake-finbert"
+
+    def _load_model(self):
+        time.sleep(MODEL_LOAD_SECONDS)
+
+    def analyze_batch(self, texts):
+        return [SimpleNamespace(text=text, label=_label(text)) for text in texts]
+
+
+@pytest.mark.parametrize("preload", [True, False])
+async def test_preload_takes_the_model_load_off_the_first_request(monkeypatch, preload):
+    async def healthy(**_kwargs):
+        return True
+
+    monkeypatch.setattr(sentiment, "_default_analyzer", None)
+    monkeypatch.setattr(sentiment, "SentimentAnalyzer", SlowLoadingAnalyzer)
+    monkeypatch.setattr(api.settings.finbert, "preload", preload, raising=False)
+    monkeypatch.setattr(api, "check_ollama_health", healthy)
+    monkeypatch.setattr(api, "get_vector_store", lambda: SimpleNamespace(count=0))
+
+    started = time.perf_counter()
+    async with api.lifespan(api.app):
+        startup = time.perf_counter() - started
+        await asyncio.sleep(MODEL_LOAD_SECONDS + 0.2)
+        started = time.perf_counter()
+        results = await asyncio.to_thread(sentiment.analyze_sentiment_batch, ["revenue growth"])
+        first_request = time.perf_counter() - started
+
+    assert results[0].label == "positive"
+    assert startup < MODEL_LOAD_SECONDS / 2, f"startup waited {startup:.2f}s for the model"
+    if preload:
+        assert first_request < MODEL_LOAD_SECONDS / 2, f"first request still paid {first_request:.2f}s"
+    else:
+        assert first_request >= MODEL_LOAD_SECONDS
