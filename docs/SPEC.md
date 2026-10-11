@@ -4,7 +4,7 @@
 > **Date:** 2026-10-08
 > **Status:** Canonical product specification.
 > **Repo:** `nilesh-auradkar05/Financial-Analyst-Agent`
-> **Supersedes:** v1.3 (2026-09-12), which superseded v1.2 (2026-07-04) from `docs/SPEC-AMENDMENT-v1.3.md` (retired; application record is ADR-0008).
+> **Supersedes:** v1.3 (2026-09-12), which superseded v1.2 (2026-07-04) from `SPEC-AMENDMENT-v1.3.md` (retired; archived 2026-10-11 to `old_artifacts/docs/`; application record is ADR-0008).
 > **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
 > **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria.
 
@@ -40,10 +40,12 @@ formulas, validation rules, and comparison policy,
 `docs/retrieval-benchmark.md` governs even though `docs/sprint-plan.md`
 controls sequencing.
 
-`docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` is the active companion
-plan for Phase 0 and Phase 1. It proposes DataOps release governance and evidence
-replay work under this SPEC. It does not amend scope by itself; ADRs and this
-file ratify scope changes.
+`LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` was the companion plan for
+Phase 0 and Phase 1 (DataOps release governance and evidence replay), both now
+complete. It is archived 2026-10-11 to `old_artifacts/docs/`, which is not tracked in git; last tracked at commit `b83fd66`.
+References to "INTEGRATION_PLAN_v2" below name that document; where a section
+still matters, this SPEC, `docs/sprint-plan.md` and `docs/cloud-deployment.md`
+carry the content. It never amended scope by itself.
 
 ---
 
@@ -395,7 +397,7 @@ Committed and gated sequencing:
 S2 pre-tasks (T00a–T00d) implement production-readiness steps 1–3 (see
 sprint-plan.md S2 preamble).
 
-`docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` adds Phase 0 and Phase 1
+The archived INTEGRATION_PLAN_v2 (§0) added Phase 0 and Phase 1
 before S2 execution: governance docs into version control, then evidence
 snapshot/replay. Phase 2 is S2's anchored fixture work on the frozen evidence
 release.

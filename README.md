@@ -18,22 +18,6 @@ A single-agent financial research system: give it a stock ticker and it gathers 
 5. **Verifies the memo**: it extracts factual claims, matches their numbers within a tolerance and checks semantic similarity (≥ 0.45) against the cited evidence. It reports `citation_coverage_rate`, `grounded_claim_rate` and any citations that point to no source.
 6. **Serves it all through a FastAPI service** with synchronous and asynchronous endpoints, health checks, statistics and Prometheus metrics.
 
-### Project status
-
-This is an **instrumented prototype** that is being made production-ready. The evaluation and grounding harness is the most mature part; the service layer is the least. Known gaps, verified against the code:
-
-- An ingestion failure or un-ingested ticker produces a memo without SEC evidence that still reports `completed`.
-- Verification results are reported but not enforced, and there is no repair loop.
-- Graph nodes run one after another, and FinBERT blocks the event loop.
-- There is no authentication, rate limiting, guardrails or caching, and async jobs run in-process.
-
-The ordered plan for closing these gaps is in [`docs/sprint-plan.md`](docs/sprint-plan.md). Scope and source-of-truth rules are in [`docs/SPEC.md`](docs/SPEC.md).
-- A ticker that was never ingested produces a memo with no SEC evidence and still reports `completed`
-- Verification failure is logged, not enforced; there is no repair loop
-- Evidence nodes run serially; FinBERT inference blocks the event loop
-- No full guardrail layer or caching; single-process auth/rate limits, in-process background jobs
-- Eval results carry no lineage (commit, model, snapshot) and no eval runs in CI
-
 ---
 
 ### Measured results
@@ -64,7 +48,28 @@ Comparisons change one thing at a time: the same fixture, and either the backend
 
 ---
 
-## Diagrams
+## Architecture
+
+### Cloud architecture: AWS serving, Azure model fallback
+
+![Cloud architecture: Cloudflare in front of AWS us-east-1, with Azure as the model fallback plane](docs/png/production/hld.png)
+
+One AWS region serves every request and holds all state. Azure hosts the same models as a fallback, so every cross-cloud call is a stateless model request.
+
+- **AWS `us-east-1` serves everything:** Cloudflare in front (WAF, Turnstile, Tunnel), ECS Fargate for the web BFF, API and workers, Aurora PostgreSQL for durable jobs and events, Valkey for disposable caches, S3 for evidence, Cognito for sign-in.
+- **Azure is the model plane only:** the same models (DeepSeek V3.2 for drafting, gpt-oss-120b for verification, Cohere Embed v4) on Microsoft Foundry, used as fallbacks behind parity gates.
+- **Cloud-neutral services:** Qdrant Cloud for the vector index, Grafana Cloud and LangSmith for observability, GitHub Actions for an eval-gated deploy.
+- **Ingestion:** Airflow 3 on MWAA Serverless, one ECS task per pipeline step, promoting a new index release by alias swap only after validation.
+- **Cost and teardown:** a $100/month ceiling enforced by an admission cap and an AWS Budgets kill switch; Terraform builds and removes the whole stack.
+
+The decisions behind this design are recorded in [ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md) and ADR-0010 to ADR-0013. [`docs/cloud-deployment.md`](docs/cloud-deployment.md) has the decision index, request path, degradation ladders, cost model and the region-loss analysis.
+
+| Diagram | Image | SVG | Editable source |
+|---|---|---|---|
+| Deployment HLD | [`hld.png`](docs/png/production/hld.png) | [`hld.svg`](docs/svg/production/hld.svg) | [`hld.excalidraw`](docs/System-design/production/hld.excalidraw) |
+| Critical flow and failover | [`critical-flow.png`](docs/png/production/critical-flow.png) | [`critical-flow.svg`](docs/svg/production/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/production/critical-flow.excalidraw) |
+| Contracts (state, caches, releases, identity, gates) | [`lld.png`](docs/png/production/lld.png) | [`lld.svg`](docs/svg/production/lld.svg) | [`lld.excalidraw`](docs/System-design/production/lld.excalidraw) |
+| Failure modes, cost and graduation triggers | [`system-design.png`](docs/png/production/system-design.png) | [`system-design.svg`](docs/svg/production/system-design.svg) | [`system-design.excalidraw`](docs/System-design/production/system-design.excalidraw) |
 
 ### Agent workflow (current code)
 
@@ -120,38 +125,6 @@ flowchart TD
 
 ![Low-level architecture](assets/images/low-level-architect-diagram.png)
 </details>
-
-### Target architecture (proposed, not yet implemented)
-
-These diagrams show where the sprint plan is heading: evidence snapshots with replay, a job queue with workers, guardrails, a bounded repair loop and an evaluation registry. They describe a design, not the code as it stands.
-
-| Diagram | Image | Editable source |
-|---|---|---|
-| High-level design | [`docs/png/hld.png`](docs/png/hld.png) | [`hld.excalidraw`](docs/System-design/hld.excalidraw) |
-| System design | [`docs/png/system-design.png`](docs/png/system-design.png) | [`system-design.excalidraw`](docs/System-design/system-design.excalidraw) |
-| Low-level design | [`docs/png/lld.png`](docs/png/lld.png) | [`lld.excalidraw`](docs/System-design/lld.excalidraw) |
-| Critical request flow | [`docs/png/critical-flow.png`](docs/png/critical-flow.png) | [`critical-flow.excalidraw`](docs/System-design/critical-flow.excalidraw) |
-
-![Target high-level architecture](docs/png/hld.png)
-
-### Cloud deployment (accepted design, not deployed)
-
-The deployment design was accepted on 2026-10-08 ([ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md), with ADR-0010 to ADR-0013). Nothing is deployed: cloud work starts only after Gate A, the local S7 service seams and the eval-replay CI gate are in place. The full write-up, with the decision index, Mermaid views, cost model and the region-loss failure mode, is in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
-
-- **AWS `us-east-1` serves everything:** Cloudflare in front, ECS Fargate for the web BFF, API and workers, Aurora PostgreSQL for durable jobs and events, Valkey for disposable caches, S3 for evidence, Cognito for sign-in.
-- **Azure is the model plane only:** the same models (DeepSeek V3.2 draft, gpt-oss-120b judge, Cohere Embed v4) on Microsoft Foundry as fallbacks behind parity gates.
-- **Cloud-neutral services:** Qdrant Cloud, Grafana Cloud, LangSmith, GitHub Actions with an eval-gated deploy.
-- **Ingestion:** Airflow 3 on MWAA Serverless.
-- **Budget and teardown:** a $100/month demo ceiling enforced by an admission cap and an AWS Budgets kill switch; `terraform destroy` for teardown.
-
-| Diagram | Image | SVG | Editable source |
-|---|---|---|---|
-| Deployment HLD | [`hld.png`](docs/png/production/hld.png) | [`hld.svg`](docs/svg/production/hld.svg) | [`hld.excalidraw`](docs/System-design/production/hld.excalidraw) |
-| Critical flow and failover | [`critical-flow.png`](docs/png/production/critical-flow.png) | [`critical-flow.svg`](docs/svg/production/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/production/critical-flow.excalidraw) |
-| Contracts (state, caches, releases, identity, gates) | [`lld.png`](docs/png/production/lld.png) | [`lld.svg`](docs/svg/production/lld.svg) | [`lld.excalidraw`](docs/System-design/production/lld.excalidraw) |
-| Failure modes, cost and graduation triggers | [`system-design.png`](docs/png/production/system-design.png) | [`system-design.svg`](docs/svg/production/system-design.svg) | [`system-design.excalidraw`](docs/System-design/production/system-design.excalidraw) |
-
-![Cloud deployment HLD](docs/png/production/hld.png)
 
 ---
 
@@ -377,5 +350,3 @@ Released under the [MIT License](LICENSE). Copyright (c) 2025 Nilesh Auradkar.
 **Nilesh Auradkar**, author and maintainer
 - GitHub: [@nilesh-auradkar05](https://github.com/nilesh-auradkar05)
 - Email: nilesh.auradkar14@gmail.com
-
-Bug reports and ideas are welcome as [GitHub issues](https://github.com/nilesh-auradkar05/Financial-Analyst-Agent/issues). Before opening a pull request, read [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md). Every change must trace to the SPEC, include a behavior test from [`docs/test-plan.md`](docs/test-plan.md), and pass the governance checks in `scripts/ci/`.

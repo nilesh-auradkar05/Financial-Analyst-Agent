@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-07-04)
 **Date:** 2026-07-04
-**Related:** SPEC §7, SPEC §10, SPEC §11, `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md`
+**Related:** SPEC §7, SPEC §10, SPEC §11, `old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md`
 
 ## Context
 

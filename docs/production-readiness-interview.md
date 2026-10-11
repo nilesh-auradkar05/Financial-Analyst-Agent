@@ -1,7 +1,7 @@
 # Production-Scale Design — Interview Companion
 
 **Project:** Alpha Financial Analyst Agent: ticker → SEC, news and market evidence → grounded financial-analysis memo.
-**Revised:** 2026-09-06, following the [production design review](production-design-review.md). **Updated 2026-10-08:** ADR-0006 accepted with ADR-0010 to ADR-0013; deployment answers in §§12–13 and the production diagrams now describe the accepted design ([cloud-deployment.md](cloud-deployment.md)). Scale projections elsewhere are unchanged.
+**Revised:** 2026-09-06, following the production design review (archived 2026-10-11: `old_artifacts/docs/production-design-review.md`). **Updated 2026-10-08:** ADR-0006 accepted with ADR-0010 to ADR-0013; deployment answers in §§12–13 and the production diagrams now describe the accepted design ([cloud-deployment.md](cloud-deployment.md)). Scale projections elsewhere are unchanged.
 **Purpose:** detailed interview answers about scaling documents and requests, supported by affordable experiments on the actual project. Large-scale numbers below are **design projections**, not measured capacity or a commitment to run millions of users.
 
 The questions originate in [production-scale-topic.txt](../production-scale-topic.txt). The proposed decisions are recorded in [ADR-0007](adr/ADR-0007-production-interview-scale-design.md). Canonical [SPEC v1.4](SPEC.md) §0 and §3 govern implementation scope. [ADR-0006](adr/ADR-0006-production-cloud-deployment.md) was accepted on 2026-10-08; its entry criteria still gate any cloud resource. SPEC v1.4 §12 lists S10 as the gated cloud item; §3.y keeps cloud resources out until the ADR-0006 entry criteria are met. This companion does not authorize infrastructure purchases. Scale numbers below are interview projections on a milestone ladder, not a new sprint map.
@@ -581,7 +581,7 @@ S10 is the cloud item (SPEC v1.4), and ADR-0006 was accepted on 2026-10-08. Clou
 | [Critical flow SVG](svg/production/critical-flow.svg) · [Excalidraw](System-design/production/critical-flow.excalidraw) | Durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence, failover ladders |
 | [System design SVG](svg/production/system-design.svg) · [Excalidraw](System-design/production/system-design.excalidraw) | Failure-mode matrix (built vs documented), cost share by tier, graduation triggers, deploy gate, S10 entry criteria |
 | [Cloud deployment](cloud-deployment.md) | Decision index D01–D17, Mermaid views, cost model and region-loss failure mode |
-| [Design review](production-design-review.md) | Historical findings; grade is not a new benchmark or automatic reapproval |
+| Design review (archived: `old_artifacts/docs/production-design-review.md`) | Historical findings; grade is not a new benchmark or automatic reapproval |
 | [Proposed ADR-0007](adr/ADR-0007-production-interview-scale-design.md) | Revised interview architecture and scope boundary |
 | [Retrieval methodology](retrieval-benchmark.md) | Canonical fixtures, identities, metrics and paired rules |
 | [Task ledger](../tasks/todo.md) | Actual revision verification and unresolved checks |

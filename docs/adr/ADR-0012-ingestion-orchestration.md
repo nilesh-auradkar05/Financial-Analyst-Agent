@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-10-08) by owner decision D15, after the owner challenged the earlier rejection of Airflow.
 **Date:** 2026-10-08
-**Related:** SPEC §9; ADR-0004 (edgartools); ADR-0005 (release registry); ADR-0006; ADR-0011; `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phase 4 ("Airflow explicitly rejected", amended by this record).
+**Related:** SPEC §9; ADR-0004 (edgartools); ADR-0005 (release registry); ADR-0006; ADR-0011; `old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phase 4 ("Airflow explicitly rejected", amended by this record).
 
 ## Context
 

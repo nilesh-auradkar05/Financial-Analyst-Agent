@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-10-08) by owner decision through the multi-cloud blueprint review. Implementation remains gated by the S10 entry criteria below.
 **Date:** 2026-07-04 (proposed) / 2026-10-08 (accepted)
-**Related:** SPEC §§2, 3, 11.1 (Gate E), 12 (S10); ADR-0003, ADR-0005, ADR-0007, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013; `docs/cloud-deployment.md`; `docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phases 4–5; production review 2026-09-06 finding 15.
+**Related:** SPEC §§2, 3, 11.1 (Gate E), 12 (S10); ADR-0003, ADR-0005, ADR-0007, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013; `docs/cloud-deployment.md`; `old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phases 4–5; production review 2026-09-06 finding 15.
 
 ## Context
 

@@ -177,7 +177,7 @@ S2-T00a — Governance docs into repo + CI governance gate  (Phase 0; step 1)
 Trace: SPEC §0/§13/§14; INTEGRATION_PLAN_v2 Phase 0; gap G11
 Goal: every governance rule the repo claims is enforced by a script that CI actually runs.
 Scope:
-- git-track docs/SPEC.md, docs/sprint-plan.md, docs/test-plan.md, docs/retrieval-benchmark.md, docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md, docs/adr/*.
+- git-track docs/SPEC.md, docs/sprint-plan.md, docs/test-plan.md, docs/retrieval-benchmark.md, old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md, docs/adr/*.
 - Add a `governance` job to .github/workflows/ci.yml running check_no_scope_residue, check_sprint_map, check_doc_sync, check_test_hygiene.
 - Remove .runtime/run_store.json and test_image/ from tracking; add to .gitignore.
 - Commit .claude/settings.json + .claude/hooks/* (SPEC §14).
