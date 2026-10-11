@@ -358,3 +358,29 @@ Traces to SPEC "Run telemetry contract — 2026-10-07" (`GET /jobs`).
 | Nothing of mine survives | When none of the browser's runs exist (or it has none), the server's available runs are shown and marked as not the viewer's own |
 | Nothing exists anywhere | No available runs → sample data, never an error |
 | Run store persistence | Compose mounts a named volume at the run-store directory |
+
+## 20. Cloud deployment contracts (S7 local seams, S10; ADR-0006, ADR-0009 amendment, ADR-0010 to ADR-0013)
+
+Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases marked *local* run in S7 against docker-compose stand-ins (Postgres, Valkey, a development JWT issuer, provider stand-ins); the rest run in S10 against the deployed demo tier. Live-provider cases record cost and are never quoted as approved baselines.
+
+| Behavior | Expected |
+|---|---|
+| Acceptance transaction (*local*) | Idempotency key, job and first event commit together or not at all; the same key and request hash returns the same job; the same key with a different hash returns 409 |
+| Fenced commit (*local*) | Kill a worker after claim and after result persistence: exactly one result commits; a stale attempt's commit updates zero rows and is discarded |
+| Lease expiry (*local*) | An expired lease is re-claimed with `attempt + 1`; retries or deadline exhausted end in `failed` with a typed reason |
+| Event replay (*local*) | Reconnecting with `Last-Event-ID` replays missed events in order; a job finished before the client subscribed is still discoverable; heartbeats arrive at least every 15 s |
+| Cache versioning (*local*) | Changing embedding fingerprint, index release, retrieval config, prompt, model or verifier policy each misses the cache; query-embedding reuse is exact only |
+| Single-flight (*local*) | N concurrent requests with the same snapshot produce one generation; all jobs link the same artifact hash |
+| Cache loss (*local*) | With Valkey stopped, jobs complete, quotas in Postgres still hold, and rate limits fall back to the per-task limit |
+| Customer isolation (*local*) | A caller cannot read, stream, cancel or reuse an idempotency key of another customer's job; `analyst` sees only own runs in `GET /jobs`; `admin` sees all |
+| Issuer allowlist (*local*) | Tokens from an issuer outside the allowlist, with a wrong audience or expired, are refused; the browser never receives an access token |
+| LLM fallback | With the Bedrock breaker forced open, a new attempt runs on Foundry with the same models; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
+| LLM parity | On the frozen eval set, DeepSeek V3.2 and gpt-oss-120b on Foundry stay within the paired tolerance of Bedrock before the fallback is enabled |
+| Judge adoption | gpt-oss-120b's verdicts reach Cohen's κ ≥ 0.85 against ≥ 50 owner-reviewed claims before it is used as the SPEC §11.2 judge (ADR-0009 amendment) |
+| Embedding parity | A fixed 200-chunk sample embedded at 1024 dimensions on Bedrock and Foundry reaches cosine ≥ 0.999 for every pair; below threshold the Foundry fallback stays off |
+| Embedding degradation | With both embedding hosts unavailable and an exact-cache miss, retrieval runs sparse-only and the run is `degraded` with `reduced_retrieval` |
+| Index promotion | A release whose point count, filter smoke tests or deletion check fails is never promoted; the active alias still serves the previous release; rollback is one alias update |
+| Ingestion DAG | A failed task retries alone; the EDGAR limiter never exceeds 8 requests/second across concurrent tasks; the same YAML runs locally through dag-factory |
+| Budget kill switch | Setting the admission flag (as the Budgets action does) refuses new jobs with a typed 503 while running jobs finish |
+| Deploy gate | A release that regresses `grounded_claim_rate` or `citation_coverage` beyond tolerance on frozen evidence is blocked before deployment |
+| Teardown | `terraform destroy` from a clean checkout leaves only the evidence bucket and its locked releases; a second `apply` recreates a working stack |

@@ -1,10 +1,11 @@
 # SPEC — Alpha Financial Analyst Agent
 
-> **Version:** 1.3
-> **Date:** 2026-09-12
+> **Version:** 1.4
+> **Date:** 2026-10-08
 > **Status:** Canonical product specification.
 > **Repo:** `nilesh-auradkar05/Financial-Analyst-Agent`
-> **Supersedes:** v1.2 (2026-07-04). Applied from `docs/SPEC-AMENDMENT-v1.3.md` (retired; application record is ADR-0008).
+> **Supersedes:** v1.3 (2026-09-12), which superseded v1.2 (2026-07-04) from `docs/SPEC-AMENDMENT-v1.3.md` (retired; application record is ADR-0008).
+> **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria.
 
 This is the product and architecture source of truth for the Alpha Financial
 Analyst Agent. Where documents disagree, resolve the conflict using §0.
@@ -28,7 +29,7 @@ This section is the only canonical conflict-resolution order.
 3. `docs/sprint-plan.md` — sequencing and task definitions.
 4. `docs/retrieval-benchmark.md` — benchmark fixture schema, matcher, metrics, validator, and comparison policy.
 5. `docs/adr/*.md` — accepted architecture decisions.
-6. `docs/System-design/**/*.excalidraw` (editable source) with `docs/png/**/*.png` and `docs/svg/production/*.svg` renders — diagram companions.
+6. `docs/System-design/**/*.excalidraw` (editable source) with `docs/png/**/*.png` and `docs/svg/production/*.svg` renders — diagram companions; `docs/cloud-deployment.md` — deployment design companion for ADR-0006.
 7. `tasks/todo.md` — active task state and verification ledger.
 8. `tasks/lessons.md` — correction log.
 9. Code comments and stale TODOs — lowest authority.
@@ -96,7 +97,8 @@ Non-goals for the committed local-first arc:
 - Trading, brokerage execution, or personalized investment advice.
 - Frontend before S8.
 - Prompt optimization before a stable evaluation oracle exists.
-- Production cloud deployment before ADR-0006 is accepted.
+- Cloud deployment before the ADR-0006 entry criteria have recorded evidence.
+- Multi-region serving, cross-region data copies or a recovery site (ADR-0006: region loss is a documented failure mode).
 
 ### 2.1 Known limitations (v1.3 baseline)
 
@@ -147,11 +149,13 @@ Deferred, gated work:
 - S7: service-readiness hardening (guardrails, caching, queue/worker, auth).
 - S8: frontend MVP.
 - S9: portfolio polish.
-- S10: cloud deployment (INTEGRATION_PLAN_v2 Phases 4–5), only after ADR-0006 is accepted with provider, budget, teardown, and deploy-gate details.
+- S10: cloud deployment (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08) and ADR-0010 to ADR-0013: AWS `us-east-1` serves; Microsoft Foundry holds model fallbacks only; $100/month demo ceiling with a Budgets kill switch; Terraform teardown; eval-gated deploy. S10 starts only when the ADR-0006 entry criteria have recorded evidence. Design companion: `docs/cloud-deployment.md`.
 
-3.y Out of scope until ADR-0006:
+3.y Out of scope (ADR-0006 accepted 2026-10-08; ADR-0013):
 
-- Cloud deployment, managed queues, multi-region (INTEGRATION_PLAN_v2 Phases 4–5).
+- Cloud resources before the ADR-0006 entry criteria are met.
+- Multi-region serving, cross-region data copies and recovery sites.
+- Managed queues (SQS) before the ADR-0013 trigger is measured.
 - Multi-agent decomposition beyond the single reviewer loop in §8.1.
 - Semantic caching of memo *outputs* (prohibited; see §11.3).
 
@@ -159,7 +163,7 @@ Out of scope unless this section is explicitly changed and backed by an ADR:
 
 - Broad multi-agent or swarm architectures.
 - Long-term memory.
-- Production cloud deployment (see 3.y).
+- Cloud deployment outside the gated S10 item (see 3.y).
 - Trading or brokerage execution.
 - Personalized investment advice.
 
@@ -167,7 +171,7 @@ Out of scope unless this section is explicitly changed and backed by an ADR:
 
 ## 4. Architecture Overview
 
-Runtime provider policy (authorized 2026-09-29, ADR-0009; configuration amended 2026-09-30): one variable per provider tier. AWS_BEDROCK_MODEL selects the Bedrock primary model. Bounded primary failures fall back to personal Anthropic (CLAUDE_LLM_MODEL with ANTHROPIC_API_KEY), then personal OpenAI (OPENAI_LLM_MODEL with OPENAI_API_KEY); a fallback without its key is skipped. AZURE_FOUNDRY_MODEL is reserved; Azure invocation is deferred to S7-AZURE-FALLBACK and its variables alone do not enable it. There is no generic provider selector and no Ollama chat path; Ollama serves embeddings only. Native traces identify actual attempted models.
+Runtime provider policy (authorized 2026-09-29, ADR-0009; configuration amended 2026-09-30): one variable per provider tier. AWS_BEDROCK_MODEL selects the Bedrock primary model. Bounded primary failures fall back to personal Anthropic (CLAUDE_LLM_MODEL with ANTHROPIC_API_KEY), then personal OpenAI (OPENAI_LLM_MODEL with OPENAI_API_KEY); a fallback without its key is skipped. AZURE_FOUNDRY_MODEL is reserved; Azure invocation is deferred to S7-AZURE-FALLBACK and its variables alone do not enable it. There is no generic provider selector and no Ollama chat path; Ollama serves embeddings only. Native traces identify actual attempted models. Deployed configuration (S10, ADR-0009 amendment 2026-10-08): DeepSeek V3.2 drafts and gpt-oss-120b is the judge/verifier model, both on Bedrock US cross-region inference profiles; the same two models on Microsoft Foundry are the only fallback, enabled after parity on the frozen eval set; personal Anthropic and OpenAI keys are development-only.
 
 Ingest on miss (authorized 2026-10-10): when analysis finds zero indexed chunks for a ticker, it ingests that ticker's latest 10-K once, off the event loop and under a time bound, then retrieves again. A ticker that already has indexed chunks is never re-ingested by analysis. An ingestion failure is reported as filing_ingestion_failed, distinct from an absent 10-K.
 
@@ -194,7 +198,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
 - `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Until S2-T00b, the implementation lives at repo-root `dataops/`.
-- `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache, MemoCache (`snapshot_hash` + `prompt_version`).
+- `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache (exact, keyed by embedding fingerprint), RetrievalCache (keyed by index release and retrieval config), MemoCache (`snapshot_hash` + `prompt_version` + model and verifier/policy fingerprints). Key formats: ADR-0013.
 - `app/services/` — tools, run store, sentiment (FinBERT wrapped in `to_thread` or out-of-process).
 - `evaluation/` — offline harness + registry; imports from `app/` only, never the reverse.
 - `dataops/` — local-first release contracts, registry, and quality gates. Must not import Qdrant, Chroma, provider SDKs, or cloud SDKs.
@@ -307,7 +311,7 @@ comparisons.
 
 Gate D: answer-quality methodology is stable enough for prompt/model changes.
 
-Gate E: S10 cloud work, gated on ADR-0006.
+Gate E: S10 cloud work. ADR-0006 was accepted on 2026-10-08; no cloud resource exists until its entry criteria have recorded evidence.
 
 Phase 1 evidence freeze is a prerequisite for S2/Gate A work in the v2 DataOps
 plan. No Qdrant or retrieval-method comparison may run on live evidence.
@@ -331,8 +335,9 @@ A run on live evidence cannot be classified `approved`.
 11.3 Caching policy
 
 - EvidenceCache: exact-key, per source. TTL: SEC = until new accession; market = 60 s; news = 15 min.
-- QueryEmbeddingCache: semantic reuse of retrieval query embeddings is permitted (cosine ≥ 0.98).
-- MemoCache: key = `snapshot_hash` + `prompt_version` + `model`. No TTL beyond snapshot validity.
+- QueryEmbeddingCache: exact reuse only, keyed by embedding fingerprint (model, version, dimensions, preprocessing) and the normalized query hash. Semantic reuse (cosine ≥ 0.98) was removed in v1.4 (ADR-0013): computing the new embedding to test similarity erases the saving, and near-identical financial queries differ by period or negation.
+- RetrievalCache: key = index release + retrieval configuration fingerprint + query and filter hashes.
+- MemoCache: key = `snapshot_hash` + `prompt_version` + model fingerprint + verifier/policy fingerprint. No TTL beyond snapshot validity. Concurrent misses for the same key are single-flighted.
 - PROHIBITED: semantic similarity caching of memo outputs across different snapshots.
 - Every cache exposes hit/miss counters in `/metrics`.
 
@@ -358,10 +363,10 @@ Committed and gated sequencing:
 | S4 | Backend comparison and default decision / Gate B |
 | S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C |
 | S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
-| S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + Postgres job store, provider circuit breaker, FinBERT out-of-process, auth + rate limit |
+| S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + Postgres job store (Postgres `SKIP LOCKED` queue; outbox → SQS only on the ADR-0013 trigger), provider circuit breaker, FinBERT out-of-process, auth + rate limit (ADR-0010) |
 | S8 | Frontend MVP |
 | S9 | Portfolio polish |
-| S10 | Cloud (INTEGRATION_PLAN_v2 Phases 4–5). Gated on ADR-0006 |
+| S10 | Cloud (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08) and ADR-0010–0013; starts when the ADR-0006 entry criteria have recorded evidence |
 
 S2 pre-tasks (T00a–T00d) implement production-readiness steps 1–3 (see
 sprint-plan.md S2 preamble).
@@ -427,15 +432,20 @@ root cause, prevention rule, whether it was applied, and verification result in
 
 Accepted ADRs:
 
-- `docs/adr/ADR-0003-qdrant-behind-interface.md`
+- `docs/adr/ADR-0003-qdrant-behind-interface.md` (addendum 2026-10-08: managed Qdrant Cloud, alias-per-release publication)
 - `docs/adr/ADR-0004-edgartools-parser.md`
 - `docs/adr/ADR-0005-unified-dataops-release-registry.md`
+- `docs/adr/ADR-0006-production-cloud-deployment.md` (accepted 2026-10-08; implementation gated by its entry criteria)
 - `docs/adr/ADR-0008-production-readiness-order.md`
+- `docs/adr/ADR-0009-runtime-provider-fallback.md` (amendment 2026-10-08: production model ladder)
+- `docs/adr/ADR-0010-identity-and-authorization.md`
+- `docs/adr/ADR-0011-managed-embedding-and-rerank-models.md` (provisional on Gate C)
+- `docs/adr/ADR-0012-ingestion-orchestration.md`
+- `docs/adr/ADR-0013-durable-execution-and-caching.md`
 
-Proposed or planned ADRs:
+Proposed ADRs:
 
-- ADR-0006: production cloud deployment. Proposed only until accepted.
-- ADR-0007: production interview scale design. Proposed; interview companion only.
+- ADR-0007: production interview scale design. Proposed; interview companion only. Superseded in part on 2026-10-08 by ADR-0006 and ADR-0009 to ADR-0013.
 
 
 ## REST service contract clarification — 2026-09-21

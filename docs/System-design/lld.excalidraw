@@ -31,11 +31,11 @@
    "locked": false,
    "fontSize": 28,
    "fontFamily": 3,
-   "text": "LLD \u2014 contracts, state, and the status machine",
+   "text": "LLD — contracts, state, and the status machine",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "LLD \u2014 contracts, state, and the status machine",
+   "originalText": "LLD — contracts, state, and the status machine",
    "lineHeight": 1.35
   },
   {
@@ -255,11 +255,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "graph, state, routing \u2014 fan-out, append reducers",
+   "text": "graph, state, routing — fan-out, append reducers",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "graph, state, routing \u2014 fan-out, append reducers",
+   "originalText": "graph, state, routing — fan-out, append reducers",
    "lineHeight": 1.35
   },
   {
@@ -479,11 +479,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "input \u00b7 content \u00b7 output",
+   "text": "input · content · output",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "input \u00b7 content \u00b7 output",
+   "originalText": "input · content · output",
    "lineHeight": 1.35
   },
   {
@@ -591,11 +591,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "EvidenceSnapshot build \u00b7 freeze \u00b7 replay",
+   "text": "EvidenceSnapshot build · freeze · replay",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "EvidenceSnapshot build \u00b7 freeze \u00b7 replay",
+   "originalText": "EvidenceSnapshot build · freeze · replay",
    "lineHeight": 1.35
   },
   {
@@ -703,11 +703,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "EvidenceCache \u00b7 QueryEmbeddingCache \u00b7 MemoCache",
+   "text": "EvidenceCache · QueryEmbeddingCache · MemoCache",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "EvidenceCache \u00b7 QueryEmbeddingCache \u00b7 MemoCache",
+   "originalText": "EvidenceCache · QueryEmbeddingCache · MemoCache",
    "lineHeight": 1.35
   },
   {
@@ -815,11 +815,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "offline harness + registry \u2014 imports app/, never the reverse",
+   "text": "offline harness + registry — imports app/, never the reverse",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "offline harness + registry \u2014 imports app/, never the reverse",
+   "originalText": "offline harness + registry — imports app/, never the reverse",
    "lineHeight": 1.35
   },
   {
@@ -885,11 +885,11 @@
    "locked": false,
    "fontSize": 15,
    "fontFamily": 3,
-   "text": "TYPED SEAMS  \u00b7  one implementation swap = one config flag",
+   "text": "TYPED SEAMS  ·  one implementation swap = one config flag",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "TYPED SEAMS  \u00b7  one implementation swap = one config flag",
+   "originalText": "TYPED SEAMS  ·  one implementation swap = one config flag",
    "lineHeight": 1.35
   },
   {
@@ -926,8 +926,8 @@
    "type": "text",
    "x": 78,
    "y": 616,
-   "width": 824,
-   "height": 298,
+   "width": 715.0,
+   "height": 309.4,
    "angle": 0,
    "strokeColor": "#22b8cf",
    "backgroundColor": "transparent",
@@ -940,7 +940,7 @@
    "frameId": null,
    "roundness": null,
    "seed": 12413,
-   "version": 1,
+   "version": 2,
    "versionNonce": 1,
    "isDeleted": false,
    "boundElements": [],
@@ -949,11 +949,11 @@
    "locked": false,
    "fontSize": 13,
    "fontFamily": 3,
-   "text": "class RetrievalStore(Protocol):\n    def upsert_documents(self, docs: list[Chunk]) -> None: ...\n    def search(self, q: str, k: int, flt: Filter | None) -> list[Hit]: ...\n    def delete_by_filter(self, flt: Filter) -> int: ...\n    def healthcheck(self) -> StoreHealth: ...\n\nclass JobQueue(Protocol):\n    def enqueue(self, job: Job, idempotency_key: str) -> JobId: ...\n    def claim(self, consumer: str, block_ms: int) -> Job | None: ...\n    def ack(self, job_id: JobId) -> None: ...\n    def dead_letter(self, job_id: JobId, reason: str) -> None: ...\n\nclass RunStore(Protocol):\n    def create(self, run: Run) -> RunId: ...\n    def patch(self, run_id: RunId, **fields) -> None: ...   # row-level\n    def get(self, run_id: RunId) -> Run | None: ...",
+   "text": "class RetrievalStore(Protocol):\n    def upsert_documents(self, docs: list[Chunk]) -> None: ...\n    def search(self, q: str, k: int, flt: Filter | None) -> list[Hit]: ...\n    def delete_by_filter(self, flt: Filter) -> int: ...\n    def healthcheck(self) -> StoreHealth: ...\n\nclass JobQueue(Protocol):\n    def enqueue(self, job: Job, idempotency_key: str) -> JobId: ...\n    def claim(self, worker_id: str, lease_s: int) -> Claim | None: ...  # job + attempt\n    def heartbeat(self, claim: Claim) -> None: ...\n    def complete(self, claim: Claim, result: Result) -> bool: ...  # False ⇒ stale fence\n    def dead_letter(self, claim: Claim, reason: str) -> None: ...\n\nclass RunStore(Protocol):\n    def create(self, run: Run) -> RunId: ...\n    def patch(self, run_id: RunId, **fields) -> None: ...   # row-level\n    def get(self, run_id: RunId) -> Run | None: ...",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "class RetrievalStore(Protocol):\n    def upsert_documents(self, docs: list[Chunk]) -> None: ...\n    def search(self, q: str, k: int, flt: Filter | None) -> list[Hit]: ...\n    def delete_by_filter(self, flt: Filter) -> int: ...\n    def healthcheck(self) -> StoreHealth: ...\n\nclass JobQueue(Protocol):\n    def enqueue(self, job: Job, idempotency_key: str) -> JobId: ...\n    def claim(self, consumer: str, block_ms: int) -> Job | None: ...\n    def ack(self, job_id: JobId) -> None: ...\n    def dead_letter(self, job_id: JobId, reason: str) -> None: ...\n\nclass RunStore(Protocol):\n    def create(self, run: Run) -> RunId: ...\n    def patch(self, run_id: RunId, **fields) -> None: ...   # row-level\n    def get(self, run_id: RunId) -> Run | None: ...",
+   "originalText": "class RetrievalStore(Protocol):\n    def upsert_documents(self, docs: list[Chunk]) -> None: ...\n    def search(self, q: str, k: int, flt: Filter | None) -> list[Hit]: ...\n    def delete_by_filter(self, flt: Filter) -> int: ...\n    def healthcheck(self) -> StoreHealth: ...\n\nclass JobQueue(Protocol):\n    def enqueue(self, job: Job, idempotency_key: str) -> JobId: ...\n    def claim(self, worker_id: str, lease_s: int) -> Claim | None: ...  # job + attempt\n    def heartbeat(self, claim: Claim) -> None: ...\n    def complete(self, claim: Claim, result: Result) -> bool: ...  # False ⇒ stale fence\n    def dead_letter(self, claim: Claim, reason: str) -> None: ...\n\nclass RunStore(Protocol):\n    def create(self, run: Run) -> RunId: ...\n    def patch(self, run_id: RunId, **fields) -> None: ...   # row-level\n    def get(self, run_id: RunId) -> Run | None: ...",
    "lineHeight": 1.4
   },
   {
@@ -984,11 +984,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "Parity suite asserts identical filter semantics across Chroma and Qdrant \u2014 the swap is measured, not assumed.",
+   "text": "Parity suite asserts identical filter semantics across Chroma and Qdrant — the swap is measured, not assumed.",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "Parity suite asserts identical filter semantics across Chroma and Qdrant \u2014 the swap is measured, not assumed.",
+   "originalText": "Parity suite asserts identical filter semantics across Chroma and Qdrant — the swap is measured, not assumed.",
    "lineHeight": 1.35
   },
   {
@@ -1118,11 +1118,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "frozen + canonical JSON \u2192 the hash is stable across processes and machines; that is what makes replay meaningful.",
+   "text": "frozen + canonical JSON → the hash is stable across processes and machines; that is what makes replay meaningful.",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "frozen + canonical JSON \u2192 the hash is stable across processes and machines; that is what makes replay meaningful.",
+   "originalText": "frozen + canonical JSON → the hash is stable across processes and machines; that is what makes replay meaningful.",
    "lineHeight": 1.35
   },
   {
@@ -1153,11 +1153,11 @@
    "locked": false,
    "fontSize": 15,
    "fontFamily": 3,
-   "text": "STATUS MACHINE  \u00b7  computed from verification + evidence completeness",
+   "text": "STATUS MACHINE  ·  computed from verification + evidence completeness",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "STATUS MACHINE  \u00b7  computed from verification + evidence completeness",
+   "originalText": "STATUS MACHINE  ·  computed from verification + evidence completeness",
    "lineHeight": 1.35
   },
   {
@@ -2193,11 +2193,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "failed,\nattempts < 2\n\u2192 revise",
+   "text": "failed,\nattempts < 2\n→ revise",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "failed,\nattempts < 2\n\u2192 revise",
+   "originalText": "failed,\nattempts < 2\n→ revise",
    "lineHeight": 1.35
   },
   {
@@ -2413,11 +2413,11 @@
    "locked": false,
    "fontSize": 15,
    "fontFamily": 3,
-   "text": "VERIFIER  \u00b7  what one claim check actually does",
+   "text": "VERIFIER  ·  what one claim check actually does",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "VERIFIER  \u00b7  what one claim check actually does",
+   "originalText": "VERIFIER  ·  what one claim check actually does",
    "lineHeight": 1.35
   },
   {
@@ -2649,11 +2649,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "[N] \u2192 registry; bare years like [2024] rejected",
+   "text": "[N] → registry; bare years like [2024] rejected",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "[N] \u2192 registry; bare years like [2024] rejected",
+   "originalText": "[N] → registry; bare years like [2024] rejected",
    "lineHeight": 1.35
   },
   {
@@ -2843,11 +2843,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "cosine \u2265 0.45 vs cited packet text",
+   "text": "cosine ≥ 0.45 vs cited packet text",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "cosine \u2265 0.45 vs cited packet text",
+   "originalText": "cosine ≥ 0.45 vs cited packet text",
    "lineHeight": 1.35
   },
   {
@@ -2975,11 +2975,11 @@
    "locked": false,
    "fontSize": 12,
    "fontFamily": 3,
-   "text": "Agreement with a judge model is measured (\u03ba) before the headline rate is quoted anywhere.",
+   "text": "Agreement with a judge model is measured (κ) before the headline rate is quoted anywhere.",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "Agreement with a judge model is measured (\u03ba) before the headline rate is quoted anywhere.",
+   "originalText": "Agreement with a judge model is measured (κ) before the headline rate is quoted anywhere.",
    "lineHeight": 1.35
   },
   {
@@ -3051,8 +3051,8 @@
    "type": "text",
    "x": 1018,
    "y": 1496,
-   "width": 724,
-   "height": 158,
+   "width": 706.875,
+   "height": 109.19999999999999,
    "angle": 0,
    "strokeColor": "#ffa94d",
    "backgroundColor": "transparent",
@@ -3065,7 +3065,7 @@
    "frameId": null,
    "roundness": null,
    "seed": 25932,
-   "version": 1,
+   "version": 2,
    "versionNonce": 1,
    "isDeleted": false,
    "boundElements": [],
@@ -3074,11 +3074,11 @@
    "locked": false,
    "fontSize": 13,
    "fontFamily": 3,
-   "text": "evidence:sec:{ticker}:{accession}          ttl = until new accession\nevidence:news:{ticker}:{window}            ttl = 900 s\nevidence:market:{ticker}                   ttl = 60 s\nembed:query:{sha1(text)}                   semantic reuse ok (cos \u2265 .98)\nmemo:{snapshot_hash}:{prompt_version}:{model}\n\n# forbidden: memo lookup by query similarity across snapshots",
+   "text": "ev:{source}:{issuer_cik}:{params_hash}     market 60 s · news 900 s · SEC new accession\nqe:{embedding_fp}:{sha256(query)}          exact only (ADR-0013)\nrr:{index_release}:{retrieval_cfg_fp}:{q}  release lifetime\nmemo:{snapshot_hash}:{prompt_version}:{model_fp}:{verifier_policy_fp}\n\n# forbidden: memo lookup by query similarity across snapshots",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "evidence:sec:{ticker}:{accession}          ttl = until new accession\nevidence:news:{ticker}:{window}            ttl = 900 s\nevidence:market:{ticker}                   ttl = 60 s\nembed:query:{sha1(text)}                   semantic reuse ok (cos \u2265 .98)\nmemo:{snapshot_hash}:{prompt_version}:{model}\n\n# forbidden: memo lookup by query similarity across snapshots",
+   "originalText": "ev:{source}:{issuer_cik}:{params_hash}     market 60 s · news 900 s · SEC new accession\nqe:{embedding_fp}:{sha256(query)}          exact only (ADR-0013)\nrr:{index_release}:{retrieval_cfg_fp}:{q}  release lifetime\nmemo:{snapshot_hash}:{prompt_version}:{model_fp}:{verifier_policy_fp}\n\n# forbidden: memo lookup by query similarity across snapshots",
    "lineHeight": 1.4
   }
  ],

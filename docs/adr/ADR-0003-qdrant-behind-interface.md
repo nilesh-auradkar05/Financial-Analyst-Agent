@@ -30,3 +30,17 @@ Implement `QdrantVectorStore` as a `RetrievalStore` implementation behind the ex
 - Stay on Chroma: lowest effort, weaker payload filtering and harder S5 path.
 - Managed vector DB: out of scope now.
 - pgvector / other stores: viable, but Qdrant better fits payload filtering and hybrid-readiness for this roadmap.
+
+## Addendum 2026-10-08 — managed deployment and release publication (owner decision D11, ADR-0006)
+
+Applies to the deployed (S10) configuration; the local Docker setup above is unchanged.
+
+- **Managed Qdrant Cloud on AWS `us-east-1`**, the same region as the workers. Free 1 GB node for the demo tier (it suspends after a week idle, so a weekly keep-alive query or a small paid node is required); a 3-node multi-AZ cluster with replication factor 2 and int8 quantization over float16 originals at scale.
+- **One collection per index release** (`sec_chunks__<release_id>`). A release is built, validated (point count equals the manifest, filter smoke tests pass, removed chunk IDs are absent) and then promoted by an atomic alias swap of `sec_chunks_active`. The previous release is retained for rollback, which is one alias update. Queries never see a partially published filing (production review finding 8).
+- **Automatic sharding with an issuer payload filter**, not per-ticker custom shards (8,000 keys × 12 shards × replication 2 would be 192,000 shard replicas, review finding 1).
+- **Dense and sparse vectors in one collection**, so S5 can retire the per-query BM25 rebuild if Gate C confirms it.
+- Vectors are rebuildable without re-embedding from the Parquet files in S3 (ADR-0011).
+
+Why managed: the `RetrievalStore` contract and payload indexes stay unchanged above the retrieval boundary, and backups, upgrades and multi-AZ placement are not operated by one person. Alternatives: self-hosted Qdrant on ECS + EBS (cheaper at the 10M-user tier, owner runs upgrades and backups); Aurora pgvector (one fewer system, weaker sparse/hybrid support); OpenSearch Serverless (native hybrid, higher cost floor); S3 Vectors (very cheap, no sparse vectors; fits a cold archive tier).
+
+Trigger to self-host: managed spend above about twice the equivalent EC2 cost plus operating time. Verify before implementation: Qdrant Cloud paid-tier availability in `us-east-1`.

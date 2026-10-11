@@ -72,7 +72,7 @@ OLLAMA_TIMEOUT=600
 OLLAMA_TEMPERATURE=0.7
 
 VECTOR_BACKEND=qdrant
-QDRANT_URL=http://localhost:6333
+QDRANT_URL=http://localhost:16333
 QDRANT_COLLECTION_NAME=sec_filings
 
 SEC_USER_AGENT="Your Name your-email@example.com"
@@ -89,14 +89,14 @@ Use `VECTOR_BACKEND=chroma` for local fallback when Qdrant is not running.
 Start the local Qdrant service:
 
 ```bash
-docker compose -f docker-compose.qdrant.yml up -d
-docker ps --filter name=qdrant-financial-analyst-agent-system
+docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml up -d
+docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml ps
 ```
 
 Follow logs if Qdrant does not appear healthy:
 
 ```bash
-docker logs qdrant-financial-analyst-agent-system
+docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml logs qdrant
 ```
 
 ## Step 5 - Optional Ollama setup
@@ -148,7 +148,7 @@ Ingestion and retrieval checks:
 ```bash
 uv run pytest tests/ingestion -q
 uv run pytest tests/unit/test_vector_store_factory.py -q
-VECTOR_BACKEND=qdrant QDRANT_URL=http://localhost:6333 uv run pytest tests/unit/test_qdrant_store.py -q
+VECTOR_BACKEND=qdrant QDRANT_URL=http://localhost:16333 uv run pytest tests/unit/test_qdrant_store.py -q
 uv run python evaluation/validate_retrieval_fixture.py evaluation/fixtures/retrieval_shared_benchmark_v1.json
 ```
 
@@ -220,7 +220,7 @@ curl http://127.0.0.1:8000/jobs/<job_id>
 Stop Qdrant when done:
 
 ```bash
-docker compose -f docker-compose.qdrant.yml down
+docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml down
 ```
 
 Local generated data usually lives under `data/` and `.runtime/`. Remove it only when you intentionally want a clean local state and after checking that no needed fixture or task artifact is stored there.

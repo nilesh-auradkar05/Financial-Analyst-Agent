@@ -1,0 +1,13 @@
+# Opt-in NVIDIA GPU access for FinBERT executing in the API container.
+# Requires NVIDIA drivers, NVIDIA Container Toolkit and Docker Compose GPU support.
+# Compose usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+# Host Ollama uses its own GPU allocation independently; both can compete for VRAM.
+services:
+  api:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

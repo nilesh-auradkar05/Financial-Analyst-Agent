@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Fail if obvious residue from the PulsePress/AWS/Terraform template remains in core Alpha docs."""
+"""Fail if obvious residue from the PulsePress/AWS/Terraform template remains in core Alpha docs.
+
+Terraform is no longer residue where ADR-0006 (accepted 2026-10-08) adopts it as the
+infrastructure-as-code tool: SPEC, test-plan and ADRs may name it. It remains residue in
+the agent-facing files and the benchmark methodology, which have no reason to mention it.
+"""
 from __future__ import annotations
 
 import re
@@ -21,6 +26,10 @@ PATTERNS = {
     "Terraform residue": re.compile(r"\bterraform\b", re.IGNORECASE),
 }
 
+# ADR-0006: Terraform is the accepted IaC tool, so these documents may name it.
+TERRAFORM_ALLOWED = {ROOT / "docs" / "SPEC.md", ROOT / "docs" / "test-plan.md"}
+TERRAFORM_ALLOWED.update((ROOT / "docs" / "adr").glob("*.md"))
+
 failures: list[str] = []
 for path in FILES:
     if not path.exists():
@@ -28,6 +37,8 @@ for path in FILES:
         continue
     text = path.read_text(encoding="utf-8")
     for label, pattern in PATTERNS.items():
+        if label == "Terraform residue" and path in TERRAFORM_ALLOWED:
+            continue
         for match in pattern.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1
             failures.append(f"{path.relative_to(ROOT)}:{line_no}: {label}")
