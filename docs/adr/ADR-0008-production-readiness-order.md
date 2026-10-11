@@ -42,7 +42,7 @@ Repo-root `dataops/` remains the implementation until S2-T00b; §5 names
 
 ## Consequences
 
-- `docs/SPEC-AMENDMENT-v1.3.md` is a pointer, not an alternate SPEC.
+- `docs/SPEC-AMENDMENT-v1.3.md` is a pointer, not an alternate SPEC (archived 2026-10-11 to `old_artifacts/docs/`).
 - Sprint-plan traces that cited amendment §9.1–9.5 retarget to SPEC §8.1–8.5.
 - S1 traces to SPEC §9 (SEC ingestion) and §16 (ADRs).
 - Applying v1.3 does not accept ADR-0006, authorize cloud spend, or implement

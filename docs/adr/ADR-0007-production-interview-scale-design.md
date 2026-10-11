@@ -1,7 +1,7 @@
 # ADR-0007 — Production interview scale design
 
 **Status:** Proposed — interview design only; user authorized documentation revision on 2026-09-06. Superseded in part on 2026-10-08 by ADR-0006 and ADR-0009 to ADR-0013 (see the amendment at the end).
-**Related:** SPEC v1.3 §§0, 3, 7, 10–12; ADR-0003; proposed ADR-0006; accepted ADR-0008; production-design-review.md findings 1–15.
+**Related:** SPEC v1.3 §§0, 3, 7, 10–12; ADR-0003; proposed ADR-0006; accepted ADR-0008; production-design-review.md findings 1–15 (review archived 2026-10-11 to `old_artifacts/docs/`).
 
 ## Context
 

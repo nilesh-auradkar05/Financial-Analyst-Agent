@@ -121,19 +121,6 @@ flowchart TD
 ![Low-level architecture](assets/images/low-level-architect-diagram.png)
 </details>
 
-### Target architecture (proposed, not yet implemented)
-
-These diagrams show where the sprint plan is heading: evidence snapshots with replay, a job queue with workers, guardrails, a bounded repair loop and an evaluation registry. They describe a design, not the code as it stands.
-
-| Diagram | Image | Editable source |
-|---|---|---|
-| High-level design | [`docs/png/hld.png`](docs/png/hld.png) | [`hld.excalidraw`](docs/System-design/hld.excalidraw) |
-| System design | [`docs/png/system-design.png`](docs/png/system-design.png) | [`system-design.excalidraw`](docs/System-design/system-design.excalidraw) |
-| Low-level design | [`docs/png/lld.png`](docs/png/lld.png) | [`lld.excalidraw`](docs/System-design/lld.excalidraw) |
-| Critical request flow | [`docs/png/critical-flow.png`](docs/png/critical-flow.png) | [`critical-flow.excalidraw`](docs/System-design/critical-flow.excalidraw) |
-
-![Target high-level architecture](docs/png/hld.png)
-
 ### Cloud deployment (accepted design, not deployed)
 
 The deployment design was accepted on 2026-10-08 ([ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md), with ADR-0010 to ADR-0013). Nothing is deployed: cloud work starts only after Gate A, the local S7 service seams and the eval-replay CI gate are in place. The full write-up, with the decision index, Mermaid views, cost model and the region-loss failure mode, is in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
