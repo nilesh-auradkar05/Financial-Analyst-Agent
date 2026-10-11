@@ -64,7 +64,28 @@ Comparisons change one thing at a time: the same fixture, and either the backend
 
 ---
 
-## Diagrams
+## Architecture
+
+### Cloud architecture: AWS serving, Azure model fallback
+
+![Cloud architecture: Cloudflare in front of AWS us-east-1, with Azure as the model fallback plane](docs/png/production/hld.png)
+
+One AWS region serves every request and holds all state. Azure hosts the same models as a fallback, so every cross-cloud call is a stateless model request.
+
+- **AWS `us-east-1` serves everything:** Cloudflare in front (WAF, Turnstile, Tunnel), ECS Fargate for the web BFF, API and workers, Aurora PostgreSQL for durable jobs and events, Valkey for disposable caches, S3 for evidence, Cognito for sign-in.
+- **Azure is the model plane only:** the same models (DeepSeek V3.2 for drafting, gpt-oss-120b for verification, Cohere Embed v4) on Microsoft Foundry, used as fallbacks behind parity gates.
+- **Cloud-neutral services:** Qdrant Cloud for the vector index, Grafana Cloud and LangSmith for observability, GitHub Actions for an eval-gated deploy.
+- **Ingestion:** Airflow 3 on MWAA Serverless, one ECS task per pipeline step, promoting a new index release by alias swap only after validation.
+- **Cost and teardown:** a $100/month ceiling enforced by an admission cap and an AWS Budgets kill switch; Terraform builds and removes the whole stack.
+
+The decisions behind this design are recorded in [ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md) and ADR-0010 to ADR-0013. [`docs/cloud-deployment.md`](docs/cloud-deployment.md) has the decision index, request path, degradation ladders, cost model and the region-loss analysis.
+
+| Diagram | Image | SVG | Editable source |
+|---|---|---|---|
+| Deployment HLD | [`hld.png`](docs/png/production/hld.png) | [`hld.svg`](docs/svg/production/hld.svg) | [`hld.excalidraw`](docs/System-design/production/hld.excalidraw) |
+| Critical flow and failover | [`critical-flow.png`](docs/png/production/critical-flow.png) | [`critical-flow.svg`](docs/svg/production/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/production/critical-flow.excalidraw) |
+| Contracts (state, caches, releases, identity, gates) | [`lld.png`](docs/png/production/lld.png) | [`lld.svg`](docs/svg/production/lld.svg) | [`lld.excalidraw`](docs/System-design/production/lld.excalidraw) |
+| Failure modes, cost and graduation triggers | [`system-design.png`](docs/png/production/system-design.png) | [`system-design.svg`](docs/svg/production/system-design.svg) | [`system-design.excalidraw`](docs/System-design/production/system-design.excalidraw) |
 
 ### Agent workflow (current code)
 
@@ -120,25 +141,6 @@ flowchart TD
 
 ![Low-level architecture](assets/images/low-level-architect-diagram.png)
 </details>
-
-### Cloud deployment (accepted design, not deployed)
-
-The deployment design was accepted on 2026-10-08 ([ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md), with ADR-0010 to ADR-0013). Nothing is deployed: cloud work starts only after Gate A, the local S7 service seams and the eval-replay CI gate are in place. The full write-up, with the decision index, Mermaid views, cost model and the region-loss failure mode, is in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
-
-- **AWS `us-east-1` serves everything:** Cloudflare in front, ECS Fargate for the web BFF, API and workers, Aurora PostgreSQL for durable jobs and events, Valkey for disposable caches, S3 for evidence, Cognito for sign-in.
-- **Azure is the model plane only:** the same models (DeepSeek V3.2 draft, gpt-oss-120b judge, Cohere Embed v4) on Microsoft Foundry as fallbacks behind parity gates.
-- **Cloud-neutral services:** Qdrant Cloud, Grafana Cloud, LangSmith, GitHub Actions with an eval-gated deploy.
-- **Ingestion:** Airflow 3 on MWAA Serverless.
-- **Budget and teardown:** a $100/month demo ceiling enforced by an admission cap and an AWS Budgets kill switch; `terraform destroy` for teardown.
-
-| Diagram | Image | SVG | Editable source |
-|---|---|---|---|
-| Deployment HLD | [`hld.png`](docs/png/production/hld.png) | [`hld.svg`](docs/svg/production/hld.svg) | [`hld.excalidraw`](docs/System-design/production/hld.excalidraw) |
-| Critical flow and failover | [`critical-flow.png`](docs/png/production/critical-flow.png) | [`critical-flow.svg`](docs/svg/production/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/production/critical-flow.excalidraw) |
-| Contracts (state, caches, releases, identity, gates) | [`lld.png`](docs/png/production/lld.png) | [`lld.svg`](docs/svg/production/lld.svg) | [`lld.excalidraw`](docs/System-design/production/lld.excalidraw) |
-| Failure modes, cost and graduation triggers | [`system-design.png`](docs/png/production/system-design.png) | [`system-design.svg`](docs/svg/production/system-design.svg) | [`system-design.excalidraw`](docs/System-design/production/system-design.excalidraw) |
-
-![Cloud deployment HLD](docs/png/production/hld.png)
 
 ---
 
