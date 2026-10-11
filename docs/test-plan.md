@@ -406,3 +406,22 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Refresh before promotion | Promotion waits until `_count` on the staged index equals the manifest; a timeout fails validation and leaves the alias unchanged |
 | Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance, else the deployment uses Qdrant Cloud |
 | Ledger reconciliation | Daily ledger minutes stay within 20% of CloudWatch search OCU activity; beyond that an alarm fires |
+
+---
+
+## 21. Embedding provider switch and per-arm indexes (ADR-0011 amendment 2026-10-11; plumbing slice)
+
+Observed through the retrieval boundary (`get_embeddings`, the `RetrievalStore` factory, ingestion) with faithful fake transports; no network and no real model.
+
+| Case | Expected behavior |
+| --- | --- |
+| Default unchanged | With no embedding settings, the embedding model is `qwen3-embedding:4b` on Ollama and the store uses the existing `sec_filings` collection |
+| Provider selected by configuration | Each of the four arms (Ollama Qwen3, Bedrock Cohere Embed v4, Bedrock Titan V2, Azure `text-embedding-3-small`) is selected by settings alone; no caller above the retrieval boundary changes |
+| Unknown or incomplete configuration | An unknown provider, or a cloud arm without its required setting, is rejected when settings load, with a message naming the missing setting and no secret value |
+| Requested dimension honoured | A cloud arm asks its model for the configured dimension (1024), and the vectors it returns have that length |
+| Query and document conventions | For a model that distinguishes queries from documents, a query embedding and a document embedding of the same text are requested with different input types |
+| One index per arm | Two arms never share a collection: the collection name is derived from the embedding identifier, is stable across runs, and the default arm keeps `sec_filings` |
+| Dimension mismatch refused | Opening a collection whose vector size differs from the configured model's dimension fails with a clear error before any write or search |
+| Embedding identifier recorded | Every ingested chunk carries the embedding identifier (provider, model, dimension) in its metadata; also closes the open part of S3-T04 |
+| Arm built from the same chunks | Building an arm's index from the baseline copies every chunk id, text and metadata unchanged and re-embeds only the vector; chunk counts match per ticker |
+| Provider client stays inside the boundary | No provider client object is reachable from outside `app/components/retrieval/` |

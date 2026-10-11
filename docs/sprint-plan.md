@@ -469,3 +469,10 @@ Result as of 2026-10-10: implementation on branch auto-ingest-on-miss. Full suit
 User decision, 2026-10-10: the Chroma-vs-Qdrant paired comparison (S4) is retired; Gate B closes at S3 exit. Recorded in SPEC §11.1 and §12, ADR-0003 (addendum) and `docs/retrieval-benchmark.md` §9. In the same pass the S2-T00b, S2-T00d and S3 results above were reconciled against the code and `tasks/todo.md`; each result names its evidence and what is still open.
 
 Remaining order after reconciliation: S2-T00c (latency artifacts, concurrency probe) → S2-T00b remainder → S2-T00d remainder (G10) → S2-T01…T06 (Gate A) → S3-T04, S3-T05 (Gate B) → S5 including the ADR-0011 embedding bake-off (Gate C) → S6 (a)…(e) (Gate D) → S7 (a)…(f) → S9 → S10 entry evidence → S10-T01…T08.
+
+
+### Authorized embedding-provider plumbing slice (2026-10-11)
+
+User decision, 2026-10-11: the Gate C embedding bake-off has four arms (`qwen3-embedding:4b`, Cohere Embed v4, Titan Text Embeddings V2, `text-embedding-3-small`; ADR-0011 amendment, `docs/retrieval-benchmark.md` §9a). The plumbing is built now, ahead of S5: an embedding provider switch behind the existing retrieval boundary, one index per arm built from the same chunks, and the embedding identifier written to ingest metadata (also the open part of S3-T04). Measurement stays in S5, after Gate A; no arm is measured or cited before the fixture is frozen. Tests: test-plan §21. The remaining order above is otherwise unchanged.
+
+Result: Pending.
