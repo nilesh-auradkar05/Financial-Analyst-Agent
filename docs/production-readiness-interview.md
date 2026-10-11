@@ -1,10 +1,10 @@
 # Production-Scale Design — Interview Companion
 
 **Project:** Alpha Financial Analyst Agent: ticker → SEC, news and market evidence → grounded financial-analysis memo.
-**Revised:** 2026-09-06, following the [production design review](production-design-review.md).
+**Revised:** 2026-09-06, following the [production design review](production-design-review.md). **Updated 2026-10-08:** ADR-0006 accepted with ADR-0010 to ADR-0013; deployment answers in §§12–13 and the production diagrams now describe the accepted design ([cloud-deployment.md](cloud-deployment.md)). Scale projections elsewhere are unchanged.
 **Purpose:** detailed interview answers about scaling documents and requests, supported by affordable experiments on the actual project. Large-scale numbers below are **design projections**, not measured capacity or a commitment to run millions of users.
 
-The questions originate in [production-scale-topic.txt](../production-scale-topic.txt). The proposed decisions are recorded in [ADR-0007](adr/ADR-0007-production-interview-scale-design.md). Canonical [SPEC v1.3](SPEC.md) §0 and §3 govern implementation scope. [ADR-0006](adr/ADR-0006-production-cloud-deployment.md) remains the cloud-deployment gate and is not accepted here. SPEC §12 lists S10 as cloud work still out of committed scope until ADR-0006 (§3.y). This companion does not authorize infrastructure purchases. Scale numbers below are interview projections on a milestone ladder, not a new sprint map.
+The questions originate in [production-scale-topic.txt](../production-scale-topic.txt). The proposed decisions are recorded in [ADR-0007](adr/ADR-0007-production-interview-scale-design.md). Canonical [SPEC v1.4](SPEC.md) §0 and §3 govern implementation scope. [ADR-0006](adr/ADR-0006-production-cloud-deployment.md) was accepted on 2026-10-08; its entry criteria still gate any cloud resource. SPEC v1.4 §12 lists S10 as the gated cloud item; §3.y keeps cloud resources out until the ADR-0006 entry criteria are met. This companion does not authorize infrastructure purchases. Scale numbers below are interview projections on a milestone ladder, not a new sprint map.
 
 Read every answer through three distinct labels:
 
@@ -42,9 +42,9 @@ These statements refer to the reviewed baseline; the diagrams did not implement 
 
 A delivered memo resolves to the exact evidence and final bytes that were checked. Record job, attempt, artifact revision/hash, `snapshot_hash`, evidence/index releases and generation/verifier/policy fingerprints. A snapshot is an identity, not a claim that content is current or the memo is correct. Its hash does not replace access control, financial validation or freshness rules.
 
-![Revised production high-level design: durable serving, evidence identity, qualified models and optional scale infrastructure](svg/production/hld.svg)
+![Accepted deployment HLD (2026-10-08): AWS us-east-1 serving, Azure model plane, cloud-neutral services, model ladder and failure domain](svg/production/hld.svg)
 
-The [editable HLD](System-design/production/hld.excalidraw) shows proposed boundaries and optional infrastructure for a larger deployment. Practical work starts with the existing local tools and a small measured workload.
+The [editable HLD](System-design/production/hld.excalidraw) shows the accepted deployment (ADR-0006), which is not built yet. Practical work starts with the existing local tools and a small measured workload.
 
 ## 1. Document volume: thousands → millions → multi-millions
 
@@ -126,7 +126,7 @@ Resume from a durable stage result if available. If the provider accepted a call
 
 **Follow-up: When would Streams or Kafka enter?**
 
-If Postgres claim throughput/wakeup latency becomes a measured constraint, write job and outbox rows in one transaction and dispatch to Redis Streams. Dispatch can duplicate, so workers remain idempotent/fenced; acknowledge after the durable outcome commits. Specify pending-entry recovery, bounded retries and dead-letter behavior. Redis Pub/Sub may provide wakeups but never authoritative records.
+If Postgres claim throughput/wakeup latency becomes a measured constraint, write job and outbox rows in one transaction and dispatch to SQS with a dead-letter queue (ADR-0013; this replaced the earlier Redis Streams target because the deployed cache is an evictable Valkey). Dispatch can duplicate, so workers remain idempotent/fenced; delete the message only after the durable outcome commits. Specify visibility timeouts, bounded retries and dead-letter behavior. Valkey Pub/Sub may provide wakeups but never authoritative records.
 
 Evaluate Kafka/Event Hubs for required retention, replay volume, ordered partitions, independent consumers or operational throughput. A second consumer alone is insufficient reason for a new broker. Delta supports batch replay; it does not automatically provide a streaming bus’s latency/delivery semantics.
 
@@ -174,7 +174,7 @@ Job ID, sequence, status, attempt, artifact revision/hash or null, snapshot iden
 
 As a provisional component target. Measure cache, query embedding, search, reranker queue/compute and assembly, including misses/timeouts. The old 185 ms sum and 115 ms slack were hypotheses, not measured headroom. Report cold/warm distributions, corpus/filtered size and concurrency before calling the budget achieved.
 
-![Revised critical flow: authenticated acceptance, evidence join, immutable snapshot, verification and durable terminal replay](svg/production/critical-flow.svg)
+![Accepted critical flow: durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence and failover ladders](svg/production/critical-flow.svg)
 
 **Practical next experiment:** record the five clocks for cold/warm requests; reconnect before/after a fast cache hit; interrupt an API replica; block prohibited output before memo delivery; replay the terminal event. Small samples expose protocol defects but cannot establish robust p99 claims.
 
@@ -283,7 +283,7 @@ At 1,024 dimensions, int8 alone is 102.4 GB before replication. Consider hot/col
 
 **Practical next experiment:** measure bytes/vector and peak RSS on representative affordable text. Sweep a few justified graph/search/quantization choices with the same fixture/method. Extrapolate raw vector bytes algebraically; label nonlinear index/recovery costs unmeasured.
 
-![Revised low-level contracts: bounded sharding, explicit precision, artifact fingerprints, ownership and fencing](svg/production/lld.svg)
+![Accepted low-level contracts: durable state, cache fingerprints, alias-swap index releases, identity and switch-over gates (shard sizing is described in the text, not drawn)](svg/production/lld.svg)
 
 ## 7. Hybrid retrieval and reranking
 
@@ -466,7 +466,7 @@ No. This revision improves design/interview material. Executable work follows au
 
 **Q: What is the provider strategy?**
 
-A selected Bedrock primary plus, if availability needs justify it, an independently qualified Azure alternative. Pin and evaluate concrete draft **and verifier** model/prompt/policy combinations; a shared prompt name proves no equivalence. Qualify latency, quota and reserve capacity. A measured vLLM option may follow; a warm third fleet is not the initial assumption.
+Accepted (ADR-0009 amendment, 2026-10-08): DeepSeek V3.2 drafts and gpt-oss-120b judges on Bedrock US cross-region inference profiles; the **same two models** on Microsoft Foundry are the fallback. Using the same models on both hosts turns qualification into a parity check on the frozen eval set instead of re-validating a different family, and costs about $0.014 per uncached memo against about $0.075 for a Claude Sonnet/Haiku pair. Pin and evaluate concrete draft **and verifier** model/prompt/policy combinations; a shared prompt name proves no equivalence, and the same weights on two hosts still need the parity check. Qualify latency, quota and reserve capacity. A measured vLLM option may follow; a warm third fleet is not the initial assumption.
 
 Per-provider breakers go closed → open after defined error/timeout budget → limited half-open probes → closed after recovery. Derive thresholds from observations. Distinguish retryable outages from invalid requests/policy refusal; respect job deadline and cost cap. A provider outage can affect both draft and verification, so both need an approved alternative or typed terminal failure.
 
@@ -500,11 +500,11 @@ Cancellation/expiry are proposed service-contract extensions, not claims about c
 | --- | --- | --- |
 | API replica/connection | Replay on another replica; durable result reconciliation | Reconnection and delay |
 | Worker | Expired lease and fenced retry | Uncertain call may duplicate spend |
-| Primary draft/verifier | Qualified Azure within quota/deadline | Fallback can be unavailable/unqualified |
-| Redis cache/Pub/Sub | Database authoritative; bounded bypass/throttle | Increased load needs reduced admission |
+| Primary draft/verifier | Same models on Foundry within quota/deadline, after parity | Fallback can be unavailable/unqualified |
+| Valkey cache/Pub/Sub | Database authoritative; bounded bypass/throttle | Increased load needs reduced admission |
 | Postgres | Refuse acceptance; stop unsafe claims/commits; recover durable state | Execution depends on DB recovery |
 | Qdrant node/release | Eligible replica of same pinned release; else failure/approved rollback for new jobs | Replication is not backup or zero interruption |
-| AWS serving region | Separately planned restore/failover | Azure model alone cannot restore API/jobs/evidence |
+| AWS serving region | Documented failure mode (ADR-0006): status page; mitigations listed, none built | Outage; permanent loss would make frozen evidence releases irrecoverable |
 | Tracing | Bounded buffering/drop accounting | Some spans may be lost |
 
 ## 13. Technology and deployment decisions
@@ -515,21 +515,21 @@ Cancellation/expiry are proposed service-contract extensions, not claims about c
 | --- | --- | --- |
 | Workflow | Existing single-agent graph/services | More agents only for authorized evaluated need |
 | Ingestion | Python/edgartools, manifests, files/Parquet | Object storage/distributed jobs for backlog, size or recovery |
-| Data platform | Local DataOps artifacts | Delta/dbt/Databricks with team/workload/full-cost justification |
+| Data platform | Local DataOps artifacts; deployed: `dataops` CLI on Airflow 3 / MWAA Serverless (ADR-0012) | Delta/dbt/Databricks with team/workload/full-cost justification |
 | Vectors | Existing Qdrant adapter, small deployment | Bounded automatic shards, tested replication/filters |
 | Sparse/reranking | Existing measured baseline | Native sparse/RRF; supported reranker service for coverage/GPU contention |
 | Embeddings | Pinned model/runtime | Batch service/dimensions/quantization after paired evidence |
-| Jobs | Existing baseline; proposed Postgres durable jobs first | Streams/outbox when database queue measurements justify it |
+| Jobs | Postgres durable jobs and `SKIP LOCKED` queue (ADR-0013) | Outbox → SQS + DLQ when claim latency/throughput measurements justify it |
 | LLM | Selected hosted/local model, usage logs | Qualified independent provider; measured vLLM business case |
-| Caches | Exact local/Redis reuse | Separate eviction/failure domains for critical state |
-| Observability | Existing metrics/tracing/run artifacts | Complete larger stack with cost/ownership decision |
-| Runtime | Local processes/containers | Managed containers/EKS for demonstrated scheduling/operations need |
+| Caches | Exact local/Valkey reuse | Separate eviction/failure domains for critical state |
+| Observability | Existing metrics/tracing/run artifacts; deployed: OpenTelemetry → Grafana Cloud + LangSmith | Self-hosted stack with cost/ownership decision |
+| Runtime | Local processes/containers; deployed: ECS Fargate (ADR-0006) | EKS for demonstrated scheduling/operations need |
 
 **Follow-up: Why more than one cloud?**
 
-Proposed serving is AWS; Azure is optional qualified model-provider independence. Azure Databricks is optional if capability/economics justify it. Data publication can be asynchronous across clouds, but Azure **model fallback is on the live request path**.
+Accepted (ADR-0006): AWS `us-east-1` is the only serving region and holds every stateful component; Azure is the **model plane only** (same-model LLM and embedding fallback on Foundry, reached keylessly through AWS STS outbound federation to Entra). Every cross-cloud call is a stateless model request, so nothing must stay consistent across providers, and the Azure **model fallback is on the live request path**. No data is mirrored across clouds, so there is no cross-cloud egress for evidence or indexes.
 
-Budget raw transfers, transformed embeddings/text, repeated backfills, dual storage, backups, telemetry and ongoing egress. `40M × 5 KB = 200 GB` estimates one assumed leg, not the total bill. Model-provider independence does not remove the AWS serving region’s shared failure domain.
+Model-provider independence does not remove the AWS serving region’s shared failure domain. That failure mode is documented rather than built: losing the region is an outage, and permanent loss would make frozen evidence releases irrecoverable (SEC filings can be refetched; past news and quotes cannot). Listed mitigations, cheapest first: S3 Cross-Region Replication, cross-region snapshot copies, ECR replication, Aurora Global Database, a warm standby applied from the same Terraform. Trigger: a stated availability SLO or a paying user.
 
 **Follow-up: Backups, security and ownership?**
 
@@ -553,11 +553,11 @@ These are interview milestones, not new accepted sprints. Runtime work follows t
 | Retrieval release | Staging/promotion, deletion reconciliation, pinning | Interrupted publish, fewer chunks, rollback |
 | Quality/cache | Qualified generation/verifier/policy and exact caches | Frozen comparisons, financial cases, invalidation |
 | Affordable envelope | Bounded corpus/concurrency steps | Local curves, failure onset, stop reasons |
-| Optional deployment | Only after scope/ADR/budget approval | Representative workload/restore evidence for promised service; not portfolio prerequisite |
+| Deployment (S10) | ADR-0006 accepted 2026-10-08; only after its entry criteria | Representative workload/restore evidence for promised service; not portfolio prerequisite |
 
-Do not relabel S10 as cloud or accept the older amendment silently. Cloud still needs ADR-0006 and SPEC §3 action; revised diagrams do not take that action.
+S10 is the cloud item (SPEC v1.4), and ADR-0006 was accepted on 2026-10-08. Cloud resources still wait for the ADR-0006 entry criteria; accepting the design is not evidence that it works.
 
-![Revised system design: affordable measured experiments separated from scale projections and production approval](svg/production/system-design.svg)
+![Accepted system design: failure modes built vs documented, cost share by tier, graduation triggers and the eval-gated deploy](svg/production/system-design.svg)
 
 ## 15. Thirty-second answers, with the next question ready
 
@@ -576,15 +576,16 @@ Do not relabel S10 as cloud or accept the older amendment silently. Cloud still 
 
 | Artifact | What it explains |
 | --- | --- |
-| [HLD SVG](svg/production/hld.svg) · [Excalidraw](System-design/production/hld.excalidraw) | Serving/evidence/model/data/observability, durable authority and optional infrastructure |
-| [LLD SVG](svg/production/lld.svg) · [Excalidraw](System-design/production/lld.excalidraw) | Bounded shards, precision, identities, cache fingerprints and ownership |
-| [Critical flow SVG](svg/production/critical-flow.svg) · [Excalidraw](System-design/production/critical-flow.excalidraw) | Evidence join, freeze, safe output, failures and terminal replay |
-| [System design SVG](svg/production/system-design.svg) · [Excalidraw](System-design/production/system-design.excalidraw) | Practical experiments, projections, bottlenecks and approval evidence |
+| [HLD SVG](svg/production/hld.svg) · [Excalidraw](System-design/production/hld.excalidraw) | Accepted deployment (2026-10-08): AWS `us-east-1` serving, Azure model plane, cloud-neutral services, model ladder, budget and failure domain |
+| [LLD SVG](svg/production/lld.svg) · [Excalidraw](System-design/production/lld.excalidraw) | Durable state schema, job state machine, cache keys, index release by alias swap, identity and RBAC, switch-over gates |
+| [Critical flow SVG](svg/production/critical-flow.svg) · [Excalidraw](System-design/production/critical-flow.excalidraw) | Durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence, failover ladders |
+| [System design SVG](svg/production/system-design.svg) · [Excalidraw](System-design/production/system-design.excalidraw) | Failure-mode matrix (built vs documented), cost share by tier, graduation triggers, deploy gate, S10 entry criteria |
+| [Cloud deployment](cloud-deployment.md) | Decision index D01–D17, Mermaid views, cost model and region-loss failure mode |
 | [Design review](production-design-review.md) | Historical findings; grade is not a new benchmark or automatic reapproval |
 | [Proposed ADR-0007](adr/ADR-0007-production-interview-scale-design.md) | Revised interview architecture and scope boundary |
 | [Retrieval methodology](retrieval-benchmark.md) | Canonical fixtures, identities, metrics and paired rules |
 | [Task ledger](../tasks/todo.md) | Actual revision verification and unresolved checks |
 
-PNG companions remain in `docs/png/production/`. Earlier non-production diagrams describe an older proposal and may retain superseded contracts; SPEC governs implemented/authorized scope and this document describes the revised interview target.
+PNG companions remain in `docs/png/production/`. The production diagrams were re-produced on 2026-10-08 for the accepted deployment; the scale projections in this document (sharding, sizing, throughput) are not drawn in them. Earlier non-production diagrams describe the local S7 target and may retain superseded contracts; SPEC governs implemented/authorized scope and this document describes the revised interview target.
 
 **Evidence discipline:** cite a run artifact for a measurement, show the formula for an estimate, and name missing evidence for a production promise.

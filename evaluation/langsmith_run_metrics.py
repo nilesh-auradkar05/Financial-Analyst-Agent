@@ -6,11 +6,11 @@ different code versions can be compared or charted from one JSONL file.
 
 The LangSmith key lives in the api container, so run it there and append on the host:
 
-    docker exec -i financial-analyst-agent-system-api python - --label ingest-on-miss --since-hours 2 \
+    docker compose exec -T api python - --label ingest-on-miss --since-hours 2 \
         < evaluation/langsmith_run_metrics.py >> evaluation/results/live_runs.jsonl
 
     # specific traces
-    docker exec -i financial-analyst-agent-system-api python - --label baseline --trace <trace_id> \
+    docker compose exec -T api python - --label baseline --trace <trace_id> \
         < evaluation/langsmith_run_metrics.py >> evaluation/results/live_runs.jsonl
 
 These are live-evidence probes (n=1 per run, network and provider noise), not

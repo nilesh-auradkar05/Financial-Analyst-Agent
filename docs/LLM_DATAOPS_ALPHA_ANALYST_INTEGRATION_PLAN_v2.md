@@ -4,7 +4,7 @@
 > **Status:** Draft v2 — supersedes v1 (`LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md`)
 > **Reviewed against:** repo HEAD `6826034` (2026-07-03) — commit message claims "True rag baseline grounded_claim_rate 0.904 ± 0.062, citation_coverage 0.925 ± 0.049"; pre-flight verification below found that claim is not backed by a clean result artifact.
 > **Parent source of truth:** `docs/SPEC.md`
-> **Goal change in v2:** the end-state is now a **production-grade, cloud-deployed data engineering + GenAI system**. This retires the v1 §3.4 constraint ("cloud deployment out of scope") and the corresponding SPEC non-goal. That retirement is **not effective until ratified** by ADR-0006 and a SPEC §3 amendment. Until then, Phases 1–3 (all local-first) are the only actionable scope.
+> **Goal change in v2:** the end-state is now a **production-grade, cloud-deployed data engineering + GenAI system**. This retires the v1 §3.4 constraint ("cloud deployment out of scope") and the corresponding SPEC non-goal. That retirement was ratified on 2026-10-08 by ADR-0006 and SPEC v1.4 §3. Phases 1–3 (all local-first) remain the only actionable scope until the ADR-0006 entry criteria are met.
 
 ---
 
@@ -40,7 +40,7 @@ What is actually done, verified against the working tree — not asserted from m
 | Source snapshots / lineage | **NOT DONE** | no snapshot contracts or storage anywhere in the tree |
 | Dataset/index release registry | **NOT DONE** | results accumulate as timestamped JSON in `evaluation/quality_res/` with no lifecycle |
 | Governance docs in repo | **NOT TRACKED BEFORE PHASE 0** | `docs/` existed but was ignored by `.gitignore`; `docs/SPEC.md` in the working tree was a sprint-plan duplicate, not a product spec. Phase 0 restores and tracks the governance set. |
-| Cloud deployment / IaC | **NOT DONE** | none |
+| Cloud deployment / IaC | **NOT DONE** — design accepted 2026-10-08 (ADR-0006), nothing deployed | `docs/cloud-deployment.md` |
 
 **Audit conclusion:** the grounding instrument fixes are committed, but the margin claim is not yet a clean datapoint. Traceability discipline is partially enforced by the instrument itself, and it caught the problem: the old headline baseline was produced on a dirty tree and live-changing evidence. The two structural gaps that remain are exactly the two things v1 under-served: the **evidence freeze** (v1 ignored non-SEC evidence entirely) and a **single versioning system** (v1 proposed a parallel one).
 
@@ -173,7 +173,7 @@ All v1 gate conditions are retained but implemented as one function per release 
 
 ## 4. Phase plan
 
-Replaces v1's LDO-0…LDO-7. Phases 1–3 are local-first and require no SPEC change. Phase 4+ requires ADR-0006. **Phases are strictly sequential; a phase with unmet exit criteria blocks the next.**
+Replaces v1's LDO-0…LDO-7. Phases 1–3 are local-first and require no SPEC change. Phase 4+ follows ADR-0006 (accepted 2026-10-08) and its entry criteria. **Phases are strictly sequential; a phase with unmet exit criteria blocks the next.**
 
 ### Phase 0 — Docs into repo *(half a day)*
 
@@ -209,19 +209,20 @@ Replaces v1's LDO-0…LDO-7. Phases 1–3 are local-first and require no SPEC ch
 - Active pointers consumed by runtime config.
 - **Exit:** every number quoted in the README traces to a registered, approved release; rollback = flip a pointer.
 
-### Phase 4 — Production data engineering (cloud) — *requires ADR-0006 + SPEC §3 amendment*
+### Phase 4 — Production data engineering (cloud) — *ADR-0006 accepted 2026-10-08; SPEC v1.4 §3*
 
-Lean, solo-operable, cost-bounded. The DataOps layer built in Phases 1–3 is what makes this deployable *safely* — releases and gates already exist; the cloud only changes where they live and what triggers them.
+Lean, solo-operable, cost-bounded. The DataOps layer built in Phases 1–3 is what makes this deployable *safely* — releases and gates already exist; the cloud only changes where they live and what triggers them. Decisions below were made in the 2026-10-08 blueprint review and are recorded in ADR-0006 and ADR-0010 to ADR-0013; the design companion is `docs/cloud-deployment.md`. Phase 4 still starts only when the ADR-0006 entry criteria have recorded evidence.
 
-- **Storage:** evidence snapshots + release artifacts to S3 (versioned bucket); `releases.jsonl` stays the registry until it hurts, then Postgres (RDS) — not before.
-- **Vector store:** Qdrant Cloud free/starter tier, or Qdrant container on the same host as the API. No self-managed cluster.
-- **Compute:** API container on one managed runtime (ECS Fargate or Cloud Run — pick one, write ADR). No Kubernetes.
-- **Orchestration:** scheduled ingestion via GitHub Actions cron invoking the dataops CLI. Dagster/Prefect only if DAG complexity demonstrably outgrows cron. **Airflow explicitly rejected** — it is the "plumbing museum" v1 warned about, at monthly-cost scale.
-- **IaC:** Terraform, single environment, one `terraform apply` from zero. No manually clicked resources.
-- **Secrets:** SSM Parameter Store / Secret Manager; zero secrets in repo or env files.
+- **Posture:** AWS `us-east-1` is the only serving region; Bedrock is called through US cross-region inference profiles; Microsoft Foundry serves the same models as fallback and holds no state. Region loss is a documented failure mode, not built (ADR-0006).
+- **Storage:** evidence snapshots + release artifacts to S3 (versioned bucket, Object Lock on approved releases); `releases.jsonl` stays the registry until it hurts, then Postgres (Aurora) — not before. No cross-region copies (owner decision; mitigation listed in ADR-0006).
+- **Vector store:** Qdrant Cloud in AWS `us-east-1` (free tier for the demo); one collection per index release, promoted by alias swap (ADR-0003 addendum). No self-managed cluster.
+- **Compute:** ECS Fargate on Graviton for web BFF, API, workers and FinBERT. Cloud Run was the other option; ECS chosen because Bedrock and the AWS configuration are already in use. No Kubernetes.
+- **Orchestration:** Airflow 3 on Amazon MWAA Serverless, one ECS task per `dataops` step, billed only while tasks run (ADR-0012). The earlier "Airflow explicitly rejected" line was about always-on cost (a provisioned MWAA small environment is about $358/month); MWAA Serverless removes that cost, so the rejection no longer holds. GitHub Actions cron is not used for ingestion because it would give CI production data-plane credentials.
+- **IaC:** Terraform (`aws`, `azurerm`, `cloudflare`, Qdrant Cloud providers), single environment, one `terraform apply` from zero. No manually clicked resources.
+- **Secrets:** OIDC for GitHub Actions to AWS and Azure; task roles; AWS STS outbound federation to Entra for Foundry; AWS Secrets Manager only for third-party keys. Zero secrets in repo or env files.
 - **CI/CD:** deploy on git tag; pipeline runs the frozen-evidence eval and **blocks deploy if `grounded_claim_rate` regresses beyond a stated tolerance vs the active approved baseline**. This gate is the single most production-grade line on the whole roadmap.
-- **Observability:** ship the existing Prometheus/Grafana stack or swap to managed equivalents; add token/cost metrics per run.
-- **Cost ceiling:** ADR-0006 must state a monthly budget and the teardown path (`terraform destroy` leaves only S3 artifacts). A portfolio project that silently bills $200/month is a liability, not a credential.
+- **Observability:** OpenTelemetry → Grafana Cloud; LangSmith for LLM traces; token/cost metrics per run from provider usage fields.
+- **Cost ceiling:** $100/month for the demo tier (projection about $73–79 at 25 memos/day), enforced by an admission cap and an AWS Budgets action that refuses new jobs at 100%. Teardown: `terraform destroy` leaves only the evidence bucket. A portfolio project that silently bills $200/month is a liability, not a credential.
 - **Exit:** public endpoint serving `/analyze` from an approved index; a merged PR that regresses grounding *cannot deploy*; infra reproducible from clean checkout.
 
 ### Phase 5 — Production LLMOps
@@ -266,11 +267,11 @@ Stop implementation if a task:
 
 ## 7. ADR outlines
 
-**ADR-0005 — Unified DataOps release registry** *(Proposed)*
+**ADR-0005 — Unified DataOps release registry** *(Accepted 2026-07-04)*
 Decision: adopt `EvidenceSnapshot` + `DatasetReleaseManifest` + JSONL registry as the single versioning system; existing `fixture_version` and benchmark `manifest.json` conventions become release types within it. Consequences: fixture freeze implemented as evidence snapshot releases; all published metrics trace to approved releases. Explicit non-decision: no database, no orchestration framework, no cloud.
 
-**ADR-0006 — Production cloud deployment** *(Proposed — amends SPEC §3 non-goals)*
-Decision: deploy as single-environment, Terraform-managed, eval-gated cloud service per Phase 4. States: chosen cloud/runtime, monthly cost ceiling, teardown guarantee. Explicit non-decision: no Kubernetes, no Airflow, no multi-region, no multi-agent.
+**ADR-0006 — Production cloud deployment** *(Accepted 2026-10-08 — SPEC v1.4 §3)*
+Decision: single-environment, Terraform-managed, eval-gated deployment per Phase 4: AWS `us-east-1` with ECS Fargate, Microsoft Foundry as same-model fallback only, $100/month demo ceiling, teardown by `terraform destroy`. Companion records: ADR-0010 (identity), ADR-0011 (embedding and rerank models), ADR-0012 (MWAA Serverless ingestion), ADR-0013 (durable execution and caching). Still excluded: Kubernetes, multi-region serving, cross-region data copies, multi-agent.
 
 ---
 

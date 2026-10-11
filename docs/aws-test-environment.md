@@ -2,7 +2,7 @@
 
 This guide creates a disposable AWS EC2 environment for testing the Alpha Financial Analyst system. It is for non-production validation only.
 
-This guide does not define production deployment architecture. It does not introduce Terraform/IaC, managed cloud rollout, public service hardening, autoscaling, production observability, or a scope change. Production cloud deployment remains out of scope unless SPEC, sprint planning, and any required ADR are updated first.
+This guide does not define production deployment architecture. It does not introduce Terraform/IaC, managed cloud rollout, public service hardening, autoscaling, production observability, or a scope change. The accepted deployment design is [ADR-0006](adr/ADR-0006-production-cloud-deployment.md) and [`cloud-deployment.md`](cloud-deployment.md) (S10, gated by its entry criteria); this disposable EC2 environment is not part of it.
 
 ## AWS references
 

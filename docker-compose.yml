@@ -1,164 +1,131 @@
-# Financial Analyst Agent System - Docker Compose
+# Financial Analyst local stack. Host Ollama handles Qwen3 embeddings;
+# enable docker-compose.gpu.yml when FinBERT in the API needs NVIDIA GPU access.
+# External-facing deployments should use TLS, authentication and a reverse proxy.
 
-# Usage:
-  # docker compose up -d         # Start all services
-  # docker compose logs -f api   # view API logs
-  # docker compose down          # Stop all services
+x-default-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
-  # Main API service
   api:
+    container_name: financial-analyst-agent-system-api
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: financial-analyst-agent-system-api
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - API_KEY=${API_KEY:-}
-      # Ollama connection
-      # Host Ollama (override here if needed)
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-qwen3-embedding:4b}
-      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-600}
-      - OLLAMA_TEMPERATURE=${OLLAMA_TEMPERATURE:-0.7}
-
-      # Retrieval backend (service DNS, not container-local localhost)
-      - VECTOR_BACKEND=${VECTOR_BACKEND:-qdrant}
-      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
-
-      # Tavily
-      - TAVILY_API_KEY=${TAVILY_API_KEY}
-
-      # ChromaDB
-      - CHROMA_PERSIST_DIR=/app/data/chroma
-      - CHROMA_COLLECTION_NAME=${CHROMA_COLLECTION_NAME:-sec_filings}
-      
-      # SEC
-      - SEC_USER_AGENT=${SEC_USER_AGENT:-AlphaAnalyst/1.0 (contact@example.com)}
-      - FINBERT_PRELOAD=${FINBERT_PRELOAD:-true}
-      
-      # LangSmith (optional)
-      # Pass through modern names only when supplied; preserve legacy aliases below.
-      - LANGSMITH_TRACING
-      - LANGSMITH_API_KEY
-      - LANGSMITH_PROJECT
-      - LANGCHAIN_TRACING=${LANGCHAIN_TRACING:-true}
-      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
-      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-alpha-analyst}
-
-      # Chat: Bedrock primary (AWS_BEDROCK_MODEL), then personal Claude
-      # (CLAUDE_LLM_MODEL + ANTHROPIC_API_KEY), then OpenAI (OPENAI_LLM_MODEL + OPENAI_API_KEY).
-      # Optional pass-through preserves defaults and the bearer-token alias.
-      - AWS_BEARER_TOKEN_BEDROCK
-      - AWS_BEARER_TOKEN
-      - AWS_REGION
-      - AWS_BEDROCK_MODEL
-      - CLAUDE_LLM_MODEL
-      - OPENAI_LLM_MODEL
-      - ANTHROPIC_API_KEY
-      - OPENAI_API_KEY
-      # Azure invocation is deferred (S7-AZURE-FALLBACK); configuration is reserved.
-      - AZURE_API_KEY
-      - AZURE_PROJECT_ENDPOINT
-      - AZURE_OPENAI_ENDPOINT
-      - AZURE_FOUNDRY_MODEL
-      # Generation tuning (all chat attempts)
-      - LLM_TEMPERATURE
-      - LLM_MAX_TOKENS
-      - LLM_REQUEST_TIMEOUT_SECONDS
-      - LLM_THINKING_MODE
-      - LLM_THINKING_BUDGET_TOKENS
-      - LLM_THINKING_EFFORT
-
+      API_KEY: ${API_KEY:?Set a non-empty API_KEY in .env}
+      # Always the host gateway: a host-run value from the env file (localhost) is wrong inside the container.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-qwen3-embedding:4b}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-600}
+      OLLAMA_TEMPERATURE: ${OLLAMA_TEMPERATURE:-0.7}
+      VECTOR_BACKEND: ${VECTOR_BACKEND:-qdrant}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      CHROMA_PERSIST_DIR: /app/data/chroma
+      CHROMA_COLLECTION_NAME: ${CHROMA_COLLECTION_NAME:-sec_filings}
+      SEC_USER_AGENT: ${SEC_USER_AGENT:?Set a real SEC_USER_AGENT with your contact details}
+      FINBERT_PRELOAD: ${FINBERT_PRELOAD:-true}
+      LANGSMITH_TRACING:
+      LANGSMITH_API_KEY:
+      LANGSMITH_PROJECT:
+      LANGCHAIN_TRACING: ${LANGCHAIN_TRACING:-true}
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY:-}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-alpha-analyst}
+      AWS_BEARER_TOKEN_BEDROCK:
+      AWS_BEARER_TOKEN:
+      AWS_REGION:
+      AWS_BEDROCK_MODEL:
+      CLAUDE_LLM_MODEL:
+      OPENAI_LLM_MODEL:
+      ANTHROPIC_API_KEY:
+      OPENAI_API_KEY:
+      AZURE_API_KEY:
+      AZURE_PROJECT_ENDPOINT:
+      AZURE_OPENAI_ENDPOINT:
+      AZURE_FOUNDRY_MODEL:
+      LLM_TEMPERATURE:
+      LLM_MAX_TOKENS:
+      LLM_REQUEST_TIMEOUT_SECONDS:
+      LLM_THINKING_MODE:
+      LLM_THINKING_BUDGET_TOKENS:
+      LLM_THINKING_EFFORT:
     volumes:
-      # Persist data between restarts
       - chroma-data:/app/data/chroma
       - filings-data:/app/data/filings
-      # Run history (jobs, memos, progress) survives image rebuilds
       - runs-data:/app/.runtime
+      - model-cache:/app/.cache
+    # Mirrors Dockerfile HEALTHCHECK. Long grace period supports FinBERT preload.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=8).close()"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 300s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     restart: unless-stopped
-    networks:
-      - financial-analyst-network
     depends_on:
       qdrant:
         condition: service_healthy
-    # For Mac/Windows to access host's ollama
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks: [financial-analyst-network]
 
-  # Web UI -> http://localhost:3001 (Grafana holds host port 3000)
   frontend:
+    container_name: financial-analyst-agent-system-frontend
     build:
       context: ./frontend
-    container_name: financial-analyst-agent-system-frontend
+      dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
-      # Server-side only; the browser never talks to the API directly.
-      - ALPHA_API_URL=http://api:8000
-      - API_KEY=${API_KEY:-}
+      ALPHA_API_URL: http://api:8000
+      API_KEY: ${API_KEY:?Set a non-empty API_KEY in .env}
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     restart: unless-stopped
-    networks:
-      - financial-analyst-network
     depends_on:
       api:
         condition: service_healthy
+    networks: [financial-analyst-network]
 
-  # Default retrieval backend
   qdrant:
-    image: qdrant/qdrant:latest
     container_name: qdrant-financial-analyst-agent-system
+    # Pin after checking stored-data compatibility before upgrading.
+    image: qdrant/qdrant:${QDRANT_VERSION:-v1.19.2}
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
+    # Official Qdrant image includes bash; this checks TCP availability.
     healthcheck:
-      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/6333"]
+      test: ["CMD", "bash", "-c", ": >/dev/tcp/127.0.0.1/6333"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     restart: unless-stopped
-    networks:
-      - financial-analyst-network
+    networks: [financial-analyst-network]
 
-  # Ollama Service (Optional if want to add ollama in docker)
-  # =========================================================================
-  # Uncomment this if you want to run Ollama in Docker instead of on host
-  # Note: Requires GPU passthrough for good performance
-  #
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: financial-analyst-agent-system-ollama
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama-data:/root/.ollama
-    # For GPU support (NVIDIA), re-enable the deploy block below
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    # networks:
-    #   - financial-analyst-network
-  # =========================================================================
-
-  # Prometheus
   prometheus:
-    image: prom/prometheus:v2.47.0
     container_name: financial-analyst-agent-system-prometheus
+    # Existing pinned version preserved; schedule tested security upgrades.
+    image: prom/prometheus:v2.47.0
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -168,50 +135,63 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=7d'
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     restart: unless-stopped
-    networks:
-      - financial-analyst-network
+    networks: [financial-analyst-network]
 
-  # Grafana
   grafana:
-    image: grafana/grafana:10.2.0
     container_name: financial-analyst-agent-system-grafana
+    # Existing pinned version preserved; schedule tested security upgrades.
+    image: grafana/grafana:10.2.0
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     restart: unless-stopped
-    networks:
-      - financial-analyst-network
     depends_on:
       - prometheus
+    networks: [financial-analyst-network]
 
 secrets:
-  # Same key the API enforces; read from API_KEY in the shell or .env.
+  # Kept for the existing Prometheus configuration; verify that it is read.
   api_key:
     environment: API_KEY
 
+# External: these volumes outlive the stack and `down -v` cannot delete them.
+# `make docker-up` creates any that are missing.
 volumes:
   chroma-data:
     name: financial-analyst-chroma
+    external: true
   filings-data:
     name: financial-analyst-filings
+    external: true
   runs-data:
     name: financial-analyst-runs
+    external: true
+  model-cache:
+    name: financial-analyst-model-cache
+    external: true
   prometheus-data:
     name: financial-analyst-prometheus
+    external: true
   grafana-data:
     name: financial-analyst-grafana
+    external: true
   qdrant-data:
     name: qdrant-financial-analyst-agent-system
-  # ollama-data:
-  #   name: financial-analyst-ollama
+    external: true
 
 networks:
   financial-analyst-network:

@@ -132,9 +132,26 @@ These diagrams show where the sprint plan is heading: evidence snapshots with re
 | Low-level design | [`docs/png/lld.png`](docs/png/lld.png) | [`lld.excalidraw`](docs/System-design/lld.excalidraw) |
 | Critical request flow | [`docs/png/critical-flow.png`](docs/png/critical-flow.png) | [`critical-flow.excalidraw`](docs/System-design/critical-flow.excalidraw) |
 
-Large-scale variants of the same four diagrams are in [`docs/png/production/`](docs/png/production/), with SVGs in [`docs/svg/production/`](docs/svg/production/). Their sizing figures are projections, not measurements.
-
 ![Target high-level architecture](docs/png/hld.png)
+
+### Cloud deployment (accepted design, not deployed)
+
+The deployment design was accepted on 2026-10-08 ([ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md), with ADR-0010 to ADR-0013). Nothing is deployed: cloud work starts only after Gate A, the local S7 service seams and the eval-replay CI gate are in place. The full write-up, with the decision index, Mermaid views, cost model and the region-loss failure mode, is in [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
+
+- **AWS `us-east-1` serves everything:** Cloudflare in front, ECS Fargate for the web BFF, API and workers, Aurora PostgreSQL for durable jobs and events, Valkey for disposable caches, S3 for evidence, Cognito for sign-in.
+- **Azure is the model plane only:** the same models (DeepSeek V3.2 draft, gpt-oss-120b judge, Cohere Embed v4) on Microsoft Foundry as fallbacks behind parity gates.
+- **Cloud-neutral services:** Qdrant Cloud, Grafana Cloud, LangSmith, GitHub Actions with an eval-gated deploy.
+- **Ingestion:** Airflow 3 on MWAA Serverless.
+- **Budget and teardown:** a $100/month demo ceiling enforced by an admission cap and an AWS Budgets kill switch; `terraform destroy` for teardown.
+
+| Diagram | Image | SVG | Editable source |
+|---|---|---|---|
+| Deployment HLD | [`hld.png`](docs/png/production/hld.png) | [`hld.svg`](docs/svg/production/hld.svg) | [`hld.excalidraw`](docs/System-design/production/hld.excalidraw) |
+| Critical flow and failover | [`critical-flow.png`](docs/png/production/critical-flow.png) | [`critical-flow.svg`](docs/svg/production/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/production/critical-flow.excalidraw) |
+| Contracts (state, caches, releases, identity, gates) | [`lld.png`](docs/png/production/lld.png) | [`lld.svg`](docs/svg/production/lld.svg) | [`lld.excalidraw`](docs/System-design/production/lld.excalidraw) |
+| Failure modes, cost and graduation triggers | [`system-design.png`](docs/png/production/system-design.png) | [`system-design.svg`](docs/svg/production/system-design.svg) | [`system-design.excalidraw`](docs/System-design/production/system-design.excalidraw) |
+
+![Cloud deployment HLD](docs/png/production/hld.png)
 
 ---
 
@@ -188,7 +205,7 @@ OLLAMA_EMBED_MODEL=qwen3-embedding:4b
 
 # Vector store
 VECTOR_BACKEND=qdrant            # or chroma
-QDRANT_URL=http://localhost:6333
+QDRANT_URL=http://localhost:16333   # standalone Qdrant; omit for the full Docker stack
 
 # Evidence sources
 TAVILY_API_KEY=tvly-...
@@ -212,9 +229,11 @@ Set `API_KEY` in the frontend server environment to the same shared key as the A
 ### 3. Start the local services
 
 ```bash
-docker compose -f docker-compose.qdrant.yml up -d   # Qdrant on :6333
+docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml up -d   # Qdrant on :16333, own volume
 ollama pull qwen3-embedding:4b                        # embedding model
 ```
+
+The standalone Qdrant listens on `:16333`, so a host-run API needs `QDRANT_URL=http://localhost:16333`; the full Compose stack keeps `:6333` and its own volume. See [docs/docker-setup.md](docs/docker-setup.md).
 
 To skip Qdrant, set `VECTOR_BACKEND=chroma`, which stores data locally on disk.
 
@@ -240,7 +259,7 @@ make serve-prod     # 4 workers, no reload
 Interactive API docs: <http://localhost:8000/docs>
 Web UI (Compose): <http://localhost:3001>
 
-To run the API with Prometheus (`:9090`) and Grafana (`:3000`) in Docker instead:
+To run the API with Prometheus (`:9090`) and Grafana (`:3000`) in Docker instead. The stack refuses to start unless `API_KEY`, `SEC_USER_AGENT` and `GRAFANA_ADMIN_PASSWORD` are set in `.env`, and every port is bound to `127.0.0.1`:
 
 ```bash
 make docker-up

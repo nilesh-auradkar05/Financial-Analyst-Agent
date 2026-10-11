@@ -1,50 +1,64 @@
-# Git
-.git
+# Backend image context only (root of repository).
+.git/
 .gitignore
-
-# Python
-__pycache__
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-.venv/
-*.egg-info/
-dist/
-build/
-
-# IDE
+.github/
 .idea/
 .vscode/
 *.swp
 *.swo
+.DS_Store
 
-# Testing
+# Local Python environments, build products and tooling.
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
 .coverage
 htmlcov/
 .tox/
-.mypy_cache/
+dist/
+build/
 
-# Data (mount as volumes instead)
+# Local runtime data, embedding/model weights and generated artifacts.
 data/
-*.db
-
-# Environment
-.env
-.env.local
-
-# Docs
-docs/
-*.md
-!README.md
-
-# Tests (not needed in production image)
-tests/
-
-# Frontend has its own image (frontend/Dockerfile)
-frontend/
-
-# Run history lives in the runs-data volume, never in the image
 .runtime/
+.cache/
+**/.cache/
+models/
+checkpoints/
+datasets/
+outputs/
+wandb/
+mlruns/
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.safetensors
+**/*.ckpt
+**/*.pth
+**/*.pt
+**/*.onnx
+*.log
+
+# Credentials and local overrides. Use runtime environment/secrets instead.
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# The Next.js service and monitoring mounts are built/mounted separately.
+frontend/
+monitoring/
+
+# Local-only files not needed to execute the API.
+tests/
+docs/
