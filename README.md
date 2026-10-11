@@ -18,22 +18,6 @@ A single-agent financial research system: give it a stock ticker and it gathers 
 5. **Verifies the memo**: it extracts factual claims, matches their numbers within a tolerance and checks semantic similarity (≥ 0.45) against the cited evidence. It reports `citation_coverage_rate`, `grounded_claim_rate` and any citations that point to no source.
 6. **Serves it all through a FastAPI service** with synchronous and asynchronous endpoints, health checks, statistics and Prometheus metrics.
 
-### Project status
-
-This is an **instrumented prototype** that is being made production-ready. The evaluation and grounding harness is the most mature part; the service layer is the least. Known gaps, verified against the code:
-
-- An ingestion failure or un-ingested ticker produces a memo without SEC evidence that still reports `completed`.
-- Verification results are reported but not enforced, and there is no repair loop.
-- Graph nodes run one after another, and FinBERT blocks the event loop.
-- There is no authentication, rate limiting, guardrails or caching, and async jobs run in-process.
-
-The ordered plan for closing these gaps is in [`docs/sprint-plan.md`](docs/sprint-plan.md). Scope and source-of-truth rules are in [`docs/SPEC.md`](docs/SPEC.md).
-- A ticker that was never ingested produces a memo with no SEC evidence and still reports `completed`
-- Verification failure is logged, not enforced; there is no repair loop
-- Evidence nodes run serially; FinBERT inference blocks the event loop
-- No full guardrail layer or caching; single-process auth/rate limits, in-process background jobs
-- Eval results carry no lineage (commit, model, snapshot) and no eval runs in CI
-
 ---
 
 ### Measured results
@@ -366,5 +350,3 @@ Released under the [MIT License](LICENSE). Copyright (c) 2025 Nilesh Auradkar.
 **Nilesh Auradkar**, author and maintainer
 - GitHub: [@nilesh-auradkar05](https://github.com/nilesh-auradkar05)
 - Email: nilesh.auradkar14@gmail.com
-
-Bug reports and ideas are welcome as [GitHub issues](https://github.com/nilesh-auradkar05/Financial-Analyst-Agent/issues). Before opening a pull request, read [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md). Every change must trace to the SPEC, include a behavior test from [`docs/test-plan.md`](docs/test-plan.md), and pass the governance checks in `scripts/ci/`.
