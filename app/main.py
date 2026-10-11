@@ -701,6 +701,8 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         execution_time_ms=state.get("execution_time_ms"),
+        snapshot_hash=state.get("snapshot_hash"),
+        evidence_as_of=state.get("evidence_as_of"),
     )
 
 def _normalize_sections_processed(value: object) -> list[str]:

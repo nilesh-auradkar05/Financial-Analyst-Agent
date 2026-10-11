@@ -80,6 +80,11 @@ class AgentState(TypedDict, total=False):
     include_news_sentiment: bool
     max_news_articles: int
 
+    # Evidence lineage (SPEC 7.x-7.z)
+    snapshot_hash: str
+    evidence_as_of: str
+    evidence_release: str
+
     # Output Fields
     investment_memo: str
     citations: list[dict]

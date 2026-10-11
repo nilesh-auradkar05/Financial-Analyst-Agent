@@ -240,6 +240,10 @@ class AnalysisResponse(BaseModel):
     # Status
     status: JobStatus
 
+    # Evidence lineage (SPEC 7.x, 7.y); absent on runs stored before S2-T00b
+    snapshot_hash: Optional[str] = None
+    evidence_as_of: Optional[str] = None
+
     # Results
     executive_summary: Optional[str] = None
     investment_memo: Optional[str] = None

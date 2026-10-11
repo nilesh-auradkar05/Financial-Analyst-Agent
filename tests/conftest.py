@@ -4,7 +4,15 @@ Shared test configuration and fixtures.
 No sys.path hacks — relies on ``pip install -e .`` (item 12).
 """
 
+import os
+
 import pytest
+
+# Tests never upload traces to the real LangSmith service, whatever the developer's
+# environment enables. Set before any app import so settings and langsmith both see it;
+# tests that exercise tracing install their own in-memory collector.
+for _name in ("LANGSMITH_TRACING", "LANGSMITH_TRACING_V2", "LANGCHAIN_TRACING", "LANGCHAIN_TRACING_V2"):
+    os.environ[_name] = "false"
 
 # ── CLI options & markers ───────────────────────────────────────────────
 

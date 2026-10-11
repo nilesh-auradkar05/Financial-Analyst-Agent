@@ -198,7 +198,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/components/retrieval/` — retrieval contracts, evidence packets, Chroma/Qdrant stores, retrieval methods.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
-- `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Until S2-T00b, the implementation lives at repo-root `dataops/`.
+- `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Runtime replay and the snapshot hash live here (S2-T00b); release contracts, registry and gates stay in repo-root `dataops/`.
 - `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache (exact, keyed by embedding fingerprint), RetrievalCache (keyed by index release and retrieval config), MemoCache (`snapshot_hash` + `prompt_version` + model and verifier/policy fingerprints). Key formats: ADR-0013.
 - `app/services/` — tools, run store, sentiment (FinBERT wrapped in `to_thread` or out-of-process).
 - `evaluation/` — offline harness + registry; imports from `app/` only, never the reverse.
@@ -239,7 +239,19 @@ sha256 over the canonical JSON of all EvidencePackets + source manifest.
 record, and every cache key.
 
 7.y `evidence_as_of` (ISO-8601) MUST be set to the oldest source timestamp in
-the snapshot and returned in AnalysisResponse.
+the snapshot and returned in AnalysisResponse. "Source timestamp" is the time
+the source was fetched. On replay it is the oldest `fetched_at` among the
+release's snapshots for the ticker. On a live run it is the run start time,
+because per-source fetch times are not tracked until the S7 evidence cache;
+filings indexed earlier can therefore be older than the value reported.
+
+7.z Runtime replay (S2-T00b). `run_agent(..., evidence_release="<name:version>")`
+seeds the run from that registered `evidence_snapshot` release and calls no
+live evidence tool, vector store, embedding model or sentiment model; only memo
+drafting and verification run. `snapshot_hash` covers the evidence the memo is
+drafted from plus the source manifest (release id and snapshot ids; empty for a
+live run). The release is an internal argument and is not accepted from API
+clients.
 
 ---
 

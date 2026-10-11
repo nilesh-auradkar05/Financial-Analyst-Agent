@@ -260,6 +260,10 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 | --- | --- |
 | Replay determinism | Two replays of one release → identical `snapshot_hash` and citation registry |
 | Zero-network replay | Replay test suite passes with network namespace disabled; any socket connect raises |
+| Runtime replay bypasses live tools (2026-10-10) | `run_agent` with an evidence release calls no news, market, filing-retrieval, embedding or sentiment code; the memo's evidence equals the release's snapshots for that ticker |
+| Replay lineage (2026-10-10) | A replayed run carries `snapshot_hash` (64 lowercase hex), `evidence_as_of` equal to the oldest `fetched_at` of the ticker's snapshots, and the release id; a different release or a changed payload gives a different hash |
+| Live lineage (2026-10-10) | A live run carries `snapshot_hash` and an ISO-8601 `evidence_as_of`; both appear in `AnalysisResponse` |
+| Replay refuses bad input (2026-10-10) | A malformed release id, an unregistered release, a release of another type, a payload whose hash drifted, or a ticker with no snapshots raises a clear error before any model call |
 | Evidence cache TTL | Second quote fetch within 60 s served from cache (hit counter +1); after TTL, refetched |
 | SEC freshness | New accession for ticker → cache miss → re-ingest; same accession → no re-ingest |
 | Memo cache key | Same `snapshot_hash + prompt_version + model` → cached memo; any component differs → miss |

@@ -24,6 +24,7 @@ import re
 from collections.abc import Callable
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional, cast
 
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -48,6 +49,7 @@ from app.components.retrieval.vector_store import (
     get_vector_store,
 )
 from app.config import settings
+from app.dataops.snapshot import freeze_evidence
 from app.llm.provider import fallback_count, get_llm, model_metadata
 from app.observability.langsmith import app_traceable, mark_trace_failed
 from app.services.llm import ANALYST_SYSTEM_PROMPT
@@ -404,6 +406,12 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
     except Exception:
         logger.error(f"[{ticker}] Sentiment analysis failed")
         return add_error(state, "analyze_sentiment", "Workflow step failed.")
+
+
+async def join_evidence_node(state: AgentState) -> dict:
+    """Score sentiment, then freeze the joined evidence into the run's lineage (SPEC 7.x, 7.y)."""
+    update = await analyze_sentiment_node(state)
+    return {**update, **freeze_evidence({**state, **update})}
 
 
 def _humanize_money(value: object) -> str:
@@ -875,7 +883,7 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     workflow.add_node("research_news", research_news_node)
     workflow.add_node("fetch_stock", fetch_stock_node)
     workflow.add_node("retrieve_filings", retrieve_sec_filings_node)
-    workflow.add_node("analyze_sentiment", analyze_sentiment_node)
+    workflow.add_node("analyze_sentiment", join_evidence_node)
     workflow.add_node("draft_memo", draft_memo_node)
     workflow.add_node("verify_memo", verify_memo_node)
 
@@ -895,8 +903,21 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     return agent
 
 
+def create_replay_agent() -> Runnable[AgentState, AgentState]:
+    """Create the replay workflow: memo drafting and verification only (SPEC 7.z)."""
+    workflow = StateGraph(AgentState)
+    workflow.add_node("draft_memo", draft_memo_node)
+    workflow.add_node("verify_memo", verify_memo_node)
+    workflow.add_edge(START, "draft_memo")
+    workflow.add_edge("draft_memo", "verify_memo")
+    workflow.add_edge("verify_memo", END)
+    return workflow.compile()
+
+
 # Compiled once per process; the graph holds no per-request state.
 AGENT = create_agent()
+# Replay runs (evidence_release) draft and verify a frozen release; no live evidence nodes.
+REPLAY_AGENT = create_replay_agent()
 
 # Optional per-run observer: receives the full node-progress list after every node start/finish.
 progress_sink: ContextVar[Callable[[list[dict]], object] | None] = ContextVar(
@@ -913,6 +934,9 @@ async def run_agent(
     include_filing_analysis: bool = True,
     include_news_sentiment: bool = True,
     max_news_articles: int = 10,
+    *,
+    evidence_release: Optional[str] = None,
+    evidence_registry_root: Path | str | None = None,
 ) -> AgentState:
     """
     Run the financial analyst agent for a given ticker.
@@ -922,6 +946,8 @@ async def run_agent(
     Args:
         ticker: Stock ticker symbol
         company_name: Company name (optional)
+        evidence_release: Registered release ("<name:version>") to replay; None runs live
+        evidence_registry_root: Directory holding the evidence registry (replay only)
 
     Returns:
         Final agent state with all results
@@ -933,16 +959,33 @@ async def run_agent(
 
     logger.info(f"Starting analysis for {ticker}")
 
-    # Create initial state
-    state = create_initial_state(
-        ticker,
-        company_name,
-        include_filing_analysis=include_filing_analysis,
-        include_news_sentiment=include_news_sentiment,
-        max_news_articles=max_news_articles,
-    )
+    agent: Runnable[AgentState, AgentState] = AGENT
+    if evidence_release is None:
+        # Create initial state
+        state = create_initial_state(
+            ticker,
+            company_name,
+            include_filing_analysis=include_filing_analysis,
+            include_news_sentiment=include_news_sentiment,
+            max_news_articles=max_news_articles,
+        )
+    else:
+        # Local import: app.dataops.replay imports app.agents.state, so a top-level import cycles.
+        from app.dataops.replay import DEFAULT_REGISTRY_ROOT, load_replay_state
+
+        state = load_replay_state(
+            evidence_release,
+            ticker,
+            registry_root=evidence_registry_root or DEFAULT_REGISTRY_ROOT,
+            include_filing_analysis=include_filing_analysis,
+            include_news_sentiment=include_news_sentiment,
+            max_news_articles=max_news_articles,
+        )
+        agent = REPLAY_AGENT
 
     metadata = {"agent": "financial_analyst", "agent_version": "1.1.0", **model_metadata(settings)}
+    if evidence_release is not None:
+        metadata["evidence_release"] = evidence_release
     if run := get_current_run_tree():
         run.metadata.update(metadata)
     config: RunnableConfig = {
@@ -956,7 +999,7 @@ async def run_agent(
     sink = progress_sink.get()
     steps: dict[str, dict] = {}
     final_state: AgentState = state
-    async for event in AGENT.astream(state, config=config, stream_mode=["tasks", "values"]):
+    async for event in agent.astream(state, config=config, stream_mode=["tasks", "values"]):
         mode, chunk = cast(tuple[str, Any], event)
         if mode == "values":
             final_state = chunk

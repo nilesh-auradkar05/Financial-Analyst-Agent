@@ -86,6 +86,9 @@ packages = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "replay: zero-network runtime replay tests (docs/test-plan.md section 13); run with network isolation",
+]
 
 [tool.ruff]
 line-length = 100
