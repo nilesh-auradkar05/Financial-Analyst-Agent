@@ -1,6 +1,6 @@
 # ADR-0003 — Qdrant behind the retrieval interface
 
-**Status:** Accepted (2026-06-04). Qdrant is the working default backend on operational grounds (below). The *quality-default* decision still passes through Gate B (S4-T04) once the trusted Gate-A oracle exists; Gate B may confirm or revisit this, but no quality win may be claimed without it.
+**Status:** Accepted (2026-06-04). Qdrant is the working default backend on operational grounds (below). The paired quality comparison planned for Gate B (S4-T04) was retired by owner decision on 2026-10-10 (addendum below); no quality win is claimed for the backend choice.
 **Date:** 2026-06-03 (accepted 2026-06-04)
 **Related:** SPEC §1, SPEC §6, SPEC §11, `retrieval-benchmark.md` §9, sprint-plan S3–S4.
 
@@ -44,3 +44,7 @@ Applies to the deployed (S10) configuration; the local Docker setup above is unc
 Why managed: the `RetrievalStore` contract and payload indexes stay unchanged above the retrieval boundary, and backups, upgrades and multi-AZ placement are not operated by one person. Alternatives: self-hosted Qdrant on ECS + EBS (cheaper at the 10M-user tier, owner runs upgrades and backups); Aurora pgvector (one fewer system, weaker sparse/hybrid support); OpenSearch Serverless (native hybrid, higher cost floor); S3 Vectors (very cheap, no sparse vectors; fits a cold archive tier).
 
 Trigger to self-host: managed spend above about twice the equivalent EC2 cost plus operating time. Verify before implementation: Qdrant Cloud paid-tier availability in `us-east-1`.
+
+## Addendum 2026-10-10 — paired backend comparison retired
+
+Owner decision: the Chroma-vs-Qdrant paired comparison (sprint S4) will not be run. Qdrant remains the default for the operational reasons already recorded here (payload-index filtering, native sparse/hybrid support for S5, and the managed Qdrant Cloud target in the 2026-10-08 addendum). With identical embeddings and `top_k` the two backends were expected to tie on quality (`docs/retrieval-benchmark.md` §9), so the comparison would not have changed the decision. Consequences: Gate B closes at S3 exit; no retrieval-quality claim may be attributed to the backend; Chroma remains a supported local backend behind the same contract.

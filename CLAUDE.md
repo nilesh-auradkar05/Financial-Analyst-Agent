@@ -10,7 +10,7 @@ Single-agent financial-analysis RAG system: ticker → market/news/SEC evidence 
 
 Scope lives in SPEC §3. Source-of-truth order lives in SPEC §0. Do not restate or improvise either one here.
 
-The active focus is whatever sprint is marked active in `tasks/todo.md` and `docs/sprint-plan.md` (S0 closed green 2026-06-04; S1 now active). Do not work ahead of it.
+The active focus is whatever sprint is marked active in `tasks/todo.md` and `docs/sprint-plan.md` (S0 and S1 closed 2026-06-04; the S2 pre-tasks are active). Do not work ahead of it.
 
 ---
 

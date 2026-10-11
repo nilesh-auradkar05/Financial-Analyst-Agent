@@ -5,6 +5,7 @@
 > **Status:** Canonical product specification.
 > **Repo:** `nilesh-auradkar05/Financial-Analyst-Agent`
 > **Supersedes:** v1.3 (2026-09-12), which superseded v1.2 (2026-07-04) from `docs/SPEC-AMENDMENT-v1.3.md` (retired; application record is ADR-0008).
+> **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
 > **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria.
 
 This is the product and architecture source of truth for the Alpha Financial
@@ -304,7 +305,9 @@ replay.
 Gate A: shared retrieval benchmark oracle is validated and has a baseline.
 
 Gate B: Qdrant backend passes parity and local operational checks behind the
-retrieval contract.
+retrieval contract. Amended 2026-10-10 (owner decision): Gate B closes at S3
+exit; the Chroma-vs-Qdrant paired comparison is retired and no quality claim is
+made for the backend choice (ADR-0003 addendum).
 
 Gate C: retrieval-quality method changes are proven by paired benchmark
 comparisons.
@@ -359,8 +362,8 @@ Committed and gated sequencing:
 | S0 | Spec coherence and baseline verification |
 | S1 | SEC ingestion identity and section coverage |
 | S2 | Shared retrieval benchmark oracle / Gate A |
-| S3 | Qdrant backend parity / Gate B prep |
-| S4 | Backend comparison and default decision / Gate B |
+| S3 | Qdrant backend parity / Gate B |
+| S4 | Backend comparison and default decision / Gate B — retired 2026-10-10 (owner decision); Gate B closes at S3 exit |
 | S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C |
 | S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
 | S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + Postgres job store (Postgres `SKIP LOCKED` queue; outbox → SQS only on the ADR-0013 trigger), provider circuit breaker, FinBERT out-of-process, auth + rate limit (ADR-0010) |

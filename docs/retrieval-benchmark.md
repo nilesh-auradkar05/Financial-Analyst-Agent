@@ -202,9 +202,24 @@ Prohibitions:
 
 ## 9. Honest expectation for backend comparison
 
+> **Retired 2026-10-10 (owner decision, ADR-0003 addendum).** The Chroma-vs-Qdrant paired comparison will not be run. The expectation below is kept as the reason no quality claim is made for the backend choice.
+
 With identical embeddings and `top_k`, Chroma and Qdrant are doing nearest-neighbor lookup over the same vectors. Their quality metrics are expected to tie within the confidence interval. A tie is correct, not a failure.
 
 The legitimate case for migrating to Qdrant is operational and forward-looking: payload-index filtering and native sparse/hybrid support needed by S5. If the default switches to Qdrant on those grounds, ADR-0003 must say exactly that. No quality fairy tales. We are not running a pitch deck.
+
+---
+
+## 9a. Embedding-model bake-off (Gate C, ADR-0011)
+
+The embedding model is a comparison axis like any other, under the same single-axis and paired policy as the rest of this document.
+
+- Candidates: Cohere Embed v4 at 1024 dimensions against the current `qwen3-embedding:4b` baseline, with Titan Text Embeddings V2 as a low-cost control.
+- Only the embedding model changes: same frozen fixture and `fixture_version`, same backend, same retrieval method and `top_k`, same matcher.
+- Each candidate needs its own index built from the same chunks; `embedding_model` is recorded in every result file.
+- The tolerance is declared before the run. If Cohere loses beyond it, Qwen3 stays (ADR-0011).
+- A change of embedding model invalidates every earlier retrieval baseline; no retrieval-quality number carries across it.
+- Rerank (Cohere Rerank 3.5) is a separate axis and is evaluated only after the embedding decision.
 
 ---
 
