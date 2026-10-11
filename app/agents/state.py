@@ -39,6 +39,11 @@ def _last_write(_current: str, new: str) -> str:
     return new
 
 
+def _merge_fetch_times(current: dict[str, str], new: dict[str, str]) -> dict[str, str]:
+    """Reducer: the parallel evidence nodes each add their own source's fetch time."""
+    return {**current, **new}
+
+
 # MAIN AGENT STATE
 
 
@@ -89,6 +94,8 @@ class AgentState(TypedDict, total=False):
     snapshot_hash: str
     evidence_as_of: str
     evidence_release: str
+    # Source name ("news", "stock", "filings") -> ISO-8601 fetch time; parallel nodes merge.
+    evidence_fetched_at: Annotated[dict[str, str], _merge_fetch_times]
 
     # Output Fields
     investment_memo: str
@@ -129,6 +136,7 @@ def create_initial_state(
         stock_data={},
         filing_chunks=[],
         sentiment_result={},
+        evidence_fetched_at={},
         investment_memo="",
         executive_summary="",
         citations=[],

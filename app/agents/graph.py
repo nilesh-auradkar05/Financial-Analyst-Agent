@@ -49,7 +49,7 @@ from app.components.retrieval.vector_store import (
     get_vector_store,
 )
 from app.config import settings
-from app.dataops.snapshot import freeze_evidence
+from app.dataops.snapshot import freeze_evidence, oldest_timestamp
 from app.llm.provider import fallback_count, get_llm, model_metadata
 from app.observability.langsmith import app_traceable, mark_trace_failed
 from app.services.llm import ANALYST_SYSTEM_PROMPT
@@ -92,6 +92,7 @@ async def research_news_node(state: AgentState) -> dict:
                 "current_step": AgentStep.RESEARCH_NEWS.value,
             }
 
+        fetched_at = datetime.now(timezone.utc).isoformat()
         articles = await search_company_news(query, max_results=max_results)
 
         news_articles = [
@@ -107,10 +108,13 @@ async def research_news_node(state: AgentState) -> dict:
 
         logger.info(f"[{ticker}] Found {len(news_articles)} articles")
 
-        return {
+        update: dict[str, Any] = {
             "news_articles": news_articles,
             "current_step": AgentStep.RESEARCH_NEWS.value,
         }
+        if news_articles:
+            update["evidence_fetched_at"] = {"news": fetched_at}
+        return update
 
     except Exception:
         logger.error(f"[{ticker}] News research failed")
@@ -137,6 +141,7 @@ async def fetch_stock_node(state: AgentState) -> dict:
 
     try:
         # Get stock data
+        fetched_at = datetime.now(timezone.utc).isoformat()
         data = await get_stock_data(ticker)
 
         stock_data = {
@@ -163,11 +168,32 @@ async def fetch_stock_node(state: AgentState) -> dict:
             "stock_data": stock_data,
             "company_name": company_name,
             "current_step": AgentStep.FETCH_STOCK.value,
+            "evidence_fetched_at": {"stock": fetched_at},
         }
 
     except Exception:
         logger.error(f"[{ticker}] Stock Fetch Failed")
         return add_error(state, "fetch_stock", "Workflow step failed.")
+
+
+def _readable_time(value: object) -> str | None:
+    """Return value when it is a non-empty ISO-8601 string, else None (SPEC 7.y)."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return value
+
+
+def _filing_fetch_time(chunks: list) -> str | None:
+    """Oldest readable fetched_at of the chunks, else their filing_date (SPEC 7.y)."""
+    times = [
+        _readable_time(chunk.metadata.get("fetched_at")) or _readable_time(chunk.filing_date)
+        for chunk in chunks
+    ]
+    return oldest_timestamp(time for time in times if time)
 
 
 def _filing_search_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -320,10 +346,12 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         ]
         logger.info(f"[retrieve_filings] Retrieved {len(filing_chunks)} chunks")
 
-        update = {
+        update: dict[str, Any] = {
             "filing_chunks": filing_chunks,
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
         }
+        if filing_chunks and (filed_at := _filing_fetch_time(top_chunks)):
+            update["evidence_fetched_at"] = {"filings": filed_at}
         if not filing_chunks:
             update["errors"] = [
                 _filing_error("filing_ingestion_failed", f"Filing ingestion failed for {ticker}.")

@@ -149,7 +149,20 @@ def _build_section_lookup(filing: Filing) -> dict[str, tuple[str, Any]]:
 def build_index_documents(
     filing: Filing,
     sections: list[str] | None = None,
+    *,
+    fetched_at: datetime | None = None,
 ) -> BuildDocumentsResult:
+    """Chunk the requested sections of a filing into index documents.
+
+    Args:
+        filing: Parsed filing whose sections are chunked.
+        sections: Section names to index (defaults to DEFAULT_SECTIONS).
+        fetched_at: Fetch time stored per chunk as `fetched_at` (SPEC 7.y); default now (UTC).
+    """
+    stamp = fetched_at or datetime.now(timezone.utc)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    fetched_at_iso = stamp.isoformat()
 
     ticker = _required_metadata(filing.metadata, "ticker").upper()
     filing_type = _required_metadata(filing.metadata, "filing_type").upper()
@@ -215,6 +228,7 @@ def build_index_documents(
                 "chunk_index": chunk_idx,
                 "parent_section_id": parent_section_id,
                 "document_id": document_id,
+                "fetched_at": fetched_at_iso,
             }
             metadata = {k: v for k, v in metadata.items() if v is not None}
             documents.append(

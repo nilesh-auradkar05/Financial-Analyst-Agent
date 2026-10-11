@@ -238,12 +238,21 @@ sha256 over the canonical JSON of all EvidencePackets + source manifest.
 `snapshot_hash` MUST appear in: AgentState, AnalysisResponse, every eval run
 record, and every cache key.
 
-7.y `evidence_as_of` (ISO-8601) MUST be set to the oldest source timestamp in
-the snapshot and returned in AnalysisResponse. "Source timestamp" is the time
-the source was fetched. On replay it is the oldest `fetched_at` among the
-release's snapshots for the ticker. On a live run it is the run start time,
-because per-source fetch times are not tracked until the S7 evidence cache;
-filings indexed earlier can therefore be older than the value reported.
+7.y `evidence_as_of` (ISO-8601 with a UTC offset) MUST be the oldest fetch time
+among the sources the memo is drafted from, and is returned in AnalysisResponse.
+It is never the run start time.
+
+- Replay: the oldest `fetched_at` among the release's snapshots for the ticker.
+- Live news and market data: the time the run fetched them.
+- Live filings: the time the filing was fetched at ingestion, recorded as
+  `fetched_at` in each chunk's metadata. A chunk indexed before that field
+  existed falls back to its `filing_date`, which is never later than the real
+  fetch time, so the reported value can be older than the truth but not newer.
+- A stored time that cannot be read is treated as absent; it never fails the
+  retrieval or removes evidence.
+- A source that returned no evidence contributes no time. When no source
+  contributed, `evidence_as_of` is absent.
+- Sentiment is computed from the news, not fetched, and contributes no time.
 
 7.z Runtime replay (S2-T00b). `run_agent(..., evidence_release="<name:version>")`
 seeds the run from that registered `evidence_snapshot` release and calls no

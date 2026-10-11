@@ -2,13 +2,15 @@
 
 The hash identifies the evidence a memo is drafted from plus the source manifest. Run
 bookkeeping such as timestamps, steps, errors and memo text is deliberately excluded.
+evidence_as_of is the oldest fetch time of that evidence, never the run start time.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import datetime, timezone
 from typing import Any
 
 EVIDENCE_FIELDS: tuple[str, ...] = (
@@ -60,6 +62,17 @@ def compute_snapshot_hash(
     return hashlib.sha256(_canonical_json(document)).hexdigest()
 
 
+def oldest_timestamp(values: Iterable[str]) -> str | None:
+    """Return the oldest ISO-8601 timestamp, with a UTC offset, or None when there are none."""
+    instants: list[datetime] = []
+    for value in values:
+        moment = datetime.fromisoformat(value)
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        instants.append(moment)
+    return min(instants).isoformat() if instants else None
+
+
 def freeze_evidence(
     state: Mapping[str, Any],
     *,
@@ -67,13 +80,21 @@ def freeze_evidence(
     snapshot_ids: Sequence[str] = (),
     as_of: str | None = None,
 ) -> dict[str, str]:
-    """Return the snapshot hash and evidence_as_of timestamp for a run (SPEC 7.x, 7.y)."""
-    evidence_as_of = as_of if as_of is not None else state.get("started_at")
-    if evidence_as_of is None:
-        raise ValueError("evidence_as_of needs as_of or state['started_at']")
-    return {
+    """Return the snapshot hash, plus the oldest fetch time as evidence_as_of when known.
+
+    evidence_as_of is the oldest fetch time of the evidence (SPEC 7.y), never the run start.
+    It is omitted when no source contributed a fetch time.
+    """
+    evidence_as_of = (
+        as_of
+        if as_of is not None
+        else oldest_timestamp((state.get("evidence_fetched_at") or {}).values())
+    )
+    frozen = {
         "snapshot_hash": compute_snapshot_hash(
             state, evidence_release=evidence_release, snapshot_ids=snapshot_ids
         ),
-        "evidence_as_of": evidence_as_of,
     }
+    if evidence_as_of is not None:
+        frozen["evidence_as_of"] = evidence_as_of
+    return frozen

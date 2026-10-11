@@ -11,7 +11,7 @@ import os
 import socket
 import threading
 import traceback
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, NoReturn
@@ -213,17 +213,33 @@ def no_live_tools(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
 
+# One filing chunk's time fields: (metadata["fetched_at"], filing_date); None omits a field.
+ChunkTimes = tuple[str | None, str | None]
+DEFAULT_FILING_TIMES: tuple[ChunkTimes, ...] = ((None, "2026-01-01"), (None, "2026-01-01"))
+
+
 @pytest.fixture
 def live_world(monkeypatch: pytest.MonkeyPatch, chat: FakeChat) -> Callable[..., None]:
     """Install faithful in-process fakes for every live evidence entry point.
 
     The fakes compute their output from their inputs (ticker, query, count) and run
-    through the real nodes and the real compiled graph. The returned installer takes a
-    `price_offset` so a test can change the live evidence deterministically.
+    through the real nodes and the real compiled graph. The returned installer takes:
+
+    - `price_offset`: changes the live evidence deterministically;
+    - `news_count`: articles the news source returns (0 = it returns nothing);
+    - `stock_available`: False makes the market-data source fail;
+    - `filing_times`: one `(fetched_at, filing_date)` pair per chunk the store returns for a
+      query (chunk n of every result gets pair n); an empty sequence = nothing indexed.
     """
     from app.agents import graph
 
-    def install(*, price_offset: float = 0.0) -> None:
+    def install(
+        *,
+        price_offset: float = 0.0,
+        news_count: int = 3,
+        stock_available: bool = True,
+        filing_times: Sequence[ChunkTimes] = DEFAULT_FILING_TIMES,
+    ) -> None:
         async def news(query: str, max_results: int = 10) -> list[SimpleNamespace]:
             return [
                 SimpleNamespace(
@@ -233,10 +249,12 @@ def live_world(monkeypatch: pytest.MonkeyPatch, chat: FakeChat) -> Callable[...,
                     snippet=f"{query} item {n} reports revenue growth.",
                     published_date="2026-09-01",
                 )
-                for n in range(min(max_results, 3))
+                for n in range(min(max_results, news_count))
             ]
 
         async def stock(ticker: str) -> SimpleNamespace:
+            if not stock_available:
+                raise RuntimeError(f"no market data for {ticker}")
             return SimpleNamespace(
                 ticker=ticker,
                 company_name=f"{ticker} Corporation",
@@ -257,21 +275,30 @@ def live_world(monkeypatch: pytest.MonkeyPatch, chat: FakeChat) -> Callable[...,
             def search_by_ticker(
                 self, query: str, ticker: str, n_results: int = 3, section: str | None = None
             ) -> SimpleNamespace:
-                metadata = {"filing_type": "10-K", "company_name": f"{ticker} Inc."}
-                return SimpleNamespace(
-                    chunks=[
+                chunks = []
+                for n, (fetched_at, filing_date) in enumerate(filing_times[:n_results]):
+                    metadata = {"filing_type": "10-K", "company_name": f"{ticker} Inc."}
+                    if fetched_at is not None:
+                        metadata["fetched_at"] = fetched_at
+                    chunks.append(
                         SimpleNamespace(
                             id=f"{ticker}:{query}:{n}",
                             text=f"{n} {query}: filing text for {ticker}.",
                             section="Business",
                             metadata=metadata,
-                            filing_date="2026-01-01",
+                            filing_date=filing_date,
                             relevance_score=1 / (n + 1),
                         )
-                        for n in range(n_results)
-                    ]
-                )
+                    )
+                return SimpleNamespace(chunks=chunks)
 
+            def count_documents(self, filters: object = None) -> int:
+                return len(filing_times)
+
+        async def ingest_nothing(ticker: str) -> SimpleNamespace:
+            return SimpleNamespace(success=False, error_code="filing_not_found")
+
+        monkeypatch.setattr(graph, "ingest_10k_for_ticker", ingest_nothing)
         monkeypatch.setattr(graph, "search_company_news", news)
         monkeypatch.setattr(graph, "get_stock_data", stock)
         monkeypatch.setattr(graph, "get_vector_store", Store)
