@@ -17,8 +17,8 @@ Embeddings come from Ollama `qwen3-embedding:4b` (2560 dimensions). A deployed s
 - **Cross-host parity gate before the fallback is enabled:** Bedrock lists dimensions up to 3072 and Foundry up to 1536, which suggests different serving revisions. A fixed 200-chunk sample is embedded on both hosts at 1024 dimensions; every pair must reach cosine similarity ≥ 0.999. The gate reruns whenever either host changes the model version. Until it passes, the fallback is off.
 - **Embedding fingerprint** = model id + version + dimension + preprocessing version. It is part of every query-embedding cache key and every index release manifest (ADR-0013).
 - **Vectors are persisted** to S3 Parquet keyed by `(chunk_id, embedding_fingerprint)`, so any new index (release, rebuild, vector-store migration) is a bulk load, not a re-embed.
-- **Storage:** float16 originals with int8 quantization (about 2 KB on disk and 1 KB in RAM per vector; 40M chunks ≈ 82 GB of originals instead of 164 GB at float32, review finding 13).
-- **Degradation ladder for query embedding:** exact cache → Bedrock → Foundry (only if parity passed) → sparse-only retrieval with the run marked `degraded` (`reduced_retrieval`).
+- **Storage (Parquet originals and the local Qdrant index):** float16 originals with int8 quantization (about 2 KB on disk and 1 KB in RAM per vector; 40M chunks ≈ 82 GB of originals instead of 164 GB at float32, review finding 13). The deployed OpenSearch Serverless index chooses its own compression (ADR-0014), so its recall is measured separately.
+- **Degradation ladder for query embedding:** exact cache → Bedrock → Foundry (only if parity passed) → keyword-only (BM25) retrieval in the deployed OpenSearch index (ADR-0014) with the run marked `degraded` (`reduced_retrieval`).
 
 ### Rerank (D12)
 
@@ -40,7 +40,7 @@ Embeddings come from Ollama `qwen3-embedding:4b` (2560 dimensions). A deployed s
 
 - Changing the embedding model invalidates every retrieval baseline until the bake-off reruns; no retrieval quality claim carries across the change.
 - Cohere costs well under $1/month for ingestion at demo scale, so cost does not decide the bake-off.
-- Tests (test-plan §20): parity gate refuses to enable the fallback below threshold; a cache key built with one fingerprint never serves another; sparse-only fallback marks the run `degraded`.
+- Tests (test-plan §20): parity gate refuses to enable the fallback below threshold; a cache key built with one fingerprint never serves another; keyword-only fallback marks the run `degraded`.
 
 ## Verify before implementation
 

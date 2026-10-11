@@ -365,19 +365,22 @@ Traces to SPEC "Run telemetry contract — 2026-10-07" (`GET /jobs`).
 | Nothing exists anywhere | No available runs → sample data, never an error |
 | Run store persistence | Compose mounts a named volume at the run-store directory |
 
-## 20. Cloud deployment contracts (S7 local seams, S10; ADR-0006, ADR-0009 amendment, ADR-0010 to ADR-0013)
+## 20. Cloud deployment contracts (S7 local seams, S10; ADR-0006, ADR-0009 amendment, ADR-0010 to ADR-0015)
 
-Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases marked *local* run in S7 against docker-compose stand-ins (Postgres, Valkey, a development JWT issuer, provider stand-ins); the rest run in S10 against the deployed demo tier. Live-provider cases record cost and are never quoted as approved baselines.
+Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases marked *local* run in S7 against docker-compose stand-ins (DynamoDB Local, ElasticMQ, a development JWT issuer, provider stand-ins; ADR-0015 replaced the Postgres and Valkey stand-ins on 2026-10-11); the rest run in S10 against the deployed demo tier. Live-provider cases record cost and are never quoted as approved baselines.
 
 | Behavior | Expected |
 |---|---|
-| Acceptance transaction (*local*) | Idempotency key, job and first event commit together or not at all; the same key and request hash returns the same job; the same key with a different hash returns 409 |
-| Fenced commit (*local*) | Kill a worker after claim and after result persistence: exactly one result commits; a stale attempt's commit updates zero rows and is discarded |
-| Lease expiry (*local*) | An expired lease is re-claimed with `attempt + 1`; retries or deadline exhausted end in `failed` with a typed reason |
+| Acceptance transaction (*local*) | Idempotency key, job and first event commit together (one `TransactWriteItems`) or not at all; the same key and request hash returns the same job; the same key with a different hash returns 409 |
+| Fenced commit (*local*) | Kill a worker after claim and after result persistence: exactly one result commits; a stale attempt's conditional write (`attempt = :mine`) fails and its result is discarded |
+| Lease expiry (*local*) | An unrecoverable worker error makes the message visible again within 10 s; a hard timeout redelivers after the 6-minute visibility timeout; each redelivery re-claims an expired lease with `attempt + 1`; a third receive goes to the DLQ, whose handler writes `failed` and bumps `attempt`; a redelivery past the job deadline writes `failed` (`deadline_exceeded`) without running |
+| Late worker (*local*) | After the DLQ handler or lazy expiry has written `failed`, the original attempt's result and event writes are all refused |
+| Enqueue outbox (*local*) | Crashing the API after the acceptance transaction and before any queue call still delivers the job: the stream-triggered dispatcher sends it to the queue |
+| Lazy expiry (*local*) | Reading a job past its deadline with an expired lease writes `failed` (`deadline_exceeded`) exactly once; a live lease is never expired by a read |
 | Event replay (*local*) | Reconnecting with `Last-Event-ID` replays missed events in order; a job finished before the client subscribed is still discoverable; heartbeats arrive at least every 15 s |
 | Cache versioning (*local*) | Changing embedding fingerprint, index release, retrieval config, prompt, model or verifier policy each misses the cache; query-embedding reuse is exact only |
 | Single-flight (*local*) | N concurrent requests with the same snapshot produce one generation; all jobs link the same artifact hash |
-| Cache loss (*local*) | With Valkey stopped, jobs complete, quotas in Postgres still hold, and rate limits fall back to the per-task limit |
+| Cache bypass (*local*) | With cache reads and writes failing, jobs complete cold and quotas still hold |
 | Customer isolation (*local*) | A caller cannot read, stream, cancel or reuse an idempotency key of another customer's job; `analyst` sees only own runs in `GET /jobs`; `admin` sees all |
 | Issuer allowlist (*local*) | Tokens from an issuer outside the allowlist, with a wrong audience or expired, are refused; the browser never receives an access token |
 | LLM fallback | With the Bedrock breaker forced open, a new attempt runs on Foundry with the same models; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
@@ -390,3 +393,16 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Budget kill switch | Setting the admission flag (as the Budgets action does) refuses new jobs with a typed 503 while running jobs finish |
 | Deploy gate | A release that regresses `grounded_claim_rate` or `citation_coverage` beyond tolerance on frozen evidence is blocked before deployment |
 | Teardown | `terraform destroy` from a clean checkout leaves only the evidence bucket and its locked releases; a second `apply` recreates a working stack |
+| OpenSearch store contract (*local*) | `OpenSearchVectorStore` passes the shared `RetrievalStore` contract suite against a local OpenSearch container; no client object escapes the retrieval boundary (ADR-0014) |
+| Awake cap (*local*) | With today's ledger at the cap, a job needing retrieval is refused with 429, `Retry-After` at the next UTC day and reason `search_awake_cap`; an exact memo-cache hit is still served; admitted jobs finish |
+| Guest access (*local*) | A Turnstile-verified visitor gets a guest session; a guest token cannot read, stream or cancel another guest's job and is refused on admin routes; a token from an issuer outside the allowlist is refused |
+| Guest quotas (*local*) | The second live job in one guest session, the fourth from one IP hash in a UTC day and the 21st across all guests are refused with 429 and `Retry-After`; example-memo replays still succeed |
+| Warm-up (*local*) | `POST /warm` extends the wake ledger, is refused once the cap or the IP warm-up quota is reached, and never starts a job |
+| Stream segment (*local*) | An event stream ends after 5 minutes or on client disconnect; reconnecting with `Last-Event-ID` resumes without loss or duplicates |
+| Signed edge | A request to the function URL without a valid SigV4 signature is refused before the function runs; the Worker's CPU time per request stays under 10 ms |
+| Concurrency ceiling | With the worker at its reserved concurrency, extra jobs wait in the queue and complete later; none fail for throttling |
+| Cold start | First-query latency after more than 24 h idle is recorded with and without the warm-up in the run registry |
+| Awake ledger (*local*) | Calls within 10 minutes extend one window; a gap over 10 minutes opens a new one; daily minutes equal the union of windows |
+| Refresh before promotion | Promotion waits until `_count` on the staged index equals the manifest; a timeout fails validation and leaves the alias unchanged |
+| Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance, else the deployment uses Qdrant Cloud |
+| Ledger reconciliation | Daily ledger minutes stay within 20% of CloudWatch search OCU activity; beyond that an alarm fires |
