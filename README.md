@@ -252,6 +252,7 @@ make docker-down
 | `GET` | `/ingest/{ticker}` | Check whether a ticker is indexed |
 | `POST` | `/analyze` | Run an analysis and wait for the memo |
 | `POST` | `/analyze/async` | Start an analysis job; returns a `job_id` |
+| `GET` | `/jobs` | List recent runs, newest first (`limit` 1–100, default 20) |
 | `GET` | `/jobs/{job_id}` | Poll a job's status and result |
 
 ### Typical flow
@@ -285,16 +286,25 @@ make smoke-test     # live end-to-end pipeline for AAPL (needs all services)
 
 ## Examples / Demos
 
+Every route except `/` and `/health` requires the shared key from `API_KEY` in `.env`, sent as a bearer token (`X-API-Key: <key>` is accepted as well). A missing or wrong key returns `401`; if the server has no `API_KEY` set, protected routes return `503`.
+
+```bash
+export API_KEY=<the API_KEY value from .env>
+```
+
 ### Ingest, then analyze
 
 ```bash
 curl -X POST http://localhost:8000/ingest \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL"}'
 
-curl http://localhost:8000/ingest/AAPL
+curl http://localhost:8000/ingest/AAPL \
+  -H "Authorization: Bearer $API_KEY"
 
 curl -X POST http://localhost:8000/analyze \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"ticker": "AAPL", "max_news_articles": 5}'
 ```
@@ -303,10 +313,28 @@ curl -X POST http://localhost:8000/analyze \
 
 ```bash
 curl -X POST http://localhost:8000/analyze/async \
+  -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"ticker": "MSFT", "include_news_sentiment": false}'
 
-curl http://localhost:8000/jobs/<job_id>
+curl http://localhost:8000/jobs/<job_id> \
+  -H "Authorization: Bearer $API_KEY"
+
+# Recent runs, newest first
+curl "http://localhost:8000/jobs?limit=20" \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+### Health, stats and metrics
+
+```bash
+curl http://localhost:8000/health
+
+curl http://localhost:8000/stats \
+  -H "Authorization: Bearer $API_KEY"
+
+curl http://localhost:8000/metrics \
+  -H "Authorization: Bearer $API_KEY"
 ```
 
 ### Response shape
