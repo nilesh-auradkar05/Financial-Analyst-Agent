@@ -1,6 +1,6 @@
 # ADR-0008 — Production-readiness order (SPEC v1.3 application)
 
-**Status:** Accepted (2026-09-12)
+**Status:** Accepted (2026-09-12). Its statements that cloud is out of committed scope describe SPEC v1.3; ADR-0006 was accepted on 2026-10-08 and SPEC v1.4 governs cloud scope.
 **Date:** 2026-08-24 (review) / 2026-09-12 (applied)
 **Related:** SPEC §§0, 2.1, 3, 5, 7.x–8.5, 11.2–11.4, 12, 14; sprint-plan S2-T00a–T00d, S6–S10; test-plan §§10–15; proposed ADR-0006
 

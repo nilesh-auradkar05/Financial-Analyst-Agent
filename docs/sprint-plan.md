@@ -170,7 +170,7 @@ Goal: a trusted, self-validating oracle before any backend or method is judged.
 > | 5 | S6 | Bounded draft→verify→revise loop (max 2), paired against no-loop on frozen snapshot |
 > | 6 | S7 | Guardrails: input schema, untrusted-content framing, output policy, API auth + rate limit |
 > | 7 | S7 | Caching: evidence (per-source TTL), query-embedding, memo (snapshot_hash) |
-> | 8 | S7 → S10 | Queue/worker, Postgres job store, Qdrant, FinBERT out-of-process, circuit breaker; cloud gated on ADR-0006 |
+> | 8 | S7 → S10 | Queue/worker, Postgres job store, Qdrant, FinBERT out-of-process, circuit breaker; cloud gated on the ADR-0006 entry criteria (ADR accepted 2026-10-08) |
 
 ```text
 S2-T00a — Governance docs into repo + CI governance gate  (Phase 0; step 1)
@@ -207,7 +207,7 @@ Verification:
 - Hook H7 rewrites the command; record the rewritten command line.
 Done: zero-network run green; hash stable across two runs; release manifest committed.
 Non-goals: no cloud storage; no scheduler.
-Result: Pending
+Result: DONE (2026-10-11), branch `feat/s2-t00b-runtime-replay`. Phase 1 (2026-07) delivered contracts, registry, gate, writer, release `alpha-evidence:0.1.0` and eval-side replay. This task added runtime replay: `run_agent(..., evidence_release=...)` runs only draft and verify from a registered release (`app/dataops/replay.py`), and every run carries `snapshot_hash` and `evidence_as_of` in `AgentState` and `AnalysisResponse` (`app/dataops/snapshot.py`; SPEC §7.y, §7.z). Replay suite `tests/replay/` 71 passed with an in-test socket guard; full suite 452 passed, 2 skipped (five consecutive runs); ruff, mypy and the four governance checks pass; two loads of the committed release give the same hash. Deviations: code is in `app/dataops/` and `dataops/`, artifacts in `artifacts/dataops/`. `unshare -n` is not permitted on this machine, so isolation rests on the socket guard plus dead-proxy variables, not a network namespace. Follow-up 2026-10-11 (user correction): `evidence_as_of` is the oldest fetch time, never the run start; live nodes record per-source fetch times, ingestion stores `fetched_at` on every chunk, and chunks indexed earlier fall back to their filing date (SPEC §7.y). Not in this task: `snapshot_hash` in eval run records (S6a) and cache keys (S7).
 ```
 
 ```text
@@ -245,7 +245,7 @@ Verification:
 - pytest tests/unit/test_graph_verification_integration.py tests/unit/test_api_schema_defaults.py → green with new statuses.
 Done: grep empty; tests green; SPEC §8.5 statuses match models.JobStatus exactly.
 Non-goals: no repair loop (S6); no guardrails (S7).
-Result: Pending
+Result: Partial (reconciled 2026-10-10). Done: `JobStatus.DEGRADED` and `EVIDENCE_MISSING` in `app/models.py`; status and `missing=[...]` derived in `app/main.py`; cases in `tests/test_api_integration.py` (verification failed → degraded; no filings or no stock data → evidence_missing); both statuses shown in the UI (user-confirmed 2026-10-10). NOT done: gap G10 layering — `app/agents/graph.py` still imports `evaluation.grounding` and `app/verification/` does not exist, so the `grep "from evaluation" app/` check is not empty.
 ```
 
 > **Implementation note (2026-06-04, audit reconciliation).** Decision: *upgrade the existing keyword/section benchmark to the content-anchored graded methodology* in `retrieval-benchmark.md` (raise code to spec). Bind the doc's planned filenames to the actual files to **extend, not recreate** (G8 path drift):
@@ -335,7 +335,7 @@ Tests: tests/rag/test_vector_backend_selection.py
 Verification: docker compose up -d qdrant ; uv run pytest tests/rag/test_vector_backend_selection.py
 Done: ADR + compose + selection + degraded test.
 Non-goals: no comparison or switch.
-Result: Pending
+Result: DONE (reconciled 2026-10-10). ADR-0003 accepted; Qdrant service with healthcheck in `docker-compose.yml`; factory defaults to Qdrant, selects by `VECTOR_BACKEND`, rejects unknown values (`tests/unit/test_vector_store_factory.py`, 3 tests); `/health` reports `vector_store.ok=false` when the store is unavailable (`tests/test_api_integration.py`). Tests live under `tests/unit/`, not `tests/rag/`.
 ```
 
 ```text
@@ -345,7 +345,7 @@ Scope: implement all five contract methods; idempotent collection; SearchFilters
 Tests: covered by S3-T04 parity suite.
 Done: Protocol implemented; no public signature above rag/ changed.
 Non-goals: no hybrid; no indexes yet.
-Result: Pending
+Result: DONE (reconciled 2026-10-10). `QdrantVectorStore` implements every `RetrievalStore` method; `qdrant_client` is imported only under `app/components/retrieval/`; `tests/unit/test_qdrant_store.py` (6 tests, fake client). Running default backend since S0-T04 G4.
 ```
 
 ```text
@@ -356,7 +356,7 @@ Tests: tests/rag/test_qdrant_payload_indexes.py
 Verification: VECTOR_BACKEND=qdrant uv run pytest tests/rag/test_qdrant_payload_indexes.py
 Done: indexes verified.
 Non-goals: no scoring changes.
-Result: Pending
+Result: DONE at unit level (reconciled 2026-10-10). `create_payload_indexes()` runs on collection setup; the fake-client tests assert the indexed fields. Not asserted against a live Qdrant server.
 ```
 
 ```text
@@ -368,7 +368,7 @@ Verification:
 - VECTOR_BACKEND=qdrant uv run pytest tests/rag/test_vector_store_contract.py
 Done: identical pass under both; differences fixed in adapter, never by forking test.
 Non-goals: no method-quality comparison.
-Result: Pending
+Result: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
 ```
 
 ```text
@@ -378,16 +378,18 @@ Scope: run S1 coverage + idempotency under VECTOR_BACKEND=qdrant; guard that the
 Verification: VECTOR_BACKEND=qdrant uv run pytest tests/ingestion/test_section_coverage.py tests/ingestion/test_ingestion_idempotency.py
 Done: coverage + idempotency pass under Qdrant; embedding identity recorded.
 Non-goals: no benchmark run; no switch.
-Result: Pending
+Result: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
 ```
 
 Exit: Qdrant passes the same contract/coverage/idempotency tests Chroma passes; indexes verified; embeddings matched; nothing above `rag/` changed.
 
 ---
 
-## Sprint 4 — Chroma vs Qdrant measured comparison → Gate B
+## Sprint 4 — Chroma vs Qdrant measured comparison → Gate B (RETIRED 2026-10-10)
 
-Goal: decide the default backend on evidence and record the decision honestly.
+> **Retired by owner decision, 2026-10-10.** No Chroma-vs-Qdrant paired comparison will be run. Qdrant stays the default on the operational grounds recorded in ADR-0003; no retrieval-quality claim is made for the backend choice. Gate B closes at S3 exit (SPEC §11.1). The task definitions below are kept as the historical record.
+
+Goal (historical): decide the default backend on evidence and record the decision honestly.
 
 ```text
 S4-T01 — Generate Qdrant candidate result
@@ -396,7 +398,7 @@ Scope: run S2-T04 runner under VECTOR_BACKEND=qdrant on the same fixture/method/
 Tests: result validates; all case_ids; fixture_version == baseline.
 Done: comparable Qdrant candidate exists.
 Non-goals: no tuning to win.
-Result: Pending
+Result: Retired (owner decision 2026-10-10). Not run.
 ```
 
 ```text
@@ -406,7 +408,7 @@ Scope: strict comparator on Chroma baseline vs Qdrant candidate; report deltas/C
 Verification: uv run python evaluation/compare_retrieval_results.py evaluation/results/chroma_section_aware_shared.json evaluation/results/qdrant_section_aware_shared.json --strict-case-ids
 Done: paired report committed.
 Non-goals: no decision yet.
-Result: Pending
+Result: Retired (owner decision 2026-10-10). Not run.
 ```
 
 ```text
@@ -415,7 +417,7 @@ Trace: SPEC §6/§11 Gate B; test-plan §5
 Scope: filtering correctness/expressiveness; cold/warm + filtered-query latency; operability notes; S5 hybrid/sparse readiness.
 Done: operability comparison recorded.
 Non-goals: no hybrid implementation.
-Result: Pending
+Result: Retired (owner decision 2026-10-10). Not run.
 ```
 
 ```text
@@ -424,10 +426,10 @@ Trace: SPEC §11 Gate B/§15
 Scope: decide against explicit criteria: no quality regression, filtering ≥ Chroma, latency acceptable, S5-readiness. Record decision and numbers in sprint-review.md and ADR-0003. Honest framing is mandatory: quality tie + better operability/S5-readiness is a valid migration reason, not a fabricated quality win.
 Done: Gate B report + operability comparison + recorded decision.
 Non-goals: no S5 work; no retro-editing fixture.
-Result: Pending
+Result: Retired (owner decision 2026-10-10). Not run.
 ```
 
-Exit = Gate B.
+Exit = Gate B. (Superseded 2026-10-10: Gate B closes at S3 exit.)
 
 ---
 
@@ -461,3 +463,9 @@ Result as of 2026-09-30: implementation in frontend-impl, focused provider check
 User authorizes INGEST-ON-MISS after the Qdrant volume was found recreated empty (2026-10-08) and every analysis reported filings unavailable. Traced to SPEC §4 ingest on miss and unavailable filings, §8.2, §8.5 and test-plan §16. Analysis ingests a ticker's latest 10-K once when zero chunks are indexed for it, off the event loop and under a time bound; an ingestion failure is reported as filing_ingestion_failed, distinct from an absent 10-K.
 
 Result as of 2026-10-10: implementation on branch auto-ingest-on-miss. Full suite 371 passed, 2 skipped; ruff, mypy and the four governance checks pass. Live check (first analysis of an unindexed ticker ingests and returns filing chunks; a second run does not ingest; a ticker with no 10-K still reports filings unavailable) not yet run.
+
+### Ledger reconciliation and S4 retirement (2026-10-10)
+
+User decision, 2026-10-10: the Chroma-vs-Qdrant paired comparison (S4) is retired; Gate B closes at S3 exit. Recorded in SPEC §11.1 and §12, ADR-0003 (addendum) and `docs/retrieval-benchmark.md` §9. In the same pass the S2-T00b, S2-T00d and S3 results above were reconciled against the code and `tasks/todo.md`; each result names its evidence and what is still open.
+
+Remaining order after reconciliation: S2-T00c (latency artifacts, concurrency probe) → S2-T00b remainder → S2-T00d remainder (G10) → S2-T01…T06 (Gate A) → S3-T04, S3-T05 (Gate B) → S5 including the ADR-0011 embedding bake-off (Gate C) → S6 (a)…(e) (Gate D) → S7 (a)…(f) → S9 → S10 entry evidence → S10-T01…T08.

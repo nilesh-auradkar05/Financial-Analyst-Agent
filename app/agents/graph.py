@@ -24,6 +24,7 @@ import re
 from collections.abc import Callable
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional, cast
 
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -48,6 +49,7 @@ from app.components.retrieval.vector_store import (
     get_vector_store,
 )
 from app.config import settings
+from app.dataops.snapshot import freeze_evidence, oldest_timestamp
 from app.llm.provider import fallback_count, get_llm, model_metadata
 from app.observability.langsmith import app_traceable, mark_trace_failed
 from app.services.llm import ANALYST_SYSTEM_PROMPT
@@ -57,6 +59,7 @@ from app.services.tools.web_search_tool import search_company_news
 from evaluation.grounding import evaluate_memo_grounding
 
 # NODE FUNCTIONS
+
 
 @app_traceable(name="research_news", run_type="chain", tags=["agent"])
 async def research_news_node(state: AgentState) -> dict:
@@ -89,6 +92,7 @@ async def research_news_node(state: AgentState) -> dict:
                 "current_step": AgentStep.RESEARCH_NEWS.value,
             }
 
+        fetched_at = datetime.now(timezone.utc).isoformat()
         articles = await search_company_news(query, max_results=max_results)
 
         news_articles = [
@@ -104,14 +108,18 @@ async def research_news_node(state: AgentState) -> dict:
 
         logger.info(f"[{ticker}] Found {len(news_articles)} articles")
 
-        return {
+        update: dict[str, Any] = {
             "news_articles": news_articles,
             "current_step": AgentStep.RESEARCH_NEWS.value,
         }
+        if news_articles:
+            update["evidence_fetched_at"] = {"news": fetched_at}
+        return update
 
     except Exception:
         logger.error(f"[{ticker}] News research failed")
         return add_error(state, "research_news", "Workflow step failed.")
+
 
 @app_traceable(name="fetch_stock", run_type="chain", tags=["agent"])
 async def fetch_stock_node(state: AgentState) -> dict:
@@ -133,6 +141,7 @@ async def fetch_stock_node(state: AgentState) -> dict:
 
     try:
         # Get stock data
+        fetched_at = datetime.now(timezone.utc).isoformat()
         data = await get_stock_data(ticker)
 
         stock_data = {
@@ -159,11 +168,32 @@ async def fetch_stock_node(state: AgentState) -> dict:
             "stock_data": stock_data,
             "company_name": company_name,
             "current_step": AgentStep.FETCH_STOCK.value,
+            "evidence_fetched_at": {"stock": fetched_at},
         }
 
     except Exception:
         logger.error(f"[{ticker}] Stock Fetch Failed")
         return add_error(state, "fetch_stock", "Workflow step failed.")
+
+
+def _readable_time(value: object) -> str | None:
+    """Return value when it is a non-empty ISO-8601 string, else None (SPEC 7.y)."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return value
+
+
+def _filing_fetch_time(chunks: list) -> str | None:
+    """Oldest readable fetched_at of the chunks, else their filing_date (SPEC 7.y)."""
+    times = [
+        _readable_time(chunk.metadata.get("fetched_at")) or _readable_time(chunk.filing_date)
+        for chunk in chunks
+    ]
+    return oldest_timestamp(time for time in times if time)
 
 
 def _filing_search_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -185,7 +215,10 @@ def _filing_search_outputs(result: SearchResult) -> dict[str, Any]:
     process_outputs=_filing_search_outputs,
 )
 def _search_filing_chunks(
-    store: RetrievalStore, query: str, ticker: str, n_results: int = 3,
+    store: RetrievalStore,
+    query: str,
+    ticker: str,
+    n_results: int = 3,
 ) -> SearchResult:
     return store.search_by_ticker(query, ticker=ticker, n_results=n_results)
 
@@ -247,13 +280,17 @@ async def _ingest_on_miss(ticker: str) -> str | None:
     # there the second request reports filing_ingestion_failed; add a lock if that matters.
     logger.info(f"[retrieve_filings] Nothing indexed for {ticker}; ingesting latest 10-K")
     try:
-        result = await asyncio.wait_for(ingest_10k_for_ticker(ticker), timeout=INGEST_TIMEOUT_SECONDS)
+        result = await asyncio.wait_for(
+            ingest_10k_for_ticker(ticker), timeout=INGEST_TIMEOUT_SECONDS
+        )
     except Exception as exc:
         logger.error("[{}] ingest on miss failed: {}", ticker, type(exc).__name__)
         return "filing_ingestion_failed"
     if result.success:
         return None
-    return "filing_not_found" if result.error_code == "filing_not_found" else "filing_ingestion_failed"
+    return (
+        "filing_not_found" if result.error_code == "filing_not_found" else "filing_ingestion_failed"
+    )
 
 
 @app_traceable(name="retrieve_filings", run_type="retriever", tags=["agent"])
@@ -287,9 +324,10 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
 
         failure = "filing_not_found"
-        if not top_chunks and await asyncio.to_thread(
-            store.count_documents, SearchFilters(ticker=ticker)
-        ) == 0:
+        if (
+            not top_chunks
+            and await asyncio.to_thread(store.count_documents, SearchFilters(ticker=ticker)) == 0
+        ):
             ingest_error = await _ingest_on_miss(ticker)
             if ingest_error:
                 failure = ingest_error
@@ -308,10 +346,12 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         ]
         logger.info(f"[retrieve_filings] Retrieved {len(filing_chunks)} chunks")
 
-        update = {
+        update: dict[str, Any] = {
             "filing_chunks": filing_chunks,
             "current_step": AgentStep.RETRIEVE_FILINGS.value,
         }
+        if filing_chunks and (filed_at := _filing_fetch_time(top_chunks)):
+            update["evidence_fetched_at"] = {"filings": filed_at}
         if not filing_chunks:
             update["errors"] = [
                 _filing_error("filing_ingestion_failed", f"Filing ingestion failed for {ticker}.")
@@ -324,8 +364,11 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Filing retrieval failed")
         return {
             "filing_chunks": [],
-            "errors": [_filing_error("filing_retrieval_failed", f"Filing retrieval failed for {ticker}.")],
+            "errors": [
+                _filing_error("filing_retrieval_failed", f"Filing retrieval failed for {ticker}.")
+            ],
         }
+
 
 @app_traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
 async def analyze_sentiment_node(state: AgentState) -> dict:
@@ -392,6 +435,13 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
         logger.error(f"[{ticker}] Sentiment analysis failed")
         return add_error(state, "analyze_sentiment", "Workflow step failed.")
 
+
+async def join_evidence_node(state: AgentState) -> dict:
+    """Score sentiment, then freeze the joined evidence into the run's lineage (SPEC 7.x, 7.y)."""
+    update = await analyze_sentiment_node(state)
+    return {**update, **freeze_evidence({**state, **update})}
+
+
 def _humanize_money(value: object) -> str:
     """Render a raw market-cap number in the human form the model will use.
 
@@ -425,7 +475,9 @@ def _format_market_data_text(stock: dict) -> str:
 
 
 def _format_sentiment_text(sentiment: dict) -> str:
-    parts = [f"Overall news sentiment (FinBERT classifier): {sentiment.get('overall_sentiment', 'N/A')}."]
+    parts = [
+        f"Overall news sentiment (FinBERT classifier): {sentiment.get('overall_sentiment', 'N/A')}."
+    ]
     parts.append(
         f"Positive articles: {sentiment.get('positive_count', 0)}. "
         f"Negative articles: {sentiment.get('negative_count', 0)}."
@@ -436,7 +488,9 @@ def _format_sentiment_text(sentiment: dict) -> str:
 
 
 def _build_citation_registry(
-    state: "AgentState", *, max_filing_chunks: int = MAX_FILING_CHUNKS,
+    state: "AgentState",
+    *,
+    max_filing_chunks: int = MAX_FILING_CHUNKS,
 ) -> list[dict]:
     """Build an ordered list of citable sources from the state."""
     registry: list[dict] = []
@@ -446,32 +500,47 @@ def _build_citation_registry(
         snippet = (article.get("snippet") or "").strip()
         if not snippet:
             continue
-        registry.append({
-            "index": idx, "source_type": "news",
-            "title": article.get("title", "Untitled"), "text": snippet,
-            "url": article.get("url", ""), "date": article.get("published_date"),
-            "source": article.get("source", "Unknown"),
-        })
+        registry.append(
+            {
+                "index": idx,
+                "source_type": "news",
+                "title": article.get("title", "Untitled"),
+                "text": snippet,
+                "url": article.get("url", ""),
+                "date": article.get("published_date"),
+                "source": article.get("source", "Unknown"),
+            }
+        )
         idx += 1
 
     # NEW: market data as a citable source (price / market cap / P/E / 52-week / sector).
     stock = state.get("stock_data", {})
     if stock and (stock.get("current_price") is not None or stock.get("market_cap")):
-        registry.append({
-            "index": idx, "source_type": "market_data",
-            "title": "Market Data (yfinance)", "text": _format_market_data_text(stock),
-            "url": None, "date": None,
-        })
+        registry.append(
+            {
+                "index": idx,
+                "source_type": "market_data",
+                "title": "Market Data (yfinance)",
+                "text": _format_market_data_text(stock),
+                "url": None,
+                "date": None,
+            }
+        )
         idx += 1
 
     # NEW: FinBERT sentiment as a citable source (overall tone + article counts).
     sentiment = state.get("sentiment_result", {})
     if sentiment and sentiment.get("overall_sentiment"):
-        registry.append({
-            "index": idx, "source_type": "sentiment",
-            "title": "News Sentiment (FinBERT)", "text": _format_sentiment_text(sentiment),
-            "url": None, "date": None,
-        })
+        registry.append(
+            {
+                "index": idx,
+                "source_type": "sentiment",
+                "title": "News Sentiment (FinBERT)",
+                "text": _format_sentiment_text(sentiment),
+                "url": None,
+                "date": None,
+            }
+        )
         idx += 1
 
     for chunk in state.get("filing_chunks", [])[:max_filing_chunks]:
@@ -480,15 +549,23 @@ def _build_citation_registry(
             continue
         section = chunk.get("section", "Unknown")
         filing_type = chunk.get("filing_type", "10-K")
-        registry.append({
-            "index": idx, "source_type": "sec_filing",
-            "title": f"{section} - {filing_type}", "text": text,
-            "url": chunk.get("source_url"), "date": chunk.get("filing_date"),
-            "chunk_id": chunk.get("chunk_id"), "section": section, "filing_type": filing_type,
-        })
+        registry.append(
+            {
+                "index": idx,
+                "source_type": "sec_filing",
+                "title": f"{section} - {filing_type}",
+                "text": text,
+                "url": chunk.get("source_url"),
+                "date": chunk.get("filing_date"),
+                "chunk_id": chunk.get("chunk_id"),
+                "section": section,
+                "filing_type": filing_type,
+            }
+        )
         idx += 1
 
     return registry
+
 
 def _format_registry_for_prompt(registry: list[dict], *, max_chars_per_item: int = 700) -> str:
     """Render the registry as a numbered list for the LLM prompt."""
@@ -514,6 +591,7 @@ def _format_registry_for_prompt(registry: list[dict], *, max_chars_per_item: int
         lines.append("")
     return "\n".join(lines)
 
+
 def _build_api_citations(registry: list[dict]) -> list[dict]:
     """Convert evidence registry into the citation metadata exposed by the API."""
     return [
@@ -527,9 +605,11 @@ def _build_api_citations(registry: list[dict]) -> list[dict]:
         for entry in registry
     ]
 
+
 def _extract_used_citations(memo: str) -> set[int]:
     """Pull citation indices like ``[1]``, ``[3]``, out of the memo text."""
     return {int(m) for m in re.findall(r"\[(\d+)\]", memo)}
+
 
 @app_traceable(name="draft_memo", run_type="chain", tags=["agent"])
 async def draft_memo_node(state: AgentState) -> dict:
@@ -557,13 +637,18 @@ async def draft_memo_node(state: AgentState) -> dict:
         # 1. Data-availability check
         availability = get_data_availability(state)
         missing = [
-            k.replace("has_", "") for k, v in availability.items()
+            k.replace("has_", "")
+            for k, v in availability.items()
             if not v and (k != "has_filings" or state.get("include_filing_analysis", True))
         ]
         filing_reason = next(
-            (error["message"] for error in state.get("errors", [])
-             if error.get("step") == "retrieve_filings"
-             and error.get("code") in {"filing_not_found", "filing_retrieval_failed", "filing_ingestion_failed"}),
+            (
+                error["message"]
+                for error in state.get("errors", [])
+                if error.get("step") == "retrieve_filings"
+                and error.get("code")
+                in {"filing_not_found", "filing_retrieval_failed", "filing_ingestion_failed"}
+            ),
             f"No indexed filings found for {ticker}.",
         )
 
@@ -574,8 +659,10 @@ async def draft_memo_node(state: AgentState) -> dict:
         # 3. Build context from accumulated data
         context = get_context_for_llm(state)
         registry_block = _format_registry_for_prompt(registry)
-        logger.debug(f"[{ticker}] Context length: {len(context)} chars, "
-                     f"Citations: {len(registry)}, Missing: {missing}")
+        logger.debug(
+            f"[{ticker}] Context length: {len(context)} chars, "
+            f"Citations: {len(registry)}, Missing: {missing}"
+        )
 
         # 4. Build prompt with data-gap awareness
         disclaimer = ""
@@ -617,15 +704,15 @@ async def draft_memo_node(state: AgentState) -> dict:
 
         llm = get_llm(settings)
         if run := get_current_run_tree():
-            run.metadata.update({
-                **model_metadata(settings),
-                "provider_policy": "bedrock_then_configured_personal",
-            })
+            run.metadata.update(
+                {
+                    **model_metadata(settings),
+                    "provider_policy": "bedrock_then_configured_personal",
+                }
+            )
         timeout_seconds = settings.llm.request_timeout_seconds
         total_timeout_seconds = timeout_seconds * fallback_count(settings) + 1
-        logger.info(
-            f"[{ticker}] Invoking LLM for memo generation (timeout={timeout_seconds}s)..."
-        )
+        logger.info(f"[{ticker}] Invoking LLM for memo generation (timeout={timeout_seconds}s)...")
         try:
             response = await asyncio.wait_for(
                 llm.ainvoke(
@@ -639,15 +726,25 @@ async def draft_memo_node(state: AgentState) -> dict:
         except asyncio.TimeoutError as exc:
             logger.error("[{}] draft_memo failed: {}", ticker, type(exc).__name__)
             mark_trace_failed("draft_memo_failed")
-            return add_error(state, "draft_memo", "LLM memo generation timed out.", recoverable=False)
+            return add_error(
+                state, "draft_memo", "LLM memo generation timed out.", recoverable=False
+            )
 
         content = getattr(response, "content", "")
-        memo = content if isinstance(content, str) else "\n".join(
-            block if isinstance(block, str) else block.get("text", "")
-            for block in content
-            if isinstance(block, str) or isinstance(block, dict) and block.get("type") == "text"
+        memo = (
+            content
+            if isinstance(content, str)
+            else "\n".join(
+                block if isinstance(block, str) else block.get("text", "")
+                for block in content
+                if isinstance(block, str) or isinstance(block, dict) and block.get("type") == "text"
+            )
         )
-        if memo.strip() and "filings" in missing and f"SEC Filings: Not Available. {filing_reason}" not in memo:
+        if (
+            memo.strip()
+            and "filings" in missing
+            and f"SEC Filings: Not Available. {filing_reason}" not in memo
+        ):
             memo = f"{memo.rstrip()}\n\nSEC Filings: Not Available. {filing_reason}"
 
         used_citations = _extract_used_citations(memo)
@@ -686,9 +783,7 @@ async def draft_memo_node(state: AgentState) -> dict:
 
         return {
             "investment_memo": memo,
-            "executive_summary": (
-                exec_summary or f"Analysis completed for {company_name}"
-            ),
+            "executive_summary": (exec_summary or f"Analysis completed for {company_name}"),
             "llm_usage": llm_usage,
             "citations": api_citations,
             "citation_evidence": registry,
@@ -700,6 +795,7 @@ async def draft_memo_node(state: AgentState) -> dict:
         logger.error("[{}] draft_memo failed: {}", ticker, type(exc).__name__)
         mark_trace_failed("draft_memo_failed")
         return add_error(state, "draft_memo", "Workflow step failed.", recoverable=False)
+
 
 @app_traceable(name="verify_memo", run_type="chain", tags=["agent"])
 async def verify_memo_node(state: AgentState) -> dict:
@@ -723,12 +819,14 @@ async def verify_memo_node(state: AgentState) -> dict:
         }
         return {
             "verification_result": verification_result,
-            "errors": [{
-                "step": "verify_memo",
-                "message": "No memo was available for verification.",
-                "recoverable": True,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }],
+            "errors": [
+                {
+                    "step": "verify_memo",
+                    "message": "No memo was available for verification.",
+                    "recoverable": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            ],
             "current_step": AgentStep.COMPLETE.value,
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -793,7 +891,9 @@ async def verify_memo_node(state: AgentState) -> dict:
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
 
+
 # Graph Construction
+
 
 def create_agent() -> Runnable[AgentState, AgentState]:
     """
@@ -811,7 +911,7 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     workflow.add_node("research_news", research_news_node)
     workflow.add_node("fetch_stock", fetch_stock_node)
     workflow.add_node("retrieve_filings", retrieve_sec_filings_node)
-    workflow.add_node("analyze_sentiment", analyze_sentiment_node)
+    workflow.add_node("analyze_sentiment", join_evidence_node)
     workflow.add_node("draft_memo", draft_memo_node)
     workflow.add_node("verify_memo", verify_memo_node)
 
@@ -831,21 +931,40 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     return agent
 
 
+def create_replay_agent() -> Runnable[AgentState, AgentState]:
+    """Create the replay workflow: memo drafting and verification only (SPEC 7.z)."""
+    workflow = StateGraph(AgentState)
+    workflow.add_node("draft_memo", draft_memo_node)
+    workflow.add_node("verify_memo", verify_memo_node)
+    workflow.add_edge(START, "draft_memo")
+    workflow.add_edge("draft_memo", "verify_memo")
+    workflow.add_edge("verify_memo", END)
+    return workflow.compile()
+
+
 # Compiled once per process; the graph holds no per-request state.
 AGENT = create_agent()
+# Replay runs (evidence_release) draft and verify a frozen release; no live evidence nodes.
+REPLAY_AGENT = create_replay_agent()
 
 # Optional per-run observer: receives the full node-progress list after every node start/finish.
-progress_sink: ContextVar[Callable[[list[dict]], object] | None] = ContextVar("progress_sink", default=None)
+progress_sink: ContextVar[Callable[[list[dict]], object] | None] = ContextVar(
+    "progress_sink", default=None
+)
 
 # AGENT EXECUTION
 
-@app_traceable(name="run_financial_analysis", tags=['agent', "main"])
+
+@app_traceable(name="run_financial_analysis", tags=["agent", "main"])
 async def run_agent(
     ticker: str,
     company_name: Optional[str] = None,
     include_filing_analysis: bool = True,
     include_news_sentiment: bool = True,
     max_news_articles: int = 10,
+    *,
+    evidence_release: Optional[str] = None,
+    evidence_registry_root: Path | str | None = None,
 ) -> AgentState:
     """
     Run the financial analyst agent for a given ticker.
@@ -855,6 +974,8 @@ async def run_agent(
     Args:
         ticker: Stock ticker symbol
         company_name: Company name (optional)
+        evidence_release: Registered release ("<name:version>") to replay; None runs live
+        evidence_registry_root: Directory holding the evidence registry (replay only)
 
     Returns:
         Final agent state with all results
@@ -866,26 +987,47 @@ async def run_agent(
 
     logger.info(f"Starting analysis for {ticker}")
 
-    # Create initial state
-    state = create_initial_state(
-        ticker,
-        company_name,
-        include_filing_analysis=include_filing_analysis,
-        include_news_sentiment=include_news_sentiment,
-        max_news_articles=max_news_articles,
-    )
+    agent: Runnable[AgentState, AgentState] = AGENT
+    if evidence_release is None:
+        # Create initial state
+        state = create_initial_state(
+            ticker,
+            company_name,
+            include_filing_analysis=include_filing_analysis,
+            include_news_sentiment=include_news_sentiment,
+            max_news_articles=max_news_articles,
+        )
+    else:
+        # Local import: app.dataops.replay imports app.agents.state, so a top-level import cycles.
+        from app.dataops.replay import DEFAULT_REGISTRY_ROOT, load_replay_state
+
+        state = load_replay_state(
+            evidence_release,
+            ticker,
+            registry_root=evidence_registry_root or DEFAULT_REGISTRY_ROOT,
+            include_filing_analysis=include_filing_analysis,
+            include_news_sentiment=include_news_sentiment,
+            max_news_articles=max_news_articles,
+        )
+        agent = REPLAY_AGENT
 
     metadata = {"agent": "financial_analyst", "agent_version": "1.1.0", **model_metadata(settings)}
+    if evidence_release is not None:
+        metadata["evidence_release"] = evidence_release
     if run := get_current_run_tree():
         run.metadata.update(metadata)
-    config: RunnableConfig = {"run_name": "financial_analyst_graph", "metadata": metadata, "tags": ["agent"]}
+    config: RunnableConfig = {
+        "run_name": "financial_analyst_graph",
+        "metadata": metadata,
+        "tags": ["agent"],
+    }
 
     # Excecute
     start_time = datetime.now(timezone.utc)
     sink = progress_sink.get()
     steps: dict[str, dict] = {}
     final_state: AgentState = state
-    async for event in AGENT.astream(state, config=config, stream_mode=["tasks", "values"]):
+    async for event in agent.astream(state, config=config, stream_mode=["tasks", "values"]):
         mode, chunk = cast(tuple[str, Any], event)
         if mode == "values":
             final_state = chunk
@@ -894,14 +1036,19 @@ async def run_agent(
             continue
         now = datetime.now(timezone.utc)
         if "input" in chunk:
-            steps[chunk["name"]] = {"node": chunk["name"], "status": "running", "started_at": now.isoformat()}
+            steps[chunk["name"]] = {
+                "node": chunk["name"],
+                "status": "running",
+                "started_at": now.isoformat(),
+            }
         elif step := steps.get(chunk["name"]):
             result = chunk.get("result")
             failed = chunk.get("error") or (isinstance(result, dict) and result.get("errors"))
             step.update(
                 status="degraded" if failed else "completed",
                 ended_at=now.isoformat(),
-                duration_ms=(now - datetime.fromisoformat(step["started_at"])).total_seconds() * 1000,
+                duration_ms=(now - datetime.fromisoformat(step["started_at"])).total_seconds()
+                * 1000,
             )
         sink([dict(step) for step in steps.values()])
 
@@ -911,6 +1058,7 @@ async def run_agent(
     logger.info(f"Analysis complete for {ticker} in ({exec_time:.0f}ms)")
 
     return final_state
+
 
 def run_agent_sync(
     ticker: str,

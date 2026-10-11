@@ -260,6 +260,12 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 | --- | --- |
 | Replay determinism | Two replays of one release → identical `snapshot_hash` and citation registry |
 | Zero-network replay | Replay test suite passes with network namespace disabled; any socket connect raises |
+| Runtime replay bypasses live tools (2026-10-10) | `run_agent` with an evidence release calls no news, market, filing-retrieval, embedding or sentiment code; the memo's evidence equals the release's snapshots for that ticker |
+| Replay lineage (2026-10-10) | A replayed run carries `snapshot_hash` (64 lowercase hex), `evidence_as_of` equal to the oldest `fetched_at` of the ticker's snapshots, and the release id; a different release or a changed payload gives a different hash |
+| Live lineage (2026-10-10; amended 2026-10-11) | A live run carries `snapshot_hash` and `evidence_as_of`; both appear in `AnalysisResponse`. `evidence_as_of` is the oldest fetch time among the sources that returned evidence, never the run start |
+| Live fetch times (2026-10-11) | News and market data count from the moment the run fetched them; filings count from the `fetched_at` recorded at ingestion, so filings ingested earlier make `evidence_as_of` earlier than the run; a chunk without `fetched_at` counts from its `filing_date`; a time that cannot be read is treated as absent and never costs the run its filing evidence; a source that returned nothing is not counted; with no evidence at all `evidence_as_of` is absent |
+| Ingestion records fetch time (2026-10-11) | Every chunk written by ingestion carries an ISO-8601 `fetched_at` with a UTC offset in its metadata; chunk ids and the other metadata are unchanged |
+| Replay refuses bad input (2026-10-10) | A malformed release id, an unregistered release, a release of another type, a payload whose hash drifted, or a ticker with no snapshots raises a clear error before any model call |
 | Evidence cache TTL | Second quote fetch within 60 s served from cache (hit counter +1); after TTL, refetched |
 | SEC freshness | New accession for ticker → cache miss → re-ingest; same accession → no re-ingest |
 | Memo cache key | Same `snapshot_hash + prompt_version + model` → cached memo; any component differs → miss |

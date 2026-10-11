@@ -5,6 +5,7 @@
 > **Status:** Canonical product specification.
 > **Repo:** `nilesh-auradkar05/Financial-Analyst-Agent`
 > **Supersedes:** v1.3 (2026-09-12), which superseded v1.2 (2026-07-04) from `docs/SPEC-AMENDMENT-v1.3.md` (retired; application record is ADR-0008).
+> **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
 > **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria.
 
 This is the product and architecture source of truth for the Alpha Financial
@@ -197,7 +198,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/components/retrieval/` — retrieval contracts, evidence packets, Chroma/Qdrant stores, retrieval methods.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
-- `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Until S2-T00b, the implementation lives at repo-root `dataops/`.
+- `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Runtime replay and the snapshot hash live here (S2-T00b); release contracts, registry and gates stay in repo-root `dataops/`.
 - `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache (exact, keyed by embedding fingerprint), RetrievalCache (keyed by index release and retrieval config), MemoCache (`snapshot_hash` + `prompt_version` + model and verifier/policy fingerprints). Key formats: ADR-0013.
 - `app/services/` — tools, run store, sentiment (FinBERT wrapped in `to_thread` or out-of-process).
 - `evaluation/` — offline harness + registry; imports from `app/` only, never the reverse.
@@ -237,8 +238,29 @@ sha256 over the canonical JSON of all EvidencePackets + source manifest.
 `snapshot_hash` MUST appear in: AgentState, AnalysisResponse, every eval run
 record, and every cache key.
 
-7.y `evidence_as_of` (ISO-8601) MUST be set to the oldest source timestamp in
-the snapshot and returned in AnalysisResponse.
+7.y `evidence_as_of` (ISO-8601 with a UTC offset) MUST be the oldest fetch time
+among the sources the memo is drafted from, and is returned in AnalysisResponse.
+It is never the run start time.
+
+- Replay: the oldest `fetched_at` among the release's snapshots for the ticker.
+- Live news and market data: the time the run fetched them.
+- Live filings: the time the filing was fetched at ingestion, recorded as
+  `fetched_at` in each chunk's metadata. A chunk indexed before that field
+  existed falls back to its `filing_date`, which is never later than the real
+  fetch time, so the reported value can be older than the truth but not newer.
+- A stored time that cannot be read is treated as absent; it never fails the
+  retrieval or removes evidence.
+- A source that returned no evidence contributes no time. When no source
+  contributed, `evidence_as_of` is absent.
+- Sentiment is computed from the news, not fetched, and contributes no time.
+
+7.z Runtime replay (S2-T00b). `run_agent(..., evidence_release="<name:version>")`
+seeds the run from that registered `evidence_snapshot` release and calls no
+live evidence tool, vector store, embedding model or sentiment model; only memo
+drafting and verification run. `snapshot_hash` covers the evidence the memo is
+drafted from plus the source manifest (release id and snapshot ids; empty for a
+live run). The release is an internal argument and is not accepted from API
+clients.
 
 ---
 
@@ -304,7 +326,9 @@ replay.
 Gate A: shared retrieval benchmark oracle is validated and has a baseline.
 
 Gate B: Qdrant backend passes parity and local operational checks behind the
-retrieval contract.
+retrieval contract. Amended 2026-10-10 (owner decision): Gate B closes at S3
+exit; the Chroma-vs-Qdrant paired comparison is retired and no quality claim is
+made for the backend choice (ADR-0003 addendum).
 
 Gate C: retrieval-quality method changes are proven by paired benchmark
 comparisons.
@@ -359,8 +383,8 @@ Committed and gated sequencing:
 | S0 | Spec coherence and baseline verification |
 | S1 | SEC ingestion identity and section coverage |
 | S2 | Shared retrieval benchmark oracle / Gate A |
-| S3 | Qdrant backend parity / Gate B prep |
-| S4 | Backend comparison and default decision / Gate B |
+| S3 | Qdrant backend parity / Gate B |
+| S4 | Backend comparison and default decision / Gate B — retired 2026-10-10 (owner decision); Gate B closes at S3 exit |
 | S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C |
 | S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
 | S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + Postgres job store (Postgres `SKIP LOCKED` queue; outbox → SQS only on the ADR-0013 trigger), provider circuit breaker, FinBERT out-of-process, auth + rate limit (ADR-0010) |

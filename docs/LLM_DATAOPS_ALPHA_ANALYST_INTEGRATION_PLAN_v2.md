@@ -36,9 +36,9 @@ What is actually done, verified against the working tree — not asserted from m
 | Observability (local) | **DONE** | Prometheus + Grafana dashboards under `monitoring/`, wired via docker-compose |
 | CI | **PARTIAL** | `.github/workflows/ci.yml`: ruff, mypy, pytest. Phase 0 wires doc-governance scripts into CI. |
 | Containerization | **DONE** | `Dockerfile`, `docker-compose.yml`, `docker-compose.qdrant.yml`, `Makefile` |
-| **Evidence fixture freeze / replay** | **NOT DONE** | `quality_baseline.py` runs the live agent — SEC, news, market data, and FinBERT are fetched fresh every run. The ±0.062 stdev still contains uncontrolled feed variance. This remains the open architectural prerequisite |
-| Source snapshots / lineage | **NOT DONE** | no snapshot contracts or storage anywhere in the tree |
-| Dataset/index release registry | **NOT DONE** | results accumulate as timestamped JSON in `evaluation/quality_res/` with no lifecycle |
+| **Evidence fixture freeze / replay** | **DONE** (Phase 1 exit PASS; runtime replay S2-T00b, 2026-10-11) | `dataops/replay.py`, `app/dataops/replay.py`, `app/dataops/snapshot.py`, `quality_baseline.py --evidence-release`, release `alpha-evidence:0.1.0` |
+| Source snapshots / lineage | **DONE (Phase 1)** | `dataops/contracts.py`, `dataops/snapshot_writer.py`, `artifacts/dataops/evidence_snapshots/` (status reconciled 2026-10-10) |
+| Dataset/index release registry | **DONE for evidence and quality-baseline releases (Phase 1)**; index releases open | `dataops/registry.py`, `artifacts/dataops/releases.jsonl`, `artifacts/dataops/active/` (status reconciled 2026-10-10) |
 | Governance docs in repo | **NOT TRACKED BEFORE PHASE 0** | `docs/` existed but was ignored by `.gitignore`; `docs/SPEC.md` in the working tree was a sprint-plan duplicate, not a product spec. Phase 0 restores and tracks the governance set. |
 | Cloud deployment / IaC | **NOT DONE** — design accepted 2026-10-08 (ADR-0006), nothing deployed | `docs/cloud-deployment.md` |
 

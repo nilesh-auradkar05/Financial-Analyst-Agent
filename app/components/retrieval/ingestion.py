@@ -50,12 +50,14 @@ from app.services.tools.sec_filings_tool import Filing, get_latest_10k
 
 # Data Models
 
+
 @dataclass(slots=True)
 class BuildDocumentsResult:
     documents: list[IndexDocument]
     sections_requested: list[str] = field(default_factory=list)
     sections_found: list[str] = field(default_factory=list)
     sections_skipped: list[str] = field(default_factory=list)
+
 
 @dataclass
 class IngestionResult:
@@ -88,6 +90,7 @@ class IngestionResult:
     def success(self) -> bool:
         return self.error is None and self.total_chunks > 0
 
+
 # Text Splitter
 
 text_splitter = RecursiveCharacterTextSplitter(
@@ -97,17 +100,20 @@ text_splitter = RecursiveCharacterTextSplitter(
     length_function=len,
 )
 
+
 def _clean_section_text(text: str) -> str:
     cleaned = text.replace("\r\n", "\n")
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
     return cleaned.strip()
 
+
 def _required_metadata(metadata: Any, field_name: str) -> str:
     value = getattr(metadata, field_name, None)
     if value is None or str(value).strip() == "":
         raise ValueError(f"filing metadata missing required field: {field_name}")
     return str(value).strip()
+
 
 def _source_url(metadata: Any) -> str:
     source_url = getattr(metadata, "source_url", None)
@@ -120,11 +126,14 @@ def _source_url(metadata: Any) -> str:
 
     raise ValueError("filing metadata missing required field: source_url")
 
+
 def _build_document_id(accession_number: str) -> str:
     return accession_number
 
+
 def _build_chunk_id(accession_number: str, section_key: str, chunk_index: int) -> str:
     return f"{accession_number}_{section_key}_{chunk_index:03d}"
+
 
 def _build_section_lookup(filing: Filing) -> dict[str, tuple[str, Any]]:
     lookup: dict[str, tuple[str, Any]] = {}
@@ -136,10 +145,24 @@ def _build_section_lookup(filing: Filing) -> dict[str, tuple[str, Any]]:
         lookup.setdefault(canonical.key, (raw_name, section))
     return lookup
 
+
 def build_index_documents(
     filing: Filing,
     sections: list[str] | None = None,
+    *,
+    fetched_at: datetime | None = None,
 ) -> BuildDocumentsResult:
+    """Chunk the requested sections of a filing into index documents.
+
+    Args:
+        filing: Parsed filing whose sections are chunked.
+        sections: Section names to index (defaults to DEFAULT_SECTIONS).
+        fetched_at: Fetch time stored per chunk as `fetched_at` (SPEC 7.y); default now (UTC).
+    """
+    stamp = fetched_at or datetime.now(timezone.utc)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    fetched_at_iso = stamp.isoformat()
 
     ticker = _required_metadata(filing.metadata, "ticker").upper()
     filing_type = _required_metadata(filing.metadata, "filing_type").upper()
@@ -178,7 +201,9 @@ def build_index_documents(
             sections_skipped.append(descriptor.key)
             continue
 
-        chunks = [chunk.strip() for chunk in text_splitter.split_text(cleaned_text) if chunk.strip()]
+        chunks = [
+            chunk.strip() for chunk in text_splitter.split_text(cleaned_text) if chunk.strip()
+        ]
         if not chunks:
             sections_skipped.append(descriptor.key)
             continue
@@ -203,6 +228,7 @@ def build_index_documents(
                 "chunk_index": chunk_idx,
                 "parent_section_id": parent_section_id,
                 "document_id": document_id,
+                "fetched_at": fetched_at_iso,
             }
             metadata = {k: v for k, v in metadata.items() if v is not None}
             documents.append(
@@ -220,8 +246,10 @@ def build_index_documents(
         sections_skipped=sections_skipped,
     )
 
+
 def _count_existing_documents(store: RetrievalStore, ticker: str) -> int:
     return store.count_documents(SearchFilters(ticker=ticker))
+
 
 def _write_documents(store: RetrievalStore, documents: list[IndexDocument]) -> int:
     if not documents:
@@ -229,7 +257,9 @@ def _write_documents(store: RetrievalStore, documents: list[IndexDocument]) -> i
 
     return store.add_documents(documents)
 
+
 # Ingestion functions
+
 
 @app_traceable(name="ingest_filing", run_type="chain", tags=["rag", "ingestion"])
 def ingest_filing(
@@ -316,13 +346,13 @@ def ingest_filing(
         documents_written=documents_written,
     )
 
+
 @app_traceable(name="ingest_10k_for_ticker", run_type="chain", tags=["rag", "10k"])
 async def ingest_10k_for_ticker(
     ticker: str,
     sections: Optional[list[str]] = None,
     replace_existing: bool = False,
 ) -> IngestionResult:
-
     """
     Download and ingest the latest 10-K for a ticker.
 
