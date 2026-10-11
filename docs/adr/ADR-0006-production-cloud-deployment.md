@@ -1,8 +1,8 @@
 # ADR-0006 — Production Cloud Deployment
 
-**Status:** Accepted (2026-10-08) by owner decision through the multi-cloud blueprint review. Implementation remains gated by the S10 entry criteria below.
+**Status:** Accepted (2026-10-08) by owner decision through the multi-cloud blueprint review. **Superseded in part on 2026-10-11 by ADR-0015** for the deployed demo tier: edge wiring (D03), runtime (D04), the secrets store and the budget projection (D16) now follow ADR-0015, which runs every component pay-per-use for recruiter-only traffic. The D03/D04 designs below are retained as the production scale tier (`docs/production-scale-architecture.md`). Posture, region, evidence storage, deploy gate, observability, the region-loss analysis and the entry criteria (as amended below) still govern. Implementation remains gated by the S10 entry criteria below.
 **Date:** 2026-07-04 (proposed) / 2026-10-08 (accepted)
-**Related:** SPEC §§2, 3, 11.1 (Gate E), 12 (S10); ADR-0003, ADR-0005, ADR-0007, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013; `docs/cloud-deployment.md`; `old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phases 4–5; production review 2026-09-06 finding 15.
+**Related:** SPEC §§2, 3, 11.1 (Gate E), 12 (S10); ADR-0003, ADR-0005, ADR-0007, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013, ADR-0014 (vector store, amended 2026-10-11), ADR-0015 (serverless demo tier, 2026-10-11); `docs/cloud-deployment.md`; `docs/production-scale-architecture.md`; `old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phases 4–5; production review 2026-09-06 finding 15.
 
 ## Context
 
@@ -23,25 +23,27 @@ Why: every cross-cloud call is a stateless model request, so nothing has to stay
 
 ### Edge (D03)
 
-Cloudflare provides DNS, WAF, Turnstile and edge rate rules on the free plan. The demo tier reaches ECS through Cloudflare Tunnel with no public ingress; a scale tier uses an ALB with authenticated origin pulls. The event stream sends a heartbeat every 15 s because Cloudflare closes idle proxied connections after about 100 s. If the origin is unreachable, Cloudflare serves a static status page.
+Cloudflare provides DNS, WAF, Turnstile and edge rate rules on the free plan. *Demo tier (ADR-0015):* a Cloudflare Worker signs requests (SigV4) to an IAM-protected Lambda function URL; there is no Tunnel. *Scale tier:* an ALB with authenticated origin pulls (the Tunnel was the original demo choice and needs an always-running connector). The event stream sends a heartbeat every 15 s because Cloudflare closes idle proxied connections after about 100 s. If the origin is unreachable, Cloudflare serves a static status page.
 
 ### Runtime (D04)
 
-ECS Fargate on Graviton (ARM64) runs four services: the Next.js web BFF, the FastAPI API, LangGraph workers and FinBERT (inside the worker as a process pool in the demo tier, its own service from the 100K-user tier). Lambda is rejected because jobs run 25–60 s and the UI streams events; EKS is rejected because a cluster control plane and its operations are not justified (integration plan: no Kubernetes). Workers scale on a published "ready jobs per worker" metric, capped by the provider token budget.
+*Demo tier (ADR-0015, 2026-10-11):* three arm64 Lambda functions (web BFF, API, worker with ONNX FinBERT) with response streaming through the Lambda Web Adapter; reserved concurrency caps spend. The original reason for rejecting Lambda (25–60 s jobs and streamed events) no longer holds: response streaming and a 15-minute limit cover both, and nothing bills while idle.
+
+*Scale tier (retained design):* ECS Fargate on Graviton (ARM64) runs four services: the Next.js web BFF, the FastAPI API, LangGraph workers and FinBERT (a process pool in the worker, its own service from the 100K-user tier). Asynchronous workers multiplex many I/O-bound jobs per task, which beats Lambda's per-job wall-clock billing under steady load. EKS is rejected because a cluster control plane and its operations are not justified (integration plan: no Kubernetes). Workers scale on a published "ready jobs per worker" metric, capped by the provider token budget.
 
 ### Evidence storage, backups and teardown (D14)
 
 - S3 holds EvidenceSnapshots, manifests, chunk and embedding Parquet and the eval registry under the existing content-addressed `{type}:{sha256}` names. The bucket is versioned; approved releases are protected by Object Lock. `releases.jsonl` appends with S3 conditional writes until a database is justified (ADR-0005).
-- Aurora keeps in-region point-in-time recovery (about 5 min RPO within the region).
+- DynamoDB point-in-time recovery on `jobs` and `job_events` in the demo tier (ADR-0015); Aurora point-in-time recovery (about 5 min RPO within the region) in the scale tier.
 - **No cross-region copies** (owner decision, 2026-10-08): no S3 Cross-Region Replication, no cross-region snapshot copies, no image replication.
 
 ### Secrets, infrastructure as code, deploy gate and budget (D16)
 
-- No stored cloud credentials. GitHub Actions reaches AWS and Azure through OIDC; ECS tasks use task roles; workers reach Foundry through AWS STS outbound identity federation trusted by an Entra federated credential (spike required). Third-party keys (Tavily, market data, Qdrant, LangSmith) live in AWS Secrets Manager with KMS.
-- Terraform with the `aws`, `azurerm`, `cloudflare` and Qdrant Cloud providers. One `apply` from a clean checkout creates the environment; no console-created resources.
-- **Deploy gate:** deploy on tag. ARM images are pushed to ECR; the frozen-evidence `eval-replay` job (SPEC §11.2) must pass before the release; ECS blue/green deployment, smoke test, then traffic shift. A release that regresses `grounded_claim_rate` or `citation_coverage` beyond the accepted tolerance against the active approved baseline cannot deploy.
-- **Budget ceiling:** $100/month for the demo tier (projection about $73 at 25 memos/day with rerank off, the default; $79 if Gate C adopts rerank; see `docs/cloud-deployment.md`). An AWS Budgets action at 100% of the ceiling sets an SSM parameter that the API reads at admission: new jobs receive a typed 503, running jobs finish. A 25-memo/day admission cap is the first control.
-- **Teardown:** `terraform destroy` removes every resource except the evidence bucket, which carries `prevent_destroy` and Object-Locked approved releases. The Qdrant Cloud cluster and Foundry deployments are destroyed through their providers.
+- No stored cloud credentials. GitHub Actions reaches AWS and Azure through OIDC; Lambda and ECS tasks use execution or task roles; workers reach Foundry through AWS STS outbound identity federation trusted by an Entra federated credential (spike required). Third-party keys (Tavily, market data, LangSmith) live in SSM Parameter Store SecureString in the demo tier and in Secrets Manager with rotation in the scale tier (ADR-0015). One scoped exception: the Cloudflare Worker's invoke-only signing key, rotated every 30 days through OIDC.
+- Terraform with the `aws` (plus `awscc` where `aws` lags), `azurerm` and `cloudflare` providers. One `apply` from a clean checkout creates the environment; no console-created resources.
+- **Deploy gate:** deploy on tag. ARM images are pushed to ECR; the frozen-evidence `eval-replay` job (SPEC §11.2) must pass before the release; then new Lambda versions are smoke-tested on a `candidate` alias and the `live` alias is moved (demo tier), or an ECS blue/green deployment shifts traffic (scale tier). A release that regresses `grounded_claim_rate` or `citation_coverage` beyond the accepted tolerance against the active approved baseline cannot deploy.
+- **Budget ceiling:** $100/month kill switch for the demo tier, with early-warning alerts at $10 and $25 (ADR-0015). Projected spend is about $4/month at 20 recruiter sessions; the worst case allowed by the guest quotas (20 live jobs/day) and the 45-minute daily search awake cap (ADR-0014) is about $30/month (see `docs/cloud-deployment.md`). An AWS Budgets action at 100% of the ceiling sets an SSM parameter that the API reads at admission: new jobs receive a typed 503, running jobs finish. Guest quotas are the first control. (The 2026-10-08 projection of about $95 at 25 memos/day applied to the always-on design, now the scale tier.)
+- **Teardown:** `terraform destroy` removes every resource except the evidence bucket, which carries `prevent_destroy` and Object-Locked approved releases. The OpenSearch Serverless collection group and the Foundry deployments are destroyed with the rest of the stack.
 
 ### Observability (D17)
 
@@ -53,14 +55,14 @@ If `us-east-1` is lost:
 
 | Component | Effect | Data at risk |
 | --- | --- | --- |
-| Web, API, workers | Unavailable; Cloudflare shows the status page | none (stateless) |
-| Cognito user pool | Nobody can sign in | User accounts, if the region's storage is permanently lost: users re-register or are migrated, and `customers.cognito_sub` mappings are rebuilt |
-| Aurora | Unavailable | Jobs, results and run records if the region's storage is permanently lost |
+| Web, API, workers (Lambda) | Unavailable; Cloudflare shows the status page | none (stateless) |
+| Cognito user pool | Nobody can sign in | User accounts, if the region's storage is permanently lost: the admin user is recreated (demo tier; guests have no accounts) or users re-register or are migrated and `customers.cognito_sub` mappings are rebuilt (scale tier) |
+| DynamoDB (demo tier) / Aurora (scale tier) | Unavailable | Jobs, results and run records if the region's storage is permanently lost |
 | S3 evidence bucket | Unavailable | Frozen evidence releases. SEC filings can be refetched; past news and quotes cannot, so approved baselines would no longer be reproducible |
-| Qdrant Cloud (AWS `us-east-1`) | Unavailable | Rebuildable from Parquet vectors in S3, which are in the same region |
+| OpenSearch Serverless collection (ADR-0014) | Unavailable | Rebuildable from Parquet vectors in S3, which are in the same region |
 | Bedrock, Foundry | Bedrock calls originate in the region, so they stop; Foundry stays up but nothing calls it | none |
 
-Mitigations, ordered by cost, recorded so they can be adopted if an SLO ever requires them: S3 Cross-Region Replication of the evidence bucket (about $1–3/month at current size, removes the irreproducible-baseline risk); AWS Backup cross-region copies of Aurora snapshots (RPO up to 24 h); ECR replication; Aurora Global Database (RPO about 1 s, a second always-on cluster); a warm standby stack applied from the same Terraform with `region` as a variable. Recovery would then be: apply the stack in the second region, restore the database, create a Qdrant Cloud cluster there and bulk-load vectors from Parquet (no re-embedding), point Cloudflare at the new origin.
+Mitigations, ordered by cost, recorded so they can be adopted if an SLO ever requires them: S3 Cross-Region Replication of the evidence bucket (about $1–3/month at current size, removes the irreproducible-baseline risk); AWS Backup cross-region copies of DynamoDB (or, in the scale tier, Aurora) backups (RPO up to 24 h); ECR replication; DynamoDB global tables or, in the scale tier, Aurora Global Database (RPO about 1 s, a second always-on cluster); a warm standby stack applied from the same Terraform with `region` as a variable. With the serverless demo tier a standby costs almost nothing while idle, which makes it the cheapest it will ever be; it stays unbuilt by the D14 decision. Recovery would then be: apply the stack in the second region, restore the database, create an OpenSearch Serverless collection there and bulk-load vectors from Parquet (no re-embedding), point Cloudflare at the new origin. An Azure-side index on Azure AI Search is also listed, to be reconsidered only when its serverless tier is generally available with alias support (owner decision 2026-10-11, ADR-0014); it would need its own retrieval parity gate because it is a different search engine.
 
 ## Alternatives considered
 
@@ -88,17 +90,19 @@ Each item needs recorded verification evidence.
 **Before the first `terraform apply`:**
 
 1. Gate A cleared on frozen evidence; S2-T00b and S2-T00d done.
-2. S7 local seams built and tested: Postgres RunStore and job queue (ADR-0013), caches, guardrails, FinBERT out of process.
+2. S7 local seams built and tested: DynamoDB `RunStore` and SQS `JobQueue` against DynamoDB Local and ElasticMQ (ADR-0013 as amended by ADR-0015), caches, guardrails, guest and admin access (ADR-0010 amendment), FinBERT as ONNX with recorded label parity.
 3. The `eval-replay` CI job exists and fails on regression (SPEC §11.2), because the deploy gate calls it.
 4. DeepSeek V3.2 and gpt-oss-120b qualified on Bedrock against the frozen eval set (paid API calls, no infrastructure); the Gate C embedding bake-off done if the embedding model is to change (ADR-0011).
 
 **Before the environment is left running:**
 
 5. Foundry parity for both models and embedding parity, measured against the Foundry deployments the first apply creates. The fallbacks stay disabled until they pass (ADR-0009 amendment, ADR-0011).
-6. Two rehearsals of `apply → smoke → destroy` from a clean checkout.
+6. Retrieval parity of OpenSearch Serverless against the Qdrant baseline on the frozen fixture (ADR-0014 adoption gate); if it fails, the deployment uses Qdrant Cloud.
+7. Two rehearsals of `apply → smoke → destroy` from a clean checkout, each recording cold-start latency with and without the warm-up (ADR-0015).
 
 ## Verify before implementation
 
-- Qdrant Cloud paid-tier availability in `us-east-1`.
+- OpenSearch Serverless next-generation pricing, idle timeout and Terraform support (ADR-0014).
 - Entra accepts the issuer and subject of the AWS STS outbound identity token.
 - Current prices for every line in the cost model (`docs/cloud-deployment.md`).
+- ADR-0015 spikes: IAM-signed streaming through the function URL; Worker CPU time; stream-triggered dispatch to SQS.

@@ -1,12 +1,12 @@
 # SPEC — Alpha Financial Analyst Agent
 
 > **Version:** 1.4
-> **Date:** 2026-10-08
+> **Date:** 2026-10-11
 > **Status:** Canonical product specification.
 > **Repo:** `nilesh-auradkar05/Financial-Analyst-Agent`
 > **Supersedes:** v1.3 (2026-09-12), which superseded v1.2 (2026-07-04) from `SPEC-AMENDMENT-v1.3.md` (retired; archived 2026-10-11 to `old_artifacts/docs/`; application record is ADR-0008).
 > **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
-> **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria.
+> **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria. Revised 2026-10-11: ADR-0014 moves the deployed index to Amazon OpenSearch Serverless with a daily awake cap (§§3, 5, 6, 16). Revised again 2026-10-11: ADR-0015 makes the deployed demo tier scale-to-zero (Lambda, DynamoDB, SQS, a Cloudflare Worker, guest access for recruiters) and keeps the always-on design as the documented production scale tier (§§0, 3, 5, 12, 16).
 
 This is the product and architecture source of truth for the Alpha Financial
 Analyst Agent. Where documents disagree, resolve the conflict using §0.
@@ -30,7 +30,7 @@ This section is the only canonical conflict-resolution order.
 3. `docs/sprint-plan.md` — sequencing and task definitions.
 4. `docs/retrieval-benchmark.md` — benchmark fixture schema, matcher, metrics, validator, and comparison policy.
 5. `docs/adr/*.md` — accepted architecture decisions.
-6. `docs/System-design/**/*.excalidraw` (editable source) with `docs/png/**/*.png` and `docs/svg/production/*.svg` renders — diagram companions; `docs/cloud-deployment.md` — deployment design companion for ADR-0006.
+6. `docs/System-design/**/*.excalidraw` (editable source) with `docs/png/**/*.png` and `docs/svg/**/*.svg` renders — diagram companions; `docs/cloud-deployment.md` — deployment design companion for ADR-0006 and ADR-0015 (deployed demo tier); `docs/production-scale-architecture.md` — production scale tier (interview design, not built).
 7. `tasks/todo.md` — active task state and verification ledger.
 8. `tasks/lessons.md` — correction log.
 9. Code comments and stale TODOs — lowest authority.
@@ -152,13 +152,13 @@ Deferred, gated work:
 - S7: service-readiness hardening (guardrails, caching, queue/worker, auth).
 - S8: frontend MVP.
 - S9: portfolio polish.
-- S10: cloud deployment (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08) and ADR-0010 to ADR-0013: AWS `us-east-1` serves; Microsoft Foundry holds model fallbacks only; $100/month demo ceiling with a Budgets kill switch; Terraform teardown; eval-gated deploy. S10 starts only when the ADR-0006 entry criteria have recorded evidence. Design companion: `docs/cloud-deployment.md`.
+- S10: cloud deployment (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08), ADR-0010 to ADR-0013 and ADR-0015 (2026-10-11): AWS `us-east-1` serves a scale-to-zero demo tier (Lambda functions, DynamoDB, SQS, a Cloudflare Worker in front; guest access for recruiters, Cognito for the admin); Microsoft Foundry holds model fallbacks only; $100/month kill switch with $10 and $25 alerts; deployed index on Amazon OpenSearch Serverless with a 45-minute daily awake cap (ADR-0014); Terraform teardown; eval-gated deploy. S10 starts only when the ADR-0006 entry criteria have recorded evidence. Design companion: `docs/cloud-deployment.md`.
 
 3.y Out of scope (ADR-0006 accepted 2026-10-08; ADR-0013):
 
 - Cloud resources before the ADR-0006 entry criteria are met.
 - Multi-region serving, cross-region data copies and recovery sites.
-- Managed queues (SQS) before the ADR-0013 trigger is measured.
+- Production scale-tier components (ECS Fargate services, Aurora PostgreSQL, Valkey, VPC with NAT) before their ADR-0015 graduation triggers are measured; they are designed in `docs/production-scale-architecture.md`, not built.
 - Multi-agent decomposition beyond the single reviewer loop in §8.1.
 - Semantic caching of memo *outputs* (prohibited; see §11.3).
 
@@ -197,12 +197,12 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 
 - `app/` — runtime API, workflow, services, tools, config, observability.
 - `app/agents/` — LangGraph graph, state, routing (fan-out allowed; nodes must be non-blocking).
-- `app/components/retrieval/` — retrieval contracts, evidence packets, Chroma/Qdrant stores, retrieval methods.
+- `app/components/retrieval/` — retrieval contracts, evidence packets, Chroma/Qdrant stores (local), OpenSearch Serverless store (deployed, ADR-0014), retrieval methods.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
 - `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Runtime replay and the snapshot hash live here (S2-T00b); release contracts, registry and gates stay in repo-root `dataops/`.
 - `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache (exact, keyed by embedding fingerprint), RetrievalCache (keyed by index release and retrieval config), MemoCache (`snapshot_hash` + `prompt_version` + model and verifier/policy fingerprints). Key formats: ADR-0013.
-- `app/services/` — tools, run store, sentiment (FinBERT wrapped in `to_thread` or out-of-process).
+- `app/services/` — tools, run store (`RunStore` protocol; DynamoDB adapter per ADR-0015), sentiment (FinBERT wrapped in `to_thread` or out-of-process; ONNX in the deployed worker).
 - `evaluation/` — offline harness + registry; imports from `app/` only, never the reverse.
 - `dataops/` — local-first release contracts, registry, and quality gates. Must not import Qdrant, Chroma, provider SDKs, or cloud SDKs.
 - `tests/` — behavior-first tests.
@@ -217,7 +217,7 @@ Retrieval consumers use typed packets and filters, not backend clients. The
 contract must support document upsert/count/search, filtering by canonical
 metadata, idempotent re-ingest, and backend selection by config.
 
-Chroma and Qdrant may differ operationally, but they must remain substitutable
+Chroma, Qdrant and the deployed OpenSearch Serverless store (ADR-0014) may differ operationally, but they must remain substitutable
 through public retrieval interfaces.
 
 ---
@@ -389,10 +389,10 @@ Committed and gated sequencing:
 | S4 | Backend comparison and default decision / Gate B — retired 2026-10-10 (owner decision); Gate B closes at S3 exit |
 | S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C |
 | S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
-| S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + Postgres job store (Postgres `SKIP LOCKED` queue; outbox → SQS only on the ADR-0013 trigger), provider circuit breaker, FinBERT out-of-process, auth + rate limit (ADR-0010) |
+| S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + job store (DynamoDB `RunStore`, SQS `JobQueue`, DynamoDB checkpointer; local DynamoDB Local and ElasticMQ; ADR-0013 as amended by ADR-0015), provider circuit breaker, FinBERT off the API event loop (ONNX in the worker), auth + rate limit with guest and admin roles (ADR-0010) |
 | S8 | Frontend MVP |
 | S9 | Portfolio polish |
-| S10 | Cloud (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08) and ADR-0010–0013; starts when the ADR-0006 entry criteria have recorded evidence |
+| S10 | Cloud (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08), ADR-0010–0014 and ADR-0015 (scale-to-zero demo tier); starts when the ADR-0006 entry criteria have recorded evidence |
 
 S2 pre-tasks (T00a–T00d) implement production-readiness steps 1–3 (see
 sprint-plan.md S2 preamble).
@@ -458,7 +458,7 @@ root cause, prevention rule, whether it was applied, and verification result in
 
 Accepted ADRs:
 
-- `docs/adr/ADR-0003-qdrant-behind-interface.md` (addendum 2026-10-08: managed Qdrant Cloud, alias-per-release publication)
+- `docs/adr/ADR-0003-qdrant-behind-interface.md` (local default; its 2026-10-08 managed-Qdrant addendum is superseded for deployment by ADR-0014 and kept as the fallback)
 - `docs/adr/ADR-0004-edgartools-parser.md`
 - `docs/adr/ADR-0005-unified-dataops-release-registry.md`
 - `docs/adr/ADR-0006-production-cloud-deployment.md` (accepted 2026-10-08; implementation gated by its entry criteria)
@@ -468,10 +468,12 @@ Accepted ADRs:
 - `docs/adr/ADR-0011-managed-embedding-and-rerank-models.md` (provisional on Gate C)
 - `docs/adr/ADR-0012-ingestion-orchestration.md`
 - `docs/adr/ADR-0013-durable-execution-and-caching.md`
+- `docs/adr/ADR-0014-opensearch-serverless-vector-store.md` (accepted 2026-10-11; adoption gated by a paired retrieval comparison)
+- `docs/adr/ADR-0015-scale-to-zero-serverless-deployment.md` (accepted 2026-10-11; supersedes in part ADR-0006, ADR-0012 and ADR-0013 for the demo tier; their always-on design is the production scale tier)
 
 Proposed ADRs:
 
-- ADR-0007: production interview scale design. Proposed; interview companion only. Superseded in part on 2026-10-08 by ADR-0006 and ADR-0009 to ADR-0013.
+- ADR-0007: production interview scale design. Proposed; interview companion only. Superseded in part on 2026-10-08 and 2026-10-11 by ADR-0006 and ADR-0009 to ADR-0015.
 
 
 ## REST service contract clarification — 2026-09-21

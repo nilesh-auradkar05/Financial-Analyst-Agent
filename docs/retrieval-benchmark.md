@@ -214,10 +214,13 @@ The legitimate case for migrating to Qdrant is operational and forward-looking: 
 
 The embedding model is a comparison axis like any other, under the same single-axis and paired policy as the rest of this document.
 
-- Candidates: Cohere Embed v4 at 1024 dimensions against the current `qwen3-embedding:4b` baseline, with Titan Text Embeddings V2 as a low-cost control.
+- Four arms (ADR-0011 amendment, 2026-10-11): the current `qwen3-embedding:4b` baseline (2560 dimensions) against Cohere Embed v4, Titan Text Embeddings V2 and OpenAI `text-embedding-3-small`, each at 1024 dimensions. Every candidate is compared with the baseline as its own pair; the three cloud arms are also compared with each other.
+- Each arm applies its model's documented query and document input convention.
 - Only the embedding model changes: same frozen fixture and `fixture_version`, same backend, same retrieval method and `top_k`, same matcher.
 - Each candidate needs its own index built from the same chunks; `embedding_model` is recorded in every result file.
-- The tolerance is declared before the run. If Cohere loses beyond it, Qwen3 stays (ADR-0011).
+- The tolerance is declared before the run. If every candidate loses beyond it, Qwen3 stays (ADR-0011).
+- No arm is measured before the Gate A fixture is frozen. Building the provider switch and the per-arm indexes earlier is allowed; running or citing a comparison is not.
+- Downstream (memo-level) measurement is a second stage and never replaces this retrieval comparison: news and stock evidence replayed from a frozen evidence release, same chat model and settings, filings retrieved again per arm, repeated runs per ticker.
 - A change of embedding model invalidates every earlier retrieval baseline; no retrieval-quality number carries across it.
 - Rerank (Cohere Rerank 3.5) is a separate axis and is evaluated only after the embedding decision.
 
