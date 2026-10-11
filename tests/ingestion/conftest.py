@@ -119,9 +119,7 @@ class InMemoryRetrievalStore:
 
     def _matching_documents(self, filters: SearchFilters | None) -> list[IndexDocument]:
         return [
-            document
-            for document in self.documents.values()
-            if _document_matches(document, filters)
+            document for document in self.documents.values() if _document_matches(document, filters)
         ]
 
 
@@ -184,8 +182,7 @@ def store() -> InMemoryRetrievalStore:
 def _section_text(*, ticker: str, section_name: str) -> str:
     return (
         f"{ticker.upper()} {section_name} disclosure describes operations, risks, "
-        "liquidity, market exposure, controls, customers, products, and suppliers. "
-        * 80
+        "liquidity, market exposure, controls, customers, products, and suppliers. " * 80
     )
 
 

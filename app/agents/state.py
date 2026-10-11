@@ -13,12 +13,14 @@ from langsmith import get_current_run_tree
 
 # ENUMS
 
+
 class AgentStep(str, Enum):
     """
     Enumeration of agent workflow steps.
 
     Used for tracking progress and conditional routing.
     """
+
     RESEARCH_NEWS = "research_news"
     FETCH_STOCK = "fetch_stock"
     RETRIEVE_FILINGS = "retrieve_filings"
@@ -28,6 +30,7 @@ class AgentStep(str, Enum):
     COMPLETE = "complete"
     ERROR = "error"
 
+
 # Filing chunks kept by retrieval, cited in the registry and shown in the LLM context.
 MAX_FILING_CHUNKS = 5
 
@@ -35,7 +38,9 @@ MAX_FILING_CHUNKS = 5
 def _last_write(_current: str, new: str) -> str:
     return new
 
+
 # MAIN AGENT STATE
+
 
 class AgentState(TypedDict, total=False):
     """
@@ -101,7 +106,9 @@ class AgentState(TypedDict, total=False):
     completed_at: str
     execution_time_ms: float
 
+
 # STATE INITIALIZATION HELPERS
+
 
 def create_initial_state(
     ticker: str,
@@ -132,6 +139,7 @@ def create_initial_state(
         started_at=datetime.now(timezone.utc).isoformat(),
     )
 
+
 def add_error(
     state: AgentState,
     step: str,
@@ -141,14 +149,20 @@ def add_error(
     """Build the partial update for one error; the `errors` reducer appends it."""
     timed_out = message == "LLM memo generation timed out."
     if run := get_current_run_tree():
-        run.metadata.update(outcome="failed", error_code="llm_timeout" if timed_out else "workflow_step_failed")
+        run.metadata.update(
+            outcome="failed", error_code="llm_timeout" if timed_out else "workflow_step_failed"
+        )
     return {
-        "errors": [{
-            "step": step,
-            "message": "LLM memo generation timed out." if timed_out else "Workflow step failed.",
-            "recoverable": recoverable,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }],
+        "errors": [
+            {
+                "step": step,
+                "message": "LLM memo generation timed out."
+                if timed_out
+                else "Workflow step failed.",
+                "recoverable": recoverable,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        ],
         "current_step": AgentStep.ERROR.value if not recoverable else state.get("current_step"),
     }
 
@@ -159,12 +173,11 @@ def apply_update(state: AgentState, update: Mapping[str, Any]) -> AgentState:
     merged["errors"] = [*state.get("errors", []), *update.get("errors", [])]
     return cast(AgentState, merged)
 
+
 def has_fatal_error(state: AgentState) -> bool:
     """True when any non-recoverable error has been recorded."""
-    return any(
-        not e.get("recoverable", True)
-        for e in state.get("errors", [])
-    )
+    return any(not e.get("recoverable", True) for e in state.get("errors", []))
+
 
 def get_data_availability(state: AgentState) -> dict[str, bool]:
     """
@@ -177,10 +190,9 @@ def get_data_availability(state: AgentState) -> dict[str, bool]:
         "has_stock_data": bool(state.get("stock_data")),
         "has_news": bool(state.get("news_articles")),
         "has_filings": bool(state.get("filing_chunks")),
-        "has_sentiment": bool(
-            state.get("sentiment_result", {}).get("overall_sentiment")
-        ),
+        "has_sentiment": bool(state.get("sentiment_result", {}).get("overall_sentiment")),
     }
+
 
 def get_context_for_llm(state: AgentState) -> str:
     """Compile all data into context string for LLM."""
@@ -192,10 +204,14 @@ def get_context_for_llm(state: AgentState) -> str:
         parts.append("## Stock Data")
         parts.append(f"Company: {stock.get('company_name', 'N/A')}")
         parts.append(f"Price: ${stock.get('current_price', 'N/A')}")
-        parts.append(f"Market Cap: ${stock.get('market_cap', 'N/A'):,}" if stock.get('market_cap') else "N/A")
+        parts.append(
+            f"Market Cap: ${stock.get('market_cap', 'N/A'):,}" if stock.get("market_cap") else "N/A"
+        )
         parts.append(f"P/E Ratio: {stock.get('pe_ratio', 'N/A')}")
         parts.append(f"Sector: {stock.get('sector', 'N/A')}")
-        parts.append(f"52-Week Range: ${stock.get('fifty_two_week_low', 'N/A')} - ${stock.get('fifty_two_week_high', 'N/A')}")
+        parts.append(
+            f"52-Week Range: ${stock.get('fifty_two_week_low', 'N/A')} - ${stock.get('fifty_two_week_high', 'N/A')}"
+        )
         parts.append("")
 
     # News articles
