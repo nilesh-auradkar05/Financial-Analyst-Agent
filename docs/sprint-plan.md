@@ -476,3 +476,9 @@ Remaining order after reconciliation: S2-T00c (latency artifacts, concurrency pr
 User decision, 2026-10-11: the Gate C embedding bake-off has four arms (`qwen3-embedding:4b`, Cohere Embed v4, Titan Text Embeddings V2, `text-embedding-3-small`; ADR-0011 amendment, `docs/retrieval-benchmark.md` §9a). The plumbing is built now, ahead of S5: an embedding provider switch behind the existing retrieval boundary, one index per arm built from the same chunks, and the embedding identifier written to ingest metadata (also the open part of S3-T04). Measurement stays in S5, after Gate A; no arm is measured or cited before the fixture is frozen. Tests: test-plan §21. The remaining order above is otherwise unchanged.
 
 Result: Pending.
+
+### Authorized Azure provider slice (2026-10-17)
+
+User decision, 2026-10-17 (ADR-0009 amendment 2026-10-17; SPEC §4 runtime provider policy; test-plan §16 rows dated 2026-10-17): the Azure tier, previously S10-T03 / S7-AZURE-FALLBACK, is pulled forward and is the next task. Scope: Foundry DeepSeek-V4-Flash as the first draft attempt when configured, Bedrock `deepseek.v3.2` next, personal fallbacks unchanged; the evaluation judge ladder GPT-5.6 Luna on Bedrock (`bedrock-mantle`) → Foundry; Compose pass-through for the new variable. Out of scope: the STS-to-Entra keyless sign-in (stays in S10), circuit breakers (S7 (e)), parity and fallback-quality measurement (S10 / S6). The in-flight EMBED-ARMS plumbing slice pauses and resumes after this slice. Ordering of the embedding bake-off and the DeepSeek-V4-Flash memo baseline after this slice: pending the owner's answer (Gate A is still open, and the bake-off is gated on it above).
+
+Result: Pending.
