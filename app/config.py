@@ -5,7 +5,7 @@ This file contains the configuration for the Financial Analyst Agent.
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 """ PATHS CONFIGURATION """
@@ -64,7 +64,7 @@ class OllamaSettings(BaseSettings):
 
 
 class LLMSettings(BaseSettings):
-    """Chat models: Bedrock primary, then personal Claude, then personal OpenAI."""
+    """Chat models: Foundry (when configured), then Bedrock, then personal Claude, then personal OpenAI."""
 
     model_config = SettingsConfigDict(
         env_prefix="LLM_",
@@ -74,9 +74,9 @@ class LLMSettings(BaseSettings):
     )
 
     model: str = Field(
-        default="global.anthropic.claude-sonnet-4-6",
+        default="deepseek.v3.2",
         validation_alias="AWS_BEDROCK_MODEL",
-        description="Bedrock primary model id or inference profile.",
+        description="Bedrock model id or inference profile (draft fallback after Foundry).",
     )
     claude_model: str = Field(
         default="claude-sonnet-4-5",
@@ -93,6 +93,18 @@ class LLMSettings(BaseSettings):
         validation_alias=AliasChoices("AWS_BEARER_TOKEN_BEDROCK", "AWS_BEARER_TOKEN"),
     )
     anthropic_api_key: Optional[SecretStr] = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    azure_openai_endpoint: Optional[str] = Field(
+        default=None,
+        validation_alias="AZURE_OPENAI_ENDPOINT",
+        description="Microsoft Foundry resource endpoint; calls use its /openai/v1/ route.",
+    )
+    azure_api_key: Optional[SecretStr] = Field(default=None, validation_alias="AZURE_API_KEY")
+    azure_foundry_model: Optional[str] = Field(
+        default=None, validation_alias="AZURE_FOUNDRY_MODEL", description="Foundry draft deployment name."
+    )
+    azure_foundry_judge_model: Optional[str] = Field(
+        default=None, validation_alias="AZURE_FOUNDRY_JUDGE_MODEL", description="Foundry judge deployment name."
+    )
     openai_api_key: Optional[SecretStr] = Field(default=None, validation_alias="OPENAI_API_KEY")
     temperature: float = Field(
         default=1.0,
@@ -126,6 +138,22 @@ class LLMSettings(BaseSettings):
         default="low",
         description="Thinking effort to be used by LLM."
     )
+
+    @field_validator("azure_openai_endpoint")
+    @classmethod
+    def _foundry_resource_endpoint(cls, value: Optional[str]) -> Optional[str]:
+        endpoint = (value or "").strip().rstrip("/")
+        if "/api/projects/" in endpoint:
+            raise ValueError("AZURE_OPENAI_ENDPOINT must be the Foundry resource endpoint, not a project endpoint")
+        return endpoint.removesuffix("/openai/v1").rstrip("/") or None
+
+    def azure_deployment(self, deployment: Optional[str]) -> Optional[tuple[str, str, SecretStr]]:
+        """(base URL, deployment, key) when the Foundry tier is fully configured, else None."""
+        key = self.azure_api_key
+        name = (deployment or "").strip()
+        if self.azure_openai_endpoint and name and key and key.get_secret_value().strip():
+            return f"{self.azure_openai_endpoint}/openai/v1/", name, key
+        return None
 
     def personal_fallbacks(self) -> list[tuple[str, str, SecretStr]]:
         """(provider, model, key) for each personal fallback whose API key is configured, in call order."""

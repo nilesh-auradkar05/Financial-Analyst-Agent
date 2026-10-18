@@ -22,6 +22,7 @@ import pytest
             "OPENAI_API_KEY": "dummy-openai",
             "AZURE_API_KEY": "dummy-azure",
             "AZURE_FOUNDRY_MODEL": "dummy-deployment",
+            "AZURE_FOUNDRY_JUDGE_MODEL": "dummy-judge-deployment",
             "AZURE_PROJECT_ENDPOINT": "https://example.invalid/project",
             "AZURE_OPENAI_ENDPOINT": "https://example.invalid/openai",
         },

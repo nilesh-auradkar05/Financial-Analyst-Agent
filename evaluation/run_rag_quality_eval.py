@@ -654,7 +654,7 @@ def main() -> None:
         "--judge-provider",
         choices=[provider.value for provider in JudgeProvider],
         default=os.getenv("RAG_EVAL_JUDGE_PROVIDER", JudgeProvider.DEEPEVAL_DEFAULT.value),
-        help="Judge model provider: deepeval_default, langchain_anthropic",
+        help="Judge model provider: deepeval_default, langchain_anthropic, luna",
     )
     parser.add_argument("--judge-model", default=os.getenv("RAG_EVAL_JUDGE_MODEL"), help="Judge model name", required=True)
     parser.add_argument("--judge-temperature", type=float, default=0.0)
