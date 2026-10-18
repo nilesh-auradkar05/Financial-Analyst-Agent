@@ -16,7 +16,7 @@ The project is a portfolio system operated by one person. Its design must show t
 
 - **AWS is the only serving cloud.** One active region, `us-east-1`, already configured in the repository. All state and compute live there.
 - **Multi-region is limited to model routing.** Bedrock is called through US cross-region inference profiles, which spread model requests across US regions without any state outside `us-east-1`.
-- **Azure is the model plane only.** Microsoft Foundry serves the same LLM and embedding models as fallbacks (ADR-0009 amendment, ADR-0011). No Azure service holds jobs, evidence, indexes or users.
+- **Azure is the model plane only.** Microsoft Foundry serves the same LLM and embedding models as fallbacks (ADR-0009 amendment, ADR-0011). No Azure service holds jobs, evidence, indexes or users. Amended 2026-10-17 by ADR-0009: Foundry is also the primary draft host (DeepSeek-V4-Flash, Bedrock V3.2 as fallback) and the judge fallback; it still holds no state.
 - **Loss of all of `us-east-1` is a documented failure mode, not built infrastructure.** See *Region-loss failure mode* below.
 
 Why: every cross-cloud call is a stateless model request, so nothing has to stay consistent across providers. Model capacity is where throttling and outages occur most often, so it is the one plane with a live fallback. A recovery site, warm standby or cross-region data copy only pays off with a stated availability SLO and rehearsed restores, which a portfolio deployment does not have. `us-east-1` keeps the existing configuration and has the broadest Bedrock catalog (DeepSeek V3.2 and gpt-oss-120b included).

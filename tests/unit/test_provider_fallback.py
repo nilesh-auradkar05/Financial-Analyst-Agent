@@ -80,7 +80,7 @@ def test_bedrock_model_variable_and_bearer_alias_precedence(monkeypatch: pytest.
 def test_personal_model_variables_never_select_bedrock_model(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
     monkeypatch.delenv("AWS_BEDROCK_MODEL", raising=False)
     monkeypatch.setenv(name, "personal-model")
-    assert LLMSettings(_env_file=None).model == "global.anthropic.claude-sonnet-4-6"  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
+    assert LLMSettings(_env_file=None).model == "deepseek.v3.2"  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
 
 
 @pytest.mark.asyncio
@@ -106,11 +106,11 @@ async def test_personal_model_variables_reach_their_provider_in_order(
     assert (await provider.get_llm(settings).ainvoke("check")).content == expected
 
 
-def test_default_model_is_invocable_inference_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_default_model_is_on_demand_deepseek_v3_2(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in ("AWS_BEDROCK_MODEL", "CLAUDE_LLM_MODEL", "OPENAI_LLM_MODEL"):
         monkeypatch.delenv(name, raising=False)
     config = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
-    assert config.model == "global.anthropic.claude-sonnet-4-6"
+    assert config.model == "deepseek.v3.2"
 
 
 def test_bedrock_sonnet_5_preserves_selection_without_temperature(monkeypatch: pytest.MonkeyPatch) -> None:

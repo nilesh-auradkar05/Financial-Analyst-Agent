@@ -361,7 +361,8 @@ async def root():
 async def health():
     """Health check endpoint."""
     embedding_ok = await check_ollama_health(model=settings.ollama.embed_model)
-    chat_ok = bool(settings.llm.aws_region and settings.llm.model) or bool(settings.llm.personal_fallbacks())
+    azure_ok = settings.llm.azure_deployment(settings.llm.azure_foundry_model) is not None
+    chat_ok = azure_ok or bool(settings.llm.aws_region and settings.llm.model) or bool(settings.llm.personal_fallbacks())
     try:
         vector_ok = get_vector_store().count >= 0
     except Exception:
@@ -373,7 +374,7 @@ async def health():
         version="1.1.0",
         timestamp=datetime.now(timezone.utc).isoformat(),
         components={
-            "chat_model": {"ok": chat_ok, "provider": "bedrock", "check": "configuration_only", "inference_verified": False},
+            "chat_model": {"ok": chat_ok, "provider": "azure" if azure_ok else "bedrock", "check": "configuration_only", "inference_verified": False},
             "ollama_embeddings": {"ok": embedding_ok},
             "vector_store": {"ok": vector_ok},
             "langsmith": {"connected": langsmith_status.get("connected", False)},

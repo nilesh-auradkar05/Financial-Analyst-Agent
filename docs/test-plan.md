@@ -303,15 +303,20 @@ Each hook is tested by piping a sample event JSON to the script and asserting st
 
 | Case | Expected behavior |
 | --- | --- |
-| Cloud defaults | Bedrock primary without generic selector; default model is an invocable inference profile (`global.anthropic.claude-sonnet-4-6`), never a bare on-demand-unsupported ID; only AWS_BEDROCK_MODEL selects it (LLM_MODEL / CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL never change it) |
+| Cloud defaults (amended 2026-10-17) | No generic selector; the Bedrock default model is `deepseek.v3.2` (invocable on demand), never an ID that needs a profile it lacks; only AWS_BEDROCK_MODEL selects it (LLM_MODEL / CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL never change it). With Azure unconfigured, Bedrock is the first attempt |
+| Azure first (2026-10-17) | With AZURE_OPENAI_ENDPOINT, AZURE_API_KEY and AZURE_FOUNDRY_MODEL all set, the first attempt goes to the Foundry `/openai/v1/` route with the deployment name as the model; Azure success invokes no Bedrock or personal fallback |
+| Azure incomplete (2026-10-17) | With any of the three Azure settings missing or blank, the Azure tier is skipped and no Azure request is made; the ladder starts at Bedrock |
+| Azure endpoint form (2026-10-17) | A trailing `/openai/v1` on the endpoint is normalized away; a Foundry project endpoint (`/api/projects/`) is rejected when settings load, with a message naming the setting and no secret value |
+| Azure failure (2026-10-17) | An Azure construction, authentication, invocation, timeout or rate-limit (429) failure reaches Bedrock in the same run within the attempt bound; no retry inside the Azure attempt |
 | Personal models | CLAUDE_LLM_MODEL reaches the Anthropic client and OPENAI_LLM_MODEL the OpenAI client, tried Claude then OpenAI; a fallback without its key is skipped |
 | Bearer authentication | Canonical AWS_BEARER_TOKEN_BEDROCK or short alias reaches SDK without secret output; AWS_REGION reaches client |
 | Sonnet 5 configuration | Bedrock Sonnet 5/5.5 requests omit unsupported sampling temperature; explicit model/profile selection is preserved |
 | Fallback success | Primary construction/invocation/timeout failure reaches configured Anthropic then OpenAI; primary success invokes no fallback |
 | Bounded failure | Each attempt bounded; all failed returns safe fatal draft error and no fabricated memo |
-| Unconfigured providers | Missing personal keys skipped; Azure variables do not enable Azure calls |
-| Tracing | Native child LLM spans identify actual attempted providers/models under original trace |
-| Compose | Bedrock/Claude/OpenAI model, token and Azure (incl. AZURE_FOUNDRY_MODEL) values survive rendering; absent optional variables do not mask aliases |
+| Unconfigured providers | Missing personal keys skipped; an incomplete Azure configuration is skipped (see Azure incomplete) |
+| Tracing | Native child LLM spans identify actual attempted providers/models under original trace; an Azure attempt names the provider and the deployment name; run metadata names the first configured tier's model |
+| Compose | Bedrock/Claude/OpenAI model, token and Azure (incl. AZURE_FOUNDRY_MODEL, AZURE_FOUNDRY_JUDGE_MODEL) values survive rendering; absent optional variables do not mask aliases |
+| Judge ladder (2026-10-17) | The evaluation judge calls GPT-5.6 Luna on Bedrock through the OpenAI-compatible `bedrock-mantle` route with the Bedrock API key; a Bedrock failure reaches the Foundry judge deployment (AZURE_FOUNDRY_JUDGE_MODEL); an unconfigured tier is skipped; structured verdicts through the DeepEval adapter survive the fallback; the answering host is identifiable from the reply's model name (Bedrock id or Foundry deployment) in native traces, while the eval output names the judge provider and configured model (revised 2026-10-18); the runtime verifier is unchanged |
 | Ingest no 10-K | Typed 404 filing_not_found with ticker-specific safe reason; real upstream failure remains safe 502 |
 | Analysis no filings | Available news/stock/sentiment preserved; memo states SEC Filings: Not Available; no fabricated SEC citations; evidence_missing/missing includes filings |
 | Ingest on miss (2026-10-10) | Analysis of a ticker with zero indexed chunks ingests its latest 10-K once, then retrieves; filing chunks are present and no filing error is recorded |
@@ -383,9 +388,9 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Cache bypass (*local*) | With cache reads and writes failing, jobs complete cold and quotas still hold |
 | Customer isolation (*local*) | A caller cannot read, stream, cancel or reuse an idempotency key of another customer's job; `analyst` sees only own runs in `GET /jobs`; `admin` sees all |
 | Issuer allowlist (*local*) | Tokens from an issuer outside the allowlist, with a wrong audience or expired, are refused; the browser never receives an access token |
-| LLM fallback | With the Bedrock breaker forced open, a new attempt runs on Foundry with the same models; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
-| LLM parity | On the frozen eval set, DeepSeek V3.2 and gpt-oss-120b on Foundry stay within the paired tolerance of Bedrock before the fallback is enabled |
-| Judge adoption | gpt-oss-120b's verdicts reach Cohen's κ ≥ 0.85 against ≥ 50 owner-reviewed claims before it is used as the SPEC §11.2 judge (ADR-0009 amendment) |
+| LLM fallback (amended 2026-10-17) | With the Foundry breaker forced open, a new draft attempt runs on Bedrock DeepSeek V3.2; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
+| LLM fallback quality (amended 2026-10-17) | On the frozen eval set, Bedrock DeepSeek V3.2 drafts stay within the paired tolerance of Foundry DeepSeek-V4-Flash before V3.2 is trusted as the draft fallback; GPT-5.6 Luna on Foundry stays within the paired tolerance of Luna on Bedrock before the judge fallback is trusted |
+| Judge adoption (amended 2026-10-17) | GPT-5.6 Luna's verdicts reach Cohen's κ ≥ 0.85 against ≥ 50 owner-reviewed claims before any Luna score is cited as the SPEC §11.2 judge (ADR-0009 amendment 2026-10-17) |
 | Embedding parity | A fixed 200-chunk sample embedded at 1024 dimensions on Bedrock and Foundry reaches cosine ≥ 0.999 for every pair; below threshold the Foundry fallback stays off |
 | Embedding degradation | With both embedding hosts unavailable and an exact-cache miss, retrieval runs sparse-only and the run is `degraded` with `reduced_retrieval` |
 | Index promotion | A release whose point count, filter smoke tests or deletion check fails is never promoted; the active alias still serves the previous release; rollback is one alias update |

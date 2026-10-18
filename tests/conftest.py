@@ -14,6 +14,13 @@ import pytest
 for _name in ("LANGSMITH_TRACING", "LANGSMITH_TRACING_V2", "LANGCHAIN_TRACING", "LANGCHAIN_TRACING_V2"):
     os.environ[_name] = "false"
 
+# Tests never call the real Microsoft Foundry endpoint either. The Azure tier is the first draft
+# attempt when fully configured (ADR-0009 amendment 2026-10-17), so blank its key and deployments
+# before any app import or `load_dotenv()` brings in the developer's values. The endpoint is left
+# alone: it is not secret, and DeepEval refuses an empty one at session start.
+for _name in ("AZURE_API_KEY", "AZURE_FOUNDRY_MODEL", "AZURE_FOUNDRY_JUDGE_MODEL"):
+    os.environ[_name] = ""
+
 # ── CLI options & markers ───────────────────────────────────────────────
 
 def pytest_addoption(parser):
