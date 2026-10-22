@@ -162,6 +162,7 @@ Definitions live in `retrieval-benchmark.md`.
 | Provenance | retrieved chunk ids/section/score preserved |
 | Cold/warm latency | captured separately |
 | Determinism | same fixture + backend + method gives identical metrics |
+| Metrics match retrieval-benchmark §3–§4 (added 2026-10-22, owner-approved) | On a hand-computed case: graded NDCG@K credits each anchor once; an anchor split across two chunks is a miss; a section hit without the anchor counts for section_recall only; precision@K divides by K; mrr@K = 0 and first_relevant_rank = null on a miss; keyword_hit_rate is null with no expected keywords |
 
 ### Paired comparator
 
