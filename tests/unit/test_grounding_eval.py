@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from evaluation.grounding import evaluate_memo_grounding
+from app.verification.grounding import evaluate_memo_grounding
 
 
 class StubEvidence:

@@ -56,7 +56,7 @@ from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
 from app.services.tools.web_search_tool import search_company_news
-from evaluation.grounding import evaluate_memo_grounding
+from app.verification.grounding import evaluate_memo_grounding
 
 # NODE FUNCTIONS
 

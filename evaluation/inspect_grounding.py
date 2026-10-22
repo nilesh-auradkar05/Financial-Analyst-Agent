@@ -21,7 +21,7 @@ import os
 from app.agents.graph import create_agent
 from app.agents.state import create_initial_state
 from app.components.retrieval.embeddings import embed_texts
-from evaluation.grounding import (
+from app.verification.grounding import (
     _build_evidence_map,
     _extract_citations,
     _extract_claim_sentences,

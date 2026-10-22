@@ -11,7 +11,7 @@ AXES = {
     "retrieval": ("app/components/retrieval/",),
     "llm": ("app/llm/", "app/config.py"),
     "graph": ("app/agents/",),
-    "verifier": ("app/verification/", "evaluation/grounding.py", "evaluation/semantic_grounding.py"),
+    "verifier": ("app/verification/", "evaluation/semantic_grounding.py"),
 }
 
 ev = read_event()
