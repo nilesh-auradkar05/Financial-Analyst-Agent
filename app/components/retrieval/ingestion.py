@@ -93,9 +93,12 @@ class IngestionResult:
 
 # Text Splitter
 
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
+
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200,
+    chunk_size=CHUNK_SIZE,
+    chunk_overlap=CHUNK_OVERLAP,
     separators=["\n\n", "\n", ". ", ", ", " ", ""],
     length_function=len,
 )
