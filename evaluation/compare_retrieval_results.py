@@ -13,8 +13,9 @@ import json
 import random
 import statistics
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 HIGHER_IS_BETTER = {
     "precision_at_5",
@@ -29,6 +30,8 @@ HIGHER_IS_BETTER = {
 
 LOWER_IS_BETTER = {
     "latency_ms",
+    "latency_cold_ms",
+    "latency_warm_ms",
     "miss_rate",
     "first_relevant_rank_mean_among_hits",
 }
@@ -55,6 +58,23 @@ DEFAULT_RUNTIME_METRICS = [
 ]
 
 FLOAT_TOLERANCE = 1e-9
+_ANCHORED_BOOTSTRAP_SAMPLES = 10_000
+
+COMPARISON_AXES: tuple[str, ...] = ("backend", "retrieval_method", "embedding_model")
+ANCHORED_METRICS: tuple[str, ...] = (
+    "pass",
+    "recall",
+    "precision",
+    "mrr",
+    "ndcg",
+    "section_recall",
+    "keyword_hit_rate",
+    "miss_rate",
+)
+_ANCHORED_LATENCY_METRICS: dict[str, str] = {
+    "latency_cold_ms": "cold",
+    "latency_warm_ms": "warm",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,16 +106,28 @@ class MetricComparison:
     shared_count: int
 
 
-def load_payload(path: str | Path) -> dict[str, Any]:
-    """Load a retrieval-eval JSON payload."""
+class ComparisonError(ValueError):
+    """Two anchored result files must not be compared."""
 
+
+def _read_object(path: str | Path) -> dict[str, Any]:
     payload_path = Path(path)
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Expected object payload in {payload_path}")
-    if not isinstance(payload.get("results"), list):
-        raise ValueError(f"Expected payload.results list in {payload_path}")
     return payload
+
+
+def _require_results(payload: dict[str, Any], path: str | Path) -> dict[str, Any]:
+    if not isinstance(payload.get("results"), list):
+        raise ValueError(f"Expected payload.results list in {path}")
+    return payload
+
+
+def load_payload(path: str | Path) -> dict[str, Any]:
+    """Load a retrieval-eval JSON payload."""
+
+    return _require_results(_read_object(path), path)
 
 
 def rows_by_case_id(payload: Mapping[str, Any]) -> dict[str, RetrievalRow]:
@@ -187,6 +219,129 @@ def compare_payloads(
         "quality": [asdict(comparison) for comparison in quality],
         "runtime": [asdict(comparison) for comparison in runtime],
     }
+
+
+def compare_anchored_results(
+    baseline: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    *,
+    strict_case_ids: bool = False,
+    bootstrap_samples: int = _ANCHORED_BOOTSTRAP_SAMPLES,
+    seed: int = 13,
+) -> dict[str, Any]:
+    """Compare two anchored benchmark result files, paired by case_id.
+
+    Rejects the pair when it breaks retrieval-benchmark section 8: different
+    fixture versions, a mode that disagrees with the retrieval method, or more
+    than one differing comparison axis.
+    """
+
+    if baseline["fixture_version"] != candidate["fixture_version"]:
+        raise ComparisonError(
+            "fixture_version differs: "
+            f"baseline={baseline['fixture_version']!r}, candidate={candidate['fixture_version']!r}"
+        )
+    for label, result in (("baseline", baseline), ("candidate", candidate)):
+        if result["mode"] != result["retrieval_method"]:
+            raise ComparisonError(
+                f"{label} mode={result['mode']!r} does not match "
+                f"retrieval_method={result['retrieval_method']!r}"
+            )
+    if baseline["ks"] != candidate["ks"]:
+        raise ComparisonError(f"ks differ: baseline={baseline['ks']}, candidate={candidate['ks']}")
+
+    baseline_axes = _comparison_axes(baseline)
+    candidate_axes = _comparison_axes(candidate)
+    differing = [axis for axis in COMPARISON_AXES if baseline_axes[axis] != candidate_axes[axis]]
+    if len(differing) > 1:
+        raise ComparisonError(
+            "Single-axis rule violated, these axes differ: " + ", ".join(differing)
+        )
+
+    baseline_cases = _anchored_cases(baseline, "baseline")
+    candidate_cases = _anchored_cases(candidate, "candidate")
+    baseline_only = sorted(baseline_cases.keys() - candidate_cases.keys())
+    candidate_only = sorted(candidate_cases.keys() - baseline_cases.keys())
+    if strict_case_ids and (baseline_only or candidate_only):
+        raise ComparisonError(
+            f"Case IDs differ. Baseline-only={baseline_only}; candidate-only={candidate_only}"
+        )
+    shared = [case_id for case_id in baseline_cases if case_id in candidate_cases]
+
+    def summarize(
+        metric: str, read: Callable[[Mapping[str, Any]], float | None]
+    ) -> dict[str, Any]:
+        pairs = _anchored_pairs(baseline_cases, candidate_cases, shared, read)
+        return asdict(
+            _summarize_pairs(
+                metric, pairs, bootstrap_samples=bootstrap_samples, random_seed=seed
+            )
+        )
+
+    return {
+        "fixture_version": baseline["fixture_version"],
+        "axis": differing[0] if differing else None,
+        "baseline": baseline_axes,
+        "candidate": candidate_axes,
+        "shared_case_count": len(shared),
+        "baseline_only_cases": baseline_only,
+        "candidate_only_cases": candidate_only,
+        "bootstrap_samples": bootstrap_samples,
+        "quality": {
+            str(k): [
+                summarize(metric, partial(_anchored_quality, k=str(k), metric=metric))
+                for metric in ANCHORED_METRICS
+            ]
+            for k in baseline["ks"]
+        },
+        "latency": [
+            summarize(metric, partial(_anchored_latency, phase=phase))
+            for metric, phase in _ANCHORED_LATENCY_METRICS.items()
+        ],
+    }
+
+
+def _comparison_axes(result: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        "backend": result["backend"],
+        "retrieval_method": result["retrieval_method"],
+        "embedding_model": result["provenance"]["embedding_model"],
+    }
+
+
+def _anchored_cases(result: Mapping[str, Any], label: str) -> dict[str, Mapping[str, Any]]:
+    cases: dict[str, Mapping[str, Any]] = {}
+    for case in result["cases"]:
+        if case["case_id"] in cases:
+            raise ComparisonError(f"Duplicate case_id in {label}: {case['case_id']}")
+        cases[case["case_id"]] = case
+    return cases
+
+
+def _anchored_quality(case: Mapping[str, Any], k: str, metric: str) -> float | None:
+    at_k = case["metrics"][k]
+    if metric == "miss_rate":
+        return 1.0 if at_k["first_relevant_rank"] is None else 0.0
+    return _as_float(at_k[metric])
+
+
+def _anchored_latency(case: Mapping[str, Any], phase: str) -> float | None:
+    return _as_float(case["latency_ms"][phase])
+
+
+def _anchored_pairs(
+    baseline_cases: Mapping[str, Mapping[str, Any]],
+    candidate_cases: Mapping[str, Mapping[str, Any]],
+    shared_case_ids: Sequence[str],
+    read: Callable[[Mapping[str, Any]], float | None],
+) -> list[tuple[float, float]]:
+    pairs: list[tuple[float, float]] = []
+    for case_id in shared_case_ids:
+        baseline_value = read(baseline_cases[case_id])
+        candidate_value = read(candidate_cases[case_id])
+        if baseline_value is not None and candidate_value is not None:
+            pairs.append((baseline_value, candidate_value))
+    return pairs
 
 
 def validate_payload_contract(
@@ -376,6 +531,18 @@ def _compare_metric(
     if metric == "latency_ms_warm" and len(pairs) > 1:
         pairs = pairs[1:]
 
+    return _summarize_pairs(
+        metric, pairs, bootstrap_samples=bootstrap_samples, random_seed=random_seed
+    )
+
+
+def _summarize_pairs(
+    metric: str,
+    pairs: Sequence[tuple[float, float]],
+    *,
+    bootstrap_samples: int,
+    random_seed: int,
+) -> MetricComparison:
     if not pairs:
         return MetricComparison(
             metric=metric,
@@ -476,6 +643,29 @@ def _bootstrap_mean_ci(
     return means[lower_index], means[upper_index]
 
 
+def print_anchored_report(
+    comparison: Mapping[str, Any], *, baseline_label: str, candidate_label: str
+) -> None:
+    """Print a readable anchored comparison report."""
+
+    print(f"Baseline:  {baseline_label}")
+    print(f"Candidate: {candidate_label}")
+    print(f"Fixture:   {comparison['fixture_version']}")
+    print(f"Axis:      {comparison['axis'] or 'none (same configuration)'}")
+    for k, rows in comparison["quality"].items():
+        print(f"\nQuality metrics at K={k}, paired by case_id")
+        _print_metric_table(rows)
+    print("\nLatency (ms), paired by case_id")
+    _print_metric_table(comparison["latency"])
+    print(
+        f"\nshared={comparison['shared_case_count']} "
+        f"baseline_only={len(comparison['baseline_only_cases'])} "
+        f"candidate_only={len(comparison['candidate_only_cases'])}"
+    )
+    _print_missing_cases("Baseline-only cases", comparison["baseline_only_cases"])
+    _print_missing_cases("Candidate-only cases", comparison["candidate_only_cases"])
+
+
 def _print_missing_cases(title: str, cases: Sequence[str]) -> None:
     if not cases:
         return
@@ -558,20 +748,58 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--bootstrap-samples",
         type=int,
-        default=2_000,
-        help="Number of bootstrap samples for paired mean-delta CI.",
+        help=(
+            "Number of bootstrap samples for paired mean-delta CI "
+            "(default 10000 for anchored files, 2000 otherwise)."
+        ),
     )
     parser.add_argument("--seed", type=int, default=13, help="Bootstrap random seed")
     parser.add_argument("--json-output", help="Optional path for comparison JSON")
     return parser
 
 
+def _main_anchored(
+    args: argparse.Namespace,
+    baseline_payload: Mapping[str, Any],
+    candidate_payload: Mapping[str, Any],
+) -> None:
+    try:
+        comparison = compare_anchored_results(
+            baseline_payload,
+            candidate_payload,
+            strict_case_ids=args.strict_case_ids,
+            bootstrap_samples=(
+                _ANCHORED_BOOTSTRAP_SAMPLES
+                if args.bootstrap_samples is None
+                else args.bootstrap_samples
+            ),
+            seed=args.seed,
+        )
+    except ComparisonError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    print_anchored_report(
+        comparison, baseline_label=args.baseline, candidate_label=args.candidate
+    )
+    if args.json_output:
+        _write_json(args.json_output, comparison)
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
-    baseline_payload = load_payload(args.baseline)
-    candidate_payload = load_payload(args.candidate)
+    baseline_payload = _read_object(args.baseline)
+    candidate_payload = _read_object(args.candidate)
+
+    if isinstance(baseline_payload.get("cases"), list) and isinstance(
+        candidate_payload.get("cases"), list
+    ):
+        _main_anchored(args, baseline_payload, candidate_payload)
+        return
+
+    baseline_payload = _require_results(baseline_payload, args.baseline)
+    candidate_payload = _require_results(candidate_payload, args.candidate)
 
     validate_payload_contract(
         baseline_payload,
@@ -589,7 +817,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     comparison = compare_payloads(
         baseline_payload,
         candidate_payload,
-        bootstrap_samples=args.bootstrap_samples,
+        bootstrap_samples=(
+            2_000 if args.bootstrap_samples is None else args.bootstrap_samples
+        ),
         random_seed=args.seed,
         include_config=args.include_config,
     )

@@ -306,7 +306,7 @@ Tests: mismatched fixture/mode/method fail; both-differ fails; missing case fail
 Verification: uv run pytest tests/evaluation/test_compare_retrieval_results.py
 Done: comparator passes behavior tests.
 Non-goals: no default switch.
-Result: Pending
+Result: DONE (2026-10-22). Red 4762699: `tests/unit/test_compare_anchored_results.py` (30 tests) covers every test-plan §6 comparator row. `evaluation/compare_retrieval_results.py` gains `compare_anchored_results` for anchored result files: rejects a fixture_version mismatch, a mode that disagrees with retrieval_method, differing K sets, duplicate case ids, and more than one differing axis among backend, retrieval_method and embedding_model (§8, §9a, §10); `--strict-case-ids` names baseline-only and candidate-only ids; reports per-K paired means, paired and relative deltas, win/tie/loss, a seeded 95% bootstrap CI (10,000 resamples by default), miss_rate with null rank as a miss, and cold/warm latency separately. Precursor path unchanged (its 4 tests pass). pytest 604 passed, 2 skipped; ruff, mypy (apart from the user's gitignored local script) and the four governance checks pass; CLI exercised on two S2-T04 smoke outputs (axis = retrieval_method), no quality claim drawn. Noted, not changed: the precursor path ranks `latency_ms_warm` as higher-is-better (pre-existing).
 ```
 
 ```text
