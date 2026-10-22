@@ -101,7 +101,7 @@ text_splitter = RecursiveCharacterTextSplitter(
 )
 
 
-def _clean_section_text(text: str) -> str:
+def clean_section_text(text: str) -> str:
     cleaned = text.replace("\r\n", "\n")
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
@@ -195,7 +195,7 @@ def build_index_documents(
 
         raw_section_name, section_obj = resolved
         raw_text = getattr(section_obj, "content", "") or ""
-        cleaned_text = _clean_section_text(raw_text)
+        cleaned_text = clean_section_text(raw_text)
 
         if not cleaned_text:
             sections_skipped.append(descriptor.key)
