@@ -1,4 +1,4 @@
-"""Runtime chat-model factory: Bedrock primary, then personal Claude and OpenAI fallbacks.
+"""Runtime chat-model factory: Foundry (when configured), Bedrock, then personal Claude and OpenAI.
 
 Bedrock Converse-API families:
   - Anthropic Claude  -> additionalModelRequestFields={"thinking": {...}}  (enabled/adaptive)
@@ -44,7 +44,9 @@ def _model_family(model_id: str) -> str:
 
 
 def model_metadata(settings: Settings) -> dict:
-    """Effective factory settings; native model spans remain authoritative."""
+    """Effective settings of the first attempt; native model spans remain authoritative."""
+    if azure := settings.llm.azure_deployment(settings.llm.azure_foundry_model):
+        return {"provider": "azure", "model": azure[1], "temperature": settings.llm.temperature}
     model = MODEL_PRESETS.get(settings.llm.model, settings.llm.model)
     family = _model_family(model)
     omit_temperature = (
@@ -139,8 +141,24 @@ def _bedrock_model(settings: Settings) -> BaseChatModel:
 
 
 def fallback_count(settings: Settings) -> int:
-    """Number of bounded cloud attempts, including Bedrock."""
-    return 1 + len(settings.llm.personal_fallbacks())
+    """Number of bounded cloud attempts, including Foundry (when configured) and Bedrock."""
+    azure = settings.llm.azure_deployment(settings.llm.azure_foundry_model) is not None
+    return int(azure) + 1 + len(settings.llm.personal_fallbacks())
+
+
+def _azure_model(settings: Settings, base_url: str, deployment: str, key: SecretStr) -> BaseChatModel:
+    """Foundry deployment through its OpenAI-compatible /openai/v1/ route; the deployment name is the model."""
+    from langchain_openai import ChatOpenAI
+
+    return ChatOpenAI(
+        model=deployment,
+        base_url=base_url,
+        api_key=key,
+        temperature=settings.llm.temperature,
+        max_completion_tokens=settings.llm.max_tokens,
+        timeout=settings.llm.request_timeout_seconds,
+        max_retries=0,  # a 429 is an attempt failure; the ladder moves on (ADR-0009 amendment 2026-10-17)
+    )
 
 
 def _personal_model(settings: Settings, provider: str, model: str, key: SecretStr) -> BaseChatModel:
@@ -167,10 +185,13 @@ _chains: dict[int, tuple[Settings, Runnable[Any, Any]]] = {}
 
 
 def get_llm(settings: Settings) -> Runnable[Any, Any]:
-    """Use Bedrock first, then personal Claude, then personal OpenAI (each only with a key)."""
+    """Foundry first when fully configured, then Bedrock, then personal Claude and OpenAI (each only with a key)."""
     if cached := _chains.get(id(settings)):
         return cached[1]
-    providers: list[tuple[str, Callable[[], BaseChatModel]]] = [("bedrock", lambda: _bedrock_model(settings))]
+    providers: list[tuple[str, Callable[[], BaseChatModel]]] = []
+    if azure := settings.llm.azure_deployment(settings.llm.azure_foundry_model):
+        providers.append(("azure", partial(_azure_model, settings, *azure)))
+    providers.append(("bedrock", lambda: _bedrock_model(settings)))
     for name, model, key in settings.llm.personal_fallbacks():
         providers.append((name, partial(_personal_model, settings, name, model, key)))
 

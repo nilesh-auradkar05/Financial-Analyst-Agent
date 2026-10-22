@@ -1,7 +1,7 @@
 # Production-Scale Design — Interview Companion
 
 **Project:** Alpha Financial Analyst Agent: ticker → SEC, news and market evidence → grounded financial-analysis memo.
-**Revised:** 2026-09-06, following the production design review (archived 2026-10-11: `old_artifacts/docs/production-design-review.md`). **Updated 2026-10-08:** ADR-0006 accepted with ADR-0010 to ADR-0013; deployment answers in §§12–13 and the production diagrams now describe the accepted design ([cloud-deployment.md](cloud-deployment.md)). Scale projections elsewhere are unchanged.
+**Revised:** 2026-09-06, following the production design review (archived 2026-10-11: `old_artifacts/docs/production-design-review.md`). **Updated 2026-10-08 and 2026-10-11:** ADR-0006 accepted with ADR-0010 to ADR-0015. The deployed design is a scale-to-zero demo tier ([cloud-deployment.md](cloud-deployment.md), ADR-0015); the always-on design is the production scale tier, answered end to end in [production-scale-architecture.md](production-scale-architecture.md) ("how would you productionize this?"). Deployment answers in §§12–13 distinguish the two; the production diagrams show the scale tier. Scale projections elsewhere are unchanged.
 **Purpose:** detailed interview answers about scaling documents and requests, supported by affordable experiments on the actual project. Large-scale numbers below are **design projections**, not measured capacity or a commitment to run millions of users.
 
 The questions originate in [production-scale-topic.txt](../production-scale-topic.txt). The proposed decisions are recorded in [ADR-0007](adr/ADR-0007-production-interview-scale-design.md). Canonical [SPEC v1.4](SPEC.md) §0 and §3 govern implementation scope. [ADR-0006](adr/ADR-0006-production-cloud-deployment.md) was accepted on 2026-10-08; its entry criteria still gate any cloud resource. SPEC v1.4 §12 lists S10 as the gated cloud item; §3.y keeps cloud resources out until the ADR-0006 entry criteria are met. This companion does not authorize infrastructure purchases. Scale numbers below are interview projections on a milestone ladder, not a new sprint map.
@@ -42,9 +42,9 @@ These statements refer to the reviewed baseline; the diagrams did not implement 
 
 A delivered memo resolves to the exact evidence and final bytes that were checked. Record job, attempt, artifact revision/hash, `snapshot_hash`, evidence/index releases and generation/verifier/policy fingerprints. A snapshot is an identity, not a claim that content is current or the memo is correct. Its hash does not replace access control, financial validation or freshness rules.
 
-![Accepted deployment HLD (2026-10-08): AWS us-east-1 serving, Azure model plane, cloud-neutral services, model ladder and failure domain](svg/production/hld.svg)
+![Production scale tier HLD: AWS us-east-1 serving, Azure model plane, cloud-neutral services, model ladder and failure domain](svg/production/hld.svg)
 
-The [editable HLD](System-design/production/hld.excalidraw) shows the accepted deployment (ADR-0006), which is not built yet. Practical work starts with the existing local tools and a small measured workload.
+The [editable HLD](System-design/production/hld.excalidraw) shows the production scale tier (ADR-0006 as amended by ADR-0015); the demo tier S10 deploys is drawn in [serverless/hld.excalidraw](System-design/serverless/hld.excalidraw). Neither is built yet. Practical work starts with the existing local tools and a small measured workload.
 
 ## 1. Document volume: thousands → millions → multi-millions
 
@@ -126,7 +126,7 @@ Resume from a durable stage result if available. If the provider accepted a call
 
 **Follow-up: When would Streams or Kafka enter?**
 
-If Postgres claim throughput/wakeup latency becomes a measured constraint, write job and outbox rows in one transaction and dispatch to SQS with a dead-letter queue (ADR-0013; this replaced the earlier Redis Streams target because the deployed cache is an evictable Valkey). Dispatch can duplicate, so workers remain idempotent/fenced; delete the message only after the durable outcome commits. Specify visibility timeouts, bounded retries and dead-letter behavior. Valkey Pub/Sub may provide wakeups but never authoritative records.
+If Postgres claim throughput/wakeup latency becomes a measured constraint, write job and outbox rows in one transaction and dispatch to SQS with a dead-letter queue (ADR-0013; this replaced the earlier Redis Streams target because the scale-tier cache is an evictable Valkey; the demo tier uses SQS from the start, fed by DynamoDB Streams, ADR-0015). Dispatch can duplicate, so workers remain idempotent/fenced; delete the message only after the durable outcome commits. Specify visibility timeouts, bounded retries and dead-letter behavior. Valkey Pub/Sub may provide wakeups but never authoritative records.
 
 Evaluate Kafka/Event Hubs for required retention, replay volume, ordered partitions, independent consumers or operational throughput. A second consumer alone is insufficient reason for a new broker. Delta supports batch replay; it does not automatically provide a streaming bus’s latency/delivery semantics.
 
@@ -174,7 +174,7 @@ Job ID, sequence, status, attempt, artifact revision/hash or null, snapshot iden
 
 As a provisional component target. Measure cache, query embedding, search, reranker queue/compute and assembly, including misses/timeouts. The old 185 ms sum and 115 ms slack were hypotheses, not measured headroom. Report cold/warm distributions, corpus/filtered size and concurrency before calling the budget achieved.
 
-![Accepted critical flow: durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence and failover ladders](svg/production/critical-flow.svg)
+![Production scale tier critical flow: durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence and failover ladders](svg/production/critical-flow.svg)
 
 **Practical next experiment:** record the five clocks for cold/warm requests; reconnect before/after a fast cache hit; interrupt an API replica; block prohibited output before memo delivery; replay the terminal event. Small samples expose protocol defects but cannot establish robust p99 claims.
 
@@ -283,7 +283,7 @@ At 1,024 dimensions, int8 alone is 102.4 GB before replication. Consider hot/col
 
 **Practical next experiment:** measure bytes/vector and peak RSS on representative affordable text. Sweep a few justified graph/search/quantization choices with the same fixture/method. Extrapolate raw vector bytes algebraically; label nonlinear index/recovery costs unmeasured.
 
-![Accepted low-level contracts: durable state, cache fingerprints, alias-swap index releases, identity and switch-over gates (shard sizing is described in the text, not drawn)](svg/production/lld.svg)
+![Production scale tier low-level contracts: durable state, cache fingerprints, alias-swap index releases, identity and switch-over gates (shard sizing is described in the text, not drawn)](svg/production/lld.svg)
 
 ## 7. Hybrid retrieval and reranking
 
@@ -494,7 +494,7 @@ Proposed lifecycle: `queued → running → terminal`, with progress for evidenc
 
 Cancellation/expiry are proposed service-contract extensions, not claims about current API enum support. As required by [test-plan §11](test-plan.md), failed financial verification with no remaining repair yields `degraded`, never `completed`. The default returns diagnostics and withholds the substantive unapproved draft. A verifier that cannot execute because its provider is unavailable is an operational failure, distinct from a completed check returning `passed=False`. Current status enforcement remains the review’s implementation gap.
 
-**Follow-up: What failures remain with two providers?**
+**Follow-up: What failures remain with two providers?** (Scale tier. In the deployed demo tier DynamoDB and SQS replace Postgres and Valkey, and caches are DynamoDB items, so a cache failure means running cold; see [cloud-deployment.md](cloud-deployment.md) §4.)
 
 | Failure | Intended behavior | Residual limit |
 | --- | --- | --- |
@@ -516,14 +516,14 @@ Cancellation/expiry are proposed service-contract extensions, not claims about c
 | Workflow | Existing single-agent graph/services | More agents only for authorized evaluated need |
 | Ingestion | Python/edgartools, manifests, files/Parquet | Object storage/distributed jobs for backlog, size or recovery |
 | Data platform | Local DataOps artifacts; deployed: `dataops` CLI on Airflow 3 / MWAA Serverless (ADR-0012) | Delta/dbt/Databricks with team/workload/full-cost justification |
-| Vectors | Existing Qdrant adapter, small deployment | Bounded automatic shards, tested replication/filters |
+| Vectors | Existing Qdrant adapter locally; deployed: OpenSearch Serverless, scale to zero, landing-page warm-up, 45-minute daily awake cap as an abuse guard (ADR-0014) | Remove the cap and keep minimum OCUs; a managed domain when steady load exceeds about 4 OCUs |
 | Sparse/reranking | Existing measured baseline | Native sparse/RRF; supported reranker service for coverage/GPU contention |
 | Embeddings | Pinned model/runtime | Batch service/dimensions/quantization after paired evidence |
-| Jobs | Postgres durable jobs and `SKIP LOCKED` queue (ADR-0013) | Outbox → SQS + DLQ when claim latency/throughput measurements justify it |
+| Jobs | Deployed demo tier: DynamoDB conditional-write fencing, SQS fed by DynamoDB Streams (ADR-0015) | Scale tier: Aurora PostgreSQL with `SKIP LOCKED`, outbox → SQS + DLQ when claim latency/throughput justify it (ADR-0013) |
 | LLM | Selected hosted/local model, usage logs | Qualified independent provider; measured vLLM business case |
-| Caches | Exact local/Valkey reuse | Separate eviction/failure domains for critical state |
+| Caches | Exact reuse; deployed as DynamoDB items with TTL (ADR-0015) | Valkey when read cost or a sub-ms rate-limit budget justifies it; separate eviction/failure domains for critical state |
 | Observability | Existing metrics/tracing/run artifacts; deployed: OpenTelemetry → Grafana Cloud + LangSmith | Self-hosted stack with cost/ownership decision |
-| Runtime | Local processes/containers; deployed: ECS Fargate (ADR-0006) | EKS for demonstrated scheduling/operations need |
+| Runtime | Local processes/containers; deployed: Lambda with response streaming (ADR-0015) | ECS Fargate async workers past ≈ 1k memos/day (Lambda bills wall-clock while waiting on tokens); EKS only for demonstrated scheduling/operations need |
 
 **Follow-up: Why more than one cloud?**
 
@@ -553,11 +553,11 @@ These are interview milestones, not new accepted sprints. Runtime work follows t
 | Retrieval release | Staging/promotion, deletion reconciliation, pinning | Interrupted publish, fewer chunks, rollback |
 | Quality/cache | Qualified generation/verifier/policy and exact caches | Frozen comparisons, financial cases, invalidation |
 | Affordable envelope | Bounded corpus/concurrency steps | Local curves, failure onset, stop reasons |
-| Deployment (S10) | ADR-0006 accepted 2026-10-08; only after its entry criteria | Representative workload/restore evidence for promised service; not portfolio prerequisite |
+| Deployment (S10) | ADR-0006 accepted 2026-10-08, demo tier scale-to-zero per ADR-0015; only after its entry criteria | Representative workload/restore evidence for promised service; not portfolio prerequisite |
 
 S10 is the cloud item (SPEC v1.4), and ADR-0006 was accepted on 2026-10-08. Cloud resources still wait for the ADR-0006 entry criteria; accepting the design is not evidence that it works.
 
-![Accepted system design: failure modes built vs documented, cost share by tier, graduation triggers and the eval-gated deploy](svg/production/system-design.svg)
+![Production scale tier: failure modes, cost share by tier, demo → scale triggers and migration seams](svg/production/system-design.svg)
 
 ## 15. Thirty-second answers, with the next question ready
 
@@ -576,16 +576,18 @@ S10 is the cloud item (SPEC v1.4), and ADR-0006 was accepted on 2026-10-08. Clou
 
 | Artifact | What it explains |
 | --- | --- |
-| [HLD SVG](svg/production/hld.svg) · [Excalidraw](System-design/production/hld.excalidraw) | Accepted deployment (2026-10-08): AWS `us-east-1` serving, Azure model plane, cloud-neutral services, model ladder, budget and failure domain |
+| [Production scale tier](production-scale-architecture.md) | The interview answer to "how would you productionize this?": demo → scale triggers, HLD, flows, LLD, capacity model, SLOs, cost by tier, migration plan |
+| [Demo tier HLD SVG](svg/serverless/hld.svg) · [Excalidraw](System-design/serverless/hld.excalidraw) | Deployed design (ADR-0015): Cloudflare Worker, Lambda functions, DynamoDB, SQS, OpenSearch Serverless; nothing runs while idle |
+| [HLD SVG](svg/production/hld.svg) · [Excalidraw](System-design/production/hld.excalidraw) | Production scale tier: AWS `us-east-1` serving, Azure model plane, cloud-neutral services, model ladder, failure domain |
 | [LLD SVG](svg/production/lld.svg) · [Excalidraw](System-design/production/lld.excalidraw) | Durable state schema, job state machine, cache keys, index release by alias swap, identity and RBAC, switch-over gates |
 | [Critical flow SVG](svg/production/critical-flow.svg) · [Excalidraw](System-design/production/critical-flow.excalidraw) | Durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence, failover ladders |
 | [System design SVG](svg/production/system-design.svg) · [Excalidraw](System-design/production/system-design.excalidraw) | Failure-mode matrix (built vs documented), cost share by tier, graduation triggers, deploy gate, S10 entry criteria |
-| [Cloud deployment](cloud-deployment.md) | Decision index D01–D17, Mermaid views, cost model and region-loss failure mode |
+| [Cloud deployment](cloud-deployment.md) | Decision index D01–D19, Mermaid views of the demo tier, cost model and region-loss failure mode |
 | Design review (archived: `old_artifacts/docs/production-design-review.md`) | Historical findings; grade is not a new benchmark or automatic reapproval |
 | [Proposed ADR-0007](adr/ADR-0007-production-interview-scale-design.md) | Revised interview architecture and scope boundary |
 | [Retrieval methodology](retrieval-benchmark.md) | Canonical fixtures, identities, metrics and paired rules |
 | [Task ledger](../tasks/todo.md) | Actual revision verification and unresolved checks |
 
-PNG companions remain in `docs/png/production/`. The production diagrams were re-produced on 2026-10-08 for the accepted deployment; the scale projections in this document (sharding, sizing, throughput) are not drawn in them. Earlier non-production diagrams describe the local S7 target and may retain superseded contracts; SPEC governs implemented/authorized scope and this document describes the revised interview target.
+PNG companions remain in `docs/png/production/`. The production diagrams were re-produced on 2026-10-08 and relabeled on 2026-10-11 as the production scale tier; the scale projections in this document (sharding, sizing, throughput) are not drawn in them. Earlier non-production diagrams describe the local S7 target and may retain superseded contracts; SPEC governs implemented/authorized scope and this document describes the revised interview target.
 
 **Evidence discipline:** cite a run artifact for a measurement, show the formula for an estimate, and name missing evidence for a production promise.

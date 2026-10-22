@@ -33,6 +33,8 @@ Implement `QdrantVectorStore` as a `RetrievalStore` implementation behind the ex
 
 ## Addendum 2026-10-08 — managed deployment and release publication (owner decision D11, ADR-0006)
 
+> **Superseded for the deployed configuration on 2026-10-11 by ADR-0014** (Amazon OpenSearch Serverless with a daily awake cap). This addendum remains the fallback if ADR-0014's adoption gate fails. The local Docker default above is unchanged.
+
 Applies to the deployed (S10) configuration; the local Docker setup above is unchanged.
 
 - **Managed Qdrant Cloud on AWS `us-east-1`**, the same region as the workers. Free 1 GB node for the demo tier (it suspends after a week idle, so a weekly keep-alive query or a small paid node is required); a 3-node multi-AZ cluster with replication factor 2 and int8 quantization over float16 originals at scale.

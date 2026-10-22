@@ -303,15 +303,20 @@ Each hook is tested by piping a sample event JSON to the script and asserting st
 
 | Case | Expected behavior |
 | --- | --- |
-| Cloud defaults | Bedrock primary without generic selector; default model is an invocable inference profile (`global.anthropic.claude-sonnet-4-6`), never a bare on-demand-unsupported ID; only AWS_BEDROCK_MODEL selects it (LLM_MODEL / CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL never change it) |
+| Cloud defaults (amended 2026-10-17) | No generic selector; the Bedrock default model is `deepseek.v3.2` (invocable on demand), never an ID that needs a profile it lacks; only AWS_BEDROCK_MODEL selects it (LLM_MODEL / CLAUDE_LLM_MODEL / OPENAI_LLM_MODEL never change it). With Azure unconfigured, Bedrock is the first attempt |
+| Azure first (2026-10-17) | With AZURE_OPENAI_ENDPOINT, AZURE_API_KEY and AZURE_FOUNDRY_MODEL all set, the first attempt goes to the Foundry `/openai/v1/` route with the deployment name as the model; Azure success invokes no Bedrock or personal fallback |
+| Azure incomplete (2026-10-17) | With any of the three Azure settings missing or blank, the Azure tier is skipped and no Azure request is made; the ladder starts at Bedrock |
+| Azure endpoint form (2026-10-17) | A trailing `/openai/v1` on the endpoint is normalized away; a Foundry project endpoint (`/api/projects/`) is rejected when settings load, with a message naming the setting and no secret value |
+| Azure failure (2026-10-17) | An Azure construction, authentication, invocation, timeout or rate-limit (429) failure reaches Bedrock in the same run within the attempt bound; no retry inside the Azure attempt |
 | Personal models | CLAUDE_LLM_MODEL reaches the Anthropic client and OPENAI_LLM_MODEL the OpenAI client, tried Claude then OpenAI; a fallback without its key is skipped |
 | Bearer authentication | Canonical AWS_BEARER_TOKEN_BEDROCK or short alias reaches SDK without secret output; AWS_REGION reaches client |
 | Sonnet 5 configuration | Bedrock Sonnet 5/5.5 requests omit unsupported sampling temperature; explicit model/profile selection is preserved |
 | Fallback success | Primary construction/invocation/timeout failure reaches configured Anthropic then OpenAI; primary success invokes no fallback |
 | Bounded failure | Each attempt bounded; all failed returns safe fatal draft error and no fabricated memo |
-| Unconfigured providers | Missing personal keys skipped; Azure variables do not enable Azure calls |
-| Tracing | Native child LLM spans identify actual attempted providers/models under original trace |
-| Compose | Bedrock/Claude/OpenAI model, token and Azure (incl. AZURE_FOUNDRY_MODEL) values survive rendering; absent optional variables do not mask aliases |
+| Unconfigured providers | Missing personal keys skipped; an incomplete Azure configuration is skipped (see Azure incomplete) |
+| Tracing | Native child LLM spans identify actual attempted providers/models under original trace; an Azure attempt names the provider and the deployment name; run metadata names the first configured tier's model |
+| Compose | Bedrock/Claude/OpenAI model, token and Azure (incl. AZURE_FOUNDRY_MODEL, AZURE_FOUNDRY_JUDGE_MODEL) values survive rendering; absent optional variables do not mask aliases |
+| Judge ladder (2026-10-17) | The evaluation judge calls GPT-5.6 Luna on Bedrock through the OpenAI-compatible `bedrock-mantle` route with the Bedrock API key; a Bedrock failure reaches the Foundry judge deployment (AZURE_FOUNDRY_JUDGE_MODEL); an unconfigured tier is skipped; structured verdicts through the DeepEval adapter survive the fallback; the answering host is identifiable from the reply's model name (Bedrock id or Foundry deployment) in native traces, while the eval output names the judge provider and configured model (revised 2026-10-18); the runtime verifier is unchanged |
 | Ingest no 10-K | Typed 404 filing_not_found with ticker-specific safe reason; real upstream failure remains safe 502 |
 | Analysis no filings | Available news/stock/sentiment preserved; memo states SEC Filings: Not Available; no fabricated SEC citations; evidence_missing/missing includes filings |
 | Ingest on miss (2026-10-10) | Analysis of a ticker with zero indexed chunks ingests its latest 10-K once, then retrieves; filing chunks are present and no filing error is recorded |
@@ -365,24 +370,27 @@ Traces to SPEC "Run telemetry contract — 2026-10-07" (`GET /jobs`).
 | Nothing exists anywhere | No available runs → sample data, never an error |
 | Run store persistence | Compose mounts a named volume at the run-store directory |
 
-## 20. Cloud deployment contracts (S7 local seams, S10; ADR-0006, ADR-0009 amendment, ADR-0010 to ADR-0013)
+## 20. Cloud deployment contracts (S7 local seams, S10; ADR-0006, ADR-0009 amendment, ADR-0010 to ADR-0015)
 
-Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases marked *local* run in S7 against docker-compose stand-ins (Postgres, Valkey, a development JWT issuer, provider stand-ins); the rest run in S10 against the deployed demo tier. Live-provider cases record cost and are never quoted as approved baselines.
+Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases marked *local* run in S7 against docker-compose stand-ins (DynamoDB Local, ElasticMQ, a development JWT issuer, provider stand-ins; ADR-0015 replaced the Postgres and Valkey stand-ins on 2026-10-11); the rest run in S10 against the deployed demo tier. Live-provider cases record cost and are never quoted as approved baselines.
 
 | Behavior | Expected |
 |---|---|
-| Acceptance transaction (*local*) | Idempotency key, job and first event commit together or not at all; the same key and request hash returns the same job; the same key with a different hash returns 409 |
-| Fenced commit (*local*) | Kill a worker after claim and after result persistence: exactly one result commits; a stale attempt's commit updates zero rows and is discarded |
-| Lease expiry (*local*) | An expired lease is re-claimed with `attempt + 1`; retries or deadline exhausted end in `failed` with a typed reason |
+| Acceptance transaction (*local*) | Idempotency key, job and first event commit together (one `TransactWriteItems`) or not at all; the same key and request hash returns the same job; the same key with a different hash returns 409 |
+| Fenced commit (*local*) | Kill a worker after claim and after result persistence: exactly one result commits; a stale attempt's conditional write (`attempt = :mine`) fails and its result is discarded |
+| Lease expiry (*local*) | An unrecoverable worker error makes the message visible again within 10 s; a hard timeout redelivers after the 6-minute visibility timeout; each redelivery re-claims an expired lease with `attempt + 1`; a third receive goes to the DLQ, whose handler writes `failed` and bumps `attempt`; a redelivery past the job deadline writes `failed` (`deadline_exceeded`) without running |
+| Late worker (*local*) | After the DLQ handler or lazy expiry has written `failed`, the original attempt's result and event writes are all refused |
+| Enqueue outbox (*local*) | Crashing the API after the acceptance transaction and before any queue call still delivers the job: the stream-triggered dispatcher sends it to the queue |
+| Lazy expiry (*local*) | Reading a job past its deadline with an expired lease writes `failed` (`deadline_exceeded`) exactly once; a live lease is never expired by a read |
 | Event replay (*local*) | Reconnecting with `Last-Event-ID` replays missed events in order; a job finished before the client subscribed is still discoverable; heartbeats arrive at least every 15 s |
 | Cache versioning (*local*) | Changing embedding fingerprint, index release, retrieval config, prompt, model or verifier policy each misses the cache; query-embedding reuse is exact only |
 | Single-flight (*local*) | N concurrent requests with the same snapshot produce one generation; all jobs link the same artifact hash |
-| Cache loss (*local*) | With Valkey stopped, jobs complete, quotas in Postgres still hold, and rate limits fall back to the per-task limit |
+| Cache bypass (*local*) | With cache reads and writes failing, jobs complete cold and quotas still hold |
 | Customer isolation (*local*) | A caller cannot read, stream, cancel or reuse an idempotency key of another customer's job; `analyst` sees only own runs in `GET /jobs`; `admin` sees all |
 | Issuer allowlist (*local*) | Tokens from an issuer outside the allowlist, with a wrong audience or expired, are refused; the browser never receives an access token |
-| LLM fallback | With the Bedrock breaker forced open, a new attempt runs on Foundry with the same models; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
-| LLM parity | On the frozen eval set, DeepSeek V3.2 and gpt-oss-120b on Foundry stay within the paired tolerance of Bedrock before the fallback is enabled |
-| Judge adoption | gpt-oss-120b's verdicts reach Cohen's κ ≥ 0.85 against ≥ 50 owner-reviewed claims before it is used as the SPEC §11.2 judge (ADR-0009 amendment) |
+| LLM fallback (amended 2026-10-17) | With the Foundry breaker forced open, a new draft attempt runs on Bedrock DeepSeek V3.2; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
+| LLM fallback quality (amended 2026-10-17) | On the frozen eval set, Bedrock DeepSeek V3.2 drafts stay within the paired tolerance of Foundry DeepSeek-V4-Flash before V3.2 is trusted as the draft fallback; GPT-5.6 Luna on Foundry stays within the paired tolerance of Luna on Bedrock before the judge fallback is trusted |
+| Judge adoption (amended 2026-10-17) | GPT-5.6 Luna's verdicts reach Cohen's κ ≥ 0.85 against ≥ 50 owner-reviewed claims before any Luna score is cited as the SPEC §11.2 judge (ADR-0009 amendment 2026-10-17) |
 | Embedding parity | A fixed 200-chunk sample embedded at 1024 dimensions on Bedrock and Foundry reaches cosine ≥ 0.999 for every pair; below threshold the Foundry fallback stays off |
 | Embedding degradation | With both embedding hosts unavailable and an exact-cache miss, retrieval runs sparse-only and the run is `degraded` with `reduced_retrieval` |
 | Index promotion | A release whose point count, filter smoke tests or deletion check fails is never promoted; the active alias still serves the previous release; rollback is one alias update |
@@ -390,3 +398,35 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Budget kill switch | Setting the admission flag (as the Budgets action does) refuses new jobs with a typed 503 while running jobs finish |
 | Deploy gate | A release that regresses `grounded_claim_rate` or `citation_coverage` beyond tolerance on frozen evidence is blocked before deployment |
 | Teardown | `terraform destroy` from a clean checkout leaves only the evidence bucket and its locked releases; a second `apply` recreates a working stack |
+| OpenSearch store contract (*local*) | `OpenSearchVectorStore` passes the shared `RetrievalStore` contract suite against a local OpenSearch container; no client object escapes the retrieval boundary (ADR-0014) |
+| Awake cap (*local*) | With today's ledger at the cap, a job needing retrieval is refused with 429, `Retry-After` at the next UTC day and reason `search_awake_cap`; an exact memo-cache hit is still served; admitted jobs finish |
+| Guest access (*local*) | A Turnstile-verified visitor gets a guest session; a guest token cannot read, stream or cancel another guest's job and is refused on admin routes; a token from an issuer outside the allowlist is refused |
+| Guest quotas (*local*) | The second live job in one guest session, the fourth from one IP hash in a UTC day and the 21st across all guests are refused with 429 and `Retry-After`; example-memo replays still succeed |
+| Warm-up (*local*) | `POST /warm` extends the wake ledger, is refused once the cap or the IP warm-up quota is reached, and never starts a job |
+| Stream segment (*local*) | An event stream ends after 5 minutes or on client disconnect; reconnecting with `Last-Event-ID` resumes without loss or duplicates |
+| Signed edge | A request to the function URL without a valid SigV4 signature is refused before the function runs; the Worker's CPU time per request stays under 10 ms |
+| Concurrency ceiling | With the worker at its reserved concurrency, extra jobs wait in the queue and complete later; none fail for throttling |
+| Cold start | First-query latency after more than 24 h idle is recorded with and without the warm-up in the run registry |
+| Awake ledger (*local*) | Calls within 10 minutes extend one window; a gap over 10 minutes opens a new one; daily minutes equal the union of windows |
+| Refresh before promotion | Promotion waits until `_count` on the staged index equals the manifest; a timeout fails validation and leaves the alias unchanged |
+| Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance, else the deployment uses Qdrant Cloud |
+| Ledger reconciliation | Daily ledger minutes stay within 20% of CloudWatch search OCU activity; beyond that an alarm fires |
+
+---
+
+## 21. Embedding provider switch and per-arm indexes (ADR-0011 amendment 2026-10-11; plumbing slice)
+
+Observed through the retrieval boundary (`get_embeddings`, the `RetrievalStore` factory, ingestion) with faithful fake transports; no network and no real model.
+
+| Case | Expected behavior |
+| --- | --- |
+| Default unchanged | With no embedding settings, the embedding model is `qwen3-embedding:4b` on Ollama and the store uses the existing `sec_filings` collection |
+| Provider selected by configuration | Each of the four arms (Ollama Qwen3, Bedrock Cohere Embed v4, Bedrock Titan V2, Azure `text-embedding-3-small`) is selected by settings alone; no caller above the retrieval boundary changes |
+| Unknown or incomplete configuration | An unknown provider, or a cloud arm without its required setting, is rejected when settings load, with a message naming the missing setting and no secret value |
+| Requested dimension honoured | A cloud arm asks its model for the configured dimension (1024), and the vectors it returns have that length |
+| Query and document conventions | For a model that distinguishes queries from documents, a query embedding and a document embedding of the same text are requested with different input types |
+| One index per arm | Two arms never share a collection: the collection name is derived from the embedding identifier, is stable across runs, and the default arm keeps `sec_filings` |
+| Dimension mismatch refused | Opening a collection whose vector size differs from the configured model's dimension fails with a clear error before any write or search |
+| Embedding identifier recorded | Every ingested chunk carries the embedding identifier (provider, model, dimension) in its metadata; also closes the open part of S3-T04 |
+| Arm built from the same chunks | Building an arm's index from the baseline copies every chunk id, text and metadata unchanged and re-embeds only the vector; chunk counts match per ticker |
+| Provider client stays inside the boundary | No provider client object is reachable from outside `app/components/retrieval/` |

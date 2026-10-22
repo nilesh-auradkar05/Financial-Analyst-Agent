@@ -227,7 +227,6 @@ def test_load_replay_state_hash_reflects_the_evidence_flags(release):
 def test_state_from_evidence_records_builds_state_from_snapshot_records(release):
     """The relocated helper keeps its behaviour: records in, seeded AgentState out."""
     from app.dataops.replay import state_from_evidence_records
-
     from dataops.evidence_release import load_snapshot_records
 
     records = [

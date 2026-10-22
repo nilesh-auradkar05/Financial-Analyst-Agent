@@ -222,6 +222,10 @@ LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN.md
 FILES-README.md
 docker_desktop_log.txt
 docs/access-check-ans.txt
+docs/model-access-setup.md
+probe_bedrock_access.py
+quicktest-bedrock.py
+docs/access-check-ans.txt
 probe_bedrock_access.py
 quicktest-bedrock.py
 
@@ -239,6 +243,7 @@ tasks/
 .cursor
 .runtime
 test_image/
+aws-user-policies/
 aws-user-policies/
 
 # Custom Zip files
