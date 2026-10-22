@@ -316,7 +316,7 @@ Scope: run runner on Chroma section_aware over validated fixture; self-compare s
 Tests: result validates; comparator self-compare produces zero deltas and full shared count.
 Done: Gate A satisfied.
 Non-goals: no Qdrant run; no method adoption.
-Result: Pending
+Result: DONE (2026-10-22) — Gate A satisfied. Baseline `evaluation/results/gate_a_baseline_qdrant_section_aware_retrieval_anchored_benchmark_v1.json` on Qdrant section_aware (owner decision D-A1 replaces the Chroma wording; the "no Qdrant run" non-goal predates the 2026-10-10 Chroma retirement), collection built from `alpha-evidence:0.1.0`, code 0e7ef14, fixture retrieval_anchored_benchmark_v1. recall@10 0.602 [0.498, 0.702], ndcg@10 0.421, pass@10 0.667 (25 of 75 misses). Self-compare: 75 shared, every quality delta 0, CI [0, 0]; an independent rerun retrieved identical chunk ids for every case. Coverage, CI widths and the power caveat are in tasks/sprint-review.md §8. The fixture freeze rule now applies.
 ```
 
 **Fixture freeze rule:** once Gate A baseline is generated, fixture edits require a `fixture_version` bump, re-validation, and regenerated baseline before any candidate comparison. No quiet label cleanup after results. That is not cleanup; that is benchmark contamination wearing a fake mustache.
