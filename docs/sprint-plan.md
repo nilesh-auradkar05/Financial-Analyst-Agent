@@ -472,6 +472,8 @@ User decision, 2026-10-10: the Chroma-vs-Qdrant paired comparison (S4) is retire
 
 Remaining order after reconciliation: S2-T00c (latency artifacts, concurrency probe) → S2-T00b remainder → S2-T00d remainder (G10) → S2-T01…T06 (Gate A) → S3-T04, S3-T05 (Gate B) → S5 including the ADR-0011 embedding bake-off (Gate C) → S6 (a)…(e) (Gate D) → S7 (a)…(f) → S9 → S10 entry evidence → S10-T01…T08.
 
+Update 2026-10-22: Gate A closed (S2-T00c, S2-T00d, S2-T01…T06 recorded above; baseline commit c1fcd21). Remaining order: S3-T04, S3-T05 (Gate B) → S5 including the ADR-0011 embedding bake-off (Gate C) → S6 (a)…(e) (Gate D) → S7 (a)…(f) → S9 → S10 entry evidence → S10-T01…T08. The authorized EMBED-ARMS plumbing slice (2026-10-11) is still pending; with the fixture frozen, arms may now be measured in S5. Open for EMBED-ARMS: the baseline records the embedding as `qwen3-embedding:4b` while the fixture records `ollama:qwen3-embedding:4b:2560`; align the identifier there and regenerate the baseline (a baseline regeneration, not a fixture change).
+
 
 ### Authorized embedding-provider plumbing slice (2026-10-11)
 
