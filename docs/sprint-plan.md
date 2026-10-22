@@ -253,6 +253,8 @@ Result: DONE (2026-10-22). G10 closed: the runtime verifier moved from `evaluati
 > - `evaluation/run_retrieval_benchmark.py` → existing `evaluation/run_shared_retrieval_benchmark.py`.
 > - `tests/evaluation/test_*` → create under `tests/unit/` (the repo's actual test home) unless a `tests/evaluation/` dir is added.
 > - The current `retrieval_shared_benchmark_v1.json` (72 keyword/section cases) is the **precursor**; the anchored fixture gets a new `fixture_version` and a source-section cache + builder (`evaluation/build_source_section_cache.py`, reusing `app/services/tools/edgartools_sec_extractor.py`). Gate A is **not** satisfied by the v1 precursor.
+>
+> **Owner decisions 2026-10-22 (GATE-A).** (D-A1) The Gate A baseline runs on **Qdrant** section_aware, not Chroma: Chroma and S4 were retired 2026-10-10. (D-A2) The benchmark corpus is a separate Qdrant collection built from the frozen release `alpha-evidence:0.1.0` (AAPL, MSFT, NVDA) with the ingestion chunker; the source-section cache holds the same cleaned section text; the live `sec_filings` collection is not used or modified (its market_risk sections run 66–73 chunks per ticker, a boundary defect logged for a later ingestion fix). (D-A4) The owner reviews the fixture's coverage report and a case sample after S2-T03, before S2-T04…T06. (D-A5) The anchored fixture is `evaluation/fixtures/retrieval_anchored_benchmark_v1.json` with `fixture_version` `retrieval_anchored_benchmark_v1`; the S2-T03 verification command applies to that file.
 
 ```text
 S2-T01 — Specify labeling schema, matcher, metric definitions
@@ -261,7 +263,7 @@ Scope: fill/verify retrieval-benchmark.md §§2–4: case schema, content-anchor
 Expected: every metric has one unambiguous formula tied to graded labels.
 Done: schema + matcher + metrics fully specified; NDCG graded.
 Non-goals: no fixture authoring; no LLM-judged relevance.
-Result: Pending
+Result: DONE (2026-10-22). §§2–4 checked against the Done line: schema, matcher and metric formulas complete, NDCG graded, K ∈ {5, 10}. Three gaps closed by an owner-approved amendment to §4: 1-based ranks; `keyword_hit_rate@K` matching, K and empty-keyword rule; `evidence_id` = `chunk_id` with its tie order. No metric changes meaning.
 ```
 
 ```text
