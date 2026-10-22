@@ -27,4 +27,4 @@ Anchors not wholly inside any single benchmark chunk (always a miss under the §
 - Anchors were chosen from the cached source text only, before any retrieval run. Queries paraphrase the question; the 12 queries that share 40% or more of their content words with a relevance-2 anchor share common domain words (revenue, data center, tax, currency), not lifted phrases.
 - Relevance 2 = the anchor answers the question; relevance 1 = supporting context in the same section.
 - Risk Factors text in the frozen release is cut at 50,000 characters for all three filings (extractor cap), so later risk factors are not in the corpus and not labelled.
-- Status: candidate (`retrieval_anchored_benchmark_v1_candidate.json`) awaiting owner review (D-A4); renamed to `retrieval_anchored_benchmark_v1.json` at freeze.
+- Status: frozen 2026-10-22 after owner review (D-A4). Any change to cases or labels requires a `fixture_version` bump, re-validation and a regenerated baseline (retrieval-benchmark §8, §10).
