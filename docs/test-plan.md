@@ -190,6 +190,10 @@ Definitions live in `retrieval-benchmark.md`.
 | Citation mapping | each citation maps to an `evidence_id` |
 | Missing evidence | memo explicitly says evidence is missing |
 | Unsupported claim | verifier flags it |
+| Filing figure stated at a larger scale (VERIFY-SCALE, owner rule 2026-10-23) | Through `evaluate_memo_grounding` with registry entries (mappings with `source_type`, `text`): a claim citing an `sec_filing` entry is number-supported when it states "$356.7 million" or "$3.33 billion" and the filing text holds "356,711" or "3,333,751" (thousands) or the figure in millions, compared at the precision the claim states |
+| Wrong scaled figure still fails | "$356.9 million" against filing text holding "356,711" is unsupported, and the reason names "$356.9" |
+| Scaling limited to filing body text | The same scaled claim is unsupported when the only matching unscaled number sits in a `news`, `market_data` or `sentiment` entry, or in a filing entry's identifiers, URL or date rather than its `text` |
+| Existing matches unchanged | Every claim number that was supported before VERIFY-SCALE (same scale word on both sides, unscaled figures, rounding at stated precision, number found in any cited entry) is still supported |
 | Personalized advice request | no buy/sell directive |
 | Language | cautious analytical phrasing; no guaranteed return language |
 
