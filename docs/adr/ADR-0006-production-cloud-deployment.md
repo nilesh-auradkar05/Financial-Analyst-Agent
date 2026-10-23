@@ -1,6 +1,6 @@
 # ADR-0006 — Production Cloud Deployment
 
-**Status:** Accepted (2026-10-08) by owner decision through the multi-cloud blueprint review. **Superseded in part on 2026-10-11 by ADR-0015** for the deployed demo tier: edge wiring (D03), runtime (D04), the secrets store and the budget projection (D16) now follow ADR-0015, which runs every component pay-per-use for recruiter-only traffic. The D03/D04 designs below are retained as the production scale tier (`docs/production-scale-architecture.md`). Posture, region, evidence storage, deploy gate, observability, the region-loss analysis and the entry criteria (as amended below) still govern. Implementation remains gated by the S10 entry criteria below.
+**Status:** Accepted (2026-10-08) by owner decision through the multi-cloud blueprint review. **Superseded in part on 2026-10-11 by ADR-0015** for the deployed demo tier: edge wiring (D03), runtime (D04), the secrets store and the budget projection (D16) now follow ADR-0015, which runs every component pay-per-use for recruiter-only traffic. The D03/D04 designs below are retained as the production scale tier (`docs/production-scale-architecture.md`). Posture, region, evidence storage, deploy gate, observability, the region-loss analysis and the entry criteria (as amended below) still govern. Implementation remains gated by the S10 entry criteria below. **Amended 2026-10-23 by ADR-0016:** the entry criteria govern the S10 demo-tier runtime and the S7 seams. Data and model plane resources (budget alarms, the OpenSearch Serverless collection, model and embedding endpoints) may exist earlier, after the CM-1 cost controls and with owner approval for each apply. Criterion 6 is the CM-4 comparison, and its Qdrant Cloud fallback is withdrawn.
 **Date:** 2026-07-04 (proposed) / 2026-10-08 (accepted)
 **Related:** SPEC §§2, 3, 11.1 (Gate E), 12 (S10); ADR-0003, ADR-0005, ADR-0007, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013, ADR-0014 (vector store, amended 2026-10-11), ADR-0015 (serverless demo tier, 2026-10-11); `docs/cloud-deployment.md`; `docs/production-scale-architecture.md`; `old_artifacts/docs/LLM_DATAOPS_ALPHA_ANALYST_INTEGRATION_PLAN_v2.md` Phases 4–5; production review 2026-09-06 finding 15.
 
@@ -97,7 +97,7 @@ Each item needs recorded verification evidence.
 **Before the environment is left running:**
 
 5. Foundry parity for both models and embedding parity, measured against the Foundry deployments the first apply creates. The fallbacks stay disabled until they pass (ADR-0009 amendment, ADR-0011).
-6. Retrieval parity of OpenSearch Serverless against the Qdrant baseline on the frozen fixture (ADR-0014 adoption gate); if it fails, the deployment uses Qdrant Cloud.
+6. Retrieval parity of OpenSearch Serverless against the Qdrant baseline on the frozen fixture (ADR-0014 adoption gate, run as CM-4 under ADR-0016); if it fails, work stops for an owner decision (the Qdrant Cloud fallback was withdrawn on 2026-10-23).
 7. Two rehearsals of `apply → smoke → destroy` from a clean checkout, each recording cold-start latency with and without the warm-up (ADR-0015).
 
 ## Verify before implementation

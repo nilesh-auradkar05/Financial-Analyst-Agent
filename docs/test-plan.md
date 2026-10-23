@@ -105,7 +105,7 @@ Allowed:
 
 ## 4. Retrieval contract: S3-T04 parity suite
 
-Runs under both Chroma and Qdrant.
+Retargeted 2026-10-23 (ADR-0016, CM-2): runs against a local OpenSearch container; it is the OpenSearch contract oracle. Chroma and Qdrant are retired, so "both backends" below means two separately populated OpenSearch indexes holding the same corpus. Previously: runs under both Chroma and Qdrant.
 
 | Case | Expected behavior |
 | --- | --- |
@@ -120,16 +120,21 @@ Runs under both Chroma and Qdrant.
 
 ---
 
-## 5. Qdrant-specific: S3
+## 5. OpenSearch-specific: CM-2 (was Qdrant-specific, S3; retargeted 2026-10-23, ADR-0016)
+
+Against a local OpenSearch container; no network beyond it and no cloud credentials.
 
 | Case | Expected behavior |
 | --- | --- |
-| `VECTOR_BACKEND=qdrant` | resolves to `QdrantVectorStore` |
+| `VECTOR_BACKEND=opensearch` | resolves to `OpenSearchVectorStore` |
 | Invalid `VECTOR_BACKEND` | config validation fails |
-| Qdrant unavailable | `healthcheck()` reports unavailable; no hang/storm |
-| Payload index creation | idempotent; indexes present for ticker, filing_type, section_key, filing_date, accession_number |
+| OpenSearch unavailable | `healthcheck()` reports unavailable within its timeout; no hang or retry storm |
+| Index mapping creation | idempotent; exact-match (keyword) fields for ticker, filing_type, section_key, filing_date, accession_number; the vector field's dimension equals the configured embedding dimension |
 | Filtered count/search | only matching metadata returned |
-| Coverage under Qdrant | S1 section-coverage + idempotency pass with Qdrant |
+| Chunk identity preserved | the document id stored for a chunk is its `chunk_id`, so gold labels resolve unchanged |
+| Coverage under OpenSearch | S1 section-coverage + idempotency pass against the container (S3-T05 retargeted) |
+
+Superseded Qdrant cases (S3, kept for history): `VECTOR_BACKEND=qdrant` resolves to `QdrantVectorStore`; Qdrant unavailable is reported without a hang; payload indexes are created idempotently; coverage passes under Qdrant.
 
 ---
 
@@ -412,7 +417,7 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Cold start | First-query latency after more than 24 h idle is recorded with and without the warm-up in the run registry |
 | Awake ledger (*local*) | Calls within 10 minutes extend one window; a gap over 10 minutes opens a new one; daily minutes equal the union of windows |
 | Refresh before promotion | Promotion waits until `_count` on the staged index equals the manifest; a timeout fails validation and leaves the alias unchanged |
-| Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance, else the deployment uses Qdrant Cloud |
+| Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance (`retrieval-benchmark.md` §9). Amended 2026-10-23 (ADR-0016): run as CM-4 on the Gate A vectors copied unchanged; on failure work stops for an owner decision (the Qdrant Cloud fallback is withdrawn) |
 | Ledger reconciliation | Daily ledger minutes stay within 20% of CloudWatch search OCU activity; beyond that an alarm fires |
 
 ---

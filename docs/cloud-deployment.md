@@ -22,7 +22,7 @@
 | D08 | Caching | **Revised:** the same versioned keys as DynamoDB items with TTL; exact query-embedding cache; single-flight by conditional put. Valkey is the scale tier | ADR-0013 (+ amendment), ADR-0015 |
 | D09 | LLM plane | DeepSeek V3.2 draft + gpt-oss-120b judge/verifier on Bedrock; same models on Foundry as fallback | ADR-0009 amendment |
 | D10 | Embeddings | Cohere Embed v4, 1024 dims, Bedrock + Foundry fallback behind a parity gate; Gate C bake-off decides adoption | ADR-0011 |
-| D11 | Vector store | Amazon OpenSearch Serverless (next generation, scales to zero) in `us-east-1`; index per release, alias promotion; 45 awake minutes per day as an abuse guard; Qdrant Cloud is the fallback if the paired comparison fails | ADR-0014 (+ amendment) |
+| D11 | Vector store | Amazon OpenSearch Serverless (next generation, scales to zero) in `us-east-1`; index per release, alias promotion; 45 awake minutes per day as an abuse guard; the only store since ADR-0016 (2026-10-23); a failed paired comparison (CM-4) stops work for an owner decision | ADR-0014 (+ amendments), ADR-0016 |
 | D12 | Rerank | Bedrock Cohere Rerank 3.5, off until Gate C shows lift | ADR-0011 |
 | D13 | Sentiment | **Revised:** FinBERT exported to ONNX inside the worker Lambda; scores cached by article hash and model version | ADR-0015 |
 | D14 | Evidence storage | S3 versioned + Object Lock on approved releases; in-region backups only; **no cross-region copies** | ADR-0006 |
@@ -221,7 +221,7 @@ Assumptions: 20 recruiter sessions a month, each one live memo plus a warm-up; o
 
 Before the first `terraform apply` (ADR-0006): Gate A cleared; S2-T00b and S2-T00d done; S7 local seams built (DynamoDB `RunStore` and SQS `JobQueue` against DynamoDB Local and ElasticMQ, caches, guardrails, guest and admin access, ONNX FinBERT with recorded label parity); `eval-replay` CI job in place; DeepSeek V3.2 and gpt-oss-120b qualified on Bedrock against frozen evidence, and the Gate C embedding bake-off done if the embedding model changes.
 
-Before the environment is left running: Foundry and embedding parity measured against the first apply's deployments (fallbacks stay off until they pass); retrieval parity of OpenSearch Serverless against the Qdrant baseline (ADR-0014; on failure the deployment uses Qdrant Cloud); two clean `apply → smoke → destroy` rehearsals, each recording cold-start latency with and without the warm-up.
+Before the environment is left running: Foundry and embedding parity measured against the first apply's deployments (fallbacks stay off until they pass); retrieval parity of OpenSearch Serverless against the Qdrant baseline (ADR-0014, run as CM-4 under ADR-0016; on failure work stops for an owner decision); two clean `apply → smoke → destroy` rehearsals, each recording cold-start latency with and without the warm-up.
 
 Task outline (detailed in `docs/sprint-plan.md` when S10 opens):
 

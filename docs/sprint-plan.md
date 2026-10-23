@@ -370,7 +370,7 @@ Verification:
 - VECTOR_BACKEND=qdrant uv run pytest tests/rag/test_vector_store_contract.py
 Done: identical pass under both; differences fixed in adapter, never by forking test.
 Non-goals: no method-quality comparison.
-Result: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
+Result: Retargeted 2026-10-23 to OpenSearch (ADR-0016): runs in CM-2 against a local OpenSearch container per test-plan §4; Chroma and Qdrant legs dropped. Earlier: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
 ```
 
 ```text
@@ -380,7 +380,7 @@ Scope: run S1 coverage + idempotency under VECTOR_BACKEND=qdrant; guard that the
 Verification: VECTOR_BACKEND=qdrant uv run pytest tests/ingestion/test_section_coverage.py tests/ingestion/test_ingestion_idempotency.py
 Done: coverage + idempotency pass under Qdrant; embedding identity recorded.
 Non-goals: no benchmark run; no switch.
-Result: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
+Result: Retargeted 2026-10-23 to OpenSearch (ADR-0016): runs in CM-2 per test-plan §5 "Coverage under OpenSearch"; the embedding identifier in ingest metadata lands in CM-2. Earlier: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
 ```
 
 Exit: Qdrant passes the same contract/coverage/idempotency tests Chroma passes; indexes verified; embeddings matched; nothing above `rag/` changed.
@@ -486,3 +486,23 @@ Result: Pending.
 User decision, 2026-10-17 (ADR-0009 amendment 2026-10-17; SPEC §4 runtime provider policy; test-plan §16 rows dated 2026-10-17): the Azure tier, previously S10-T03 / S7-AZURE-FALLBACK, is pulled forward and is the next task. Scope: Foundry DeepSeek-V4-Flash as the first draft attempt when configured, Bedrock `deepseek.v3.2` next, personal fallbacks unchanged; the evaluation judge ladder GPT-5.6 Luna on Bedrock (`bedrock-mantle`) → Foundry; Compose pass-through for the new variable. Out of scope: the STS-to-Entra keyless sign-in (stays in S10), circuit breakers (S7 (e)), parity and fallback-quality measurement (S10 / S6). The in-flight EMBED-ARMS plumbing slice pauses and resumes after this slice. Ordering of the embedding bake-off and the DeepSeek-V4-Flash memo baseline after this slice: pending the owner's answer (Gate A is still open, and the bake-off is gated on it above).
 
 Result as of 2026-10-18: implemented on branch feat/embedding-provider-switch. Offline: 492 passed, 2 skipped; ruff, mypy and the four governance checks pass; test-plan §16 rows dated 2026-10-17 (Judge ladder row revised 2026-10-18) covered offline by `tests/unit/test_provider_azure.py` and `tests/unit/test_judge_ladder.py`, including a structured verdict through the DeepEval adapter that falls back to Foundry. Live Azure draft run not yet done; Bedrock Luna is blocked by a zero account quota on `bedrock-runtime`, so only the Foundry judge is live-usable.
+
+### Authorized cloud data and model plane migration (2026-10-23)
+
+Owner decisions, 2026-10-23 (ADR-0016): migrate the data and model plane to managed services first, then benchmark there; Qdrant and Chroma are retired and OpenSearch is the only store (local container for development and tests, Serverless in the cloud); all three cloud embedding arms are measured on OpenSearch Serverless; the backend comparison copies the Gate A vectors instead of re-embedding; sentiment moves to a hosted model. Scope is the data and model plane only; the S10 demo-tier runtime and the S7 seams keep the ADR-0006 entry criteria. Every apply that creates billable resources needs the owner's approval first.
+
+Order (one `task/<id>` branch each; test-author → implementer loop for code):
+
+1. CM-0 — ADR-0016 and doc amendments (SPEC §§1, 3, 5, 6, 11.1, 12, 16; ADR-0003/0006/0007/0011/0014; test-plan §§4, 5, 20; retrieval-benchmark §§8, 9.1, 9a; this note).
+2. VERIFY-SCALE — bug fix, in parallel with CM-1…CM-3: the runtime verifier misses 10-K figures stated in million/billion against tables in thousands (156 of 243 unsupported claims across the nine `degraded` runs; diagnosis in `tasks/todo.md` DEGRADED-DIAG). Owner rule: scale-aware matching for SEC filing evidence only, rounded at the claim's stated precision; a wrong figure must still fail. Trace: SPEC §8.5, test-plan §7 (row added first). Must land before any eval baseline is recorded.
+3. CM-1 — cost controls: AWS Budgets ($10, $25, $100 action), tags, teardown command; official OpenSearch Serverless prices and idle timeout recorded in ADR-0014.
+4. CM-2 — `OpenSearchVectorStore`; test-plan §§4, 5 against a local container (S3-T04, S3-T05 retargeted); embedding identifier in ingest metadata.
+5. CM-3 — Terraform for the Serverless collection group; apply → smoke → destroy once.
+6. CM-4 — copy the Gate A vectors; backend-only comparison (retrieval-benchmark §9.1) → Gate B.
+7. CM-5 — cloud embedding provider switch (EMBED-ARMS, test-plan §21) and the three-arm bake-off (retrieval-benchmark §9a) → Gate C embedding outcome.
+8. CM-6 — model-plane close-out (Azure draft live check, Bedrock Luna quota, G13). CM-6b — hosted sentiment with its own ADR.
+9. CM-7 — remove Qdrant and Chroma; CLAUDE.md/AGENTS.md §8 and `check_doc_sync.py` updated together.
+
+After CM-7: S5 (hybrid/rerank on OpenSearch), S6 (a)…(e), S7 (a)…(f), S9, then the S10 runtime tasks.
+
+Result: Pending.

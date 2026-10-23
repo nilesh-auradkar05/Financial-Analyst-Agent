@@ -41,7 +41,7 @@ ADR-0006 was accepted on 2026-10-08 together with ADR-0010 to ADR-0013; ADR-0014
 | --- | --- | --- |
 | Postgres outbox → Redis Streams when Postgres claim throughput is a measured constraint | ADR-0013 | Graduation target is an outbox dispatching to SQS with a dead-letter queue. Valkey holds only disposable cache data, so a durable queue there would mix failure domains |
 | Bedrock primary plus an "independently qualified Azure alternative" | ADR-0009 amendment | The same models (DeepSeek V3.2, gpt-oss-120b) on Bedrock and Foundry; qualification is a parity check |
-| Bounded Qdrant shard topology for the deployed index | ADR-0014 | The deployed index is Amazon OpenSearch Serverless (next generation, scale to zero, daily awake cap); Qdrant stays the local and benchmark backend |
+| Bounded Qdrant shard topology for the deployed index | ADR-0014 | The deployed index is Amazon OpenSearch Serverless (next generation, scale to zero, daily awake cap); Qdrant stayed the local and benchmark backend until ADR-0016 (2026-10-23) retired it |
 | Embedding service, optional reranker service | ADR-0011 | Managed Bedrock embedding (Cohere Embed v4, 1024 dims) with a Foundry fallback behind a parity gate; managed Bedrock rerank only on Gate C lift |
 | Optional Databricks/Delta/dbt data plane, Azure Databricks | ADR-0012 | Ingestion is the `dataops` CLI orchestrated by Airflow 3 on MWAA Serverless; no lakehouse |
 | Self-hosted Langfuse option | ADR-0006 (D17) | Grafana Cloud through OpenTelemetry, plus LangSmith |
