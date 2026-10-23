@@ -82,3 +82,11 @@ OpenSearch Serverless becomes the deployed default only after a paired compariso
 - The adoption gate is CM-4: the Gate A `qwen3-embedding:4b` vectors are copied unchanged into a Serverless index and benchmarked against the Gate A Qdrant result, so the backend is the only changed variable. The tolerance is in `docs/retrieval-benchmark.md` §9.
 - The Qdrant Cloud fallback is withdrawn. A loss beyond tolerance stops work for an owner decision.
 - The Serverless collection may exist before the ADR-0006 entry criteria are met (ADR-0016 decision 2), after the CM-1 cost controls and with owner approval for each apply.
+
+## Verified 2026-10-23 (CM-1)
+
+From the official AWS pricing page (https://aws.amazon.com/opensearch-service/pricing/), read 2026-10-23:
+
+- NextGen collections bill OCU-hours on the collection group, per second; there is **no minimum OCU**, and indexing and search OCUs **scale to zero after 10 minutes of inactivity**. Storage bills separately per GB-month. All collections in a group share its OCUs.
+- The page's worked examples use **$0.24 per OCU-hour** and **$0.02 per GB-month** of managed storage. The earlier $0.334 per OCU-hour (third-party estimate, Context above) overstated compute by about 40%; at 2 OCUs an awake hour is about $0.48 and a 10-minute idle tail about $0.08.
+- Still open: cold-start time on the pinned configuration (measured in CM-3), Terraform `aws` support for `NEXTGEN` collection groups, and the hybrid pipeline and filter spike (CM-3).

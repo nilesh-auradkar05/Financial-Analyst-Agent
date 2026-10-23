@@ -253,3 +253,10 @@ Alpha-Financial-Analyst.zip
 graphify-out/
 
 
+
+# Terraform (CM-1): local state and per-owner variables never enter git
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan
