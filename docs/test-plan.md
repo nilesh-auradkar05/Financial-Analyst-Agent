@@ -297,7 +297,9 @@ Each hook is tested by piping a sample event JSON to the script and asserting st
 | H7 replay no-network | `pytest -m replay` command rewritten with network isolation prefix | non-replay pytest untouched |
 | H8 secrets | `cat .env` → deny; `AKIA…` in command → deny | `cat README.md` → allow |
 | H9 destructive | `git push --force`, `rm -rf /home` → deny | `rm -rf /tmp/x` → allow |
+| H11 lessons capture (revised 2026-10-22, owner instruction) | an owner correction (a user record that is not `isMeta`, not `isSidechain`, not a tool result) followed by a failing Bash appends one stub; the same correction never appends a second | stop-hook feedback or agent hand-backs (`isMeta`), subagent prompts (`isSidechain`), subagent events (`agent_id`), or a passing command → no stub |
 | H12 stop gate | dirty tree or failing unit tests → block with reasons; `stop_hook_active=true` → exit 0 immediately | clean tree, tests green → allow |
+| H13 quality gate (added 2026-10-22, owner instruction) | `git commit` with a failing `ruff check .`, `mypy .` or `pytest` → deny naming the check; a `test(<id>): red` commit that changes code outside tests/ → deny; Stop after a code change with failing ruff or mypy → block | non-commit Bash → allow without running checks; all green → allow; git-ignored files are not type-checked; a red commit changing only tests/ → allow when ruff passes on everything and mypy/pytest pass with those test files excluded; `stop_hook_active` → exit 0 |
 
 
 ## 16. Provider fallback and unavailable filings (authorized 2026-09-29)
