@@ -284,7 +284,7 @@ Scope: AAPL/MSFT/NVDA plus more if available × all 4 sections; mixed answer_int
 Verification: uv run python evaluation/validate_benchmark_fixture.py evaluation/fixtures/retrieval_shared_benchmark_v1.json --min-cases 50
 Done: 50–100 validated cases; coverage report committed; thin cells noted.
 Non-goals: no tuning toward any backend or method; no answer-quality labels.
-Result: Pending
+Result: DONE (2026-10-22). `evaluation/fixtures/retrieval_anchored_benchmark_v1.json` (`fixture_version` retrieval_anchored_benchmark_v1), frozen after owner review: 75 cases (AAPL 24, MSFT 24, NVDA 27) over all four sections of `alpha-evidence:0.1.0`, 138 graded anchors (93 relevance 2, 45 relevance 1), five answer intents, 6 multi-section cases; anchors authored from the source-section cache only. Validator passes with `--min-cases 50`. Coverage report `evaluation/fixtures/retrieval_anchored_benchmark_v1_coverage.md`: thin cells are the three market_risk cells (4 cases each); 0 anchors straddle a chunk. Risk Factors text is capped at 50,000 characters by the extractor, so later risk factors are outside the corpus.
 ```
 
 ```text

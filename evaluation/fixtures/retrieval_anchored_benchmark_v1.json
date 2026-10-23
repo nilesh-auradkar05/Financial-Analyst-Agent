@@ -1,0 +1,2623 @@
+{
+  "fixture_version": "retrieval_anchored_benchmark_v1",
+  "generated_at": "2026-10-22T00:00:00Z",
+  "embedding_model": "ollama:qwen3-embedding:4b:2560",
+  "cases": [
+    {
+      "case_id": "aapl-biz-001",
+      "ticker": "AAPL",
+      "query": "How does Apple divide its operations by region for financial reporting?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "The Company’s reportable segments consist of the Americas, Europe, Greater China, Japan and Rest of Asia Pacific",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "Greater China includes China mainland, Hong Kong and Taiwan",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "Americas",
+        "Greater China"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-biz-002",
+      "ticker": "AAPL",
+      "query": "How many people work at Apple?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "the Company had approximately 166,000 full-time equivalent employees",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "166,000"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-biz-003",
+      "ticker": "AAPL",
+      "query": "What portion of Apple's sales happens through its own stores and website compared with partners?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "the Company’s net sales through its direct and indirect distribution channels accounted for 40% and 60%, respectively, of total net sales",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "employs a variety of indirect distribution channels, such as third-party cellular network carriers and other resellers",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "40%",
+        "60%"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-biz-004",
+      "ticker": "AAPL",
+      "query": "When in the year does Apple typically sell the most?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "The Company has historically experienced higher net sales in its first quarter compared to other quarters in its fiscal year due in part to seasonal holiday demand",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "first quarter",
+        "holiday"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-biz-005",
+      "ticker": "AAPL",
+      "query": "Does Apple depend on sole suppliers for any parts?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "certain components are currently obtained from single or limited sources",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "the Company may not be able to extend or renew agreements for the supply of components on similar terms",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "single or limited sources"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-biz-006",
+      "ticker": "AAPL",
+      "query": "How are competitors undercutting Apple?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "Competition has been particularly intense as competitors have aggressively cut prices and lowered product margins",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "Many of the Company’s competitors seek to compete primarily through aggressive pricing and very low cost structures",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "cut prices",
+        "margins"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mda-001",
+      "ticker": "AAPL",
+      "query": "Why did Apple's revenue in its China region fall last year?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "Greater China net sales decreased during 2025 compared to 2024 primarily due to lower net sales of iPhone",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "iPhone",
+        "decreased"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mda-002",
+      "ticker": "AAPL",
+      "query": "What drove growth in Apple's non-hardware business?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "Services net sales increased during 2025 compared to 2024 primarily due to higher net sales from advertising, the App Store and cloud services",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "Services gross margin increased during 2025 compared to 2024 primarily due to higher Services net sales and a different mix of services",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "advertising",
+        "App Store"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mda-003",
+      "ticker": "AAPL",
+      "query": "Why did Apple's tax burden as a share of profit drop?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "effective tax rate for 2025 was lower compared to 2024 due to a $10.7 billion year-over-year decrease in the provision for income taxes related to the State Aid Decision",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "effective tax rate for 2025 was lower than the statutory federal income tax rate primarily due to a lower effective tax rate on foreign earnings",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "State Aid Decision",
+        "$10.7 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mda-004",
+      "ticker": "AAPL",
+      "query": "How much capital did Apple return to shareholders during the year?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "During 2025, the Company repurchased $89.3 billion of its common stock and paid dividends and dividend equivalents of $15.4 billion",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "announced a new share repurchase program of up to $100 billion and raised its quarterly dividend from $0.25 to $0.26 per share",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "$89.3 billion",
+        "$15.4 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mda-005",
+      "ticker": "AAPL",
+      "query": "How much liquidity does Apple have on hand?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "cash, cash equivalents and marketable securities, which totaled $132.4 billion as of September 27, 2025",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "$132.4 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mda-006",
+      "ticker": "AAPL",
+      "query": "According to the management discussion, how could new import levies affect Apple's costs and profitability?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": "md&a",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "Tariffs and other measures that are applied to the Company’s products or their components can have a material adverse impact",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "additional tariffs on imports from China, India, Japan, South Korea, Taiwan, Vietnam and the EU",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "tariffs",
+        "gross margin"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-risk-001",
+      "ticker": "AAPL",
+      "query": "Where does Apple rely on a sole manufacturing partner?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "The Company relies on single-source partners in the U.S., Asia and Europe to supply and manufacture many components",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "a business interruption affecting such sources would exacerbate any negative consequences to the Company",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "single-source",
+        "final assembly"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-risk-002",
+      "ticker": "AAPL",
+      "query": "What happens to Apple if app makers stop supporting its platforms?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "If third-party software applications and services cease to be developed and maintained for the Company’s products, customers may choose not to buy the Company’s products",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "can make developers less inclined to develop or upgrade software for the Company’s products",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "developers",
+        "third-party software"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-risk-003",
+      "ticker": "AAPL",
+      "query": "How is the hacking threat against Apple expected to change?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "attacks are expected to continue accelerating in both frequency and sophistication",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "The Company experiences malicious attacks and other attempts to gain unauthorized access to its systems on a regular basis",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "frequency",
+        "sophistication"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-risk-004",
+      "ticker": "AAPL",
+      "query": "How could natural catastrophes interrupt Apple's operations?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "are in locations that are prone to earthquakes and other natural disasters",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "Global climate change is resulting in certain types of natural disasters and extreme weather occurring more frequently",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "earthquakes",
+        "extreme weather"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-risk-005",
+      "ticker": "AAPL",
+      "query": "When does Apple have to mark down the value of parts and products it holds?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "The Company records a write-down for product and component inventories if cost exceeds net realizable value",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "builds inventory in advance of product announcements and shipments",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "write-down",
+        "net realizable value"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-risk-006",
+      "ticker": "AAPL",
+      "query": "Who sues Apple over inventions it uses, and what do they want?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "The Company has faced and continues to face a significant number of patent claims relating to its standards-enabled products",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "intellectual property asset–holding companies frequently assert their intellectual property rights and seek royalties",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "The plaintiffs in these actions frequently seek broad injunctive relief and substantial damages",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "patent",
+        "royalties"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mkt-001",
+      "ticker": "AAPL",
+      "query": "How much could Apple lose in a single day on its currency derivatives?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "a maximum one-day loss in fair value of $590 million and $538 million",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "applied a value-at-risk (“VAR”) model to its foreign currency derivative positions",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "$590 million",
+        "95%"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mkt-002",
+      "ticker": "AAPL",
+      "query": "How would higher borrowing costs affect Apple's bond holdings and debt?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "Increases in interest rates will negatively affect the fair value of the Company’s investment portfolio and increase the interest expense",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "the Company may use derivative instruments, offset interest rate–sensitive assets and liabilities, or control duration",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "interest rates",
+        "term debt"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mkt-003",
+      "ticker": "AAPL",
+      "query": "How does a strong dollar hurt Apple?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "a strengthening of the U.S. dollar, will negatively affect the Company’s net sales and gross margins",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "the Company being a net receiver of currencies other than the U.S. dollar",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "net receiver",
+        "gross margins"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-mkt-004",
+      "ticker": "AAPL",
+      "query": "Does Apple hedge every currency exposure it has?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": "market_risk",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "market_risk",
+          "anchor_text": "the Company may choose to not hedge certain foreign currency exposures for a variety of reasons, including accounting considerations or prohibitive cost",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "not hedge",
+        "prohibitive cost"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-cmp-001",
+      "ticker": "AAPL",
+      "query": "How do Apple's risk disclosures and results discussion each describe the 2025 tariffs?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a",
+        "risk_factors"
+      ],
+      "answer_intent": "comparison",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "including additional tariffs on imports from China, India, Japan, South Korea, Taiwan, Vietnam and the European Union",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "md&a",
+          "anchor_text": "Tariffs and other measures that are applied to the Company’s products or their components can have a material adverse impact",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "tariffs"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "aapl-cmp-002",
+      "ticker": "AAPL",
+      "query": "How does Apple's reliance on limited suppliers appear in both its business overview and its risk factors?",
+      "filters": {
+        "ticker": "AAPL",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business",
+        "risk_factors"
+      ],
+      "answer_intent": "comparison",
+      "gold_evidence": [
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "business",
+          "anchor_text": "certain components are currently obtained from single or limited sources",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000320193-25-000079",
+          "section_key": "risk_factors",
+          "anchor_text": "Because the Company currently obtains certain components from single or limited sources, the Company is subject to significant supply and pricing risks",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "single or limited sources"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-biz-001",
+      "ticker": "MSFT",
+      "query": "How many people does Microsoft employ, and how are they split by function?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "we employed approximately 228,000 people on a full-time basis, 125,000 in the U.S. and 103,000 internationally",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "80,000 were in product research and development; 44,000 were in sales and marketing",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "228,000"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-biz-002",
+      "ticker": "MSFT",
+      "query": "What environmental commitments has Microsoft made for the end of this decade?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "we announced goals to become a carbon negative, water positive, and zero waste company by 2030",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "carbon negative",
+        "2030"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-biz-003",
+      "ticker": "MSFT",
+      "query": "Into which business groups does Microsoft organize its financial results?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "report our financial performance using three segments: Productivity and Business Processes, Intelligent Cloud, and More Personal Computing",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "Intelligent Cloud",
+        "More Personal Computing"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-biz-004",
+      "ticker": "MSFT",
+      "query": "What determines how much money Microsoft's public cloud platform brings in?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "Azure revenue is mainly affected by infrastructure-as-a-service and platform-as-a-service consumption-based services",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "Azure AI offerings provide a competitive advantage as companies seek ways to optimize and scale their business with AI",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "consumption-based",
+        "Azure"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-biz-005",
+      "ticker": "MSFT",
+      "query": "What drives the revenue Microsoft earns from computer makers preloading its operating system?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "Windows OEM revenue is impacted significantly by the number of Windows operating system licenses purchased by OEMs",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "OEM",
+        "licenses"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-biz-006",
+      "ticker": "MSFT",
+      "query": "Are there bottlenecks in obtaining hardware for Microsoft's datacenters?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "There are few qualified suppliers for certain components of our servers and devices",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "Extended or unforeseen disruptions at these suppliers could impact our ability to operate our datacenters",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "suppliers",
+        "components"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mda-001",
+      "ticker": "MSFT",
+      "query": "How quickly did Microsoft's cloud computing platform grow in fiscal 2025?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Azure and other cloud services revenue grew 34% driven by demand for our portfolio of services",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Server products and cloud services revenue increased $18.6 billion or 23% driven by Azure and other cloud services",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "34%",
+        "Azure"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mda-002",
+      "ticker": "MSFT",
+      "query": "What rights does Microsoft have under its arrangement with OpenAI?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "We hold rights to OpenAI’s intellectual property, including models and infrastructure, for integration into our products",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "The OpenAI API is exclusive to Azure, runs on Azure, and is available through the Azure OpenAI Service",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "intellectual property",
+        "exclusive"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mda-003",
+      "ticker": "MSFT",
+      "query": "How much extra tax is the IRS demanding from Microsoft?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "the IRS is seeking an additional tax payment of $28.9 billion plus penalties and interest",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "The primary issues in the NOPAs relate to intercompany transfer pricing",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "$28.9 billion",
+        "transfer pricing"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mda-004",
+      "ticker": "MSFT",
+      "query": "Why did the profitability of Microsoft's cloud business decline?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Microsoft Cloud gross margin percentage decreased to 69% driven by the impact of scaling our AI infrastructure",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Gross margin percentage decreased driven by the impact of scaling our AI infrastructure, offset in part by efficiency gains in Azure",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "69%",
+        "AI infrastructure"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mda-005",
+      "ticker": "MSFT",
+      "query": "How did Microsoft's gaming hardware sales do?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Xbox hardware revenue decreased 25% driven by lower volume of consoles sold",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Xbox content and services revenue increased 16% driven by the impact of the Activision Blizzard acquisition",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "25%",
+        "consoles"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mda-006",
+      "ticker": "MSFT",
+      "query": "Which quarter is usually Microsoft's strongest for revenue, and why?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": "md&a",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Our revenue fluctuates quarterly and is generally higher in the fourth quarter of our fiscal year",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Fourth quarter revenue is driven by a higher volume of multi-year contracts executed during the period",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "fourth quarter",
+        "multi-year contracts"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-risk-001",
+      "ticker": "MSFT",
+      "query": "What happened in the state-sponsored intrusion into Microsoft's corporate email?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "a nation-state associated threat actor used a password spray attack to compromise a legacy test account",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "gain unauthorized access to some of our source code repositories and internal systems",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "password spray",
+        "source code"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-risk-002",
+      "ticker": "MSFT",
+      "query": "How do free software alternatives threaten Microsoft's business?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "modifying and then distributing open source software at little or no cost to end users",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "These firms do not bear the full costs of research and development for the open source products",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "open source"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-risk-003",
+      "ticker": "MSFT",
+      "query": "What can go wrong with the data and outputs behind Microsoft's AI features?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "Datasets may be overbroad, insufficient, or contain biased or inaccurate information",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "Content generated by AI systems may be offensive, illegal, inaccurate, or otherwise harmful",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "biased",
+        "harmful"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-risk-004",
+      "ticker": "MSFT",
+      "query": "Which recent transactions does Microsoft cite when discussing deal risk?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "in October 2023 we completed our acquisition of Activision Blizzard",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "In January 2023 we announced the third phase of our OpenAI strategic partnership",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "Activision Blizzard",
+        "OpenAI"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-risk-005",
+      "ticker": "MSFT",
+      "query": "How could U.S. trade measures affect Microsoft's costs and international customers?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "U.S. tariff and shifting AI export controls policies, like the AI Diffusion Rule, could increase operational costs",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "The volatility of U.S. tariffs has triggered economic uncertainty and could impact cloud and devices supply chain cost competitiveness",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "U.S. export controls restrict Microsoft from offering many of its products and services to",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "export controls",
+        "tariffs"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-risk-006",
+      "ticker": "MSFT",
+      "query": "Is Microsoft under the eye of competition regulators?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "U.S. and foreign antitrust authorities have previously brought enforcement actions and continue to scrutinize our business",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "antitrust"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mkt-001",
+      "ticker": "MSFT",
+      "query": "Which foreign currencies matter most to Microsoft's exchange-rate risk?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "market_risk",
+          "anchor_text": "Principal currency exposures include the Euro, Japanese yen, British pound, Canadian dollar, and Australian dollar",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "Euro",
+        "Japanese yen"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mkt-002",
+      "ticker": "MSFT",
+      "query": "How does Microsoft manage interest-rate sensitivity in its bond holdings?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "market_risk",
+          "anchor_text": "We manage the average maturity of the fixed-income portfolio to achieve economic returns that correlate to certain global fixed-income indices",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "market_risk",
+          "anchor_text": "Securities held in our fixed-income portfolio are subject to different interest rate risks based on their maturities",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "average maturity"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mkt-003",
+      "ticker": "MSFT",
+      "query": "What is the credit quality of Microsoft's debt investments?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "market_risk",
+          "anchor_text": "Our fixed-income portfolio is diversified and consists primarily of investment-grade securities",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "market_risk",
+          "anchor_text": "We manage credit exposures relative to broad-based indices to facilitate portfolio diversification",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "investment-grade"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-mkt-004",
+      "ticker": "MSFT",
+      "query": "Does Microsoft estimate what adverse market shocks would cost it?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": "market_risk",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "market_risk",
+          "anchor_text": "the potential loss in future earnings or fair values, including associated derivatives, resulting from hypothetical changes in relevant market rates or prices",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "potential loss",
+        "fair values"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-cmp-001",
+      "ticker": "MSFT",
+      "query": "How do Microsoft's business overview and risk factors each describe limited hardware suppliers for its datacenters?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business",
+        "risk_factors"
+      ],
+      "answer_intent": "comparison",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "business",
+          "anchor_text": "There are few qualified suppliers for certain components of our servers and devices",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "There are limited suppliers for certain device and datacenter components",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "suppliers"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "msft-cmp-002",
+      "ticker": "MSFT",
+      "query": "How do Microsoft's risk factors and results discussion each describe the OpenAI relationship?",
+      "filters": {
+        "ticker": "MSFT",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a",
+        "risk_factors"
+      ],
+      "answer_intent": "comparison",
+      "gold_evidence": [
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "risk_factors",
+          "anchor_text": "In January 2023 we announced the third phase of our OpenAI strategic partnership",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0000950170-25-100235",
+          "section_key": "md&a",
+          "anchor_text": "Microsoft and OpenAI maintain a long-term strategic partnership originally established in 2019",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "OpenAI",
+        "partnership"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-001",
+      "ticker": "NVDA",
+      "query": "Can NVIDIA still compete for data center business in China?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "we were effectively foreclosed from competing in China's data center computing/compute market",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "The Chinese government has encouraged customers to purchase from our China-based competitors",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "foreclosed",
+        "China"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-002",
+      "ticker": "NVDA",
+      "query": "Does NVIDIA manufacture its own chips?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "We utilize a fabless and contracting manufacturing strategy, whereby we employ and partner with key suppliers for all phases of the manufacturing process",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "We utilize foundries, such as Taiwan Semiconductor Manufacturing Company Limited, or TSMC, and Samsung Electronics",
+          "relevance": 1
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "We purchase memory from SK Hynix Inc., Micron Technology, Inc., and Samsung",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "fabless",
+        "TSMC"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-003",
+      "ticker": "NVDA",
+      "query": "How big is NVIDIA's workforce and how often do employees leave?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "we had approximately 42,000 employees in 38 countries; 31,000 were engaged in research and development",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "In fiscal year 2026, our turnover rate was 3.7 percent",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "42,000",
+        "3.7 percent"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-004",
+      "ticker": "NVDA",
+      "query": "How large is the community of coders using NVIDIA's GPU programming toolkit?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "There are over 7.5 million developers worldwide using CUDA and our other software tools",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "With our introduction of CUDA in 2006, we opened the parallel processing capabilities of our GPU",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "7.5 million",
+        "CUDA"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-005",
+      "ticker": "NVDA",
+      "query": "How much has NVIDIA spent on research over its history?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "We have invested over $76.7 billion in research and development since our inception",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "More than half of our engineers work on software",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "$76.7 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-006",
+      "ticker": "NVDA",
+      "query": "What are NVIDIA's two reporting segments and what do they include?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "The Compute & Networking segment includes our Data Center accelerated computing and networking platforms",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "The Graphics segment includes GeForce GPUs for gaming and PCs, and Quadro/NVIDIA RTX GPUs",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "Compute & Networking",
+        "Graphics"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-biz-007",
+      "ticker": "NVDA",
+      "query": "Are there seasonal patterns in NVIDIA's gaming sales?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": "business",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "Our desktop gaming products typically see stronger revenue in the second half of our fiscal year",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "second half"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-001",
+      "ticker": "NVDA",
+      "query": "What was NVIDIA's total revenue for fiscal 2026 and how much did it grow?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Revenue for fiscal year 2026 was $215.9 billion, up 65% from a year ago",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Data Center revenue for fiscal year 2026 was up 68% from a year ago",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "$215.9 billion",
+        "65%"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-002",
+      "ticker": "NVDA",
+      "query": "How dependent is NVIDIA on a handful of large buyers?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "sales to one direct customer represented 22% of total revenue and sales to another direct customer represented 14% of total revenue",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Our revenue is concentrated among a limited number of direct and indirect customers",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "one AI research and deployment company contributed to a meaningful amount of our revenue",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "22%",
+        "14%"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-003",
+      "ticker": "NVDA",
+      "query": "Why did NVIDIA's margins shrink?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Gross margins decreased to 71.1% in fiscal year 2026 from 75.0% in fiscal year 2025",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Gross margin decreased in fiscal year 2026 as our business model transitioned from offering Hopper HGX systems",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "71.1%",
+        "Blackwell"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-004",
+      "ticker": "NVDA",
+      "query": "How much capital did NVIDIA deploy into young companies during the year?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "We invested $17.5 billion in private companies and infrastructure funds, primarily to support",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "We provided $3.5 billion in land, power, and shell guarantees",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "$17.5 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-005",
+      "ticker": "NVDA",
+      "query": "What external bottlenecks could slow customers' deployment of NVIDIA systems?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "The availability of data centers, energy, and capital to support the buildout of NVIDIA AI infrastructure by our customers and partners is crucial",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Expanding energy capacity to meet demand is a complex, multi-year process",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "energy",
+        "capital"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-006",
+      "ticker": "NVDA",
+      "query": "How fast did NVIDIA's data center interconnect revenue grow?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "financial_performance",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Revenue from Data Center networking grew 142% driven by the introduction and continued ramp of NVLink compute fabric",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "Revenue from Data Center computing grew 59% driven by demand for our Blackwell computing platform",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "142%",
+        "NVLink"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mda-007",
+      "ticker": "NVDA",
+      "query": "Is NVIDIA entering a deal with OpenAI?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": "md&a",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "md&a"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "We are finalizing an investment and partnership agreement with OpenAI",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "OpenAI"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-001",
+      "ticker": "NVDA",
+      "query": "How has cryptocurrency mining affected demand for NVIDIA's gaming chips?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "our Gaming GPUs began to be used for mining digital currencies, such as Ethereum",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Volatility in the cryptocurrency market, including new compute technologies, price changes in cryptocurrencies",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "Ethereum",
+        "mining"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-002",
+      "ticker": "NVDA",
+      "query": "What has NVIDIA done to lock in future manufacturing capacity, and at what cost?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "To secure future supply and capacity, we have paid premiums, provided deposits, and entered into long-term supply agreements",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "We have long manufacturing lead times and build finished products and maintain inventory in advance of anticipated demand",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "premiums",
+        "deposits"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-003",
+      "ticker": "NVDA",
+      "query": "How could wildfires or heat threaten NVIDIA's headquarters?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Extreme heat and wind coupled with dry conditions in Northern California may lead to power safety shut offs due to wildfire risk",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "certain of our facilities may be vulnerable to the impacts of extreme weather events",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "Santa Clara",
+        "power safety shut offs"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-004",
+      "ticker": "NVDA",
+      "query": "What risks come from NVIDIA releasing new data center architectures every year?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "We have introduced a new product and architecture cadence of our Data Center solutions where we seek to complete new computing solutions each year",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "The increased frequency of these transitions and the larger number of products and product configurations may magnify the challenges",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "cadence",
+        "volatility"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-005",
+      "ticker": "NVDA",
+      "query": "Could NVIDIA's buyers build substitutes themselves?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Some of our customers have in-house expertise and internal development capabilities similar to some of ours",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "in-house"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-006",
+      "ticker": "NVDA",
+      "query": "Why might NVIDIA struggle to restore systems after an extortion-style cyberattack?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Our ability to recover from ransomware attacks may be limited if our backups have been affected by the attack",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Cyber-attacks, including ransomware attacks by organized criminal threat actors, nation-states, and nation-state-supported actors, may become more prevalent and severe",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "ransomware",
+        "backups"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-risk-007",
+      "ticker": "NVDA",
+      "query": "Do secondary-market resellers compete with NVIDIA's new products?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": "risk_factors",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "risk_factors"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Gray market products and reseller marketplaces compete with our new products and distribution channels",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "gray market"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mkt-001",
+      "ticker": "NVDA",
+      "query": "How sensitive is NVIDIA's investment portfolio to falling yields?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "a decrease in the yield curve of 0.5% as of the end of fiscal year 2026 and 2025 would decrease the fair value for these investments by approximately $0.2 billion",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "0.5%",
+        "$0.2 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mkt-002",
+      "ticker": "NVDA",
+      "query": "Does NVIDIA's debt expose it to interest rate changes?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "factual",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "As the Notes bear interest at a fixed rate, we have no financial statement risk associated with changes in interest rates",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "we had $8.5 billion of senior Notes outstanding",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "fixed rate",
+        "$8.5 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mkt-003",
+      "ticker": "NVDA",
+      "query": "How exposed is NVIDIA to currency movements?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "risk",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "We consider our direct exposure to foreign exchange rate fluctuations to be minimal as substantially all of our sales are in United States dollars",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "Increases in the value of the United States’ dollar relative to other currencies would make our products more expensive",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "minimal",
+        "United States dollars"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-mkt-004",
+      "ticker": "NVDA",
+      "query": "What would a 10% drop in stock prices do to NVIDIA's equity holdings?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": "market_risk",
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "market_risk"
+      ],
+      "answer_intent": "section_specific",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "A hypothetical 10% decrease in our publicly-held equity securities would decrease the fair value of the publicly-held equity securities balance by $1.8 billion",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "market_risk",
+          "anchor_text": "Valuations of our non-marketable equity securities are inherently complex",
+          "relevance": 1
+        }
+      ],
+      "expected_keywords": [
+        "$1.8 billion"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-cmp-001",
+      "ticker": "NVDA",
+      "query": "How do NVIDIA's business section and results discussion each describe the H20 export license requirement and its cost?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business",
+        "md&a"
+      ],
+      "answer_intent": "comparison",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "we incurred a $4.5 billion charge in the first quarter of fiscal year 2026 associated with H20 for excess inventory and purchase obligations, as the demand for H20 products diminished",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "md&a",
+          "anchor_text": "the USG informed us that a license is required for exports of our H20 product into the China market",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "$4.5 billion",
+        "H20"
+      ],
+      "notes": null
+    },
+    {
+      "case_id": "nvda-cmp-002",
+      "ticker": "NVDA",
+      "query": "How do NVIDIA's competition discussion and risk factors describe cloud companies designing their own chips?",
+      "filters": {
+        "ticker": "NVDA",
+        "filing_type": "10-K",
+        "section_key": null,
+        "filing_date_from": null,
+        "filing_date_to": null,
+        "accession_number": null
+      },
+      "expected_sections": [
+        "business",
+        "risk_factors"
+      ],
+      "answer_intent": "comparison",
+      "gold_evidence": [
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "business",
+          "anchor_text": "large cloud services companies with internal teams designing hardware and software that incorporate accelerated or AI computing functionality",
+          "relevance": 2
+        },
+        {
+          "accession_number": "0001045810-26-000021",
+          "section_key": "risk_factors",
+          "anchor_text": "Some of our customers have in-house expertise and internal development capabilities similar to some of ours",
+          "relevance": 2
+        }
+      ],
+      "expected_keywords": [
+        "internal teams",
+        "in-house"
+      ],
+      "notes": null
+    }
+  ]
+}
