@@ -125,6 +125,13 @@ NDCG@K     = DCG@K / IDCG@K, or 0 if IDCG@K == 0
 
 Determinism: ties in retrieval score are broken by `evidence_id` ascending.
 
+**Amendment 2026-10-22 (S2-T01, owner-approved).** Pins down what the formulas above leave open; no metric changes meaning.
+
+- Ranks are 1-based: `R[1]` is the top result, `first_relevant_rank` ∈ {1..K} or `null`, and DCG sums `i = 1..K`.
+- `keyword_hit_rate@K`, at each K: the share of `expected_keywords` whose `norm()` (§3) is a substring of the `norm()` of the concatenated `R_K` text. `null` when the case has no `expected_keywords`; `null` cases are left out of means.
+- `precision@K` divides by K even when fewer than K chunks come back.
+- `evidence_id` is the chunk's `chunk_id` (`<accession>_<section_key>_<chunk_index:03d>`). Order: score descending, then `chunk_id` ascending.
+
 ---
 
 ## 5. Fixture validator
