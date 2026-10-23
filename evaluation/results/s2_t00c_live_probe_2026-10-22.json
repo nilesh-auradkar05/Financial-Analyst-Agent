@@ -1,0 +1,29 @@
+{
+  "task": "S2-T00c",
+  "recorded_at": "2026-10-22",
+  "decision": "D1 (2026-09-30) and D-A3 (2026-10-22)",
+  "request": {"endpoint": "POST /analyze/async", "ticker": "APP", "include_filing_analysis": true, "include_news_sentiment": true, "max_news_articles": 10},
+  "runtime": "running api container built 2026-10-11; app/ evidence-path files identical to main @ 351298f (differs only in config.py, llm/provider.py, main.py: Azure draft wiring)",
+  "evidence_phase_definition": "earliest start of research_news/fetch_stock/retrieve_filings/analyze_sentiment to analyze_sentiment end, from /jobs/{id} progress",
+  "batch_span_definition": "first request submission to last evidence-phase end",
+  "before": {"trace_id": "01a0f4dc-8b2b-7021-b7de-5958220c0ad1", "evidence_s": 8.65, "shape": "serial: 6.83 + 0.45 + 0.42 + 0.95"},
+  "runs": [
+    {"run": 1, "role": "single, cold (excluded: FinBERT and embedding model load)", "job_id": "48d92f08-4a6c-4a00-8f6b-a5694a2dc72b", "trace_id": "01a1624a-6581-7e80-b3d2-8a86344295b1", "status": "degraded", "evidence_s": 14.58, "span_s": 15.11, "total_s": 64.72,
+     "node_ms": {"research_news": 5414.9, "fetch_stock": 4406.8, "retrieve_filings": 6661.8, "analyze_sentiment": 7830.1, "draft_memo": 49641.0, "verify_memo": 40.0}},
+    {"run": 2, "role": "single, warm (yfinance outlier)", "job_id": "b9ed99af-85ed-46ad-ada1-c03ead5cd76f", "trace_id": "01a1624b-c521-7bb0-be62-e98e585ef901", "status": "degraded", "evidence_s": 13.22, "span_s": 13.36, "total_s": 56.75,
+     "node_ms": {"research_news": 2136.7, "fetch_stock": 11090.3, "retrieve_filings": 1065.1, "analyze_sentiment": 2087.5, "draft_memo": 43319.1, "verify_memo": 52.1}},
+    {"run": 3, "role": "concurrent 1/4", "job_id": "80007c26-9045-4374-8897-8c08ffc426a2", "trace_id": "01a1624c-d11d-7c92-89e9-12b492f85ed5", "status": "degraded", "evidence_s": 5.33, "total_s": 38.46,
+     "node_ms": {"research_news": 927.2, "fetch_stock": 1747.2, "retrieve_filings": 1222.1, "analyze_sentiment": 3558.5, "draft_memo": 32586.6, "verify_memo": 56.9}},
+    {"run": 4, "role": "concurrent 2/4", "job_id": "3d05d221-e2e5-4c97-b8b8-bb1ff5dda64e", "trace_id": "01a1624c-d112-7f71-845d-1ee6087d49b1", "status": "degraded", "evidence_s": 5.65, "total_s": 42.91,
+     "node_ms": {"research_news": 1028.3, "fetch_stock": 2111.7, "retrieve_filings": 1441.8, "analyze_sentiment": 3509.7, "draft_memo": 36818.7, "verify_memo": 73.8}},
+    {"run": 5, "role": "concurrent 3/4", "job_id": "9774c1cf-4aab-4cda-b669-7d1f6c1a7545", "trace_id": "01a1624c-d115-7aa3-93f6-519f9c56fd14", "status": "degraded", "evidence_s": 5.31, "total_s": 44.28,
+     "node_ms": {"research_news": 1064.3, "fetch_stock": 1902.7, "retrieve_filings": 1198.1, "analyze_sentiment": 3350.5, "draft_memo": 38487.2, "verify_memo": 49.1}},
+    {"run": 6, "role": "concurrent 4/4", "job_id": "20d30a4d-b897-46ff-ba66-1fc699ac2554", "trace_id": "01a1624c-d111-7580-a6f8-1f8e4debefbb", "status": "degraded", "evidence_s": 5.64, "total_s": 42.71,
+     "node_ms": {"research_news": 1037.4, "fetch_stock": 2126.6, "retrieve_filings": 1394.9, "analyze_sentiment": 3488.7, "draft_memo": 36659.0, "verify_memo": 62.3}},
+    {"run": 7, "role": "single, warm (probe baseline)", "job_id": "9d46c2b6-15f7-4f51-b091-73f94e519908", "trace_id": "01a1624d-ae8a-7ac2-af41-a0f028c0a9f0", "status": "degraded", "evidence_s": 4.12, "span_s": 4.27, "total_s": 43.44,
+     "node_ms": {"research_news": 639.3, "fetch_stock": 1800.5, "retrieve_filings": 1208.4, "analyze_sentiment": 2251.2, "draft_memo": 39038.9, "verify_memo": 70.8}}
+  ],
+  "fan_out": {"run": 7, "evidence_s": 4.12, "max_branch_plus_sentiment_s": 4.05, "serial_sum_s": 5.90},
+  "concurrency_probe": {"batch_span_s": 6.15, "single_span_s": 4.27, "ratio": 1.44, "threshold": 1.5, "pass": true,
+                        "note": "n=1 single baseline over live network; against run 2 the ratio is 0.46. Sentiment per request rises from 2.25 s to about 3.5 s under 4-way load (CPU contention), not serialized."}
+}
