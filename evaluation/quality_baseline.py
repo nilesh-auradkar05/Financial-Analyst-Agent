@@ -27,10 +27,10 @@ from app.agents.state import AgentState, apply_update, create_initial_state, has
 from app.config import settings
 from app.dataops.replay import state_from_evidence_records
 from app.llm.provider import MODEL_PRESETS, _model_family
+from app.verification.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_grounding
 from dataops.evidence_release import SnapshotRecord
 from dataops.git_state import git_state as _git_state
 from dataops.replay import EvidenceReplayBundle, load_evidence_release_records
-from evaluation.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_grounding
 from evaluation.semantic_grounding import evaluate_memo_grounding_semantic
 
 RESULTS_DIR = Path("evaluation/results")

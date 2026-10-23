@@ -117,7 +117,9 @@ def test_deepeval_judge_falls_back_to_foundry_for_structured_verdicts(monkeypatc
     _judge(monkeypatch, server)  # configures both tiers and routes them to the fake
     config = judge_config_from_env(provider="luna", model=None, temperature=0.0, top_p=None, max_tokens=None)
 
-    result = create_deepeval_judge_model(config).generate("Is the claim supported?", schema=Verdict)
+    judge = create_deepeval_judge_model(config)
+    assert judge is not None and not isinstance(judge, str)
+    result = judge.generate("Is the claim supported?", schema=Verdict)
 
     assert result == Verdict(verdict="luna-judge")
     assert [r.url.host for r in server.requests] == [MANTLE_HOST, AZURE_HOST]

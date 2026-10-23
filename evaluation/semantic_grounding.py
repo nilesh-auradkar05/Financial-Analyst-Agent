@@ -28,7 +28,7 @@ import math
 from typing import Callable, Sequence
 
 from app.components.retrieval.embeddings import embed_texts
-from evaluation.grounding import (
+from app.verification.grounding import (
     ClaimAssessment,
     GroundingCheckResult,
     _build_evidence_map,
