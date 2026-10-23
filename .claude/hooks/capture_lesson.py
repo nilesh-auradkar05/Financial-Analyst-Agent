@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """H11 — PostToolUse Bash: when a failure follows a user correction, append a lesson stub.
 
-Heuristic: the transcript's last human turn contains a correction phrase and this Bash result
-contains a failure marker. Appends a dated stub to tasks/lessons.md for the agent to complete.
+Heuristic: the owner's last turn contains a correction phrase and this Bash result contains a
+failure marker. Appends a dated stub to tasks/lessons.md for the agent to complete.
+The owner's turn is the last user record that is not machine-generated: stop-hook feedback and agent
+hand-backs are `isMeta`, subagent prompts are `isSidechain`, tool results carry no text. Subagent
+events never stub, and a correction already in lessons.md is not stubbed twice.
 """
 from __future__ import annotations
 
@@ -17,6 +20,8 @@ CORRECTION = re.compile(r"\b(no[,.]|wrong|that's not|that is not|incorrect|you m
 FAILURE = re.compile(r"(FAILED|Traceback|Error:|error\[|exit code [1-9])")
 
 ev = read_event()
+if ev.get("agent_id"):
+    raise SystemExit(0)
 resp = ev.get("tool_response", {}) or {}
 output = resp if isinstance(resp, str) else json.dumps(resp)
 if not FAILURE.search(output):
@@ -30,19 +35,27 @@ if tp and transcript.is_file():
             rec = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if rec.get("type") == "user" or rec.get("role") == "user":
-            msg = rec.get("message", rec)
-            content = msg.get("content", "") if isinstance(msg, dict) else ""
-            last_human = content if isinstance(content, str) else " ".join(
-                c.get("text", "") for c in content if isinstance(c, dict))
+        if rec.get("type") != "user" and rec.get("role") != "user":
+            continue
+        if rec.get("isMeta") or rec.get("isSidechain"):
+            continue
+        msg = rec.get("message", rec)
+        content = msg.get("content", "") if isinstance(msg, dict) else ""
+        text = content if isinstance(content, str) else " ".join(
+            c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+        if text.strip():
+            last_human = text
             break
 if not CORRECTION.search(last_human):
     raise SystemExit(0)
 lessons = REPO / "tasks" / "lessons.md"
+correction = f"- Correction: {last_human.strip()[:200]}\n"
+if lessons.exists() and correction in lessons.read_text(errors="ignore"):
+    raise SystemExit(0)
 lessons.parent.mkdir(exist_ok=True)
 stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
 stub = (f"\n## {stamp} — (fill in) pattern behind the correction\n"
-        f"- Correction: {last_human.strip()[:200]}\n- Failure seen: {FAILURE.search(output).group(0)}\n"
+        f"{correction}- Failure seen: {FAILURE.search(output).group(0)}\n"
         "- Rule for next time: \n")
 with lessons.open("a") as f:
     f.write(stub)

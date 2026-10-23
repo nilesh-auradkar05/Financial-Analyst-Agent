@@ -337,3 +337,262 @@ def test_h12_failing_unit_tests_block(tmp_path: Path) -> None:
     assert out["decision"] == "block"
     assert "unit tests failing" in out["reason"]
     assert "uncommitted changes" not in out["reason"]
+
+
+# --- H11 capture_lesson ----------------------------------------------------------------------
+
+
+def human(text: str) -> dict[str, Any]:
+    return {"type": "user", "message": {"role": "user", "content": text}}
+
+
+def meta(text: str) -> dict[str, Any]:
+    """Stop-hook feedback and agent hand-backs are user-type records marked isMeta."""
+    return {"type": "user", "isMeta": True, "message": {"role": "user", "content": text}}
+
+
+def sidechain(text: str) -> dict[str, Any]:
+    return {"type": "user", "isSidechain": True, "message": {"role": "user", "content": text}}
+
+
+def tool_result() -> dict[str, Any]:
+    content = [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]
+    return {"type": "user", "message": {"role": "user", "content": content}}
+
+
+def h11_event(
+    tmp_path: Path, records: list[dict[str, Any]], *, failed: bool = True
+) -> dict[str, Any]:
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("".join(json.dumps(r) + "\n" for r in records))
+    stdout = "1 FAILED" if failed else "1 passed"
+    return {
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {"command": "uv run pytest"},
+        "tool_response": {"stdout": stdout, "stderr": ""},
+        "transcript_path": str(transcript),
+    }
+
+
+def lessons_text(project: Path) -> str:
+    path = project / "tasks" / "lessons.md"
+    return path.read_text() if path.exists() else ""
+
+
+def test_h11_genuine_correction_then_failure_appends_one_stub(tmp_path: Path) -> None:
+    """H11: a real owner correction followed by a failing command appends one stub, never two."""
+    project = tmp_path / "proj"
+    (project / "tasks").mkdir(parents=True)
+    event = h11_event(tmp_path, [human("no, that's the wrong file"), tool_result()])
+    first = run_hook("capture_lesson.py", event, project)
+    assert first.returncode == 2 and "H11" in first.stderr
+    second = run_hook("capture_lesson.py", event, project)
+    assert second.returncode == 0
+    assert lessons_text(project).count("Rule for next time") == 1
+
+
+@pytest.mark.parametrize(
+    ("records", "extra", "failed"),
+    [
+        pytest.param(
+            [human("let's continue"), meta("Stop hook feedback:\nDone conditions not met")],
+            {},
+            True,
+            id="stop-hook-feedback-is-not-a-correction",
+        ),
+        pytest.param(
+            [human("ok, go ahead"), meta("Another Claude session sent a message: no, wrong")],
+            {},
+            True,
+            id="agent-hand-back-is-not-a-correction",
+        ),
+        pytest.param(
+            [human("continue please"), sidechain("stop and report if the test is wrong")],
+            {},
+            True,
+            id="subagent-prompt-is-not-a-correction",
+        ),
+        pytest.param(
+            [human("no, that's wrong")],
+            {"agent_id": "a1", "agent_type": "general-purpose"},
+            True,
+            id="subagent-event-never-stubs",
+        ),
+        pytest.param([human("no, that's wrong")], {}, False, id="successful-command"),
+    ],
+)
+def test_h11_no_stub_without_owner_correction_and_failure(
+    tmp_path: Path, records: list[dict[str, Any]], extra: dict[str, str], failed: bool
+) -> None:
+    """H11: machine-generated user records, subagent events and green commands never stub."""
+    project = tmp_path / "proj"
+    (project / "tasks").mkdir(parents=True)
+    proc = run_hook(
+        "capture_lesson.py", {**h11_event(tmp_path, records, failed=failed), **extra}, project
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert lessons_text(project) == ""
+
+
+# --- H13 quality_gate ------------------------------------------------------------------------
+
+
+def tool_uv_dir(tmp_path: Path) -> Path:
+    """A `uv` shim: `uv run <tool> args` runs `<this python> -m <tool> args`, so the gate runs the
+    real ruff, mypy and pytest on the throwaway project."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    shim = bindir / "uv"
+    shim.write_text(
+        f'#!/bin/sh\nshift\ntool="$1"\nshift\nexec "{sys.executable}" -m "$tool" "$@"\n'
+    )
+    shim.chmod(shim.stat().st_mode | stat.S_IXUSR)
+    return bindir
+
+
+GOOD_CODE = {
+    "pkg/__init__.py": "",
+    "pkg/mod.py": "def add(a: int, b: int) -> int:\n    return a + b\n",
+    "tests/unit/test_mod.py": (
+        "from pkg.mod import add\n\n\ndef test_add() -> None:\n    assert add(1, 2) == 3\n"
+    ),
+}
+
+
+def quality_project(
+    tmp_path: Path, extra: dict[str, str] | None = None
+) -> tuple[Path, dict[str, str]]:
+    """Two commits, the last one adding code, so the Stop path sees a code change."""
+    project = make_repo(tmp_path / "proj")
+    for rel_path, body in {**GOOD_CODE, **(extra or {})}.items():
+        target = project / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(body)
+    git(project, "add", "-A")
+    git(project, "commit", "-q", "-m", "code")
+    env = {"PATH": f"{tool_uv_dir(tmp_path)}{os.pathsep}{os.environ['PATH']}"}
+    return project, env
+
+
+def add_file(project: Path, rel_path: str, body: str) -> None:
+    target = project / rel_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body)
+
+
+COMMIT = 'git add -A && git commit -m "feat: change"'
+RED_COMMIT = 'git add tests && git commit -m "test(T1): red"'
+
+
+@needs_git
+@pytest.mark.parametrize(
+    "cmd", ["git status", "uv run pytest", "echo 'git commit is next'", "git log --oneline -3"]
+)
+def test_h13_non_commit_command_allowed_without_checks(tmp_path: Path, cmd: str) -> None:
+    """H13: only `git commit` is gated; a type error in the tree does not matter for other commands."""
+    project, env = quality_project(tmp_path, {"pkg/bad.py": "x: int = 'a'\n"})
+    assert_silent_allow(run_hook("quality_gate.py", bash(cmd), project, env))
+
+
+@needs_git
+def test_h13_commit_allowed_when_all_checks_pass(tmp_path: Path) -> None:
+    """H13: ruff, mypy and pytest all green → the commit proceeds."""
+    project, env = quality_project(tmp_path)
+    add_file(project, "pkg/more.py", "def twice(a: int) -> int:\n    return 2 * a\n")
+    assert_silent_allow(run_hook("quality_gate.py", bash(COMMIT), project, env, timeout=300))
+
+
+@needs_git
+@pytest.mark.parametrize(
+    ("rel_path", "body", "check"),
+    [
+        ("pkg/lint.py", "import os\n", "ruff"),
+        ("pkg/types.py", "x: int = 'a'\n", "mypy"),
+        ("tests/unit/test_fail.py", "def test_fail() -> None:\n    assert 1 == 2\n", "pytest"),
+    ],
+)
+def test_h13_commit_denied_when_a_check_fails(
+    tmp_path: Path, rel_path: str, body: str, check: str
+) -> None:
+    """H13: a failing ruff, mypy or pytest run denies the commit and names the check."""
+    project, env = quality_project(tmp_path)
+    add_file(project, rel_path, body)
+    reason = assert_denied(run_hook("quality_gate.py", bash(COMMIT), project, env, timeout=300))
+    assert check in reason
+
+
+@needs_git
+def test_h13_git_ignored_files_are_not_type_checked(tmp_path: Path) -> None:
+    """H13: CI never sees git-ignored files, so a local scratch script does not block a commit."""
+    project, env = quality_project(tmp_path, {".gitignore": "local_probe.py\n"})
+    add_file(project, "local_probe.py", "x: int = 'a'\n")
+    assert_silent_allow(run_hook("quality_gate.py", bash(COMMIT), project, env, timeout=300))
+
+
+RED_TEST = "from pkg.missing import thing\n\n\ndef test_thing() -> None:\n    assert thing() == 1\n"
+
+
+@needs_git
+@pytest.mark.parametrize(
+    "cmd",
+    [RED_COMMIT, "git add tests && git commit -q -F - <<'EOF'\ntest(T1): red\n\nbody\nEOF"],
+)
+def test_h13_red_commit_with_only_tests_allowed(tmp_path: Path, cmd: str) -> None:
+    """H13 red exemption: new failing tests under tests/ are excluded from mypy and pytest."""
+    project, env = quality_project(tmp_path)
+    add_file(project, "tests/unit/test_new.py", RED_TEST)
+    assert_silent_allow(run_hook("quality_gate.py", bash(cmd), project, env, timeout=300))
+
+
+@needs_git
+def test_h13_red_commit_with_code_outside_tests_denied(tmp_path: Path) -> None:
+    """H13 red exemption: a red commit may only change tests/."""
+    project, env = quality_project(tmp_path)
+    add_file(project, "tests/unit/test_new.py", RED_TEST)
+    add_file(project, "pkg/extra.py", "def f() -> int:\n    return 1\n")
+    reason = assert_denied(run_hook("quality_gate.py", bash(RED_COMMIT), project, env, timeout=300))
+    assert "red" in reason and "pkg/extra.py" in reason
+
+
+@needs_git
+def test_h13_red_commit_still_runs_ruff_on_its_tests(tmp_path: Path) -> None:
+    """H13 red exemption: ruff still covers the excluded test files."""
+    project, env = quality_project(tmp_path)
+    add_file(project, "tests/unit/test_new.py", "import os\n\n" + RED_TEST)
+    reason = assert_denied(run_hook("quality_gate.py", bash(RED_COMMIT), project, env, timeout=300))
+    assert "ruff" in reason
+
+
+@needs_git
+@pytest.mark.parametrize(
+    ("extra", "check"),
+    [({"pkg/types.py": "x: int = 'a'\n"}, "mypy"), ({"pkg/lint.py": "import os\n"}, "ruff")],
+)
+def test_h13_stop_blocks_on_failing_check(
+    tmp_path: Path, extra: dict[str, str], check: str
+) -> None:
+    """H13 Stop: after a code change, a failing mypy or ruff blocks the end of the turn."""
+    project, env = quality_project(tmp_path, extra)
+    proc = run_hook("quality_gate.py", {"hook_event_name": "Stop"}, project, env, timeout=300)
+    assert proc.returncode == 0, proc.stderr
+    out = json.loads(proc.stdout)
+    assert out["decision"] == "block"
+    assert check in out["reason"]
+
+
+@needs_git
+def test_h13_stop_allows_clean_code(tmp_path: Path) -> None:
+    """H13 Stop: ruff and mypy green → the turn may end."""
+    project, env = quality_project(tmp_path)
+    assert_silent_allow(
+        run_hook("quality_gate.py", {"hook_event_name": "Stop"}, project, env, timeout=300)
+    )
+
+
+@needs_git
+def test_h13_stop_hook_active_exits_immediately(tmp_path: Path) -> None:
+    """H13 Stop loop guard: no checks run when stop_hook_active is set."""
+    project, env = quality_project(tmp_path, {"pkg/types.py": "x: int = 'a'\n"})
+    event = {"hook_event_name": "Stop", "stop_hook_active": True}
+    assert_silent_allow(run_hook("quality_gate.py", event, project, env))
