@@ -295,7 +295,7 @@ Tests: all case_ids present; labels present; null rank emitted; provenance and l
 Verification: VECTOR_BACKEND=chroma uv run python evaluation/run_retrieval_benchmark.py --fixture evaluation/fixtures/retrieval_shared_benchmark_v1.json --mode section_aware --output evaluation/results/chroma_section_aware_shared.json
 Done: schema-valid, provenance-bearing result.
 Non-goals: no comparison; no hybrid/rerank.
-Result: Pending
+Result: DONE (2026-10-22). Red e025bb5: `tests/unit/test_anchored_benchmark_runner.py` (34 tests) covers every test-plan §6 runner row, including the owner-approved metrics row (hand-computed graded NDCG, straddle miss, section-only hit, precision over K, null rank and keyword rate). `evaluation/run_shared_retrieval_benchmark.py` gains `score_retrieval`, `run_anchored_benchmark` (methods `dense`, `section_aware`; K ∈ {5, 10}; cold/warm latency; per-chunk provenance) and an anchored CLI path; the precursor path is unchanged. `evaluation/build_benchmark_index.py` indexes the release's SEC snapshots with the ingestion chunker into `sec_filings_bench_alpha_evidence_0_1_0` (532 chunks; refuses `sec_filings`; live collection unchanged at 1,104); every fixture anchor lies wholly in one indexed chunk. Ingestion exposes `CHUNK_SIZE`/`CHUNK_OVERLAP` for provenance. End-to-end smoke runs of both methods produce all 75 cases with provenance (not a baseline; no comparison drawn). pytest 574 passed, 2 skipped; ruff, mypy (apart from the user's gitignored local script) and the four governance checks pass. Binding: the doc's `run_retrieval_benchmark.py` is this file, per the implementation note.
 ```
 
 ```text
