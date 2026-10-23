@@ -6,15 +6,31 @@ from typing import Any, Mapping, Sequence
 
 # Bumped when claim-extraction or number-gate semantics change, so pre-fix and
 # post-fix baseline artifacts can never be silently compared.
-GROUNDING_EVAL_VERSION = 3
+GROUNDING_EVAL_VERSION = 4
 
 _SENTENCE_SPILT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 _WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9&'\-/]*")
 _NUMBER_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?%?")
 _EMPHASIS_RE = re.compile(r"[*_`]+")
-_SCALE_RE = re.compile(r"\s*(thousand|million|billion)\b", re.IGNORECASE)
-_SCALES = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
+# A scale follows a figure as a word ("7 million") or as an abbreviation attached
+# to the digits ("$7M", "3.2bn"); the abbreviation must end the word, so "10-K"
+# (hyphen) and "7Mbps" (letters follow) carry no scale.
+_SCALE_RE = re.compile(
+    r"\s*(thousand|million|billion|trillion)\b|(MM|BN|K|M|B|T)(?![A-Za-z])", re.IGNORECASE
+)
+_SCALES = {
+    "thousand": 1e3,
+    "k": 1e3,
+    "million": 1e6,
+    "m": 1e6,
+    "mm": 1e6,
+    "billion": 1e9,
+    "b": 1e9,
+    "bn": 1e9,
+    "trillion": 1e12,
+    "t": 1e12,
+}
 # SEC filing tables state figures in thousands or millions.
 _FILING_UNITS = (1e3, 1e6)
 
@@ -317,22 +333,28 @@ def _extract_number_tokens(text: str) -> list[tuple[float, int]]:
         tokens.append((value, decimals))
     return tokens
 
-def _scaled_filing_values(filing_texts: Sequence[str]) -> list[tuple[float, tuple[float, ...]]]:
-    """(value, units) per filing-body number: its own scale word, else the implicit
-    filing units for comma-grouped table figures only, so years never scale."""
-    return [
-        (
-            value,
-            (_SCALES[scale.group(1).lower()],)
-            if scale
-            else _FILING_UNITS
-            if "," in match.group(0)
-            else (),
-        )
+def _scale_after(text: str, end: int) -> float:
+    """Scale (1.0 when none) stated right after the number token ending at `end`."""
+    scale = _SCALE_RE.match(text, end)
+    return _SCALES[(scale.group(1) or scale.group(2)).lower()] if scale else 1.0
+
+def _absolute_amounts(texts: Sequence[str], filing_texts: Sequence[str]) -> list[float]:
+    """Every figure in the cited evidence at its own stated scale. Comma-grouped
+    filing-body figures without a scale also count in thousands and millions
+    (SEC tables state them so); years and other plain numbers never scale."""
+    amounts = [
+        value * _scale_after(text, match.end())
+        for text in texts
+        for match, (value, _) in zip(_NUMBER_RE.finditer(text), _extract_number_tokens(text))
+    ]
+    amounts += [
+        value * unit
         for text in filing_texts
         for match, (value, _) in zip(_NUMBER_RE.finditer(text), _extract_number_tokens(text))
-        for scale in [_SCALE_RE.match(text, match.end())]
+        if "," in match.group(0) and _scale_after(text, match.end()) == 1.0
+        for unit in _FILING_UNITS
     ]
+    return amounts
 
 def _numbers_supported_any(
     claim_text: str,
@@ -351,10 +373,10 @@ def _numbers_supported_any(
     number substrings verbatim as they appear in the claim, so a human can
     hand-audit exactly which figures were not found in any cited evidence.
 
-    A claim figure followed by a scale word ("$356.7 million") is also supported
-    when a filing body text (`filing_texts`) holds a number that, taken in
-    thousands or millions (or at its own scale word), rounds to it at the
-    claim's stated precision.
+    A claim figure that states a scale ("$356.7 million", "$3.2B") is part of the
+    figure: it is supported only by an evidence figure of the same absolute
+    amount, rounded in the claim's unit at the claim's stated precision. A bare
+    "7" never supports "$7.0 million".
     """
     claim_tokens = _extract_number_tokens(claim_text)
     if not claim_tokens:
@@ -363,21 +385,17 @@ def _numbers_supported_any(
     evidence_values = [
         value for text in evidence_texts for value, _ in _extract_number_tokens(text)
     ]
-
-    filing_values = _scaled_filing_values(filing_texts)
+    amounts = _absolute_amounts(evidence_texts, filing_texts)
 
     unmatched: list[str] = []
     for (value, decimals), match in zip(claim_tokens, _NUMBER_RE.finditer(claim_text)):
-        if any(round(ev, decimals) == value for ev in evidence_values):
-            continue
-        scale = _SCALE_RE.match(claim_text, match.end())
-        if scale and any(
-            round(fv * unit / _SCALES[scale.group(1).lower()], decimals) == value
-            for fv, units in filing_values
-            for unit in units
-        ):
-            continue
-        unmatched.append(match.group(0))
+        scale = _scale_after(claim_text, match.end())
+        if scale == 1.0:
+            supported = any(round(ev, decimals) == value for ev in evidence_values)
+        else:
+            supported = any(round(amount / scale, decimals) == value for amount in amounts)
+        if not supported:
+            unmatched.append(match.group(0))
 
     return not unmatched, unmatched
 
