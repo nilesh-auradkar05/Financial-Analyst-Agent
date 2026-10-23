@@ -144,6 +144,31 @@ def test_scaling_does_not_use_filing_identifiers(
     assert claim.supported is False
 
 
+# Test-plan §7: Years never scale
+@pytest.mark.parametrize(
+    ("claim_figure", "filing_text"),
+    [
+        pytest.param(
+            "$2.0 billion",
+            "Net income rose in fiscal 2025 for the fiscal year.",
+            id="year-millions",
+        ),
+        pytest.param(
+            "$2.03 million",
+            "Net income for fiscal 2026 for the fiscal year.",
+            id="year-thousands",
+        ),
+    ],
+)
+def test_years_in_filing_text_do_not_scale(claim_figure: str, filing_text: str) -> None:
+    memo = f"Net income was {claim_figure} for the fiscal year [1]."
+
+    claim = _only_claim(memo, [_filing(filing_text)])
+
+    assert claim.numbers_ok is False
+    assert claim.supported is False
+
+
 # Test-plan §7: Existing matches unchanged
 @pytest.mark.parametrize(
     ("memo", "evidence"),
