@@ -167,7 +167,7 @@ uv run python evaluation/compare_retrieval_results.py \
 
 ## 9. Claude-specific mechanics
 
-- Hooks H1–H12 (SPEC §14, `.claude/settings.json`) enforce part of these rules mechanically. A blocked action means fix the cause, not route around the hook.
+- Hooks H1–H13 (SPEC §14, `.claude/settings.json`) enforce part of these rules mechanically. H13 runs `uv run ruff check .`, `uv run mypy .` and `uv run pytest` before every `git commit` (a `test(<id>): red` commit may change only tests/) and ruff + mypy when a turn stops. A blocked action means fix the cause, not route around the hook.
 - Subagents start without this conversation. A delegation brief is self-contained: task id, trace, the test-plan cases quoted, SPEC section paths, contract brief, files in and out of scope, red-commit SHA (implementer), commands to run, and the report format.
 - Subagents load this file, so their prompts do not repeat it.
 - Work on a `task/<id>` branch, never directly on `main`. Push only after verification is green.

@@ -440,7 +440,11 @@ observe or inject.
 H3 governance docs read-only; H4 frozen fixtures immutable; H5 eval results need
 lineage (§11.2); H6 single-axis benchmark discipline; H7 replay tests run without
 network; H8 secrets; H9 destructive commands; H10 lint/type on write; H11 lessons
-capture; H12 stop gate (tests + doc sync + clean tree).
+capture (owner corrections only: not stop-hook feedback, agent hand-backs or subagents;
+revised 2026-10-22); H12 stop gate (tests + doc sync + clean tree); H13 quality gate
+(added 2026-10-22, owner instruction: `ruff check .` + `mypy .` at Stop after a code change;
+`ruff check .` + `mypy .` + `pytest` before every `git commit`, with a `test(<id>): red`
+commit limited to tests/ and its test files excluded from mypy and pytest).
 
 14.4 Hooks are the first line; `scripts/ci/check_*.py` in CI are the second. A
 rule enforced by a hook without a CI counterpart is a defect (tracked as G11).
