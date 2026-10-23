@@ -274,7 +274,7 @@ Tests: valid fixture passes; duplicate id, missing gold, unknown section, invali
 Verification: uv run pytest tests/evaluation/test_benchmark_fixture_schema.py
 Done: validator and behavior tests pass.
 Non-goals: no scoring logic.
-Result: Pending
+Result: DONE (2026-10-22). Red c309b13: `tests/unit/test_anchored_fixture_validator.py`, 46 cases over every test-plan §6 validator row plus the §5 answer_intent and coverage checks and §3 norm() matching. `evaluation/validate_retrieval_fixture.py` gains the anchored API (`validate_anchored_fixture`, `load_anchored_fixture`, `normalize_text`, `FixtureValidationError` listing every failure by case_id and rule; CLI `--source-dir`, `--min-cases`); the precursor path is unchanged. `evaluation/build_source_section_cache.py` writes `evaluation/fixtures/source_sections/` (12 files) from `alpha-evidence:0.1.0` with the ingestion cleaner (`clean_section_text`, made public): all 532 chunks the ingestion chunker builds from the release appear verbatim in the cache, and a rebuild is byte-identical. pytest 540 passed, 2 skipped; ruff and mypy clean (apart from the user's gitignored local script); four governance checks pass. Test path bound to tests/unit per the implementation note.
 ```
 
 ```text
