@@ -433,3 +433,77 @@ Observed through the retrieval boundary (`get_embeddings`, the `RetrievalStore` 
 | Embedding identifier recorded | Every ingested chunk carries the embedding identifier (provider, model, dimension) in its metadata; also closes the open part of S3-T04 |
 | Arm built from the same chunks | Building an arm's index from the baseline copies every chunk id, text and metadata unchanged and re-embeds only the vector; chunk counts match per ticker |
 | Provider client stays inside the boundary | No provider client object is reachable from outside `app/components/retrieval/` |
+
+---
+
+## 22. Agent architecture revision: S11 (ADR-0016, proposed 2026-11-01; SPEC v1.5 §§3.z, 8.1a, 11.1 Gate F, 11.3)
+
+Traces to SPEC v1.5 and `docs/agent-architecture.md`. Observed through the supervisor's public run surface (`run_agent`, the API routes, `/metrics`, the release manifest) with faithful fakes at the tool gateway, memory store and provider boundaries; no network, no real model. Cases are effective when ADR-0016 is accepted; until then they are the oracle the design is written against.
+
+### 22.1 Specialists and supervisor
+
+| Case | Expected behavior |
+| --- | --- |
+| Behavior-preserving refactor | On the frozen release, the specialist graph and the pre-revision graph produce byte-identical citation registries and the same `snapshot_hash`; no additional model call is made |
+| Fixed topology | The supervisor runs exactly the five specialists; the only data-dependent branch is the verifier's loop; a third revision never happens |
+| Containment: tool users have no model | With the provider fake counting calls, `market`, `news` and `filings` make zero model calls; with the gateway fake counting calls, `analyst` and `verifier` make zero tool calls |
+| Sentiment inside `news` | Sentiment scores are produced without waiting for `filings`; a slow filings fake does not delay the sentiment result; outputs equal the pre-revision `analyze_sentiment` result |
+| Concurrent filing queries | Four 1 s search fakes complete the filings specialist in about 1 s, not 4 s |
+| Specialist budget | A tool fake that never returns makes the specialist end `failed(timeout)` within its wall budget; the run continues and ends with the ladder's status; the specialist's semaphore is released |
+| Tool-call cap | A specialist attempting one call beyond its cap gets `BudgetExceeded`; the extra call never reaches the gateway |
+| Degradation ladder | `market` failed → `evidence_missing`; `news` failed with sentiment enabled → `evidence_missing`; `filings` absent → `filing_not_found` and the memo's "SEC Filings: Not Available" line; `analyst` failed on every tier → `failed` (`provider_unavailable`); `verifier` not passed after two revisions → `degraded` |
+| Per-agent telemetry | `progress` entries carry `agent` and `cache` fields; `/metrics` exposes `agent_runs_total{agent,status}`, `agent_duration_seconds{agent}` and `agent_tool_calls_total{tool,outcome}` |
+| Cancellation | Cancelling a job mid-fan-out leaves no running specialist task and no held semaphore |
+
+### 22.2 Memory
+
+| Case | Expected behavior |
+| --- | --- |
+| Memory is not evidence | A prior-memo fact that appears only in the MEMORY block has no citation index; a drafted claim supported only by it fails verification as uncited |
+| MEMORY block framing | The analyst prompt renders memory inside a delimited block marked context-only and possibly stale; the citation registry contains no memory entry |
+| Replay pins memory | A run's manifest records `memory_ref`; replaying it with a changed live memory store produces the same memo input and `memory_ref`; replay never calls the memory store |
+| Evaluation reads no memory | A quality-baseline run reads nothing from the memory store unless the fixture pins memory items |
+| Tenant isolation | Episodic records written for customer A are never returned for customer B, including when both analyze the same ticker |
+| Guest lifetime | A guest's episodic record carries a 24 h `expires_at`; an analyst's carries 90 days |
+| Write after commit | A stale attempt whose fenced commit is refused writes no episodic record; a committed job writes exactly one, and a repeated write for the same `job_id` is a no-op |
+| Delta computed by code | With a prior record of a different `snapshot_hash`, `AnalysisResponse.memory.delta` lists changed fields with previous and current values and a citation index for the current value; with the same `snapshot_hash` the delta is empty |
+| Issuer profile reuse | After one successful run, the next run for the ticker makes no company-name lookup query; a new accession replaces the profile |
+| Memory outage | With the memory store failing on read and write, the run completes, `guardrail_events` records `memory_unavailable`, and `memory` in the response is empty |
+| Forget | `DELETE /memory` removes the caller's episodic records and returns the count; another customer's records are untouched; a guest token can forget only its own session |
+
+### 22.3 Tool gateway and MCP
+
+| Case | Expected behavior |
+| --- | --- |
+| Allowlist | A specialist calling a tool outside its allowlist gets a typed `ToolError(not_allowed)` and the call never reaches a server |
+| Read-only registry | A `ToolSpec` with any side effect is rejected when settings load |
+| Schema pinning | A server whose `tools/list` hash differs from the pinned hash has that tool disabled at startup with a `tool_schema_drift` event; the run degrades per the ladder |
+| Payload validation | A payload that fails the output schema is dropped as `ToolError(invalid_payload)`; no partial payload reaches a specialist |
+| Framing | Every payload reaches a specialist wrapped in the untrusted-content framing of §12; the "ignore previous instructions" case of §12 holds for an MCP payload |
+| Server-initiated requests refused | A fake server issuing a sampling or elicitation request receives a refusal and no model call occurs |
+| Breaker per server | After the configured failure count a server's breaker opens; calls fail fast with `ToolError(breaker_open)`; a half-open probe closes it after a success |
+| Tool-call log in the release | A live run's manifest lists `tool`, `schema_hash`, `args_hash` and `payload_hash` per call; a replay asserts the same list |
+| Parity behind a flag | With `news-search` on MCP and the HTTP tool side by side on 20 tickers, titles, URLs and snippets match within the TTL window (recorded, not asserted in CI) |
+| `/mcp` exposure | `analyze_ticker` without credentials → 401; over quota → 429 with `Retry-After`; errors use the typed envelope; responses carry `Cache-Control: no-store`; `memo://{job_id}` of another customer → 403 |
+
+### 22.4 Cache stages
+
+| Case | Expected behavior |
+| --- | --- |
+| Stage metrics | `/metrics` exposes `cache_events_total{stage,outcome}` for every stage C0–C9 |
+| Tool-result cache | Two identical tool calls within the TTL class make one server call; a changed `schema_hash` or args misses |
+| Verification cache | Verifying the same memo against the same registry twice runs the verifier once; a changed verifier policy fingerprint misses |
+| Prompt-prefix order | The draft prompt places the static system prompt and instructions first, the issuer profile next and the registry last; cached-token counts appear in `usage` only when the provider reports them |
+| Issuer profile cache | Served until a new accession is observed; a new accession misses and refreshes |
+| Single-flight unchanged | §20 single-flight and cache-versioning cases pass unchanged under the specialist graph |
+
+### 22.5 Gate F and drills
+
+| Case | Expected behavior |
+| --- | --- |
+| Gate F comparison | Specialist graph versus pre-revision graph on the frozen release, same model, temperature and prompt: `grounded_claim_rate` and `citation_coverage` within the predeclared tolerance; the comparator refuses a run where more than one axis differs |
+| Specialist kill | Killing one evidence specialist mid-fan-out ends the run in the ladder's status with the other evidence intact |
+| Schema drift drill | A drifted tool is disabled and the run degrades; nothing crashes |
+| Memory outage drill | The run completes without memory and records the event |
+| Provider 429 storm | The breaker opens, the next attempt runs on the next tier, no partial draft is spliced |
+| Identical-request burst | N identical requests produce one generation; all N results link the same artifact hash |

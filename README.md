@@ -93,6 +93,10 @@ flowchart TD
     V --> E([END])
 ```
 
+### Agent architecture revision (proposed, ADR-0016)
+
+[`docs/agent-architecture.md`](docs/agent-architecture.md) is the design for the next step inside the worker, proposed on 2026-11-01 and not yet built: five specialists (`market`, `news`, `filings`, `analyst`, `verifier`) under a deterministic supervisor, four memory tiers under the rule that memory is context and never evidence, a tool gateway fronting in-process tools and allowlisted MCP servers, asynchronous execution with nested deadlines, nine fingerprinted cache stages, and agent-specific reliability contracts with a paired-eval adoption gate. The decision record is [ADR-0016](docs/adr/ADR-0016-agent-architecture-revision.md); the behavior oracle is test-plan §22.
+
 ### Component diagrams
 
 <details>
