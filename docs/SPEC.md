@@ -32,7 +32,7 @@ This section is the only canonical conflict-resolution order.
 3. `docs/sprint-plan.md` — sequencing and task definitions.
 4. `docs/retrieval-benchmark.md` — benchmark fixture schema, matcher, metrics, validator, and comparison policy.
 5. `docs/adr/*.md` — accepted architecture decisions.
-6. `docs/System-design/**/*.excalidraw` (editable source) with `docs/png/**/*.png` and `docs/svg/**/*.svg` renders — diagram companions; `docs/cloud-deployment.md` — deployment design companion for ADR-0006 and ADR-0015 (deployed demo tier); `docs/production-scale-architecture.md` — production scale tier (interview design, not built); `docs/agent-architecture.md` — agent architecture revision companion for ADR-0016 (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs; proposed, not built).
+6. `docs/System-design/**/*.excalidraw` and `docs/System-design/agents/*.archify.json` (editable sources) with `docs/System-design/agents/*.html`, `docs/png/**/*.png` and `docs/svg/**/*.svg` renders — diagram companions; `docs/cloud-deployment.md` — deployment design companion for ADR-0006 and ADR-0015 (deployed demo tier); `docs/production-scale-architecture.md` — production scale tier (interview design, not built); `docs/agent-architecture.md` — agent architecture revision companion for ADR-0016 (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs; proposed, not built).
 7. `tasks/todo.md` — active task state and verification ledger.
 8. `tasks/lessons.md` — correction log.
 9. Code comments and stale TODOs — lowest authority.

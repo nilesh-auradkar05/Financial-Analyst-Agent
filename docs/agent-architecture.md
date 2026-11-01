@@ -604,4 +604,15 @@ Accept ADR-0016 as the design, keep it gated on S7 seams and Gate D, and build i
 
 ## 16. Diagrams
 
-The Mermaid diagrams in §§3, 4, 5.1, 6.3, 7.1, 9 and 11.2 are the design's companions for this revision. Editable Excalidraw sources under `docs/System-design/agents/` and renders under `docs/png/agents/` and `docs/svg/agents/` are produced when the ADR is accepted, following the convention of the production and serverless sets.
+The Mermaid diagrams in §§3, 4, 5.1, 6.3, 7.1, 9 and 11.2 are inline companions. The reviewed set below was authored with Archify (editable JSON sources, interactive HTML, light-theme SVG and PNG renders), following the convention of the production and serverless sets. The HTML pages passed Archify's automated validation, delivery, strict provenance and browser gates and were inspected visually at 2048 px; the SVG and PNG files are exports of the same artifacts.
+
+| Diagram | Editable source | Interactive | Renders |
+| --- | --- | --- | --- |
+| Agent HLD (§3) | [`hld.archify.json`](System-design/agents/hld.archify.json) | [`hld.html`](System-design/agents/hld.html) | [`png`](png/agents/hld.png) · [`svg`](svg/agents/hld.svg) |
+| Critical flow and attempt 2 after a crash (§4, §8) | [`critical-flow.archify.json`](System-design/agents/critical-flow.archify.json) | [`critical-flow.html`](System-design/agents/critical-flow.html) | [`png`](png/agents/critical-flow.png) · [`svg`](svg/agents/critical-flow.svg) |
+| LLD: specialist protocol, gateway and memory contracts (§11) | [`lld.archify.json`](System-design/agents/lld.archify.json) | [`lld.html`](System-design/agents/lld.html) | [`png`](png/agents/lld.png) · [`svg`](svg/agents/lld.svg) |
+| Analysis job lifecycle (§5.1, SPEC §8.5) | [`run-lifecycle.archify.json`](System-design/agents/run-lifecycle.archify.json) | [`run-lifecycle.html`](System-design/agents/run-lifecycle.html) | [`png`](png/agents/run-lifecycle.png) · [`svg`](svg/agents/run-lifecycle.svg) |
+| Memory tiers and cache stages (§6, §9) | [`memory-cache-dataflow.archify.json`](System-design/agents/memory-cache-dataflow.archify.json) | [`memory-cache-dataflow.html`](System-design/agents/memory-cache-dataflow.html) | [`png`](png/agents/memory-cache-dataflow.png) · [`svg`](svg/agents/memory-cache-dataflow.svg) |
+| MCP tool plane and trust boundary (§7) | [`mcp-tool-plane.archify.json`](System-design/agents/mcp-tool-plane.archify.json) | [`mcp-tool-plane.html`](System-design/agents/mcp-tool-plane.html) | [`png`](png/agents/mcp-tool-plane.png) · [`svg`](svg/agents/mcp-tool-plane.svg) |
+
+Two deliberate simplifications in the drawings: the HLD shows the two first MCP servers and names the later `market-data` wrapper in a card, and the lifecycle folds the claim into the first transition (claim = attempt + 1, lease, guard_inputs, issuer-profile read) to stay within desktop width.

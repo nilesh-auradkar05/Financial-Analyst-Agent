@@ -1,0 +1,647 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Agent HLD (ADR-0016) — five specialists under a deterministic supervisor, memory, tool gateway, MCP, staged caches",
+    "output": "docs/System-design/agents/hld.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "views": [
+      {
+        "id": "evidence",
+        "label": "Evidence fan-out",
+        "focus": [
+          "supervisor",
+          "market",
+          "news",
+          "filings",
+          "gateway",
+          "toolcache",
+          "index"
+        ],
+        "note": "Three model-free specialists run concurrently under their own budgets"
+      },
+      {
+        "id": "draft",
+        "label": "Draft and verify loop",
+        "focus": [
+          "freeze",
+          "analyst",
+          "verifier",
+          "foundry",
+          "bedrock",
+          "memocache"
+        ],
+        "note": "One model call per draft; revise at most twice; verifier has no tools"
+      },
+      {
+        "id": "memory",
+        "label": "Memory and commit",
+        "focus": [
+          "supervisor",
+          "memsvc",
+          "verifier",
+          "jobstore"
+        ],
+        "note": "Memory is read before drafting and written only after the fenced commit"
+      },
+      {
+        "id": "mcp",
+        "label": "MCP tool plane",
+        "focus": [
+          "gateway",
+          "mcp_news",
+          "mcp_edgar"
+        ],
+        "note": "Allowlisted, read-only, schema-pinned servers outside the worker role"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Browser / agent client",
+      "sublabel": "guest or admin session",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "API acceptance",
+      "sublabel": "idempotency · quotas · budget",
+      "pos": [
+        255,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "no model calls"
+    },
+    {
+      "id": "jobstore",
+      "type": "database",
+      "label": "Job store",
+      "sublabel": "jobs · events · checkpoints",
+      "pos": [
+        470,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "ADR-0013"
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Queue",
+      "sublabel": "SQS / SKIP LOCKED",
+      "pos": [
+        685,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "mcp_news",
+      "type": "external",
+      "label": "MCP news-search",
+      "sublabel": "vendor-hosted · MCP-1",
+      "pos": [
+        900,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "mcp_edgar",
+      "type": "cloud",
+      "label": "MCP sec-edgar",
+      "sublabel": "own wrapper · MCP-2",
+      "pos": [
+        1145,
+        40
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "memsvc",
+      "type": "database",
+      "label": "Memory store",
+      "sublabel": "M1 episodic · M2 issuer",
+      "pos": [
+        470,
+        275
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "per customer_id"
+    },
+    {
+      "id": "bedrock",
+      "type": "cloud",
+      "label": "Bedrock",
+      "sublabel": "DeepSeek V3.2 · next tier",
+      "pos": [
+        470,
+        390
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "foundry",
+      "type": "cloud",
+      "label": "Foundry",
+      "sublabel": "DeepSeek-V4-Flash · first tier",
+      "pos": [
+        470,
+        505
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "memocache",
+      "type": "database",
+      "label": "Cache store",
+      "sublabel": "C1 memo · C8 verification",
+      "pos": [
+        470,
+        620
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "fingerprinted keys"
+    },
+    {
+      "id": "supervisor",
+      "type": "backend",
+      "label": "Supervisor",
+      "sublabel": "code-routed · fixed topology",
+      "pos": [
+        685,
+        275
+      ],
+      "size": [
+        140,
+        70
+      ],
+      "tag": "no LLM planner"
+    },
+    {
+      "id": "freeze",
+      "type": "backend",
+      "label": "Freeze snapshot",
+      "sublabel": "snapshot_hash · memory_ref",
+      "pos": [
+        685,
+        390
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "analyst",
+      "type": "backend",
+      "label": "analyst",
+      "sublabel": "LLM · no tools",
+      "pos": [
+        685,
+        505
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "specialist 4"
+    },
+    {
+      "id": "verifier",
+      "type": "backend",
+      "label": "verifier",
+      "sublabel": "grounding + policy · no tools",
+      "pos": [
+        685,
+        620
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "specialist 5"
+    },
+    {
+      "id": "market",
+      "type": "backend",
+      "label": "market",
+      "sublabel": "quote · profile",
+      "pos": [
+        900,
+        160
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "8 s · 2 calls"
+    },
+    {
+      "id": "news",
+      "type": "backend",
+      "label": "news",
+      "sublabel": "news search · FinBERT",
+      "pos": [
+        900,
+        275
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "12 s · 2 calls"
+    },
+    {
+      "id": "filings",
+      "type": "backend",
+      "label": "filings",
+      "sublabel": "retrieval · ingest",
+      "pos": [
+        900,
+        390
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "20 s · 4 calls"
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "Tool gateway",
+      "sublabel": "allowlist · budgets · framing",
+      "pos": [
+        1145,
+        275
+      ],
+      "size": [
+        140,
+        80
+      ],
+      "tag": "breaker per target"
+    },
+    {
+      "id": "toolcache",
+      "type": "database",
+      "label": "Cache store",
+      "sublabel": "C2–C6 tool results",
+      "pos": [
+        900,
+        720
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "index",
+      "type": "database",
+      "label": "Index",
+      "sublabel": "release-pinned alias",
+      "pos": [
+        1145,
+        720
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "ADR-0014"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Worker — one supervisor run per claimed job",
+      "wraps": [
+        "supervisor",
+        "freeze",
+        "analyst",
+        "verifier",
+        "market",
+        "news",
+        "filings",
+        "gateway"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "security-group",
+      "label": "MCP servers — outside the worker role · read-only · schema-pinned",
+      "wraps": [
+        "mcp_news",
+        "mcp_edgar"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "security-group",
+      "label": "Model plane — ADR-0009 ladder",
+      "wraps": [
+        "bedrock",
+        "foundry"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "from": "client",
+      "to": "api",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "api",
+      "to": "jobstore",
+      "label": "accept txn",
+      "variant": "emphasis"
+    },
+    {
+      "from": "jobstore",
+      "to": "queue",
+      "label": "stream",
+      "variant": "dashed"
+    },
+    {
+      "from": "queue",
+      "to": "supervisor",
+      "label": "deliver · claim attempt + 1",
+      "variant": "emphasis"
+    },
+    {
+      "from": "supervisor",
+      "to": "market",
+      "label": "8 s",
+      "variant": "emphasis",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "supervisor",
+      "to": "news",
+      "label": "12 s",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        882,
+        296
+      ]
+    },
+    {
+      "from": "supervisor",
+      "to": "filings",
+      "label": "20 s",
+      "variant": "emphasis",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "market",
+      "to": "gateway",
+      "label": "market.quote",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          1110,
+          192
+        ],
+        [
+          1110,
+          315
+        ]
+      ]
+    },
+    {
+      "from": "news",
+      "to": "gateway",
+      "label": "tools",
+      "route": "straight",
+      "labelAt": [
+        1065,
+        296
+      ]
+    },
+    {
+      "from": "filings",
+      "to": "gateway",
+      "label": "retrieval ×4 · ingest",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [
+          1110,
+          422
+        ],
+        [
+          1110,
+          315
+        ]
+      ],
+      "labelAt": [
+        1140,
+        440
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "mcp_edgar",
+      "label": "MCP",
+      "variant": "security",
+      "route": "straight"
+    },
+    {
+      "from": "gateway",
+      "to": "mcp_news",
+      "label": "streamable HTTP",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [
+          1215,
+          132
+        ],
+        [
+          970,
+          132
+        ]
+      ]
+    },
+    {
+      "from": "gateway",
+      "to": "index",
+      "label": "release alias",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight"
+    },
+    {
+      "from": "gateway",
+      "to": "toolcache",
+      "label": "C2–C6 by TTL class",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "supervisor",
+      "to": "freeze",
+      "label": "join → snapshot_hash",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "freeze",
+      "to": "analyst",
+      "label": "C1 miss → draft",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "analyst",
+      "to": "verifier",
+      "label": "memo + usage",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "from": "verifier",
+      "to": "analyst",
+      "label": "revise ≤ 2",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "from": "analyst",
+      "to": "foundry",
+      "label": "draft",
+      "route": "straight"
+    },
+    {
+      "from": "foundry",
+      "to": "bedrock",
+      "label": "breaker open → next tier",
+      "variant": "dashed",
+      "route": "straight"
+    },
+    {
+      "from": "verifier",
+      "to": "memocache",
+      "label": "C1 · C8",
+      "route": "straight"
+    },
+    {
+      "from": "supervisor",
+      "to": "memsvc",
+      "label": "memory",
+      "route": "straight"
+    },
+    {
+      "from": "verifier",
+      "to": "jobstore",
+      "label": "fenced commit · attempt = fence",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          755,
+          740
+        ],
+        [
+          450,
+          740
+        ],
+        [
+          450,
+          130
+        ],
+        [
+          540,
+          130
+        ]
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Containment rule",
+      "items": [
+        "market, news and filings make no model call; analyst and verifier call no tool",
+        "The supervisor is code: its only data-dependent branch is the revise loop",
+        "Tool payloads are framed as data before any model sees them"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Memory is context, never evidence",
+      "items": [
+        "The supervisor reads the issuer profile before fan-out and episodic memory before drafting; it writes episodic memory only after the fenced commit",
+        "Memory items carry no citation index; the verifier rejects memory-only claims; the manifest records memory_ref for replay",
+        "Episodic memory is keyed by customer_id; guests expire after 24 h"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "One cache store, nine stages",
+      "items": [
+        "C0 idempotency · C1 memo (single-flight) · C2–C6 tool, embedding, retrieval, sentiment",
+        "C7 provider prompt prefix · C8 verification · C9 issuer profile",
+        "Every key carries the fingerprint of what produced it; semantic memo reuse stays prohibited"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What does not change, and what comes later",
+      "items": [
+        "Acceptance, fencing, event replay and identity stay as ADR-0010, ADR-0013 and ADR-0015 define them",
+        "A third server, market-data (own wrapper, MCP-4), joins the MCP group when licensed data arrives",
+        "The pre-revision graph stays the default until Gate F passes a paired comparison on the frozen release"
+      ]
+    }
+  ]
+}

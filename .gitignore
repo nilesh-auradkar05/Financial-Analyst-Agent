@@ -253,3 +253,6 @@ Alpha-Financial-Analyst.zip
 graphify-out/
 
 
+
+# Archify working folders (candidates, receipts, captures); delivered diagrams live under docs/
+.archify/

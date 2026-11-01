@@ -1,0 +1,204 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Analysis job lifecycle (ADR-0016) — supervisor states, bounded loops and terminal statuses",
+    "output": "docs/System-design/agents/run-lifecycle.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "mainPath": [
+    "queued",
+    "evidence",
+    "frozen",
+    "drafting",
+    "verifying",
+    "completed"
+  ],
+  "states": [
+    {
+      "id": "queued",
+      "type": "start",
+      "label": "Queued",
+      "sublabel": "accepted",
+      "tag": "entry",
+      "step": "01"
+    },
+    {
+      "id": "evidence",
+      "type": "active",
+      "label": "Evidence",
+      "sublabel": "3 specialists",
+      "tag": "no LLM",
+      "step": "02"
+    },
+    {
+      "id": "frozen",
+      "type": "decision",
+      "label": "Frozen",
+      "sublabel": "snapshot_hash",
+      "tag": "C1",
+      "step": "03"
+    },
+    {
+      "id": "drafting",
+      "type": "active",
+      "label": "Drafting",
+      "sublabel": "analyst",
+      "tag": "1 call",
+      "step": "04"
+    },
+    {
+      "id": "verifying",
+      "type": "decision",
+      "label": "Verifying",
+      "sublabel": "grounding",
+      "tag": "no tools",
+      "step": "05"
+    },
+    {
+      "id": "completed",
+      "type": "success",
+      "label": "Completed",
+      "sublabel": "passed",
+      "tag": "terminal",
+      "step": "06"
+    },
+    {
+      "id": "revising",
+      "type": "active",
+      "label": "Revising",
+      "sublabel": "failed claims",
+      "tag": "≤ 2"
+    },
+    {
+      "id": "degraded",
+      "type": "neutral",
+      "label": "Degraded",
+      "sublabel": "2 revisions",
+      "tag": "terminal"
+    },
+    {
+      "id": "missing",
+      "type": "neutral",
+      "label": "Missing",
+      "sublabel": "evidence class",
+      "tag": "terminal"
+    },
+    {
+      "id": "failed",
+      "type": "failure",
+      "label": "Failed",
+      "sublabel": "typed cause",
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t1",
+      "from": "queued",
+      "to": "evidence",
+      "label": "claim"
+    },
+    {
+      "id": "t3",
+      "from": "evidence",
+      "to": "frozen",
+      "label": "join"
+    },
+    {
+      "id": "t4",
+      "from": "frozen",
+      "to": "drafting",
+      "label": "C1 miss"
+    },
+    {
+      "id": "t5",
+      "from": "drafting",
+      "to": "verifying",
+      "label": "memo"
+    },
+    {
+      "id": "t6",
+      "from": "verifying",
+      "to": "completed",
+      "label": "pass"
+    },
+    {
+      "id": "t7",
+      "from": "frozen",
+      "to": "verifying",
+      "label": "C1 hit",
+      "variant": "dashed"
+    },
+    {
+      "id": "t8",
+      "from": "verifying",
+      "to": "revising",
+      "label": "r < 2"
+    },
+    {
+      "id": "t9",
+      "from": "revising",
+      "to": "verifying",
+      "label": "verify"
+    },
+    {
+      "id": "t10",
+      "from": "verifying",
+      "to": "degraded",
+      "label": "r = 2",
+      "variant": "security"
+    },
+    {
+      "id": "t11",
+      "from": "verifying",
+      "to": "missing",
+      "label": "no class",
+      "variant": "security"
+    },
+    {
+      "id": "t12",
+      "from": "drafting",
+      "to": "failed",
+      "label": "no tier",
+      "variant": "security"
+    },
+    {
+      "id": "t13",
+      "from": "queued",
+      "to": "failed",
+      "label": "deadline",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Terminal precedence",
+      "items": [
+        "failed › evidence_missing › degraded › completed (SPEC §8.5)",
+        "completed needs passing verification, output policy and no missing evidence class",
+        "Every terminal write carries the attempt fence; a C1 hit is verified from C8, never re-drafted"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Bounded loops and crashes",
+      "items": [
+        "Revise at most twice, then degraded; 'no tier' means every provider tier failed or the cost cap was hit",
+        "A crash expires the lease: the job is redelivered and re-claimed with attempt + 1 (at most three attempts, then the DLQ writes failed)",
+        "A re-claim skips completed, in-TTL specialists and the memo cache answers for the same snapshot_hash"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Memory touches",
+      "items": [
+        "Claim = attempt + 1 with a lease, then guard_inputs and the issuer-profile read, before the evidence fan-out",
+        "Episodic memory is read before drafting and written only after the fenced terminal commit",
+        "A memory outage records memory_unavailable and continues"
+      ]
+    }
+  ]
+}

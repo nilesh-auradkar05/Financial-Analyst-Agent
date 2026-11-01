@@ -1,0 +1,350 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "MCP tool plane (ADR-0016) — gateway trust boundary, consumed servers and the exposed analyst",
+    "output": "docs/System-design/agents/mcp-tool-plane.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "components": [
+    {
+      "id": "specialists",
+      "type": "backend",
+      "label": "market · news · filings",
+      "sublabel": "tool-using specialists, no model",
+      "pos": [
+        40,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "llm_specialists",
+      "type": "backend",
+      "label": "analyst · verifier",
+      "sublabel": "model-calling, empty allowlist",
+      "pos": [
+        40,
+        380
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "registry",
+      "type": "database",
+      "label": "ToolSpec registry",
+      "sublabel": "pinned schema hashes · read-only only",
+      "pos": [
+        300,
+        80
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "Pydantic settings"
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "Tool gateway",
+      "sublabel": "allowlist · budget · breaker · framing",
+      "pos": [
+        300,
+        230
+      ],
+      "size": [
+        160,
+        80
+      ]
+    },
+    {
+      "id": "toolcache",
+      "type": "database",
+      "label": "C3 tool cache",
+      "sublabel": "server · tool · schema_hash · args",
+      "pos": [
+        300,
+        380
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "inproc",
+      "type": "backend",
+      "label": "In-process adapters",
+      "sublabel": "retrieval store · FinBERT · ingest",
+      "pos": [
+        560,
+        380
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "index",
+      "type": "database",
+      "label": "Index",
+      "sublabel": "release alias",
+      "pos": [
+        820,
+        380
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "mcpclient",
+      "type": "backend",
+      "label": "MCP client",
+      "sublabel": "streamable HTTP · pooled sessions",
+      "pos": [
+        560,
+        230
+      ],
+      "size": [
+        160,
+        80
+      ],
+      "tag": "callbacks disabled"
+    },
+    {
+      "id": "news_srv",
+      "type": "external",
+      "label": "news-search",
+      "sublabel": "vendor-hosted · MCP-1",
+      "pos": [
+        820,
+        80
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "edgar_srv",
+      "type": "cloud",
+      "label": "sec-edgar",
+      "sublabel": "own wrapper · EDGAR limiter · MCP-2",
+      "pos": [
+        820,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "edgar",
+      "type": "external",
+      "label": "SEC EDGAR",
+      "sublabel": "≤ 8 req/s",
+      "pos": [
+        1080,
+        230
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "agents",
+      "type": "external",
+      "label": "Agent clients",
+      "sublabel": "IDE · desktop assistant · orchestrators",
+      "pos": [
+        40,
+        560
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "mcpserver",
+      "type": "backend",
+      "label": "MCP server /mcp",
+      "sublabel": "analyze_ticker · get_job · list_runs",
+      "pos": [
+        300,
+        560
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "MCP-3"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "API routes",
+      "sublabel": "same issuer allowlist · quotas · envelope",
+      "pos": [
+        660,
+        560
+      ],
+      "size": [
+        160,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Worker trust boundary — the gateway is the only path from a specialist to a tool",
+      "wraps": [
+        "specialists",
+        "llm_specialists",
+        "registry",
+        "gateway",
+        "toolcache",
+        "inproc",
+        "mcpclient"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "MCP servers — outside the worker execution role, read-only tools",
+      "wraps": [
+        "news_srv",
+        "edgar_srv"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Expose (MCP-3) — thin adapter over the existing API",
+      "wraps": [
+        "agents",
+        "mcpserver",
+        "api"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "from": "specialists",
+      "to": "gateway",
+      "label": "allowed call",
+      "variant": "emphasis"
+    },
+    {
+      "from": "llm_specialists",
+      "to": "gateway",
+      "label": "refused: not_allowed",
+      "variant": "security",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "gateway",
+      "to": "registry",
+      "label": "schema_hash check at startup",
+      "route": "straight"
+    },
+    {
+      "from": "gateway",
+      "to": "toolcache",
+      "label": "lookup by TTL class",
+      "route": "straight"
+    },
+    {
+      "from": "gateway",
+      "to": "mcpclient",
+      "label": "server tools",
+      "variant": "emphasis"
+    },
+    {
+      "from": "gateway",
+      "to": "inproc",
+      "label": "in-process tools",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "inproc",
+      "to": "index",
+      "label": "active alias"
+    },
+    {
+      "from": "mcpclient",
+      "to": "news_srv",
+      "label": "per-server credential",
+      "variant": "security",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "mcpclient",
+      "to": "edgar_srv",
+      "label": "server creds",
+      "variant": "security"
+    },
+    {
+      "from": "edgar_srv",
+      "to": "edgar",
+      "label": "filings",
+      "variant": "dashed"
+    },
+    {
+      "from": "agents",
+      "to": "mcpserver",
+      "label": "MCP over HTTP",
+      "variant": "emphasis"
+    },
+    {
+      "from": "mcpserver",
+      "to": "api",
+      "label": "POST /analyze/async · GET /jobs",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Threats and controls",
+      "items": [
+        "Tool poisoning / rug-pull: schema and description hashes pinned; drift disables the tool until re-approved",
+        "Server-initiated model calls: sampling and elicitation refused by the client",
+        "Injection through payloads: output-schema validation, framing as data, only model-free specialists receive payloads"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Adoption order",
+      "items": [
+        "MCP-0 gateway with in-process tools only; tool_calls log in the release manifest",
+        "MCP-1 news-search behind a flag with a paired evidence-equality check",
+        "MCP-2 sec-edgar wrapper; MCP-3 expose /mcp; MCP-4 market-data wrapper"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Replay and cost",
+      "items": [
+        "A replay asserts the same tool, schema_hash and args_hash list, not only the same memo",
+        "Own wrappers are two idle-free functions in the demo tier or two small tasks in the scale tier",
+        "Credentials per server live in Parameter Store; the worker role gains no permission"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,659 @@
+{
+  "schema_version": 1,
+  "diagram_type": "class",
+  "meta": {
+    "title": "LLD (ADR-0016) — specialist protocol, tool gateway and memory contracts",
+    "subtitle": "app/agents/specialists · app/tools · app/memory — specialists import the gateway and the memory protocol, never a client",
+    "output": "docs/System-design/agents/lld.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "layout": {
+    "mode": "grid",
+    "typeMaxW": 240
+  },
+  "types": [
+    {
+      "id": "supervisor",
+      "label": "Supervisor",
+      "kind": "class",
+      "sublabel": "app/agents/supervisor.py — fixed topology, code routing",
+      "row": 0,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "specialists",
+          "type": "dict[str, SpecialistAgent]",
+          "visibility": "private"
+        },
+        {
+          "name": "memory",
+          "type": "MemoryStore",
+          "visibility": "private"
+        },
+        {
+          "name": "ctx",
+          "type": "RunContext (job_id, attempt, customer_id, deadline)",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "request, ctx",
+          "returns": "AgentState",
+          "visibility": "public"
+        },
+        {
+          "name": "freeze_snapshot",
+          "parameters": "results",
+          "returns": "EvidenceSnapshot",
+          "visibility": "private"
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "label": "SpecialistAgent",
+      "kind": "interface",
+      "sublabel": "one contract for all five specialists",
+      "row": 0,
+      "col": 1.5,
+      "attributes": [
+        {
+          "name": "name",
+          "type": "str",
+          "visibility": "public"
+        },
+        {
+          "name": "budget",
+          "type": "AgentBudget",
+          "visibility": "public"
+        },
+        {
+          "name": "tool_allowlist",
+          "type": "frozenset[str]",
+          "visibility": "public"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "task, ctx: RunContext",
+          "returns": "AgentResult",
+          "visibility": "public",
+          "abstract": true
+        }
+      ]
+    },
+    {
+      "id": "budget",
+      "label": "AgentBudget",
+      "kind": "record",
+      "sublabel": "bounded autonomy per specialist",
+      "row": 0,
+      "col": 3,
+      "attributes": [
+        {
+          "name": "wall_timeout_s",
+          "type": "float"
+        },
+        {
+          "name": "max_tool_calls",
+          "type": "int"
+        },
+        {
+          "name": "max_input_tokens",
+          "type": "int"
+        },
+        {
+          "name": "max_output_tokens",
+          "type": "int"
+        },
+        {
+          "name": "max_llm_attempts",
+          "type": "int"
+        },
+        {
+          "name": "max_cost_usd",
+          "type": "float"
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "label": "MemoryStore",
+      "kind": "interface",
+      "sublabel": "app/memory/store.py — no client escapes",
+      "row": 1,
+      "col": 0,
+      "methods": [
+        {
+          "name": "read_episodic",
+          "parameters": "principal, ticker, limit",
+          "returns": "list[EpisodicRecord]",
+          "abstract": true
+        },
+        {
+          "name": "write_episodic",
+          "parameters": "record",
+          "returns": "None",
+          "abstract": true
+        },
+        {
+          "name": "read_issuer_profile",
+          "parameters": "ticker",
+          "returns": "IssuerProfile | None",
+          "abstract": true
+        },
+        {
+          "name": "upsert_issuer_profile",
+          "parameters": "profile",
+          "returns": "None",
+          "abstract": true
+        },
+        {
+          "name": "forget",
+          "parameters": "principal",
+          "returns": "int",
+          "abstract": true
+        }
+      ]
+    },
+    {
+      "id": "market",
+      "label": "MarketSpecialist",
+      "kind": "class",
+      "sublabel": "no model call",
+      "row": 1,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "tool_allowlist",
+          "type": "{market.quote, market.profile}"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "task, ctx",
+          "returns": "AgentResult[MarketEvidence]"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "label": "AgentResult",
+      "kind": "record",
+      "sublabel": "status + usage per specialist",
+      "row": 1,
+      "col": 3,
+      "attributes": [
+        {
+          "name": "status",
+          "type": "ok|degraded|failed|skipped"
+        },
+        {
+          "name": "output",
+          "type": "BaseModel"
+        },
+        {
+          "name": "errors",
+          "type": "list[AgentError]"
+        },
+        {
+          "name": "usage",
+          "type": "Usage (wall, tool calls, tokens, cost)"
+        },
+        {
+          "name": "cache",
+          "type": "dict[stage, outcome]"
+        },
+        {
+          "name": "fetched_at",
+          "type": "str | None"
+        }
+      ]
+    },
+    {
+      "id": "episodic",
+      "label": "EpisodicRecord",
+      "kind": "record",
+      "sublabel": "M1 — per customer_id × ticker",
+      "row": 2,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "customer_id",
+          "type": "str"
+        },
+        {
+          "name": "job_id",
+          "type": "str"
+        },
+        {
+          "name": "snapshot_hash",
+          "type": "str"
+        },
+        {
+          "name": "status",
+          "type": "completed|degraded|evidence_missing"
+        },
+        {
+          "name": "memo_ref",
+          "type": "str"
+        },
+        {
+          "name": "executive_summary",
+          "type": "str ≤ 500"
+        },
+        {
+          "name": "expires_at",
+          "type": "str"
+        }
+      ]
+    },
+    {
+      "id": "news",
+      "label": "NewsSpecialist",
+      "kind": "class",
+      "sublabel": "news search + FinBERT, no model call",
+      "row": 2,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "tool_allowlist",
+          "type": "{news.search, sentiment.score}"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "task, ctx",
+          "returns": "AgentResult[NewsEvidence]"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "label": "ToolGateway",
+      "kind": "class",
+      "sublabel": "app/tools/gateway.py — only path to a tool",
+      "row": 2,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "registry",
+          "type": "dict[str, ToolSpec]",
+          "visibility": "private"
+        },
+        {
+          "name": "breakers",
+          "type": "dict[str, Breaker]",
+          "visibility": "private"
+        }
+      ],
+      "methods": [
+        {
+          "name": "call",
+          "parameters": "specialist, tool, args, ctx",
+          "returns": "ToolResult",
+          "visibility": "public"
+        }
+      ]
+    },
+    {
+      "id": "spec",
+      "label": "ToolSpec",
+      "kind": "record",
+      "sublabel": "from MCPSettings, pinned at startup",
+      "row": 2,
+      "col": 3,
+      "attributes": [
+        {
+          "name": "name",
+          "type": "str"
+        },
+        {
+          "name": "server",
+          "type": "str | None"
+        },
+        {
+          "name": "schema_hash",
+          "type": "str"
+        },
+        {
+          "name": "ttl_class",
+          "type": "market|news|sec|permanent|none"
+        },
+        {
+          "name": "timeout_s",
+          "type": "float"
+        },
+        {
+          "name": "side_effects",
+          "type": "Literal['none']"
+        }
+      ]
+    },
+    {
+      "id": "issuer",
+      "label": "IssuerProfile",
+      "kind": "record",
+      "sublabel": "M2 — per issuer, no principal field",
+      "row": 3,
+      "col": 0,
+      "attributes": [
+        {
+          "name": "ticker",
+          "type": "str"
+        },
+        {
+          "name": "cik",
+          "type": "str | None"
+        },
+        {
+          "name": "latest_10k_accession",
+          "type": "str | None"
+        },
+        {
+          "name": "section_coverage",
+          "type": "dict[str, int]"
+        },
+        {
+          "name": "source_snapshot_hash",
+          "type": "str"
+        }
+      ]
+    },
+    {
+      "id": "filings",
+      "label": "FilingsSpecialist",
+      "kind": "class",
+      "sublabel": "retrieval + ingest on miss, no model call",
+      "row": 3,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "tool_allowlist",
+          "type": "{retrieval.search, edgar.latest_10k, ingest.10k}"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "task, ctx",
+          "returns": "AgentResult[FilingEvidence]"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "label": "McpClient",
+      "kind": "class",
+      "sublabel": "app/tools/mcp_client.py — only MCP SDK import",
+      "row": 3,
+      "col": 3,
+      "attributes": [
+        {
+          "name": "transport",
+          "type": "streamable HTTP, pooled"
+        },
+        {
+          "name": "callbacks",
+          "type": "sampling, elicitation disabled"
+        }
+      ],
+      "methods": [
+        {
+          "name": "call_tool",
+          "parameters": "spec, args, timeout",
+          "returns": "dict"
+        },
+        {
+          "name": "verify_schemas",
+          "returns": "list[ToolSchemaDrift]"
+        }
+      ]
+    },
+    {
+      "id": "analyst",
+      "label": "AnalystSpecialist",
+      "kind": "class",
+      "sublabel": "model call, no tools",
+      "row": 4,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "tool_allowlist",
+          "type": "∅"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "task, ctx",
+          "returns": "AgentResult[MemoDraft]"
+        },
+        {
+          "name": "revise",
+          "parameters": "request: RevisionRequest",
+          "returns": "AgentResult[MemoDraft]"
+        }
+      ]
+    },
+    {
+      "id": "toolresult",
+      "label": "ToolResult",
+      "kind": "record",
+      "sublabel": "validated, then framed as untrusted data",
+      "row": 4,
+      "col": 2,
+      "attributes": [
+        {
+          "name": "tool",
+          "type": "str"
+        },
+        {
+          "name": "schema_hash",
+          "type": "str"
+        },
+        {
+          "name": "fetched_at",
+          "type": "str"
+        },
+        {
+          "name": "cache",
+          "type": "hit|miss|bypass"
+        },
+        {
+          "name": "payload",
+          "type": "dict"
+        }
+      ]
+    },
+    {
+      "id": "verifier",
+      "label": "VerifierSpecialist",
+      "kind": "class",
+      "sublabel": "heuristic + policy, no tools",
+      "row": 5,
+      "col": 1,
+      "attributes": [
+        {
+          "name": "tool_allowlist",
+          "type": "∅"
+        },
+        {
+          "name": "max_revisions",
+          "type": "int = 2"
+        }
+      ],
+      "methods": [
+        {
+          "name": "run",
+          "parameters": "memo, registry, ctx",
+          "returns": "AgentResult[VerificationResult]"
+        },
+        {
+          "name": "reject_memory_only",
+          "parameters": "claims",
+          "returns": "list[Claim]"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "sup_runs",
+      "from": "supervisor",
+      "to": "agent",
+      "kind": "aggregation",
+      "label": "runs five"
+    },
+    {
+      "id": "sup_mem",
+      "from": "supervisor",
+      "to": "memory",
+      "kind": "dependency",
+      "label": "read · write"
+    },
+    {
+      "id": "mem_episodic",
+      "from": "memory",
+      "to": "episodic",
+      "kind": "dependency"
+    },
+    {
+      "id": "mem_issuer",
+      "from": "memory",
+      "to": "issuer",
+      "kind": "dependency",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "agent_budget",
+      "from": "agent",
+      "to": "budget",
+      "kind": "association",
+      "label": "bounded by"
+    },
+    {
+      "id": "agent_result",
+      "from": "agent",
+      "to": "result",
+      "kind": "dependency",
+      "label": "returns",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "market_is",
+      "from": "market",
+      "to": "agent",
+      "kind": "realization"
+    },
+    {
+      "id": "news_is",
+      "from": "news",
+      "to": "agent",
+      "kind": "realization",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "filings_is",
+      "from": "filings",
+      "to": "agent",
+      "kind": "realization",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "analyst_is",
+      "from": "analyst",
+      "to": "agent",
+      "kind": "realization",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "verifier_is",
+      "from": "verifier",
+      "to": "agent",
+      "kind": "realization",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "market_gw",
+      "from": "market",
+      "to": "gateway",
+      "kind": "dependency",
+      "label": "allowlisted calls"
+    },
+    {
+      "id": "news_gw",
+      "from": "news",
+      "to": "gateway",
+      "kind": "dependency"
+    },
+    {
+      "id": "filings_gw",
+      "from": "filings",
+      "to": "gateway",
+      "kind": "dependency"
+    },
+    {
+      "id": "gw_spec",
+      "from": "gateway",
+      "to": "spec",
+      "kind": "composition",
+      "label": "registry"
+    },
+    {
+      "id": "gw_mcp",
+      "from": "gateway",
+      "to": "mcp",
+      "kind": "dependency",
+      "label": "server tools",
+      "route": "orthogonal-h"
+    },
+    {
+      "id": "gw_result",
+      "from": "gateway",
+      "to": "toolresult",
+      "kind": "dependency",
+      "label": "returns"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Containment in the types",
+      "items": [
+        "Market, News and Filings hold a non-empty allowlist and never a model client",
+        "Analyst and Verifier hold an empty allowlist: a tool call cannot be expressed",
+        "ToolSpec.side_effects is the literal 'none', so a writing tool cannot be registered"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Memory contract and adapters",
+      "items": [
+        "IssuerProfile has no principal field by construction; EpisodicRecord stores a memo reference, never the memo text",
+        "forget(principal) backs DELETE /memory",
+        "Adapters: InMemoryMemoryStore (tests), DynamoDBMemoryStore (demo tier, DynamoDB Local in compose); Postgres only at its scale-tier trigger"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Dependency rules",
+      "items": [
+        "specialists → gateway, memory protocol; never a client",
+        "mcp_client.py is the only module importing the MCP SDK",
+        "RunContext (job_id, attempt, customer_id, deadline, correlation ids) is built per attempt by the Supervisor and passed to every run()"
+      ]
+    }
+  ]
+}
