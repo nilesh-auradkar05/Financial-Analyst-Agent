@@ -52,29 +52,17 @@ Comparisons change one thing at a time: the same fixture, and either the backend
 
 ### Cloud architecture: AWS serving, Azure model fallback
 
-![Cloud architecture: a Cloudflare Worker in front of scale-to-zero AWS services in us-east-1, with Azure as the model fallback plane](docs/png/serverless/hld.png)
-
-One AWS region serves every request and holds all state, and nothing runs while the system is idle. Azure hosts the same models as a fallback, so every cross-cloud call is a stateless model request.
+One AWS region serves every request and holds all state, and nothing runs while the system is idle. Azure is the model plane only, so every cross-cloud call is a stateless model request. The topology, request path, crash-resume flow and degradation ladders are drawn as Mermaid figures in [`docs/cloud-deployment.md`](docs/cloud-deployment.md) §§2–5.
 
 - **Demo tier, scale-to-zero on AWS `us-east-1`:** a Cloudflare Worker signs requests to Lambda functions (web BFF, API, worker) with response streaming; DynamoDB holds jobs, fenced attempts, events and caches; SQS (fed by DynamoDB Streams) queues work; S3 holds evidence. Visitors get a Turnstile-gated guest mode; Cognito is for the admin.
 - **Production scale tier:** ECS Fargate async workers, Aurora PostgreSQL with a `SKIP LOCKED` queue and an outbox to SQS, Valkey and an ALB, each adopted on a measured trigger. [`docs/production-scale-architecture.md`](docs/production-scale-architecture.md) answers "how would you productionize this?" end to end.
-- **Azure is the model plane only:** the same models (DeepSeek V3.2 for drafting, gpt-oss-120b for verification, Cohere Embed v4) on Microsoft Foundry, used as fallbacks behind parity gates.
-- **Search:** Amazon OpenSearch Serverless (scales to zero, hybrid keyword and vector search), woken by a landing-page warm-up and capped at 45 awake minutes a day as an abuse guard. Qdrant stays the local and benchmark backend.
+- **Model plane across two clouds:** drafting tries Microsoft Foundry DeepSeek-V4-Flash first, then Bedrock `deepseek.v3.2` (ADR-0009 amendment 2026-10-17); the evaluation judge runs GPT-5.6 Luna on Bedrock, then on Foundry. Embedding arms are chosen by the CM-5 bake-off (ADR-0016).
+- **Search:** OpenSearch is the only vector store (ADR-0016, 2026-10-23): a local container for development and tests, Amazon OpenSearch Serverless in the cloud, woken by a landing-page warm-up and capped at 45 awake minutes a day as an abuse guard. Qdrant and Chroma are retired and removed in CM-7.
 - **Cloud-neutral services:** Grafana Cloud and LangSmith for observability, GitHub Actions for an eval-gated deploy.
 - **Ingestion:** Airflow 3 on MWAA Serverless, monthly or on demand, promoting a new index release by alias swap only after validation.
 - **Cost and teardown:** about $4/month projected, with guest quotas, reserved concurrency and an AWS Budgets kill switch at $100/month; Terraform builds and removes the whole stack.
 
-The decisions behind this design are recorded in [ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md), ADR-0010 to ADR-0013, [ADR-0014](docs/adr/ADR-0014-opensearch-serverless-vector-store.md) (vector store) and [ADR-0015](docs/adr/ADR-0015-scale-to-zero-serverless-deployment.md) (scale-to-zero runtime). [`docs/cloud-deployment.md`](docs/cloud-deployment.md) has the decision index, request path, degradation ladders, cost model and the region-loss analysis.
-
-| Diagram | Image | SVG | Editable source |
-|---|---|---|---|
-| Demo tier HLD | [`hld.png`](docs/png/serverless/hld.png) | [`hld.svg`](docs/svg/serverless/hld.svg) | [`hld.excalidraw`](docs/System-design/serverless/hld.excalidraw) |
-| Demo tier cold-start flow | [`critical-flow.png`](docs/png/serverless/critical-flow.png) | [`critical-flow.svg`](docs/svg/serverless/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/serverless/critical-flow.excalidraw) |
-| Demo tier contracts | [`lld.png`](docs/png/serverless/lld.png) | [`lld.svg`](docs/svg/serverless/lld.svg) | [`lld.excalidraw`](docs/System-design/serverless/lld.excalidraw) |
-| Scale tier HLD | [`hld.png`](docs/png/production/hld.png) | [`hld.svg`](docs/svg/production/hld.svg) | [`hld.excalidraw`](docs/System-design/production/hld.excalidraw) |
-| Scale tier critical flow and failover | [`critical-flow.png`](docs/png/production/critical-flow.png) | [`critical-flow.svg`](docs/svg/production/critical-flow.svg) | [`critical-flow.excalidraw`](docs/System-design/production/critical-flow.excalidraw) |
-| Scale tier contracts (state, caches, releases, identity, gates) | [`lld.png`](docs/png/production/lld.png) | [`lld.svg`](docs/svg/production/lld.svg) | [`lld.excalidraw`](docs/System-design/production/lld.excalidraw) |
-| Scale tier failure modes, cost and demo-to-scale triggers | [`system-design.png`](docs/png/production/system-design.png) | [`system-design.svg`](docs/svg/production/system-design.svg) | [`system-design.excalidraw`](docs/System-design/production/system-design.excalidraw) |
+The decisions behind this design are recorded in [ADR-0006](docs/adr/ADR-0006-production-cloud-deployment.md), ADR-0010 to ADR-0013, [ADR-0014](docs/adr/ADR-0014-opensearch-serverless-vector-store.md) (vector store), [ADR-0015](docs/adr/ADR-0015-scale-to-zero-serverless-deployment.md) (scale-to-zero runtime), [ADR-0016](docs/adr/ADR-0016-cloud-data-and-model-plane-migration.md) (cloud data and model plane first) and [ADR-0017](docs/adr/ADR-0017-agent-topology-and-execution-memory.md) (three agents, execution memory and crash resume). [`docs/cloud-deployment.md`](docs/cloud-deployment.md) has the decision index, request path, degradation ladders, cost model and the region-loss analysis; [`docs/production-scale-architecture.md`](docs/production-scale-architecture.md) draws the scale tier in Mermaid. The earlier Excalidraw renders of both tiers were retired on 2026-10-31 because they predate ADR-0017; they remain in git history before commit `3b7b379`.
 
 ### Agent workflow (current code)
 
@@ -93,11 +81,17 @@ flowchart TD
     V --> E([END])
 ```
 
-### Agent architecture revision (proposed, ADR-0016)
+### Agent topology: accepted baseline (ADR-0017) and proposed revision (ADR-0018)
 
-[`docs/agent-architecture.md`](docs/agent-architecture.md) is the design for the next step inside the worker, proposed on 2026-11-01 and not yet built: five specialists (`market`, `news`, `filings`, `analyst`, `verifier`) under a deterministic supervisor, four memory tiers under the rule that memory is context and never evidence, a tool gateway fronting in-process tools and allowlisted MCP servers, asynchronous execution with nested deadlines, nine fingerprinted cache stages, and agent-specific reliability contracts with a paired-eval adoption gate. The decision record is [ADR-0016](docs/adr/ADR-0016-agent-architecture-revision.md); the behavior oracle is test-plan §22.
+**Accepted, not built yet:** [ADR-0017](docs/adr/ADR-0017-agent-topology-and-execution-memory.md) (2026-10-31) splits the graph above into three agents (Researcher, Analyst, Reviewer) inside one run, with three-tier execution memory (T1 working, T2 fenced checkpoints, effect journal and handoff envelopes, T3 snapshots, index and caches) so a crashed run resumes at the failed agent without repeating paid model calls. It lands in sprints S6.4, S7.3–S7.8, S7.10 and S7.12; its oracle is test-plan §22.
 
-![Agent HLD: five specialists under a deterministic supervisor, with the tool gateway, MCP servers, memory store and staged caches](docs/png/agents/hld.png)
+**Proposed, not accepted:** [`docs/agent-architecture.md`](docs/agent-architecture.md) and [ADR-0018](docs/adr/ADR-0018-agent-architecture-revision.md) (2026-11-01, first numbered "ADR-0016") refine that baseline: the Researcher splits into `market`, `news` and `filings` specialists under a deterministic supervisor, a tool gateway fronts in-process tools and allowlisted MCP servers, nine fingerprinted cache stages cut model and tool calls, and a paired-eval Gate F decides adoption. Its per-customer episodic memory conflicts with ADR-0017's owner decision against episodic memory and stays conditional until the owner rules. Its oracle is test-plan §23.
+
+The accepted ADR-0017 design is drawn in [`hld.svg`](docs/svg/adr-0017/hld.svg) (demo tier with three agents and T1–T3), [`critical-flow.svg`](docs/svg/adr-0017/critical-flow.svg) (the Analyst crashes after the model answers; attempt 2 resumes at the Analyst) and [`lld.svg`](docs/svg/adr-0017/lld.svg) (execution-memory contracts and fenced writes). The diagrams below draw the ADR-0018 proposal instead: five specialists and an episodic memory store that ADR-0017 does not have.
+
+![Accepted ADR-0017 design: demo tier with Researcher, Analyst and Reviewer agents and three-tier memory](docs/svg/adr-0017/hld.svg)
+
+![ADR-0018 proposal: five specialists under a deterministic supervisor, with the tool gateway, MCP servers, memory store and staged caches](docs/png/agents/hld.png)
 
 | Diagram | Image | SVG | Interactive | Editable source |
 |---|---|---|---|---|

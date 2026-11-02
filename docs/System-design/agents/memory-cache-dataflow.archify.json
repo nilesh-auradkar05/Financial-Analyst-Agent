@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Memory tiers and cache stages (ADR-0016) — what a request reads, what it writes, and what it may cite",
+    "title": "Memory tiers and cache stages (ADR-0018) — what a request reads, what it writes, and what it may cite",
     "output": "docs/System-design/agents/memory-cache-dataflow.html",
     "quality_profile": "showcase",
     "locale": "en",

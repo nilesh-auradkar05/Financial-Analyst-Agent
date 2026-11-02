@@ -5090,7 +5090,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           @media (prefers-reduced-motion: reduce) { svg[data-class-ui] * { transition: none !important; } }
         
 ]]></style>
-        <title id="archify-diagram-title">LLD (ADR-0016) — specialist protocol, tool gateway and memory contracts</title>
+        <title id="archify-diagram-title">LLD (ADR-0018) — specialist protocol, tool gateway and memory contracts</title>
         <desc id="archify-diagram-description">app/agents/specialists · app/tools · app/memory — specialists import the gateway and the memory protocol, never a client</desc>
         <!-- Definitions -->
         <defs>

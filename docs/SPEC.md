@@ -1,11 +1,12 @@
 # SPEC — Alpha Financial Analyst Agent
 
-> **Version:** 1.5 (draft; takes effect when ADR-0016 is accepted)
+> **Version:** 1.5 (draft; takes effect when ADR-0018 is accepted)
 > **Date:** 2026-11-01
 > **Status:** Canonical product specification.
 > **Repo:** `nilesh-auradkar05/Financial-Analyst-Agent`
 > **Supersedes:** v1.4 (2026-10-11), which superseded v1.3 (2026-09-12) and v1.2 (2026-07-04) from `SPEC-AMENDMENT-v1.3.md` (retired; archived 2026-10-11 to `old_artifacts/docs/`; application record is ADR-0008).
-> **v1.5 change (2026-11-01, owner-requested architecture revision; ADR-0016 proposed):** a bounded five-specialist decomposition under a deterministic supervisor, four memory tiers with the "memory is context, never evidence" invariant, an MCP tool plane behind a gateway, asynchronous execution inside the worker, nine fingerprinted cache stages and agent-specific NFR contracts. Updated §§0, 2, 3, 5, 8.1, 11.1 (Gate F), 11.3, 12 (S11) and 16. Design companion: `docs/agent-architecture.md`. Until ADR-0016 is accepted the v1.4 scope lines stand and the pre-revision graph is the default.
+> **Amended 2026-10-31 (ADR recorded 2026-11-01; SPEC text recorded 2026-11-02):** ADR-0017 accepted — three agents (Researcher, Analyst, Reviewer) inside one run, three-tier execution memory (T1 working, T2 execution, T3 long-term), fenced checkpoints, an effect journal, handoff envelopes and crash resume at the failed agent (§§2, 3, 5, 8.6–8.8, 12 G14–G15, 16). No per-ticker episodic memory (owner decision).
+> **v1.5 change (2026-11-01, owner-requested architecture revision; ADR-0018 proposed, renumbered from a colliding "ADR-0016" on 2026-11-02):** a bounded five-specialist decomposition under a deterministic supervisor, memory tiers with the "memory is context, never evidence" invariant, an MCP tool plane behind a gateway, asynchronous execution inside the worker, nine fingerprinted cache stages and agent-specific NFR contracts. Updated §§0, 2, 3, 5, 8.1, 11.1 (Gate F), 11.3, 12 (S11) and 16. Design companion: `docs/agent-architecture.md`. ADR-0018 is a proposed extension of the accepted ADR-0017; where they overlap ADR-0017 governs (three agents are the baseline, T1–T3 is the memory model, episodic memory is excluded unless the owner reverses ADR-0017 §1). Until ADR-0018 is accepted the §3.z scope lines are inactive.
 > **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
 > **Amended 2026-10-23:** ADR-0016 — Qdrant and Chroma retired; OpenSearch (local container for development and tests, Serverless in the cloud) is the only store; the data and model plane moves to managed services ahead of S7 (§§1, 3, 5, 6, 11.1, 12, 16).
 > **Amended 2026-10-17:** ADR-0009 amendment — Azure-first draft ladder (Foundry DeepSeek-V4-Flash → Bedrock `deepseek.v3.2`) and GPT-5.6 Luna judge (Bedrock → Foundry); Foundry is no longer fallback-only (§§3, 4).
@@ -33,7 +34,7 @@ This section is the only canonical conflict-resolution order.
 3. `docs/sprint-plan.md` — sequencing and task definitions.
 4. `docs/retrieval-benchmark.md` — benchmark fixture schema, matcher, metrics, validator, and comparison policy.
 5. `docs/adr/*.md` — accepted architecture decisions.
-6. `docs/System-design/**/*.excalidraw` and `docs/System-design/agents/*.archify.json` (editable sources) with `docs/System-design/agents/*.html`, `docs/png/**/*.png` and `docs/svg/**/*.svg` renders — diagram companions; `docs/cloud-deployment.md` — deployment design companion for ADR-0006 and ADR-0015 (deployed demo tier); `docs/production-scale-architecture.md` — production scale tier (interview design, not built); `docs/agent-architecture.md` — agent architecture revision companion for ADR-0016 (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs; proposed, not built).
+6. `docs/svg/adr-0017/*.svg` (ADR-0017 diagrams, owner-authored) and `docs/System-design/agents/*.archify.json` (editable Archify sources for the ADR-0018 proposal) with `docs/System-design/agents/*.html`, `docs/png/agents/*.png` and `docs/svg/agents/*.svg` renders — diagram companions (the Excalidraw sets for the demo and scale tiers were retired on 2026-10-31; the Mermaid figures in `docs/cloud-deployment.md` and `docs/production-scale-architecture.md` are their companions now); `docs/cloud-deployment.md` — deployment design companion for ADR-0006, ADR-0015 and ADR-0017 (deployed demo tier, D20); `docs/production-scale-architecture.md` — production scale tier (interview design, not built); `docs/agent-architecture.md` — agent architecture revision companion for ADR-0018 (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs; proposed, not built).
 7. `tasks/todo.md` — active task state and verification ledger.
 8. `tasks/lessons.md` — correction log.
 9. Code comments and stale TODOs — lowest authority.
@@ -98,8 +99,8 @@ Goals:
 
 Non-goals for the committed local-first arc:
 
-- Broad multi-agent or swarm orchestration. The bounded five-specialist decomposition under a deterministic supervisor (ADR-0016, S11) is not this: the specialist count is fixed, routing is code, and there is no LLM planner.
-- Uncontrolled long-term memory. The scoped memory tiers of ADR-0016 (per-principal episodic, per-issuer semantic, offline-governed procedural) are admitted under the invariant that memory is context, never evidence.
+- Broad multi-agent or swarm orchestration. The three agents of ADR-0017 (Researcher, Analyst, Reviewer; S7.6) and the bounded five-specialist refinement of ADR-0018 (S11, proposed) are not this: the agent count is fixed, routing is code, and there is no LLM planner.
+- Long-term memory beyond ADR-0017 §1: T3 holds only the snapshot store, index releases and fingerprint-keyed caches, written after verification and never cited as evidence. Per-ticker episodic memory is excluded by owner decision; ADR-0018's episodic tier (M1) is conditional on the owner reversing that decision and is otherwise out of scope.
 - Trading, brokerage execution, or personalized investment advice.
 - Frontend before S8.
 - Prompt optimization before a stable evaluation oracle exists.
@@ -148,12 +149,12 @@ In scope:
 - Eval run registry with lineage and a CI regression gate (§11.2).
 - Agent-tooling hooks (§14) enforcing governance rules at the coding-agent boundary.
 
-3.z In scope (added v1.5, ADR-0016 proposed 2026-11-01; effective on acceptance; built in S11 after S7 (a)–(e) and Gate D; adopted only on Gate F):
+3.z In scope (added v1.5, ADR-0018 proposed 2026-11-01; effective on acceptance; built in S11 after S7.1–S7.12 (including the ADR-0017 three-agent split, S7.6) and Gate D; adopted only on Gate F):
 
-- Exactly five specialists (`market`, `news`, `filings`, `analyst`, `verifier`) under a deterministic LangGraph supervisor with a fixed topology; tool-using specialists make no model call and model-calling specialists use no tools.
-- Memory tiers M0–M3 (`app/memory/`) with the invariant "memory is context, never evidence", per-principal scoping, replay pinning (`memory_ref`) and `DELETE /memory`.
+- Exactly five specialists (`market`, `news`, `filings`, `analyst`, `verifier`) under a deterministic LangGraph supervisor with a fixed topology, as a refinement of ADR-0017's three agents: `market`, `news` and `filings` split the Researcher's failure domain into three budgeted, allowlisted specialists; `analyst` and `verifier` are the Analyst and Reviewer. Tool-using specialists make no model call and model-calling specialists use no tools.
+- Memory tiers mapped onto ADR-0017: M0 working = T1; M2 semantic (issuer profile, C9) and M3 procedural (versions) live in T3 under its write-after-verification rule; the invariant "memory is context, never evidence" and replay pinning (`memory_ref`). M1 episodic (`app/memory/` episodic records, `DELETE /memory`) is **conditional** on an owner reversal of ADR-0017 §1 and is not built otherwise.
 - A tool gateway (`app/tools/`) fronting in-process tools and allowlisted, read-only, schema-pinned MCP servers; the analyst exposed as an MCP server at `/mcp` over the existing auth and quotas.
-- Asynchronous execution inside the worker: specialist fan-out, concurrent filing queries, per-target semaphores, provider token bucket, nested deadlines with cancellation, specialist checkpoints.
+- Asynchronous execution inside the worker: specialist fan-out, concurrent filing queries, per-target semaphores, provider token bucket, nested deadlines with cancellation; resume after a crash uses ADR-0017's fenced checkpoints and effect journal (§8.7–8.8), not a separate mechanism.
 - Cache stages C0–C9 (§11.3) with per-stage metrics.
 - Agent NFR contracts (§10 of the companion): bounded autonomy, degradation ladder, breakers, tenant isolation, deterministic replay of tool calls and memory, per-agent observability, Gate F.
 
@@ -171,9 +172,9 @@ Deferred, gated work:
 - Cloud resources before the ADR-0006 entry criteria are met, except the data and model plane resources ADR-0016 authorizes (budget alarms, the OpenSearch Serverless collection, model and embedding endpoints), each created only with owner approval.
 - Multi-region serving, cross-region data copies and recovery sites.
 - Production scale-tier components (ECS Fargate services, Aurora PostgreSQL, Valkey, VPC with NAT) before their ADR-0015 graduation triggers are measured; they are designed in `docs/production-scale-architecture.md`, not built.
-- Multi-agent decomposition beyond the five specialists and the single reviewer loop of §8.1 (ADR-0016): no LLM planner, no per-source summarizers, no additional critics without a further ADR.
+- Multi-agent decomposition beyond the five specialists and the single reviewer loop of §8.1 (ADR-0018): no LLM planner, no per-source summarizers, no additional critics without a further ADR.
 - Semantic caching of memo *outputs* (prohibited; see §11.3).
-- Memory used as citable evidence, cross-principal memory, vector-indexed episodic recall, runtime MCP tool discovery, and MCP tools with side effects (ADR-0016).
+- Memory used as citable evidence, cross-principal memory, vector-indexed episodic recall, runtime MCP tool discovery, and MCP tools with side effects (ADR-0018).
 
 Out of scope unless this section is explicitly changed and backed by an ADR:
 
@@ -209,11 +210,12 @@ offline DataOps/evaluation tooling.
 Dependency rule: backend client objects never escape the retrieval boundary.
 
 - `app/` — runtime API, workflow, services, tools, config, observability.
-- `app/agents/` — LangGraph graph, state, routing (fan-out allowed; nodes must be non-blocking). From S11 (ADR-0016): `supervisor.py` (fixed topology, code routing), `context.py` (`RunContext`), `specialists/` (`SpecialistAgent` protocol and the five specialists); specialists import the tool gateway and the memory protocol, never a client.
-- `app/tools/` (S11, ADR-0016) — `ToolGateway`, `ToolSpec` registry from Pydantic settings with pinned schema hashes, in-process adapters, and the only module that imports the MCP SDK client. Read-only tools only.
-- `app/mcp/` (S11, ADR-0016) — the analyst exposed as an MCP server at `/mcp`; a thin adapter over the API routes' services, never over the graph.
-- `app/memory/` (S11, ADR-0016) — `MemoryStore` protocol and schemas (`EpisodicRecord`, `IssuerProfile`), adapters (in-memory, DynamoDB; Postgres at its scale-tier trigger), `MEMORY` block rendering and delta computation. No store client escapes it.
-- `app/components/retrieval/` — retrieval contracts, evidence packets, Chroma/Qdrant stores (local), OpenSearch Serverless store (deployed, ADR-0014), retrieval methods.
+- `app/agents/` — LangGraph graph, state, routing (fan-out allowed; nodes must be non-blocking). From S7.6 (ADR-0017): three agent subgraphs (Researcher, Analyst, Reviewer) handing off through `HandoffEnvelope`. From S11 (ADR-0018): `supervisor.py` (fixed topology, code routing), `context.py` (`RunContext`), `specialists/` (`SpecialistAgent` protocol and the five specialists); specialists import the tool gateway and the memory protocol, never a client.
+- `app/execution/` (S7.3–S7.5, S7.8; ADR-0017) — `FencedCheckpointer` over the SQLite, DynamoDB and Postgres savers, `EffectJournal`, `HandoffEnvelope`, the error classifier and the fault-injection harness. Imports nothing from `app/agents/`.
+- `app/tools/` (S11, ADR-0018) — `ToolGateway`, `ToolSpec` registry from Pydantic settings with pinned schema hashes, in-process adapters, and the only module that imports the MCP SDK client. Read-only tools only.
+- `app/mcp/` (S11, ADR-0018) — the analyst exposed as an MCP server at `/mcp`; a thin adapter over the API routes' services, never over the graph.
+- `app/memory/` (S11, ADR-0018) — `MemoryStore` protocol and `IssuerProfile`, adapters (in-memory, DynamoDB; Postgres at its scale-tier trigger) and `MEMORY` block rendering; `EpisodicRecord` and delta computation only if the owner reverses ADR-0017 §1. No store client escapes it.
+- `app/components/retrieval/` — retrieval contracts, evidence packets, the OpenSearch store (local container and Serverless; ADR-0014, ADR-0016), retrieval methods. The Chroma and Qdrant adapters remain only until CM-7 removes them.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
 - `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Runtime replay and the snapshot hash live here (S2-T00b); release contracts, registry and gates stay in repo-root `dataops/`.
@@ -300,14 +302,16 @@ START → [research_news ‖ fetch_stock ‖ retrieve_filings]  (parallel fan-ou
       → (passed | attempts ≥ 2) ? guard_output → END : revise_memo → verify_memo
 ```
 
-8.1a Supervisor topology from S11 (ADR-0016; default only after Gate F, until then behind a flag):
+8.1b Three agents from S7.6 (ADR-0017 §2, recorded here 2026-11-02): the graph splits into Researcher (`research_news ‖ fetch_stock ‖ retrieve_filings → analyze_sentiment → freeze_snapshot`), Analyst (`guard_inputs → draft_memo`, or `revise_memo` on a returned envelope) and Reviewer (`verify_memo → decide → guard_output`), each a subgraph with its own retry policy and failure domain, running inside one graph execution. No agent starts until the handoff envelope before it is durably committed.
+
+8.1a Supervisor topology from S11 (ADR-0018; refines 8.1b by splitting the Researcher into `market`, `news` and `filings`; default only after Gate F, until then behind a flag):
 
 ```text
 START → guard_inputs → memory_read_issuer
       → [market ‖ news ‖ filings]                 (news includes sentiment; filing queries concurrent)
       → freeze_snapshot (manifest += memory_ref, tool_calls) → memo_cache_lookup
           hit  → verifier
-          miss → memory_read_episodic → analyst → verifier
+          miss → [memory_read_episodic, only if ADR-0017 §1 is reversed] → analyst → verifier
       → (passed | revisions ≥ 2) ? guard_output → persist → memory_write → END
                                  : analyst(revise) → verifier
 ```
@@ -327,6 +331,12 @@ state.
 8.5 Terminal statuses: `completed` | `degraded` (verification failed after max
 attempts) | `evidence_missing` (a required evidence class absent) | `failed`.
 `completed` requires `verification.passed == True` AND no evidence class missing.
+
+8.6 Bounded revise loop with early stop (ADR-0017 §2, recorded here 2026-11-02; S6.4): the Reviewer returns only the failed claim ids to the Analyst; at most 2 revisions (3 drafts); the loop stops early when a revision does not raise the grounded-claim rate (Δgrounded ≤ 0). A run that ends without passing returns the best draft by grounded rate, with uncited claims removed, as `degraded`, never `completed`. The response reports the number of drafts, never job attempts.
+
+8.7 Effect journal and evidence pinning (ADR-0017 §3, recorded here 2026-11-02; S7.4): every model and tool call inside a node runs through `EffectJournal.memoize(key, fn)` with `key = sha256(run_id, node, model_id, params, prompt_version, rendered_prompt_hash, snapshot_hash)`; a resumed node reuses a journaled result and never calls the provider again. A partial stream is never journaled; it is discarded and the call is repeated, counted as a duplicate provider call. After the snapshot is frozen, evidence is read from T3 by `snapshot_hash`, never fetched again.
+
+8.8 Durable checkpoints, fencing and error classes (ADR-0017 §§3–5, recorded here 2026-11-02; S7.3, S7.5, S7.8): `thread_id = job_id`, `durability = "sync"`, one checkpoint per super-step, each carrying `graph_version`; every T2 write (checkpoint, pending writes, journal, envelope) succeeds only while `jobs.attempt` equals the writer's attempt, so a stale attempt can neither commit a result nor fork the checkpoint history. A redelivered job resumes at the agent that was running from the latest compatible checkpoint; an incompatible `graph_version` restarts from the pinned snapshot. Errors are classified transient (per-node retry with jitter, bounded by the run deadline), deterministic (typed outcome, no retry) or fatal (abort the attempt; SQS redelivers; the third receive goes to the DLQ). The model that first answers a run is pinned for that run; a fallback after the breaker opens is a new attempt on the fallback model, recorded in lineage and never eligible as a baseline. If a checkpoint or envelope write fails after its retry, the attempt aborts before the next agent starts.
 
 ---
 
@@ -373,7 +383,7 @@ Gate D: answer-quality methodology is stable enough for prompt/model changes.
 
 Gate E: S10 cloud work. ADR-0006 was accepted on 2026-10-08; no cloud resource exists until its entry criteria have recorded evidence, except the ADR-0016 data and model plane resources (2026-10-23).
 
-Gate F (added v1.5, ADR-0016): the five-specialist supervisor replaces the pre-revision graph only after a paired comparison on the frozen evidence release (same model, temperature and prompt; single-axis rule) shows no regression of `grounded_claim_rate` or `citation_coverage` beyond the predeclared tolerance, and the S11 game days (specialist kill, tool-schema drift, memory outage, provider 429 storm, identical-request burst) each end in their documented terminal status.
+Gate F (added v1.5, ADR-0018): the five-specialist supervisor replaces ADR-0017's three-agent graph (§8.1b) only after a paired comparison on the frozen evidence release (same model, temperature and prompt; single-axis rule) shows no regression of `grounded_claim_rate` or `citation_coverage` beyond the predeclared tolerance, and the S11 game days (specialist kill, tool-schema drift, memory outage, provider 429 storm, identical-request burst) each end in their documented terminal status.
 
 Phase 1 evidence freeze is a prerequisite for S2/Gate A work in the v2 DataOps
 plan. No backend, embedding or retrieval-method comparison may run on live evidence.
@@ -402,7 +412,8 @@ A run on live evidence cannot be classified `approved`.
 - MemoCache: key = `snapshot_hash` + `prompt_version` + model fingerprint + verifier/policy fingerprint. No TTL beyond snapshot validity. Concurrent misses for the same key are single-flighted.
 - PROHIBITED: semantic similarity caching of memo outputs across different snapshots.
 - Every cache exposes hit/miss counters in `/metrics`.
-- Stages from S11 (v1.5, ADR-0016), additive to the four caches above and keyed with the same fingerprint discipline: C0 request idempotency (existing); C1 memo (= MemoCache, single-flight); C2/C3 evidence and tool results (`tool:{server}:{tool}:{schema_hash}:{args_hash}`, generalizing the `ev:` keys; same TTLs per source); C4 query embedding (= QueryEmbeddingCache, exact only); C5 retrieval result (= RetrievalCache); C6 sentiment score by `(sha256(text), model_version)`, permanent; C7 provider prompt-prefix caching (stable prefix first; saving reported from provider usage, never estimated); C8 verification result (`ver:{sha256(memo)}:{registry_hash}:{verifier_policy_fp}`); C9 issuer profile (`issuer:{ticker}`, until a new accession). Each stage reports `cache_events_total{stage, outcome ∈ hit|miss|bypass|wait}`. Memory (M1, M2) shares the cache store and key discipline; it is never a second system.
+- Stages from S11 (v1.5, ADR-0018), additive to the four caches above and keyed with the same fingerprint discipline: C0 request idempotency (existing); C1 memo (= MemoCache, single-flight); C2/C3 evidence and tool results (`tool:{server}:{tool}:{schema_hash}:{args_hash}`, generalizing the `ev:` keys; same TTLs per source); C4 query embedding (= QueryEmbeddingCache, exact only); C5 retrieval result (= RetrievalCache); C6 sentiment score by `(sha256(text), model_version)`, permanent; C7 provider prompt-prefix caching (stable prefix first; saving reported from provider usage, never estimated); C8 verification result (`ver:{sha256(memo)}:{registry_hash}:{verifier_policy_fp}`); C9 issuer profile (`issuer:{ticker}`, until a new accession). Each stage reports `cache_events_total{stage, outcome ∈ hit|miss|bypass|wait}`. Memory (M2; and M1 only if ADR-0017 §1 is reversed) shares the cache store and key discipline; it is never a second system.
+- T3 write policy (ADR-0017 §1 and scenario 15, recorded here 2026-11-02; S7.9): long-term caches accept only verified, structured, provenance-tagged artifacts, written after verification passes; raw tool or web text is never written to T3; a stored memo is never returned as evidence.
 
 11.4 Guardrails
 
@@ -426,11 +437,11 @@ Committed and gated sequencing:
 | S4 | Backend comparison and default decision / Gate B — retired 2026-10-10 (owner decision); Gate B closes at S3 exit |
 | S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C (the embedding bake-off was pulled forward to CM-5 on 2026-10-23, ADR-0016) |
 | S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
-| S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + job store (DynamoDB `RunStore`, SQS `JobQueue`, DynamoDB checkpointer; local DynamoDB Local and ElasticMQ; ADR-0013 as amended by ADR-0015), provider circuit breaker, FinBERT off the API event loop (ONNX in the worker), auth + rate limit with guest and admin roles (ADR-0010) |
+| S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + job store (DynamoDB `RunStore`, SQS `JobQueue`, DynamoDB checkpointer; local DynamoDB Local and ElasticMQ; ADR-0013 as amended by ADR-0015), provider circuit breaker, FinBERT off the API event loop (ONNX in the worker), auth + rate limit with guest and admin roles (ADR-0010). Restructured 2026-11-01 into one-feature sprints S7.1–S7.12; S7.3–S7.6, S7.8, S7.10 and S7.12 implement ADR-0017 (fenced checkpoints, effect journal, error taxonomy, three agents, execution observability) |
 | S8 | Frontend MVP |
 | S9 | Portfolio polish |
 | S10 | Cloud (INTEGRATION_PLAN_v2 Phases 4–5) per ADR-0006 (accepted 2026-10-08), ADR-0010–0014 and ADR-0015 (scale-to-zero demo tier); starts when the ADR-0006 entry criteria have recorded evidence |
-| S11 | Agent architecture revision (ADR-0016, added v1.5 on 2026-11-01): five specialists under a deterministic supervisor, tool gateway and MCP tool plane, cache stages C7–C9, memory tiers, `/mcp` exposure, agent NFR drills and Gate F. Starts after S7 (a)–(e) and Gate D; may run before or in parallel with S10 at the owner's choice, since it changes only the inside of the worker |
+| S11 | Agent architecture revision (ADR-0018, proposed; added v1.5 on 2026-11-01): five specialists refining ADR-0017's three agents, tool gateway and MCP tool plane, cache stages C7–C9, issuer-profile memory (episodic memory only if ADR-0017 §1 is reversed), `/mcp` exposure, agent NFR drills and Gate F. Opens after S7.12 and Gate D, when the owner accepts ADR-0018; may run in parallel with S10, since it changes only the inside of the worker |
 
 S2 pre-tasks (T00a–T00d) implement production-readiness steps 1–3 (see
 sprint-plan.md S2 preamble).
@@ -445,6 +456,8 @@ Open gaps (mirrored in sprint-plan.md):
 - **G10** — `app/` depends on `evaluation/` (`graph.py` imports `evaluation.grounding`). Resolve in S2-T00d by moving the runtime verifier to `app/verification/`.
 - **G11** — CI does not invoke `scripts/ci/check_*.py`. Resolve in S2-T00a.
 - **G12** — `add_error` mutates `state["errors"]` in place; unsafe under fan-out. Resolve in S2-T00c.
+- **G14** (2026-11-01, ADR-0017) — no checkpointer; jobs run in-process, so a crash restarts the run. Resolve in S7.3 and S7.4.
+- **G15** (2026-11-01, ADR-0017) — the stock `DynamoDBSaver` writes are not fenced; two attempts of one job can fork the checkpoint history. Resolve in S7.8.
 - **G13** — `/health` reports `degraded` on Ollama outage even when Bedrock is the configured provider. Resolve in S7.
 
 ---
@@ -512,11 +525,12 @@ Accepted ADRs:
 - `docs/adr/ADR-0014-opensearch-serverless-vector-store.md` (accepted 2026-10-11; amended 2026-10-23 by ADR-0016: only store, adoption gate is CM-4)
 - `docs/adr/ADR-0015-scale-to-zero-serverless-deployment.md` (accepted 2026-10-11; supersedes in part ADR-0006, ADR-0012 and ADR-0013 for the demo tier; their always-on design is the production scale tier)
 - `docs/adr/ADR-0016-cloud-data-and-model-plane-migration.md` (accepted 2026-10-23; supersedes ADR-0003; data and model plane first, Qdrant and Chroma retired)
+- `docs/adr/ADR-0017-agent-topology-and-execution-memory.md` (accepted 2026-10-31, recorded 2026-11-01; three agents, three-tier execution memory, fenced checkpoints, effect journal, crash resume; amends ADR-0013 and ADR-0015; implemented in S6.4, S7.3–S7.8, S7.10, S7.12, S10-T11)
 
 Proposed ADRs:
 
 - ADR-0007: production interview scale design. Proposed; interview companion only. Superseded in part on 2026-10-08 and 2026-10-11 by ADR-0006 and ADR-0009 to ADR-0015.
-- `docs/adr/ADR-0016-agent-architecture-revision.md`: agent architecture revision (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs, Gate F). Proposed 2026-11-01 at the owner's request; acceptance makes the v1.5 scope lines (§3.z) effective. Companion: `docs/agent-architecture.md`.
+- `docs/adr/ADR-0018-agent-architecture-revision.md`: agent architecture revision (five specialists refining ADR-0017's three agents, memory tiers mapped onto T1–T3 with episodic memory conditional, MCP tool plane, async execution, cache stages, agent NFRs, Gate F). Proposed 2026-11-01 at the owner's request as "ADR-0016"; renumbered 2026-11-02 because that number was already taken by the accepted cloud data and model plane record. Acceptance makes the §3.z scope lines effective. Companion: `docs/agent-architecture.md`.
 
 Superseded ADRs:
 
