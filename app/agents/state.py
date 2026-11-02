@@ -105,6 +105,13 @@ class AgentState(TypedDict, total=False):
     llm_usage: dict
     verification_result: dict
 
+    # Revise loop (SPEC 8.1): one entry per draft, in order, with that draft's memo alongside.
+    draft_count: int
+    draft_history: list[dict]
+    drafts: list[str]
+    needs_revision: bool
+    revision_failed: bool
+
     # Metadata Fields
     # Reducers: the evidence nodes run in parallel and all write these two keys.
     current_step: Annotated[str, _last_write]
@@ -142,6 +149,9 @@ def create_initial_state(
         citations=[],
         citation_evidence=[],
         verification_result={},
+        draft_count=0,
+        draft_history=[],
+        drafts=[],
         current_step=AgentStep.RESEARCH_NEWS.value,
         errors=[],
         started_at=datetime.now(timezone.utc).isoformat(),

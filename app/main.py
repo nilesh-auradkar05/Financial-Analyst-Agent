@@ -685,6 +685,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         missing=missing,
         filing_chunk_count=len(state.get("filing_chunks") or []),
         usage=UsageResponse(**usage) if (usage := state.get("llm_usage")) else None,
+        draft_count=state.get("draft_count"),
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         execution_time_ms=state.get("execution_time_ms"),
