@@ -54,7 +54,7 @@
       "id": "jobs",
       "type": "database",
       "label": "Job store",
-      "sublabel": "fenced attempts"
+      "sublabel": "fenced attempts · T2"
     }
   ],
   "segments": [
@@ -229,7 +229,7 @@
       "from": "sup",
       "to": "mem",
       "y": 1352,
-      "label": "write episodic after commit",
+      "label": "write episodic after commit (if M1 adopted)",
       "variant": "dashed"
     },
     {
@@ -241,16 +241,16 @@
     },
     {
       "from": "sup",
-      "to": "cache",
+      "to": "jobs",
       "y": 1464,
-      "label": "specialist checkpoints complete and in TTL → fan-out skipped",
-      "note": "Checkpointed specialist results are reused"
+      "label": "load fenced checkpoint → resume at the running specialist",
+      "note": "Finished siblings kept as pending writes"
     },
     {
       "from": "sup",
-      "to": "cache",
+      "to": "jobs",
       "y": 1548,
-      "label": "C1 hit for the same snapshot_hash → no model call"
+      "label": "effect-journal hit → no second model call"
     },
     {
       "from": "sup",
@@ -339,7 +339,7 @@
       "dot": "rose",
       "title": "Crash and resume",
       "items": [
-        "A re-claimed attempt skips completed, in-TTL specialists and reuses the memo cache",
+        "A re-claimed attempt loads ADR-0017's fenced checkpoint, resumes at the running specialist and reuses journaled model and tool results",
         "Every commit and memory write carries the attempt fence",
         "Exactly one attempt's result is stored; a duplicated model call is recorded as cost, never as a second result"
       ]

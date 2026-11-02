@@ -283,9 +283,10 @@ The demo tier is drawn in Mermaid in this document: topology (§2), first-query 
 | Diagram | Status | Where |
 | --- | --- | --- |
 | Demo tier and scale tier Excalidraw sets (HLD, critical flow, LLD, system design) | Retired 2026-10-31 (commit `3b7b379`): they showed the single-graph worker and predate ADR-0017 | Git history before `3b7b379` |
+| ADR-0017 (accepted): demo tier HLD with three agents and T1–T3, crash-resume critical flow, LLD of execution-memory contracts and fenced writes | Owner-authored, added to the repository 2026-11-02 | [`svg/adr-0017/hld.svg`](svg/adr-0017/hld.svg) · [`critical-flow.svg`](svg/adr-0017/critical-flow.svg) · [`lld.svg`](svg/adr-0017/lld.svg) |
 | Agent revision diagrams: HLD, critical flow, LLD, job lifecycle, memory and cache dataflow, MCP tool plane | Draw the **proposed** ADR-0018 five-specialist design, not the accepted ADR-0017 three-agent baseline | [`svg/agents/`](svg/agents/) · [`png/agents/`](png/agents/) · interactive and Archify sources in [`System-design/agents/`](System-design/agents/) |
 
-ADR-0017's three-agent topology and crash resume have no dedicated diagram beyond §3.1 yet; drawing one is open.
+The `svg/adr-0017/` set is the accepted design; the `svg/agents/` set is the proposal layered on it.
 
 ## 11. Verify before implementation
 

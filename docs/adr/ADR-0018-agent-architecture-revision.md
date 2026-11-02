@@ -15,7 +15,7 @@ At `HEAD` (`eee2fec`, the code this record was written against) the worker runs 
 | Topic | ADR-0017 (accepted) | This record (proposed) | Status |
 | --- | --- | --- | --- |
 | Topology | Researcher, Analyst, Reviewer subgraphs | `market`, `news`, `filings` split the Researcher; `analyst` = Analyst; `verifier` = Reviewer | Compatible refinement; built after S7.6 lands the three agents |
-| Resume after a crash | Fenced checkpoints, effect journal, handoff envelopes (T2) | Specialist checkpoints | ADR-0017's mechanism is used; this record adds none of its own |
+| Resume after a crash | Fenced checkpoints, effect journal, handoff envelopes (T2) | None of its own (first draft: specialist checkpoints, withdrawn) | ADR-0017's mechanism is used; this record adds none of its own |
 | Working, semantic, procedural memory | T1 working; T3 snapshot store, index, caches | M0 = T1; M2 issuer profile and M3 versions live in T3 under its write-after-verification rule | Compatible |
 | Episodic memory | Excluded by owner decision (§1: breaks replay unless pinned; no benefit at demo volume) | M1 per `customer_id` × ticker, uncited, pinned by `memory_ref` | **Conflict — owner decision.** M1, `DELETE /memory` and the episodic rows of test-plan §23.2 are not built unless the owner reverses ADR-0017 §1 |
 | Revise loop | ≤ 2 revisions, early stop on Δgrounded ≤ 0, failed claims only | ≤ 2 revisions | ADR-0017's rule applies |
@@ -47,7 +47,7 @@ The analyst is later exposed as an MCP server at `/mcp` (`analyze_ticker`, `get_
 
 ### D4 — Asynchronous execution inside the worker
 
-Evidence specialists fan out as graph branches; the four filing queries run concurrently; sentiment moves inside `news` so it overlaps retrieval. One semaphore per tool target per process; a provider token bucket checked before each model call; deadlines nest tool < specialist < job with propagated cancellation; blocking libraries stay behind `to_thread` with a bounded pool; specialist results are checkpointed so a re-claimed attempt skips completed, in-TTL specialists. Acceptance, fencing, queue and autoscaling stay as ADR-0013 and ADR-0015 define them.
+Evidence specialists fan out as graph branches; the four filing queries run concurrently; sentiment moves inside `news` so it overlaps retrieval. One semaphore per tool target per process; a provider token bucket checked before each model call; deadlines nest tool < specialist < job with propagated cancellation; blocking libraries stay behind `to_thread` with a bounded pool; resume after a crash is ADR-0017's: a re-claimed attempt loads the latest fenced checkpoint, resumes at the specialist that was running (finished siblings are kept as pending writes) and reuses journaled model and tool results. Acceptance, fencing, queue and autoscaling stay as ADR-0013 and ADR-0015 define them.
 
 ### D5 — Nine cache stages, every key fingerprinted
 

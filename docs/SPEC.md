@@ -34,7 +34,7 @@ This section is the only canonical conflict-resolution order.
 3. `docs/sprint-plan.md` — sequencing and task definitions.
 4. `docs/retrieval-benchmark.md` — benchmark fixture schema, matcher, metrics, validator, and comparison policy.
 5. `docs/adr/*.md` — accepted architecture decisions.
-6. `docs/System-design/agents/*.archify.json` (editable Archify sources) with `docs/System-design/agents/*.html`, `docs/png/agents/*.png` and `docs/svg/agents/*.svg` renders — diagram companions (the Excalidraw sets for the demo and scale tiers were retired on 2026-10-31; the Mermaid figures in `docs/cloud-deployment.md` and `docs/production-scale-architecture.md` are their companions now); `docs/cloud-deployment.md` — deployment design companion for ADR-0006, ADR-0015 and ADR-0017 (deployed demo tier, D20); `docs/production-scale-architecture.md` — production scale tier (interview design, not built); `docs/agent-architecture.md` — agent architecture revision companion for ADR-0018 (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs; proposed, not built).
+6. `docs/svg/adr-0017/*.svg` (ADR-0017 diagrams, owner-authored) and `docs/System-design/agents/*.archify.json` (editable Archify sources for the ADR-0018 proposal) with `docs/System-design/agents/*.html`, `docs/png/agents/*.png` and `docs/svg/agents/*.svg` renders — diagram companions (the Excalidraw sets for the demo and scale tiers were retired on 2026-10-31; the Mermaid figures in `docs/cloud-deployment.md` and `docs/production-scale-architecture.md` are their companions now); `docs/cloud-deployment.md` — deployment design companion for ADR-0006, ADR-0015 and ADR-0017 (deployed demo tier, D20); `docs/production-scale-architecture.md` — production scale tier (interview design, not built); `docs/agent-architecture.md` — agent architecture revision companion for ADR-0018 (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs; proposed, not built).
 7. `tasks/todo.md` — active task state and verification ledger.
 8. `tasks/lessons.md` — correction log.
 9. Code comments and stale TODOs — lowest authority.
@@ -214,7 +214,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/execution/` (S7.3–S7.5, S7.8; ADR-0017) — `FencedCheckpointer` over the SQLite, DynamoDB and Postgres savers, `EffectJournal`, `HandoffEnvelope`, the error classifier and the fault-injection harness. Imports nothing from `app/agents/`.
 - `app/tools/` (S11, ADR-0018) — `ToolGateway`, `ToolSpec` registry from Pydantic settings with pinned schema hashes, in-process adapters, and the only module that imports the MCP SDK client. Read-only tools only.
 - `app/mcp/` (S11, ADR-0018) — the analyst exposed as an MCP server at `/mcp`; a thin adapter over the API routes' services, never over the graph.
-- `app/memory/` (S11, ADR-0018) — `MemoryStore` protocol and schemas (`EpisodicRecord`, `IssuerProfile`), adapters (in-memory, DynamoDB; Postgres at its scale-tier trigger), `MEMORY` block rendering and delta computation. No store client escapes it.
+- `app/memory/` (S11, ADR-0018) — `MemoryStore` protocol and `IssuerProfile`, adapters (in-memory, DynamoDB; Postgres at its scale-tier trigger) and `MEMORY` block rendering; `EpisodicRecord` and delta computation only if the owner reverses ADR-0017 §1. No store client escapes it.
 - `app/components/retrieval/` — retrieval contracts, evidence packets, the OpenSearch store (local container and Serverless; ADR-0014, ADR-0016), retrieval methods. The Chroma and Qdrant adapters remain only until CM-7 removes them.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
@@ -311,7 +311,7 @@ START → guard_inputs → memory_read_issuer
       → [market ‖ news ‖ filings]                 (news includes sentiment; filing queries concurrent)
       → freeze_snapshot (manifest += memory_ref, tool_calls) → memo_cache_lookup
           hit  → verifier
-          miss → memory_read_episodic → analyst → verifier
+          miss → [memory_read_episodic, only if ADR-0017 §1 is reversed] → analyst → verifier
       → (passed | revisions ≥ 2) ? guard_output → persist → memory_write → END
                                  : analyst(revise) → verifier
 ```
@@ -412,7 +412,8 @@ A run on live evidence cannot be classified `approved`.
 - MemoCache: key = `snapshot_hash` + `prompt_version` + model fingerprint + verifier/policy fingerprint. No TTL beyond snapshot validity. Concurrent misses for the same key are single-flighted.
 - PROHIBITED: semantic similarity caching of memo outputs across different snapshots.
 - Every cache exposes hit/miss counters in `/metrics`.
-- Stages from S11 (v1.5, ADR-0018), additive to the four caches above and keyed with the same fingerprint discipline: C0 request idempotency (existing); C1 memo (= MemoCache, single-flight); C2/C3 evidence and tool results (`tool:{server}:{tool}:{schema_hash}:{args_hash}`, generalizing the `ev:` keys; same TTLs per source); C4 query embedding (= QueryEmbeddingCache, exact only); C5 retrieval result (= RetrievalCache); C6 sentiment score by `(sha256(text), model_version)`, permanent; C7 provider prompt-prefix caching (stable prefix first; saving reported from provider usage, never estimated); C8 verification result (`ver:{sha256(memo)}:{registry_hash}:{verifier_policy_fp}`); C9 issuer profile (`issuer:{ticker}`, until a new accession). Each stage reports `cache_events_total{stage, outcome ∈ hit|miss|bypass|wait}`. Memory (M1, M2) shares the cache store and key discipline; it is never a second system.
+- Stages from S11 (v1.5, ADR-0018), additive to the four caches above and keyed with the same fingerprint discipline: C0 request idempotency (existing); C1 memo (= MemoCache, single-flight); C2/C3 evidence and tool results (`tool:{server}:{tool}:{schema_hash}:{args_hash}`, generalizing the `ev:` keys; same TTLs per source); C4 query embedding (= QueryEmbeddingCache, exact only); C5 retrieval result (= RetrievalCache); C6 sentiment score by `(sha256(text), model_version)`, permanent; C7 provider prompt-prefix caching (stable prefix first; saving reported from provider usage, never estimated); C8 verification result (`ver:{sha256(memo)}:{registry_hash}:{verifier_policy_fp}`); C9 issuer profile (`issuer:{ticker}`, until a new accession). Each stage reports `cache_events_total{stage, outcome ∈ hit|miss|bypass|wait}`. Memory (M2; and M1 only if ADR-0017 §1 is reversed) shares the cache store and key discipline; it is never a second system.
+- T3 write policy (ADR-0017 §1 and scenario 15, recorded here 2026-11-02; S7.9): long-term caches accept only verified, structured, provenance-tagged artifacts, written after verification passes; raw tool or web text is never written to T3; a stored memo is never returned as evidence.
 
 11.4 Guardrails
 

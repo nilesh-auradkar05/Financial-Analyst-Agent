@@ -124,7 +124,7 @@ sequenceDiagram
   alt C1 hit
     W->>V: verify cached memo (C8 hit expected)
   else miss
-    W->>M: read episodic(customer_id, ticker)
+    W->>M: read episodic(customer_id, ticker) — only if M1 is adopted
     M-->>W: prior runs (context only)
     W->>A: draft(registry, MEMORY block, C7 cacheable prefix)
     A-->>W: memo + usage
@@ -138,7 +138,7 @@ sequenceDiagram
     W->>C: C1 write · C8 write · release lock
   end
   W->>J: result + terminal event WHERE attempt = fence
-  W->>M: write episodic(job_id, snapshot_hash, summary) — idempotent
+  W->>M: write episodic(job_id, snapshot_hash, summary) — only if M1 is adopted
 ```
 
 What the ordering protects: the snapshot is frozen before any model call, so the memo cache key and every citation refer to evidence that can no longer change; memory is written only after the fenced commit, so a stale attempt can never leave a memory record for a result that was discarded.
@@ -196,8 +196,8 @@ M2 is where memory and caching meet. The design keeps one store and one key sche
 
 1. **Memory is context, never evidence.** The analyst receives memory inside a delimited `MEMORY` block framed as "context only; may be stale; do not cite". Memory items have no citation index. The verifier rejects a claim whose only support is memory text, exactly as it rejects an orphan citation.
 2. **Replay is deterministic.** The snapshot manifest records `memory_ref` (sha256 over the canonical JSON of the memory items read). A replay reuses those items and never reads the live memory store. Evaluation runs read no memory unless the fixture pins it, so quality baselines stay comparable.
-3. **Tenant isolation.** M1 is keyed by `customer_id` and authorized as data (ADR-0010 §4). Guests get session-scoped episodic memory with the session's 24 h TTL. M2 holds no principal data by construction (its schema has no `customer_id`).
-4. **Freshness over recall.** A "what changed since your last memo" delta is computed by code from the current snapshot against the prior episodic record, and only when the prior `snapshot_hash` differs. Prior values appear in the MEMORY block; current values are cited to current evidence.
+3. **Tenant isolation (applies only if M1 is adopted).** M1 is keyed by `customer_id` and authorized as data (ADR-0010 §4). Guests get session-scoped episodic memory with the session's 24 h TTL. M2 holds no principal data by construction (its schema has no `customer_id`).
+4. **Freshness over recall (only if M1 is adopted).** A "what changed since your last memo" delta is computed by code from the current snapshot against the prior episodic record, and only when the prior `snapshot_hash` differs. Prior values appear in the MEMORY block; current values are cited to current evidence.
 5. **Nothing user-written persists** beyond ticker, company name and request controls, which input guardrails already bound (SPEC §11.4).
 6. **Write-after-commit, idempotent on `job_id`.** A memory write for a job whose fenced commit failed is impossible; a repeated write is a no-op.
 7. **Memory unavailable is a degradation, not a failure.** The run proceeds without memory and records `memory_unavailable` in `guardrail_events`; the response's `memory` field is empty.
@@ -212,14 +212,14 @@ flowchart TD
   IR --> N[news specialist]
   IR --> K[market specialist]
   F & N & K --> Z[freeze snapshot<br/>manifest += memory_ref]
-  Z --> ER[read episodic — M1<br/>scoped by customer_id]
+  Z --> ER[read episodic — M1, if adopted<br/>scoped by customer_id]
   ER --> MB[MEMORY block<br/>uncited · framed stale]
   Z --> REG[Citation registry<br/>evidence only]
   MB --> A[analyst]
   REG --> A
   A --> V[verifier<br/>memory-only claims rejected]
   V --> CM[fenced commit]
-  CM --> EW[write episodic — M1]
+  CM --> EW[write episodic — M1, if adopted]
   F -. new accession .-> IW[upsert IssuerProfile — M2]
 ```
 
@@ -424,7 +424,7 @@ Projected calls per request (formula, not measurement): with memo hit rate `h`, 
 | Prompt-injection containment | Tool-using specialists have no model; model specialists have no tools; memory never cites; tool outputs framed as data; tool schemas pinned; no server-initiated model calls; output policy before exposure | `guardrail_events` in every response |
 | Tenant isolation | `customer_id` on episodic memory, jobs, events, idempotency; row-level security in the scale tier; guests 24 h TTL; `DELETE /memory` | cross-customer tests (test-plan §23.2, conditional) |
 | Determinism and replay | Snapshot before any model call; `memory_ref` and `tool_calls` in the manifest; replay reads no live tool or memory | replay suite byte-identical |
-| Idempotency and exactly-one result | ADR-0013 fencing unchanged; specialist checkpoints make a retried attempt cheaper, not different | `fence_rejections_total` |
+| Idempotency and exactly-one result | ADR-0013 fencing unchanged; ADR-0017's fenced checkpoints and effect journal make a retried attempt cheaper, not different | `fence_rejections_total` |
 | Capacity | Admission against provider TPM; worker count derived from the token quota; per-target semaphores | `tokens_per_minute{provider}` vs quota |
 | Quality drift | Sampled live runs scored against the approved baseline (`grounded_claim_rate`, `citation_coverage`); per-specialist evals in CI on the frozen release | drift alert at 2σ |
 | Model and prompt change control | M3 is offline-only; every change is a new `prompt_version` or `model_fp`, so caches miss and the eval gate runs | eval registry lineage (SPEC §11.2) |
@@ -537,7 +537,7 @@ START → guard_inputs → memory_read_issuer
       → freeze_snapshot (manifest += memory_ref, tool_calls)
       → memo_cache_lookup
           hit  → verifier
-          miss → memory_read_episodic → analyst → verifier
+          miss → [memory_read_episodic, if M1 is adopted] → analyst → verifier
       → (passed | revisions ≥ 2) ? guard_output → persist → memory_write → END
                                  : analyst(revise) → verifier
 ```
@@ -566,7 +566,7 @@ Entry criteria for any phase beyond A: S7.1–S7.12 recorded (guardrails, identi
 | B | S11-T01 | `SpecialistAgent` protocol; ADR-0017's Researcher split into `market`, `news` and `filings`, with the Analyst and Reviewer becoming `analyst` and `verifier` under the supervisor; sentiment inside `news`; concurrent filing queries | Replay registries byte-identical; test-plan §10 fan-out cases still pass; no new model call |
 | C | S11-T02 | Tool gateway with in-process tools, allowlists, budgets, C3, `tool_calls` in the release manifest (MCP-0) | Zero-network replay passes; every specialist's tool calls are within allowlist; metrics present |
 | D | S11-T03 | Cache stages C7, C8, C9 with metrics | Each fingerprint change misses; provider-reported cached tokens appear in `usage` |
-| E | S11-T04 | Memory store M1/M2, MEMORY block, delta, verifier rule, `DELETE /memory`, replay pins `memory_ref` | Cross-customer and guest-TTL cases; memory-only claim rejected; memory-down run completes |
+| E | S11-T04 | Issuer-profile memory (M2), MEMORY block, verifier rule, replay pins `memory_ref`; M1 episodic, delta and `DELETE /memory` only if ADR-0017 §1 is reversed | Cross-customer and guest-TTL cases; memory-only claim rejected; memory-down run completes |
 | F | S11-T05 | MCP-1 and MCP-2 servers behind flags | Paired evidence-equality checks; breaker and schema-drift drills |
 | G | S11-T06 | `/mcp` exposure (MCP-3) | Auth, quota and envelope cases reuse §1 |
 | H | S11-T07 | Gate F: paired comparison of the specialist graph against ADR-0017's three-agent graph on the frozen release, same model, temperature and prompt (single-axis rule); game days | No regression of `grounded_claim_rate` or `citation_coverage` beyond tolerance; every drill ends in its documented status |
@@ -606,7 +606,7 @@ Decide the episodic-memory conflict with ADR-0017 §1 first. Then accept ADR-001
 
 ## 16. Diagrams
 
-The Mermaid diagrams in §§3, 4, 5.1, 6.3, 7.1, 9 and 11.2 are inline companions. The set below was authored with Archify (editable JSON sources, interactive HTML, light-theme SVG and PNG renders). **It draws this proposal (ADR-0018), not the accepted ADR-0017 baseline:** it shows five specialists and an episodic memory store, which ADR-0017 does not have; ADR-0017's crash resume is drawn in Mermaid in `cloud-deployment.md` §3.1. The titles were re-rendered with the ADR-0018 number on 2026-11-02. The HTML pages passed Archify's automated validation, delivery, strict provenance and browser gates and were inspected visually at 2048 px; the SVG and PNG files are exports of the same artifacts.
+The Mermaid diagrams in §§3, 4, 5.1, 6.3, 7.1, 9 and 11.2 are inline companions. The set below was authored with Archify (editable JSON sources, interactive HTML, light-theme SVG and PNG renders). **It draws this proposal (ADR-0018), not the accepted ADR-0017 baseline:** it shows five specialists and an episodic memory store, which ADR-0017 does not have; ADR-0017's own diagrams are in `docs/svg/adr-0017/` (HLD, crash-resume critical flow, LLD), and its resume path is also drawn in Mermaid in `cloud-deployment.md` §3.1. The titles were re-rendered with the ADR-0018 number on 2026-11-02. The HTML pages passed Archify's automated validation, delivery, strict provenance and browser gates and were inspected visually at 2048 px; the SVG and PNG files are exports of the same artifacts.
 
 | Diagram | Editable source | Interactive | Renders |
 | --- | --- | --- | --- |

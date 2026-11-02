@@ -188,7 +188,7 @@
       "items": [
         "Revise at most twice, then degraded; 'no tier' means every provider tier failed or the cost cap was hit",
         "A crash expires the lease: the job is redelivered and re-claimed with attempt + 1 (at most three attempts, then the DLQ writes failed)",
-        "A re-claim skips completed, in-TTL specialists and the memo cache answers for the same snapshot_hash"
+        "A re-claim loads ADR-0017's fenced checkpoint, resumes at the running specialist and reuses journaled model calls"
       ]
     },
     {
@@ -196,7 +196,7 @@
       "title": "Memory touches",
       "items": [
         "Claim = attempt + 1 with a lease, then guard_inputs and the issuer-profile read, before the evidence fan-out",
-        "Episodic memory is read before drafting and written only after the fenced terminal commit",
+        "Episodic memory, only if the owner reverses ADR-0017 §1, is read before drafting and written only after the fenced terminal commit",
         "A memory outage records memory_unavailable and continues"
       ]
     }

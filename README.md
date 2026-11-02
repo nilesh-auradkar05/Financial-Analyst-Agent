@@ -87,7 +87,9 @@ flowchart TD
 
 **Proposed, not accepted:** [`docs/agent-architecture.md`](docs/agent-architecture.md) and [ADR-0018](docs/adr/ADR-0018-agent-architecture-revision.md) (2026-11-01, first numbered "ADR-0016") refine that baseline: the Researcher splits into `market`, `news` and `filings` specialists under a deterministic supervisor, a tool gateway fronts in-process tools and allowlisted MCP servers, nine fingerprinted cache stages cut model and tool calls, and a paired-eval Gate F decides adoption. Its per-customer episodic memory conflicts with ADR-0017's owner decision against episodic memory and stays conditional until the owner rules. Its oracle is test-plan §23.
 
-The diagrams below draw the ADR-0018 proposal, not the accepted ADR-0017 baseline: they show five specialists and an episodic memory store. ADR-0017's crash-resume flow is drawn in Mermaid in [`docs/cloud-deployment.md`](docs/cloud-deployment.md) §3.1.
+The accepted ADR-0017 design is drawn in [`hld.svg`](docs/svg/adr-0017/hld.svg) (demo tier with three agents and T1–T3), [`critical-flow.svg`](docs/svg/adr-0017/critical-flow.svg) (the Analyst crashes after the model answers; attempt 2 resumes at the Analyst) and [`lld.svg`](docs/svg/adr-0017/lld.svg) (execution-memory contracts and fenced writes). The diagrams below draw the ADR-0018 proposal instead: five specialists and an episodic memory store that ADR-0017 does not have.
+
+![Accepted ADR-0017 design: demo tier with Researcher, Analyst and Reviewer agents and three-tier memory](docs/svg/adr-0017/hld.svg)
 
 ![ADR-0018 proposal: five specialists under a deterministic supervisor, with the tool gateway, MCP servers, memory store and staged caches](docs/png/agents/hld.png)
 

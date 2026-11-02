@@ -5430,11 +5430,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </g>
         </g>
 
-        <g data-edge-from="sup" data-edge-to="mem" data-edge-label="write episodic after commit" data-edge-key="19">
+        <g data-edge-from="sup" data-edge-to="mem" data-edge-label="write episodic after commit (if M1 adopted)" data-edge-key="19">
           <path data-composition-edge-from="sup" data-composition-edge-to="mem" data-composition-points="112,1352;202.57142857142856,1352" d="M 112 1352 L 202.57142857142856 1352" class="a-dashed" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <g data-detail="context">
-          <rect x="62.18571428571428" y="1332" width="190.2" height="18" rx="3" class="c-mask"/>
-          <text x="157.28571428571428" y="1342" class="t-edge-dashed" font-size="11" text-anchor="middle">write episodic after commit</text>
+          <rect x="9.385714285714272" y="1332" width="295.8" height="18" rx="3" class="c-mask"/>
+          <text x="157.28571428571428" y="1342" class="t-edge-dashed" font-size="11" text-anchor="middle">write episodic after commit (if M1 adopted)</text>
         </g>
         </g>
 
@@ -5446,20 +5446,20 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </g>
         </g>
 
-        <g data-edge-from="sup" data-edge-to="cache" data-edge-label="specialist checkpoints complete and in TTL → fan-out skipped" data-edge-key="21">
-          <path data-composition-edge-from="sup" data-composition-edge-to="cache" data-composition-points="112,1464;516.2857142857142,1464" d="M 112 1464 L 516.2857142857142 1464" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-edge-from="sup" data-edge-to="jobs" data-edge-label="load fenced checkpoint → resume at the running specialist" data-edge-key="21">
+          <path data-composition-edge-from="sup" data-composition-edge-to="jobs" data-composition-points="112,1464;830,1464" d="M 112 1464 L 830 1464" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="110.14285714285711" y="1444" width="408" height="18" rx="3" class="c-mask"/>
-          <text x="314.1428571428571" y="1454" class="t-muted" font-size="11" text-anchor="middle">specialist checkpoints complete and in TTL → fan-out skipped</text>
+          <rect x="276.9" y="1444" width="388.2" height="18" rx="3" class="c-mask"/>
+          <text x="471" y="1454" class="t-muted" font-size="11" text-anchor="middle">load fenced checkpoint → resume at the running specialist</text>
         </g>
-        <text data-detail="context" x="124" y="1482" class="t-muted" font-size="7"><tspan x="124" dy="0">Checkpointed</tspan><tspan x="124" dy="11">specialist</tspan><tspan x="124" dy="11">results are</tspan><tspan x="124" dy="11">reused</tspan></text>
+        <text data-detail="context" x="124" y="1482" class="t-muted" font-size="7"><tspan x="124" dy="0">Finished siblings</tspan><tspan x="124" dy="11">kept as pending</tspan><tspan x="124" dy="11">writes</tspan></text>
         </g>
 
-        <g data-edge-from="sup" data-edge-to="cache" data-edge-label="C1 hit for the same snapshot_hash → no model call" data-edge-key="22">
-          <path data-composition-edge-from="sup" data-composition-edge-to="cache" data-composition-points="112,1548;516.2857142857142,1548" d="M 112 1548 L 516.2857142857142 1548" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-edge-from="sup" data-edge-to="jobs" data-edge-label="effect-journal hit → no second model call" data-edge-key="22">
+          <path data-composition-edge-from="sup" data-composition-edge-to="jobs" data-composition-points="112,1548;830,1548" d="M 112 1548 L 830 1548" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="146.44285714285712" y="1528" width="335.4" height="18" rx="3" class="c-mask"/>
-          <text x="314.1428571428571" y="1538" class="t-muted" font-size="11" text-anchor="middle">C1 hit for the same snapshot_hash → no model call</text>
+          <rect x="329.70000000000005" y="1528" width="282.59999999999997" height="18" rx="3" class="c-mask"/>
+          <text x="471" y="1538" class="t-muted" font-size="11" text-anchor="middle">effect-journal hit → no second model call</text>
         </g>
         </g>
 
@@ -5579,8 +5579,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text data-detail="context" x="732.4285714285714" y="122" class="t-muted" font-size="7" text-anchor="middle">no tools</text>
         </g>
 
-        <g id="node-jobs" data-node-id="jobs" data-node-label="Job store" tabindex="0" role="button" aria-label="Focus Job store, fenced attempts, Sequence participant" aria-pressed="false" data-node-kind="database" data-node-sublabel="fenced attempts" data-node-context="Sequence participant">
-          <title>Job store · fenced attempts · Sequence participant</title>
+        <g id="node-jobs" data-node-id="jobs" data-node-label="Job store" tabindex="0" role="button" aria-label="Focus Job store, fenced attempts · T2, Sequence participant" aria-pressed="false" data-node-kind="database" data-node-sublabel="fenced attempts · T2" data-node-context="Sequence participant">
+          <title>Job store · fenced attempts · T2 · Sequence participant</title>
           <rect x="794" y="72" width="86" height="60" rx="6" class="c-mask"/>
           <rect x="794" y="72" width="86" height="60" rx="6" class="c-database" data-animate="node" style="--step:7" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(800 78) scale(0.6875)">
@@ -5588,7 +5588,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="837" y="108" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Job store</text>
-          <text data-detail="context" x="837" y="122" class="t-muted" font-size="7" text-anchor="middle">fenced attempts</text>
+          <text data-detail="context" x="837" y="122" class="t-muted" font-size="6.5" text-anchor="middle">fenced attempts · T2</text>
         </g>
 
         <!-- Legend -->
@@ -5822,7 +5822,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <h3>Crash and resume</h3>
         </div>
         <ul>
-          <li>A re-claimed attempt skips completed, in-TTL specialists and reuses the memo cache</li>
+          <li>A re-claimed attempt loads ADR-0017&#39;s fenced checkpoint, resumes at the running specialist and reuses journaled model and tool results</li>
           <li>Every commit and memory write carries the attempt fence</li>
           <li>Exactly one attempt&#39;s result is stored; a duplicated model call is recorded as cost, never as a second result</li>
         </ul>
