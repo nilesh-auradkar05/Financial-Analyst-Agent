@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "class",
   "meta": {
-    "title": "LLD (ADR-0016) — specialist protocol, tool gateway and memory contracts",
+    "title": "LLD (ADR-0018) — specialist protocol, tool gateway and memory contracts",
     "subtitle": "app/agents/specialists · app/tools · app/memory — specialists import the gateway and the memory protocol, never a client",
     "output": "docs/System-design/agents/lld.html",
     "quality_profile": "showcase",

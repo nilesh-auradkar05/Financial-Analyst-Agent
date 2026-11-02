@@ -82,7 +82,7 @@ flowchart LR
   PS -. secrets .-> WEB
 ```
 
-Not drawn, to keep the view readable: every function exports OpenTelemetry directly to Grafana Cloud (flushed at the end of each invocation) and LLM traces to LangSmith; GitHub Actions deploys through OIDC. The [serverless HLD](System-design/serverless/hld.excalidraw) shows them.
+Not drawn, to keep the view readable: every function exports OpenTelemetry directly to Grafana Cloud (flushed at the end of each invocation) and LLM traces to LangSmith; GitHub Actions deploys through OIDC.
 
 Every cross-cloud arrow is a stateless model request. Nothing that must stay consistent exists outside `us-east-1`. Reserved concurrency (web 10, api 10, worker 3 with the queue limited to 2) is the hard ceiling on spend rate; excess jobs wait in SQS.
 
@@ -278,15 +278,14 @@ Task outline (each task is one feature sprint under the sprint-plan "Sprint cont
 
 ## 10. Diagrams
 
-| Diagram | Editable source | Renders |
-| --- | --- | --- |
-| Demo tier HLD (deployed design) | [`serverless/hld.excalidraw`](System-design/serverless/hld.excalidraw) | [`png`](png/serverless/hld.png) · [`svg`](svg/serverless/hld.svg) |
-| Demo tier cold-start request flow | [`serverless/critical-flow.excalidraw`](System-design/serverless/critical-flow.excalidraw) | [`png`](png/serverless/critical-flow.png) · [`svg`](svg/serverless/critical-flow.svg) |
-| Demo tier contracts (tables, conditional writes, guest quotas) | [`serverless/lld.excalidraw`](System-design/serverless/lld.excalidraw) | [`png`](png/serverless/lld.png) · [`svg`](svg/serverless/lld.svg) |
-| Production scale tier (interview design) | [`production/*.excalidraw`](System-design/production/) | [`png/production/`](png/production/) · [`svg/production/`](svg/production/) |
-| Agents and execution memory (ADR-0017): HLD, LLD, crash-resume critical flow | Generator-built (no Excalidraw source) | [`svg/agents/hld.svg`](svg/agents/hld.svg) · [`lld.svg`](svg/agents/lld.svg) · [`critical-flow.svg`](svg/agents/critical-flow.svg) · interactive `alpha-agent-architecture.html` |
+The demo tier is drawn in Mermaid in this document: topology (§2), first-query request path (§3), resume after a worker crash under ADR-0017 (§3.1), degradation ladders (§4) and ingestion (§5). The scale tier is drawn in [`production-scale-architecture.md`](production-scale-architecture.md) §§4–6.
 
-The three `serverless/*` diagrams above predate ADR-0017: they show the single-graph worker and do not show T2/T3 or crash resume. The `svg/agents/*` set supersedes them for the worker internals; their edge, admission, ingestion and cost content is unchanged.
+| Diagram | Status | Where |
+| --- | --- | --- |
+| Demo tier and scale tier Excalidraw sets (HLD, critical flow, LLD, system design) | Retired 2026-10-31 (commit `3b7b379`): they showed the single-graph worker and predate ADR-0017 | Git history before `3b7b379` |
+| Agent revision diagrams: HLD, critical flow, LLD, job lifecycle, memory and cache dataflow, MCP tool plane | Draw the **proposed** ADR-0018 five-specialist design, not the accepted ADR-0017 three-agent baseline | [`svg/agents/`](svg/agents/) · [`png/agents/`](png/agents/) · interactive and Archify sources in [`System-design/agents/`](System-design/agents/) |
+
+ADR-0017's three-agent topology and crash resume have no dedicated diagram beyond §3.1 yet; drawing one is open.
 
 ## 11. Verify before implementation
 

@@ -2,7 +2,7 @@
   "schema_version": 3,
   "diagram_type": "lifecycle",
   "meta": {
-    "title": "Analysis job lifecycle (ADR-0016) — supervisor states, bounded loops and terminal statuses",
+    "title": "Analysis job lifecycle (ADR-0018) — supervisor states, bounded loops and terminal statuses",
     "output": "docs/System-design/agents/run-lifecycle.html",
     "quality_profile": "showcase",
     "locale": "en"

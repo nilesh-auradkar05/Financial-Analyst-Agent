@@ -386,13 +386,7 @@ Main risks: provider quotas lag demand (mitigated by admission against the token
 
 ## 13. Diagrams
 
-| Diagram | Editable source | Renders |
-| --- | --- | --- |
-| Scale tier HLD | [`production/hld.excalidraw`](System-design/production/hld.excalidraw) | [`png`](png/production/hld.png) · [`svg`](svg/production/hld.svg) |
-| Scale tier critical flow and failover | [`production/critical-flow.excalidraw`](System-design/production/critical-flow.excalidraw) | [`png`](png/production/critical-flow.png) · [`svg`](svg/production/critical-flow.svg) |
-| Scale tier contracts (Postgres, Valkey, releases, identity, gates) | [`production/lld.excalidraw`](System-design/production/lld.excalidraw) | [`png`](png/production/lld.png) · [`svg`](svg/production/lld.svg) |
-| Failure modes, cost by tier, demo → scale triggers, migration seams | [`production/system-design.excalidraw`](System-design/production/system-design.excalidraw) | [`png`](png/production/system-design.png) · [`svg`](svg/production/system-design.svg) |
-| Deployed demo tier, for contrast | [`serverless/*.excalidraw`](System-design/serverless/) | [`png/serverless/`](png/serverless/) · [`svg/serverless/`](svg/serverless/) |
+The scale tier is drawn in Mermaid in this document: HLD (§4), critical flow (§5) and job state machine (§6.2); execution memory under ADR-0017 is specified in §6.1a. The Excalidraw sets for the scale and demo tiers were retired on 2026-10-31 (commit `3b7b379`) because they predate ADR-0017; they remain in git history before that commit. The deployed demo tier is drawn in Mermaid in [`cloud-deployment.md`](cloud-deployment.md) §§2–5.
 
 ## 14. Final recommendation
 

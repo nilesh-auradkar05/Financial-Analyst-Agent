@@ -1,6 +1,8 @@
 # Agent Architecture Revision — memory, five specialists, MCP, async scale, staged caching, agent NFRs
 
-> **Status:** Design companion for [ADR-0016](adr/ADR-0016-agent-architecture-revision.md) (proposed 2026-11-01 at the owner's request; implementation gated, see §12). Nothing in this document is built. Where it disagrees with SPEC or an accepted ADR, those govern (SPEC §0 rank 6).
+> **Status:** Design companion for [ADR-0018](adr/ADR-0018-agent-architecture-revision.md) (proposed 2026-11-01 at the owner's request; implementation gated, see §12). Nothing in this document is built. Where it disagrees with SPEC or an accepted ADR, those govern (SPEC §0 rank 6).
+>
+> **Relation to ADR-0017 (accepted 2026-10-31):** ADR-0017 is the baseline: three agents (Researcher, Analyst, Reviewer), three-tier execution memory (T1–T3), fenced checkpoints, an effect journal and crash resume at the failed agent. This document was first written as "ADR-0016" without that text and was reconciled to it on 2026-11-02 (record renumbered to ADR-0018). The five specialists refine the three agents (`market`, `news`, `filings` split the Researcher); M0 = T1 and M2/M3 live in T3; resume uses ADR-0017's mechanism. **Episodic memory (M1) conflicts with ADR-0017 §1 and is conditional on an owner decision.** Where the two documents disagree, ADR-0017 governs.
 >
 > **Relation to existing design:** this revision changes the *inside* of one job: how the worker decomposes a memo request, what it remembers between jobs, how it reaches tools, and what it caches. It changes nothing about acceptance, fencing, event replay, identity or deployment, which stay as ADR-0010, ADR-0013 and ADR-0015 define them. The scale tier in [`production-scale-architecture.md`](production-scale-architecture.md) is unchanged; this document is what runs *inside* its workers.
 >
@@ -10,7 +12,7 @@
 
 - **Five specialists under a deterministic supervisor.** The LangGraph graph stays code-routed (no LLM planner). It fans out three evidence specialists (`market`, `news`, `filings`), joins and freezes the snapshot, then runs `analyst` and `verifier` in a bounded loop. Each specialist is a typed unit with its own contract, tool allowlist, budget, cache policy, failure semantics and offline eval.
 - **Tool-using specialists have no LLM; LLM specialists have no tools.** This split is the prompt-injection containment boundary: untrusted tool output can only reach a model as framed data, and a model can never call a tool.
-- **Four memory tiers, one rule.** Working (per job, checkpointed), episodic (per principal, per ticker), semantic (per issuer, principal-free, provenance-bearing), procedural (versioned prompts and policies, offline-governed). Memory is **context, never evidence**: nothing from memory can carry a citation index, and replay pins the memory items a run read.
+- **Four memory tiers, one rule.** Working (per job, checkpointed; ADR-0017's T1 and T2), episodic (per principal, per ticker; **conditional on an owner reversal of ADR-0017 §1**), semantic (per issuer, principal-free, provenance-bearing), procedural (versioned prompts and policies, offline-governed). Memory is **context, never evidence**: nothing from memory can carry a citation index, and replay pins the memory items a run read.
 - **MCP as the tool plane, behind a gateway.** One `Tool` interface fronts in-process tools and Model Context Protocol servers alike; servers are allowlisted, read-only, schema-pinned and circuit-broken; outputs are untrusted data. The analyst itself is later exposed as an MCP server over the same auth and quotas.
 - **Caching at nine stages, every key fingerprinted.** Request idempotency, memo, evidence/tool results, query embeddings, retrieval results, sentiment scores, provider prompt-prefix caching, verification results and issuer profiles. The memo cache is single-flighted. Semantic reuse of memo outputs stays prohibited.
 - **Agent NFRs are contracts, not aspirations.** Bounded autonomy (fixed topology, revision cap, tool-call and cost caps per specialist), deadline propagation and cancellation, per-target circuit breakers, a per-specialist degradation ladder, tenant-scoped memory, deterministic replay of tool results, per-agent spans and metrics, and a paired-eval gate (Gate F) before the decomposition replaces the current graph.
@@ -184,7 +186,7 @@ Every terminal specialist state carries `usage` (wall ms, tool calls, tokens, co
 | Tier | Scope | Holds | Read by | Written by | Store (demo / scale) | Lifetime |
 | --- | --- | --- | --- | --- | --- | --- |
 | M0 working | one job | `AgentState`, specialist results, checkpoints | every specialist | supervisor | DynamoDB `checkpoints` / Postgres saver (ADR-0013, ADR-0015) | job + 7 days |
-| M1 episodic | `customer_id` × ticker | prior runs: `job_id`, `snapshot_hash`, `evidence_as_of`, status, memo reference, executive summary (≤ 500 chars), verification rates | `analyst` (MEMORY block), API "what changed" | supervisor after fenced commit | DynamoDB `memory` (`ep#{customer_id}#{ticker}`) / Postgres `episodic_memory` with row-level security | 90 days; guests 24 h; delete on request |
+| M1 episodic **(conditional: ADR-0017 §1 excludes it unless the owner reverses that decision)** | `customer_id` × ticker | prior runs: `job_id`, `snapshot_hash`, `evidence_as_of`, status, memo reference, executive summary (≤ 500 chars), verification rates | `analyst` (MEMORY block), API "what changed" | supervisor after fenced commit | DynamoDB `memory` (`ep#{customer_id}#{ticker}`) / Postgres `episodic_memory` with row-level security | 90 days; guests 24 h; delete on request |
 | M2 semantic | issuer (principal-free) | `IssuerProfile`: CIK, name, sector, fiscal year end, latest 10-K accession and filing date, section coverage, `source_snapshot_hash`; FinBERT scores by text hash; evidence snapshots and index releases (existing) | `filings`, `news`, freshness checks | `filings` after a successful ingest or retrieval; dataops releases | DynamoDB `memory` (`issuer#{ticker}`) and `cache` / Postgres `issuer_profiles` | until a newer accession; scores permanent per model version |
 | M3 procedural | deployment | prompt versions, retrieval configuration, specialist budgets, policy rules, verifier thresholds | all | offline only, through the eval registry (S6, GEPA on holdout) | git + fingerprints in every cache key | per release |
 
@@ -359,7 +361,7 @@ What this revision adds inside the worker:
 | Provider throughput | Token-bucket counter `tok:{provider}:{minute}` (Valkey / DynamoDB) checked before each model call; admission refuses at 80% of quota | provider TPM |
 | Deadlines | `asyncio.timeout` per tool < per specialist < job deadline; cancellation propagates through task groups; a cancelled specialist records `failed(cancelled)` and releases its semaphore | job deadline 10 min |
 | Blocking libraries | `yfinance`, `edgartools`, FinBERT (PyTorch locally, ONNX in the Lambda worker) stay behind `to_thread` with a bounded pool; no sync call on the loop (SPEC §8.2) | pool size = 2 × vCPU |
-| Resume after crash | Specialist results are checkpointed (M0); a re-claimed attempt skips specialists whose checkpoint is complete and whose evidence is within TTL; the snapshot is frozen once per attempt | attempt < 3 |
+| Resume after crash | ADR-0017's mechanism, unchanged: fenced checkpoints per super-step, an effect journal for every model and tool call, and handoff envelopes; a re-claimed attempt resumes at the specialist that was running and reuses journaled results; the snapshot is frozen once and read by hash afterwards | attempt < 3 |
 | Backpressure | Queue age and ready-jobs-per-worker drive autoscaling; per-worker in-flight cap; 429 with `Retry-After` at admission, never an unbounded backlog | ready / (tasks × 50) |
 | Duplicate work | Request idempotency (C0), memo single-flight (C1), tool-result cache (C3) collapse identical work at three granularities | lock TTL = generation deadline |
 | Streaming | Progress events gain `agent` and `cache` fields; the `progress` contract (SPEC run telemetry) stays additive | 15 s heartbeat |
@@ -420,7 +422,7 @@ Projected calls per request (formula, not measurement): with memo hit rate `h`, 
 | Fault isolation | Breaker per provider (ADR-0009 ladder) and per MCP server; half-open probes; a failed evidence specialist degrades the run per its ladder row, never crashes it | `breaker_state{target}` |
 | Degradation ladder | `market` failed → `evidence_missing`; `news` failed → memo states news unavailable, `evidence_missing` when enabled; `filings` absent → `filing_not_found` + "SEC Filings: Not Available"; `analyst` failed on every tier → `failed(provider_unavailable)`; `verifier` not passed after cap → `degraded`; memory down → run continues, `memory_unavailable` event | `run_status_total{status, cause}` |
 | Prompt-injection containment | Tool-using specialists have no model; model specialists have no tools; memory never cites; tool outputs framed as data; tool schemas pinned; no server-initiated model calls; output policy before exposure | `guardrail_events` in every response |
-| Tenant isolation | `customer_id` on episodic memory, jobs, events, idempotency; row-level security in the scale tier; guests 24 h TTL; `DELETE /memory` | cross-customer tests (test-plan §22) |
+| Tenant isolation | `customer_id` on episodic memory, jobs, events, idempotency; row-level security in the scale tier; guests 24 h TTL; `DELETE /memory` | cross-customer tests (test-plan §23.2, conditional) |
 | Determinism and replay | Snapshot before any model call; `memory_ref` and `tool_calls` in the manifest; replay reads no live tool or memory | replay suite byte-identical |
 | Idempotency and exactly-one result | ADR-0013 fencing unchanged; specialist checkpoints make a retried attempt cheaper, not different | `fence_rejections_total` |
 | Capacity | Admission against provider TPM; worker count derived from the token quota; per-target semaphores | `tokens_per_minute{provider}` vs quota |
@@ -556,20 +558,20 @@ Replay topology: `memo_cache_lookup → analyst → verifier → guard_output` w
 
 ## 12. Implementation plan
 
-Entry criteria for any phase beyond A: S7 (a)–(e) recorded (guardrails, identity, caches, queue and store seams, breaker) and Gate D (eval registry and regression gate), because the adoption decision is a paired comparison. Each phase is a behavior-preserving step until Gate F.
+Entry criteria for any phase beyond A: S7.1–S7.12 recorded (guardrails, identity, ADR-0017's checkpoints, journal, error taxonomy and three agents, job store and queue, caches, breaker, execution observability) and Gate D (eval registry and regression gate), because the adoption decision is a paired comparison. Each phase is a behavior-preserving step until Gate F.
 
 | Phase | Task | Change | Validation before the next phase |
 | --- | --- | --- | --- |
-| A | S7 (a)–(e) | Existing seams: guardrails, auth, caches C1/C2/C4/C5/C6, `RunStore`/`JobQueue`, breaker | S7 verification as planned |
-| B | S11-T01 | `SpecialistAgent` protocol; the six nodes refactored into five specialists under the supervisor; sentiment inside `news`; concurrent filing queries | Replay registries byte-identical; test-plan §10 fan-out cases still pass; no new model call |
+| A | S7.1–S7.12 | Existing seams and ADR-0017: guardrails, auth, fenced checkpoints, effect journal, three agents, caches C1/C2/C4/C5/C6, `RunStore`/`JobQueue`, breaker | S7 verification as planned; R6 resume matrix green |
+| B | S11-T01 | `SpecialistAgent` protocol; ADR-0017's Researcher split into `market`, `news` and `filings`, with the Analyst and Reviewer becoming `analyst` and `verifier` under the supervisor; sentiment inside `news`; concurrent filing queries | Replay registries byte-identical; test-plan §10 fan-out cases still pass; no new model call |
 | C | S11-T02 | Tool gateway with in-process tools, allowlists, budgets, C3, `tool_calls` in the release manifest (MCP-0) | Zero-network replay passes; every specialist's tool calls are within allowlist; metrics present |
 | D | S11-T03 | Cache stages C7, C8, C9 with metrics | Each fingerprint change misses; provider-reported cached tokens appear in `usage` |
 | E | S11-T04 | Memory store M1/M2, MEMORY block, delta, verifier rule, `DELETE /memory`, replay pins `memory_ref` | Cross-customer and guest-TTL cases; memory-only claim rejected; memory-down run completes |
 | F | S11-T05 | MCP-1 and MCP-2 servers behind flags | Paired evidence-equality checks; breaker and schema-drift drills |
 | G | S11-T06 | `/mcp` exposure (MCP-3) | Auth, quota and envelope cases reuse §1 |
-| H | S11-T07 | Gate F: paired comparison of the specialist graph against the pre-revision graph on the frozen release, same model, temperature and prompt (single-axis rule); game days | No regression of `grounded_claim_rate` or `citation_coverage` beyond tolerance; every drill ends in its documented status |
+| H | S11-T07 | Gate F: paired comparison of the specialist graph against ADR-0017's three-agent graph on the frozen release, same model, temperature and prompt (single-axis rule); game days | No regression of `grounded_claim_rate` or `citation_coverage` beyond tolerance; every drill ends in its documented status |
 
-Gate F is the adoption decision. Until it passes, the pre-revision graph stays the default and the specialist graph runs behind a flag.
+Gate F is the adoption decision. Until it passes, ADR-0017's three-agent graph stays the default and the specialist graph runs behind a flag.
 
 ## 13. Security and cost
 
@@ -600,11 +602,11 @@ Main risks: the decomposition changes memo quality in a way the heuristic verifi
 
 ## 15. Final recommendation
 
-Accept ADR-0016 as the design, keep it gated on S7 seams and Gate D, and build it in the order of §12: refactor to five specialists with no behavior change first, then the gateway, then caches, then memory, then MCP, and adopt only on a paired Gate F result. The next engineering action is S11-T01 after S7 (e), and the next decision for the owner is the acceptance of the ADR and the SPEC v1.5 scope amendment it carries.
+Decide the episodic-memory conflict with ADR-0017 §1 first. Then accept ADR-0018 as a refinement of ADR-0017, keep it gated on S7.1–S7.12 and Gate D, and build it in the order of §12: refactor to five specialists with no behavior change first, then the gateway, then caches, then memory, then MCP, and adopt only on a paired Gate F result. The next engineering action is S11-T01 after S7 (e), and the next decision for the owner is the acceptance of the ADR and the SPEC v1.5 scope amendment it carries.
 
 ## 16. Diagrams
 
-The Mermaid diagrams in §§3, 4, 5.1, 6.3, 7.1, 9 and 11.2 are inline companions. The reviewed set below was authored with Archify (editable JSON sources, interactive HTML, light-theme SVG and PNG renders), following the convention of the production and serverless sets. The HTML pages passed Archify's automated validation, delivery, strict provenance and browser gates and were inspected visually at 2048 px; the SVG and PNG files are exports of the same artifacts.
+The Mermaid diagrams in §§3, 4, 5.1, 6.3, 7.1, 9 and 11.2 are inline companions. The set below was authored with Archify (editable JSON sources, interactive HTML, light-theme SVG and PNG renders). **It draws this proposal (ADR-0018), not the accepted ADR-0017 baseline:** it shows five specialists and an episodic memory store, which ADR-0017 does not have; ADR-0017's crash resume is drawn in Mermaid in `cloud-deployment.md` §3.1. The titles were re-rendered with the ADR-0018 number on 2026-11-02. The HTML pages passed Archify's automated validation, delivery, strict provenance and browser gates and were inspected visually at 2048 px; the SVG and PNG files are exports of the same artifacts.
 
 | Diagram | Editable source | Interactive | Renders |
 | --- | --- | --- | --- |

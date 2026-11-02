@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "MCP tool plane (ADR-0016) — gateway trust boundary, consumed servers and the exposed analyst",
+    "title": "MCP tool plane (ADR-0018) — gateway trust boundary, consumed servers and the exposed analyst",
     "output": "docs/System-design/agents/mcp-tool-plane.html",
     "quality_profile": "showcase",
     "locale": "en"

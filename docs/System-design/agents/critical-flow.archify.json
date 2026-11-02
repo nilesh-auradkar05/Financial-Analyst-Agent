@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "sequence",
   "meta": {
-    "title": "Critical flow (ADR-0016) — one memo request through the supervisor, and attempt 2 after a crash",
+    "title": "Critical flow (ADR-0018) — one memo request through the supervisor, and attempt 2 after a crash",
     "output": "docs/System-design/agents/critical-flow.html",
     "quality_profile": "showcase",
     "locale": "en"

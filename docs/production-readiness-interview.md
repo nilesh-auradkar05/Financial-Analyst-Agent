@@ -42,9 +42,7 @@ These statements refer to the reviewed baseline; the diagrams did not implement 
 
 A delivered memo resolves to the exact evidence and final bytes that were checked. Record job, attempt, artifact revision/hash, `snapshot_hash`, evidence/index releases and generation/verifier/policy fingerprints. A snapshot is an identity, not a claim that content is current or the memo is correct. Its hash does not replace access control, financial validation or freshness rules.
 
-![Production scale tier HLD: AWS us-east-1 serving, Azure model plane, cloud-neutral services, model ladder and failure domain](svg/production/hld.svg)
-
-The [editable HLD](System-design/production/hld.excalidraw) shows the production scale tier (ADR-0006 as amended by ADR-0015); the demo tier S10 deploys is drawn in [serverless/hld.excalidraw](System-design/serverless/hld.excalidraw). Neither is built yet. Practical work starts with the existing local tools and a small measured workload.
+The production scale tier (ADR-0006 as amended by ADR-0015) is drawn in [`production-scale-architecture.md`](production-scale-architecture.md) §4; the demo tier S10 deploys is drawn in [`cloud-deployment.md`](cloud-deployment.md) §2. Neither is built yet. Practical work starts with the existing local tools and a small measured workload.
 
 ## 1. Document volume: thousands → millions → multi-millions
 
@@ -174,7 +172,7 @@ Job ID, sequence, status, attempt, artifact revision/hash or null, snapshot iden
 
 As a provisional component target. Measure cache, query embedding, search, reranker queue/compute and assembly, including misses/timeouts. The old 185 ms sum and 115 ms slack were hypotheses, not measured headroom. Report cold/warm distributions, corpus/filtered size and concurrency before calling the budget achieved.
 
-![Production scale tier critical flow: durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence and failover ladders](svg/production/critical-flow.svg)
+The scale-tier critical flow (durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal precedence, failover ladders) is drawn in [`production-scale-architecture.md`](production-scale-architecture.md) §5.
 
 **Practical next experiment:** record the five clocks for cold/warm requests; reconnect before/after a fast cache hit; interrupt an API replica; block prohibited output before memo delivery; replay the terminal event. Small samples expose protocol defects but cannot establish robust p99 claims.
 
@@ -283,7 +281,7 @@ At 1,024 dimensions, int8 alone is 102.4 GB before replication. Consider hot/col
 
 **Practical next experiment:** measure bytes/vector and peak RSS on representative affordable text. Sweep a few justified graph/search/quantization choices with the same fixture/method. Extrapolate raw vector bytes algebraically; label nonlinear index/recovery costs unmeasured.
 
-![Production scale tier low-level contracts: durable state, cache fingerprints, alias-swap index releases, identity and switch-over gates (shard sizing is described in the text, not drawn)](svg/production/lld.svg)
+The scale-tier low-level contracts (durable state, cache fingerprints, alias-swap index releases, identity and switch-over gates) are in [`production-scale-architecture.md`](production-scale-architecture.md) §6.
 
 ## 7. Hybrid retrieval and reranking
 
@@ -557,7 +555,7 @@ These are interview milestones, not new accepted sprints. Runtime work follows t
 
 S10 is the cloud item (SPEC v1.4), and ADR-0006 was accepted on 2026-10-08. Cloud resources still wait for the ADR-0006 entry criteria; accepting the design is not evidence that it works.
 
-![Production scale tier: failure modes, cost share by tier, demo → scale triggers and migration seams](svg/production/system-design.svg)
+Failure modes, cost by tier, demo → scale triggers and migration seams are tabulated in [`production-scale-architecture.md`](production-scale-architecture.md) §§2, 7–8 and 10.
 
 ## 15. Thirty-second answers, with the next question ready
 
@@ -577,17 +575,12 @@ S10 is the cloud item (SPEC v1.4), and ADR-0006 was accepted on 2026-10-08. Clou
 | Artifact | What it explains |
 | --- | --- |
 | [Production scale tier](production-scale-architecture.md) | The interview answer to "how would you productionize this?": demo → scale triggers, HLD, flows, LLD, capacity model, SLOs, cost by tier, migration plan |
-| [Demo tier HLD SVG](svg/serverless/hld.svg) · [Excalidraw](System-design/serverless/hld.excalidraw) | Deployed design (ADR-0015): Cloudflare Worker, Lambda functions, DynamoDB, SQS, OpenSearch Serverless; nothing runs while idle |
-| [HLD SVG](svg/production/hld.svg) · [Excalidraw](System-design/production/hld.excalidraw) | Production scale tier: AWS `us-east-1` serving, Azure model plane, cloud-neutral services, model ladder, failure domain |
-| [LLD SVG](svg/production/lld.svg) · [Excalidraw](System-design/production/lld.excalidraw) | Durable state schema, job state machine, cache keys, index release by alias swap, identity and RBAC, switch-over gates |
-| [Critical flow SVG](svg/production/critical-flow.svg) · [Excalidraw](System-design/production/critical-flow.excalidraw) | Durable acceptance, evidence join and freeze, memo cache, fenced commit, terminal status precedence, failover ladders |
-| [System design SVG](svg/production/system-design.svg) · [Excalidraw](System-design/production/system-design.excalidraw) | Failure-mode matrix (built vs documented), cost share by tier, graduation triggers, deploy gate, S10 entry criteria |
-| [Cloud deployment](cloud-deployment.md) | Decision index D01–D19, Mermaid views of the demo tier, cost model and region-loss failure mode |
+| [Cloud deployment](cloud-deployment.md) | Decision index D01–D20, Mermaid views of the demo tier (topology, request path, ADR-0017 crash resume, degradation ladders, ingestion), cost model and region-loss failure mode |
 | Design review (archived: `old_artifacts/docs/production-design-review.md`) | Historical findings; grade is not a new benchmark or automatic reapproval |
 | [Proposed ADR-0007](adr/ADR-0007-production-interview-scale-design.md) | Revised interview architecture and scope boundary |
 | [Retrieval methodology](retrieval-benchmark.md) | Canonical fixtures, identities, metrics and paired rules |
 | [Task ledger](../tasks/todo.md) | Actual revision verification and unresolved checks |
 
-PNG companions remain in `docs/png/production/`. The production diagrams were re-produced on 2026-10-08 and relabeled on 2026-10-11 as the production scale tier; the scale projections in this document (sharding, sizing, throughput) are not drawn in them. Earlier non-production diagrams describe the local S7 target and may retain superseded contracts; SPEC governs implemented/authorized scope and this document describes the revised interview target.
+The Excalidraw, PNG and SVG renders of the scale and demo tiers were retired on 2026-10-31 (commit `3b7b379`) because they predate ADR-0017; the Mermaid figures in the two linked documents replace them, and the old renders remain in git history. The scale projections in this document (sharding, sizing, throughput) are not drawn. Earlier non-production diagrams describe the local S7 target and may retain superseded contracts; SPEC governs implemented/authorized scope and this document describes the revised interview target.
 
 **Evidence discipline:** cite a run artifact for a measurement, show the formula for an estimate, and name missing evidence for a production promise.
