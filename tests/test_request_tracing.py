@@ -1,4 +1,5 @@
 """Trace: docs/test-plan.md §1 Correlated tracing (T2-01 through T2-09)."""
+
 from uuid import UUID, uuid4
 
 import pytest
@@ -30,6 +31,7 @@ def test_request_ids_cover_errors_and_invalid_values(offline):
 class RunCollector:
     otel_exporter = None
     """Faithful public SDK create/update transport: persisted runs keyed by UUID."""
+
     def __init__(self):
         self.runs = {}
         self.flushed = False
@@ -54,8 +56,10 @@ def offline(monkeypatch, tmp_path):
 
     import app.observability.langsmith as tracing
     from app.services.run_store import FileBackedRunStore
+
     async def healthy(**kwargs):
         return True
+
     monkeypatch.setattr(api, "check_ollama_health", healthy)
     monkeypatch.setattr(api, "get_vector_store", lambda: SimpleNamespace(count=0))
     monkeypatch.setattr(api, "run_store", FileBackedRunStore(tmp_path / "runs.json"))
@@ -64,8 +68,10 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(api.settings.langsmith, "tracing_v2", False)
     monkeypatch.setattr(api.settings.langsmith, "api_key", None)
     import requests
+
     def deny_network(*args, **kwargs):
         raise AssertionError("Offline tracing tests must never use network")
+
     monkeypatch.setattr(requests.Session, "request", deny_network)
     collector = RunCollector()
     monkeypatch.setattr(tracing, "Client", lambda **kwargs: collector)
@@ -97,7 +103,6 @@ def test_http_trace_headers_and_metadata(traced):
     assert traced.flushed
 
 
-
 @pytest.fixture
 def evidence(monkeypatch):
     import asyncio
@@ -125,37 +130,79 @@ def evidence(monkeypatch):
             memo = "## Executive Summary\n" + "\n".join(
                 f"{text} [{index}]" for index, text in sources
             )
-            return ChatResult(generations=[ChatGeneration(message=AIMessage(
-                content=[{"type": "reasoning", "reasoning": "provider-visible-reasoning"},
-                         {"type": "text", "text": memo}],
-                usage_metadata={"input_tokens": len(prompt.split()), "output_tokens": len(memo.split()),
-                                "total_tokens": len(prompt.split()) + len(memo.split())},
-            ))])
+            return ChatResult(
+                generations=[
+                    ChatGeneration(
+                        message=AIMessage(
+                            content=[
+                                {"type": "reasoning", "reasoning": "provider-visible-reasoning"},
+                                {"type": "text", "text": memo},
+                            ],
+                            usage_metadata={
+                                "input_tokens": len(prompt.split()),
+                                "output_tokens": len(memo.split()),
+                                "total_tokens": len(prompt.split()) + len(memo.split()),
+                            },
+                        )
+                    )
+                ]
+            )
 
     @traceable(name="get_stock_data", run_type="tool")
     async def stock(ticker):
         await asyncio.sleep(0.02)
-        return SimpleNamespace(ticker=ticker, company_name=ticker + " Corporation",
-                               current_price=float(sum(map(ord, ticker))), price_change_percent=1.0,
-                               market_cap=1000000, pe_ratio=10.0, fifty_two_week_high=400.0,
-                               fifty_two_week_low=50.0, volume=100, dividend_yield=0.0,
-                               sector="Technology", industry="Software", recommendation="hold")
+        return SimpleNamespace(
+            ticker=ticker,
+            company_name=ticker + " Corporation",
+            current_price=float(sum(map(ord, ticker))),
+            price_change_percent=1.0,
+            market_cap=1000000,
+            pe_ratio=10.0,
+            fifty_two_week_high=400.0,
+            fifty_two_week_low=50.0,
+            volume=100,
+            dividend_yield=0.0,
+            sector="Technology",
+            industry="Software",
+            recommendation="hold",
+        )
 
     @traceable(name="search_company_news", run_type="tool")
     async def news(query, max_results=10):
         await asyncio.sleep(0)
-        return [SimpleNamespace(title=query, url="https://example.test/news", source="Local evidence",
-                                snippet=query + " reports software revenue growth.", published_date="2026-09-01")][:max_results]
+        return [
+            SimpleNamespace(
+                title=query,
+                url="https://example.test/news",
+                source="Local evidence",
+                snippet=query + " reports software revenue growth.",
+                published_date="2026-09-01",
+            )
+        ][:max_results]
 
     class Store:
         def search_by_ticker(self, query, ticker, n_results=3):
-            return SimpleNamespace(chunks=[SimpleNamespace(id=f"{ticker}-business", text=f"{ticker} sells software and faces competition.",
-                section="Business", metadata={"filing_type": "10-K"}, filing_date="2026-01-01", relevance_score=1.0)])
+            return SimpleNamespace(
+                chunks=[
+                    SimpleNamespace(
+                        id=f"{ticker}-business",
+                        text=f"{ticker} sells software and faces competition.",
+                        section="Business",
+                        metadata={"filing_type": "10-K"},
+                        filing_date="2026-01-01",
+                        relevance_score=1.0,
+                    )
+                ]
+            )
 
     monkeypatch.setattr(graph, "get_stock_data", stock)
     monkeypatch.setattr(graph, "search_company_news", news)
     monkeypatch.setattr(graph, "get_vector_store", Store)
-    monkeypatch.setattr(graph, "analyze_sentiment_batch", lambda texts: [SimpleNamespace(label="positive") for text in texts])
+    monkeypatch.setattr(
+        graph,
+        "analyze_sentiment_batch",
+        lambda texts: [SimpleNamespace(label="positive") for text in texts],
+    )
     monkeypatch.setattr(graph, "get_llm", lambda settings: EvidenceChat())
 
 
@@ -174,11 +221,18 @@ def descendants(runs, root_id):
 
 def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, evidence):
     with TestClient(api.app) as client:
-        response = client.post("/analyze", json={"ticker": "AAPL"}, headers={
-            "Authorization": "Bearer private-auth-value", "Cookie": "private-cookie-value"})
+        response = client.post(
+            "/analyze",
+            json={"ticker": "AAPL"},
+            headers={
+                "Authorization": "Bearer private-auth-value",
+                "Cookie": "private-cookie-value",
+            },
+        )
     assert response.status_code == 200
     assert "provider-visible-reasoning" not in response.text
-    assert "AAPL" in response.json()["investment_memo"]
+    assert isinstance(response.json()["investment_memo"], str)
+    assert response.json()["investment_memo"].strip()
     runs = list(traced.runs.values())
     roots = [run for run in runs if not run.get("parent_run_id")]
     assert len(roots) == 1
@@ -187,14 +241,20 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     names = [run["name"] for run in children]
     assert names.count("run_financial_analysis") == 1
     assert names.count("financial_analyst_graph") == 1
-    assert {"get_stock_data", "search_company_news", "retrieve_filings", "verify_memo"} <= set(names)
+    assert {"get_stock_data", "search_company_news", "retrieve_filings", "verify_memo"} <= set(
+        names
+    )
     searches = [run for run in children if run["name"] == "search_filing_chunks"]
     assert len(searches) == 5  # four topic queries plus the company-name lookup (S2-T00c D2)
     assert all(set(run["inputs"]) == {"query", "ticker", "n_results"} for run in searches)
-    assert all(run["outputs"] == {"count": 1, "evidence_ids": ["AAPL-business"]} for run in searches)
+    assert all(
+        run["outputs"] == {"count": 1, "evidence_ids": ["AAPL-business"]} for run in searches
+    )
     assert all(run["run_type"] == "chain" for run in children if run["name"] == "draft_memo")
     llms = [run for run in children if run["run_type"] == "llm"]
-    assert len(llms) == 1
+    assert len(llms) == response.json()["draft_count"]  # one native span per draft (SPEC 8.1)
+    parents = {str(run["id"]): run["name"] for run in children}
+    assert {parents[str(llm["parent_run_id"])] for llm in llms[1:]} <= {"revise_memo"}
     assert "provider-visible-reasoning" in str(llms[0]["outputs"])
     assert "usage_metadata" in str(llms[0]["outputs"])
     assert llms[0]["inputs"]
@@ -206,7 +266,10 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     assert llms[0]["extra"]["metadata"]["ls_model_name"] == "offline-evidence-model"
     assert llms[0]["extra"]["metadata"]["ls_temperature"] == 0.0
     exported = str(runs)
-    assert all(secret not in exported for secret in ("private-auth-value", "private-cookie-value", "private-export-key"))
+    assert all(
+        secret not in exported
+        for secret in ("private-auth-value", "private-cookie-value", "private-export-key")
+    )
 
 
 def test_nested_app_failure_exports_only_safe_error(traced, evidence, monkeypatch):
@@ -306,8 +369,9 @@ def test_fatal_draft_failure_marks_draft_span_and_failed_root(traced, evidence, 
 
     monkeypatch.setattr(graph, "get_llm", lambda settings: BrokenChat())
     with TestClient(api.app) as client:
-        response = client.post("/analyze", json={"ticker": "AAPL"},
-                               headers={"X-API-Key": "private-auth-value"})
+        response = client.post(
+            "/analyze", json={"ticker": "AAPL"}, headers={"X-API-Key": "private-auth-value"}
+        )
     assert response.status_code == 200
     assert response.json()["status"] == "failed"
     runs = list(traced.runs.values())
@@ -316,16 +380,26 @@ def test_fatal_draft_failure_marks_draft_span_and_failed_root(traced, evidence, 
     root = next(run for run in runs if str(run["id"]) == response.headers["X-Trace-ID"])
     assert root["error"] == "analysis_failed"
     # Native model spans are the provider's own record (T2-06); app spans stay safe.
-    assert "private-draft-exception-secret" not in str([run for run in runs if run["run_type"] != "llm"])
+    assert "private-draft-exception-secret" not in str(
+        [run for run in runs if run["run_type"] != "llm"]
+    )
 
 
 def test_async_original_correlation_survives_parent_end_replay_and_poll(traced, evidence):
     request_id = str(uuid4())
-    headers = {"X-API-Key": "private-auth-value", "X-Request-ID": request_id, "Idempotency-Key": "stable-job"}
+    headers = {
+        "X-API-Key": "private-auth-value",
+        "X-Request-ID": request_id,
+        "Idempotency-Key": "stable-job",
+    }
     with TestClient(api.app) as client:
         first = client.post("/analyze/async", json={"ticker": "AAPL"}, headers=headers)
         poll = client.get(first.headers["Location"], headers={"X-API-Key": "private-auth-value"})
-        replay = client.post("/analyze/async", json={"ticker": "AAPL"}, headers={**headers, "X-Request-ID": str(uuid4())})
+        replay = client.post(
+            "/analyze/async",
+            json={"ticker": "AAPL"},
+            headers={**headers, "X-Request-ID": str(uuid4())},
+        )
     assert first.status_code == replay.status_code == 202
     original = first.json()
     assert original["request_id"] == request_id
@@ -344,7 +418,16 @@ def test_async_original_correlation_survives_parent_end_replay_and_poll(traced, 
     assert str(jobs[0]["trace_id"]) == original["trace_id"]
     assert root["end_time"] < jobs[0]["end_time"]
     assert root["outputs"]["status_code"] == 202
-    assert len([run for run in descendants(runs, str(jobs[0]["id"])) if run["name"] == "financial_analyst_graph"]) == 1
+    assert (
+        len(
+            [
+                run
+                for run in descendants(runs, str(jobs[0]["id"]))
+                if run["name"] == "financial_analyst_graph"
+            ]
+        )
+        == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -352,26 +435,43 @@ async def test_concurrent_requests_never_cross_trace_or_ticker(traced, evidence)
     import asyncio
 
     import httpx
+
     async with api.lifespan(api.app):
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api.app), base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=api.app), base_url="http://test"
+        ) as client:
             ids = [str(uuid4()), str(uuid4())]
-            responses = await asyncio.gather(*[
-                client.post("/analyze", json={"ticker": ticker}, headers={"X-API-Key": "private-auth-value", "X-Request-ID": request_id})
-                for ticker, request_id in zip(("AAPL", "MSFT"), ids, strict=True)
-            ])
+            responses = await asyncio.gather(
+                *[
+                    client.post(
+                        "/analyze",
+                        json={"ticker": ticker},
+                        headers={"X-API-Key": "private-auth-value", "X-Request-ID": request_id},
+                    )
+                    for ticker, request_id in zip(("AAPL", "MSFT"), ids, strict=True)
+                ]
+            )
     runs = list(traced.runs.values())
     for ticker, request_id, response in zip(("AAPL", "MSFT"), ids, responses, strict=True):
         assert response.status_code == 200
         assert response.headers["X-Request-ID"] == response.json()["request_id"] == request_id
         root = next(run for run in runs if str(run["id"]) == response.headers["X-Trace-ID"])
-        agent = next(run for run in descendants(runs, str(root["id"])) if run["name"] == "run_financial_analysis")
+        agent = next(
+            run
+            for run in descendants(runs, str(root["id"]))
+            if run["name"] == "run_financial_analysis"
+        )
         assert agent["inputs"]["ticker"] == ticker
-        assert all(str(run["trace_id"]) == response.headers["X-Trace-ID"] for run in descendants(runs, str(root["id"])))
+        assert all(
+            str(run["trace_id"]) == response.headers["X-Trace-ID"]
+            for run in descendants(runs, str(root["id"]))
+        )
 
 
 @pytest.mark.asyncio
 async def test_native_carrier_restores_job_after_http_context_closes(traced, evidence):
     from app.observability.langsmith import trace_boundary
+
     async with api.lifespan(api.app):
         async with trace_boundary("HTTP accepted", metadata={}) as root:
             headers = root.to_headers()
@@ -385,7 +485,10 @@ async def test_native_carrier_restores_job_after_http_context_closes(traced, evi
     assert str(jobs[0]["parent_run_id"]) == parent_id
     assert str(jobs[0]["trace_id"]) == trace_id
     assert traced.runs[parent_id]["end_time"] <= jobs[0]["start_time"]
-    assert any(run["run_type"] == "llm" for run in descendants(list(traced.runs.values()), str(jobs[0]["id"])))
+    assert any(
+        run["run_type"] == "llm"
+        for run in descendants(list(traced.runs.values()), str(jobs[0]["id"]))
+    )
 
 
 @pytest.mark.parametrize("enabled,key", [(False, "unused-key"), (True, None), (True, "   ")])
@@ -406,7 +509,10 @@ def test_configuration_aliases_export_one_root(offline, monkeypatch, prefix):
     monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
     monkeypatch.delenv("LANGCHAIN_TRACING_V2", raising=False)
     key = "LANGSMITH_TRACING" if prefix == "LANGSMITH" else "LANGCHAIN_TRACING_V2"
-    config = LangSmithSettings(_env_file=None, **{key: "true", prefix + "_API_KEY": "offline", prefix + "_PROJECT": "offline-project"})
+    config = LangSmithSettings(
+        _env_file=None,
+        **{key: "true", prefix + "_API_KEY": "offline", prefix + "_PROJECT": "offline-project"},
+    )
     monkeypatch.setattr(api.settings, "langsmith", config)
     with TestClient(api.app) as client:
         response = client.get("/")
@@ -461,8 +567,11 @@ async def test_caught_tool_failures_export_safe_codes(traced, monkeypatch):
     monkeypatch.setattr(ingestion, "get_latest_10k", fail_ingestion)
 
     metadata = sec_filings_tool.FilingMetaData(
-        cik="0000320193", accession_number="0000320193-26-000001",
-        filing_type="10-K", filing_date="2026-09-26", primary_document="aapl.htm",
+        cik="0000320193",
+        accession_number="0000320193-26-000001",
+        filing_type="10-K",
+        filing_date="2026-09-26",
+        primary_document="aapl.htm",
         ticker="AAPL",
     )
     cik_client = FailingCIKClient()
@@ -485,8 +594,11 @@ async def test_caught_tool_failures_export_safe_codes(traced, monkeypatch):
     assert ingested.error == "10-K ingestion failed."
 
     runs = list(traced.runs.values())
-    empty = next(run for run in runs if run["name"] == "search_company_news"
-                 and run["inputs"]["query"] == "legitimate empty")
+    empty = next(
+        run
+        for run in runs
+        if run["name"] == "search_company_news" and run["inputs"]["query"] == "legitimate empty"
+    )
     assert empty.get("error") is None
     expected = {
         "get_stock_data": "stock_fetch_failed",
@@ -507,12 +619,17 @@ async def test_caught_tool_failures_export_safe_codes(traced, monkeypatch):
 def test_safe_error_correlation_and_failed_job(traced, monkeypatch):
     async def failure(*args, **kwargs):
         raise RuntimeError("private-exception-secret")
+
     monkeypatch.setattr(api, "run_agent", failure)
     monkeypatch.setattr(api, "get_metrics", lambda: 1 / 0)
     headers = {"X-API-Key": "private-auth-value", "Cookie": "private-cookie-value"}
     with TestClient(api.app) as client:
-        responses = [client.get("/missing"), client.post("/analyze", json={}, headers=headers),
-                     client.get("/metrics", headers=headers), client.post("/analyze", json={"ticker": "AAPL"}, headers=headers)]
+        responses = [
+            client.get("/missing"),
+            client.post("/analyze", json={}, headers=headers),
+            client.get("/metrics", headers=headers),
+            client.post("/analyze", json={"ticker": "AAPL"}, headers=headers),
+        ]
         accepted = client.post("/analyze/async", json={"ticker": "AAPL"}, headers=headers)
         poll = client.get(accepted.headers["Location"], headers=headers)
     assert [r.status_code for r in responses] == [404, 422, 500, 500]
@@ -527,7 +644,15 @@ def test_safe_error_correlation_and_failed_job(traced, monkeypatch):
     assert poll.json()["status"] == "failed"
     assert poll.json()["request_id"] == accepted.json()["request_id"]
     assert poll.json()["trace_id"] == accepted.headers["X-Trace-ID"]
-    assert all(value not in str(traced.runs) for value in ("private-exception-secret", "private-auth-value", "private-cookie-value", "private-export-key"))
+    assert all(
+        value not in str(traced.runs)
+        for value in (
+            "private-exception-secret",
+            "private-auth-value",
+            "private-cookie-value",
+            "private-export-key",
+        )
+    )
     job = next(run for run in traced.runs.values() if run["name"] == "analysis_job")
     assert job["error"] == "analysis_failed"
     assert job["outputs"]["error_id"] in poll.json()["error"]
@@ -536,12 +661,18 @@ def test_safe_error_correlation_and_failed_job(traced, monkeypatch):
 @pytest.mark.parametrize("phase", ["initialize", "create", "update", "flush"])
 def test_exporter_fault_preserves_success(traced, monkeypatch, phase):
     import app.observability.langsmith as tracing
+
     def failed(*args, **kwargs):
         raise RuntimeError("private-exporter-secret")
+
     if phase == "initialize":
         monkeypatch.setattr(tracing, "Client", failed)
     else:
-        monkeypatch.setattr(traced, {"create": "create_run", "update": "update_run", "flush": "flush"}[phase], failed)
+        monkeypatch.setattr(
+            traced,
+            {"create": "create_run", "update": "update_run", "flush": "flush"}[phase],
+            failed,
+        )
     with TestClient(api.app) as client:
         assert client.get("/").status_code == 200
 
@@ -552,9 +683,12 @@ async def test_shutdown_flush_is_bounded(traced, monkeypatch):
     import threading
 
     import app.observability.langsmith as tracing
+
     released = threading.Event()
+
     def stalled(timeout=None):
         released.wait(1)
+
     monkeypatch.setattr(traced, "flush", stalled)
     monkeypatch.setattr(tracing, "FLUSH_TIMEOUT_SECONDS", 0.01)
     tracing.setup_langsmith_env()
@@ -569,4 +703,9 @@ def test_modern_alias_wins_and_default_is_off(monkeypatch):
     for key in ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2"):
         monkeypatch.delenv(key, raising=False)
     assert LangSmithSettings(_env_file=None).tracing_v2 is False
-    assert LangSmithSettings(_env_file=None, LANGSMITH_TRACING="false", LANGCHAIN_TRACING_V2="true").tracing_v2 is False
+    assert (
+        LangSmithSettings(
+            _env_file=None, LANGSMITH_TRACING="false", LANGCHAIN_TRACING_V2="true"
+        ).tracing_v2
+        is False
+    )

@@ -249,6 +249,7 @@ class AnalysisResponse(BaseModel):
     investment_memo: Optional[str] = None
     filing_chunk_count: Optional[int] = None
     usage: Optional[UsageResponse] = None
+    draft_count: Optional[int] = None
 
     # Supporting data
     stock_data: Optional[StockDataResponse] = None

@@ -85,21 +85,20 @@ async def test_the_memo_is_drafted_from_the_releases_evidence_only(release, chat
     ticker (the fake model writes its memo from that prompt)."""
     final = await replay(release)
 
-    assert len(chat.prompts_seen) == 1
     prompt = chat.prompts_seen[0]
     for article in release.expected_news("AAPL"):
         assert article["snippet"] in prompt
     for chunk in release.expected_filing_chunks("AAPL"):
         assert chunk["text"] in prompt
     for article in release.expected_news("MSFT"):
-        assert article["snippet"] not in prompt
+        assert all(article["snippet"] not in seen for seen in chat.prompts_seen)
     registry_text = json.dumps(final["citation_evidence"])
     assert "Microsoft" not in registry_text
 
 
-async def test_replay_reports_only_draft_and_verify_as_progress(release, chat, no_live_tools):
-    """Section 13 / 7.z: only memo drafting and verification run. Node progress, when the run
-    reports any, never names an evidence node."""
+async def test_replay_reports_only_memo_nodes_as_progress(release, chat, no_live_tools):
+    """Section 13 / 7.z, SPEC 8.1: only memo drafting, verification and revision run. Node
+    progress, when the run reports any, never names an evidence node."""
     from app.agents.graph import progress_sink
 
     reported: list[list[dict]] = []
@@ -110,7 +109,7 @@ async def test_replay_reports_only_draft_and_verify_as_progress(release, chat, n
         progress_sink.reset(token)
 
     names = {step["node"] for snapshot in reported for step in snapshot}
-    assert names <= {"draft_memo", "verify_memo"}
+    assert names <= {"draft_memo", "verify_memo", "revise_memo"}
 
 
 async def test_flags_that_exclude_evidence_apply_on_replay(release, chat, no_live_tools):
