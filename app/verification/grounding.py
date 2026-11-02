@@ -2,17 +2,37 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 # Bumped when claim-extraction or number-gate semantics change, so pre-fix and
 # post-fix baseline artifacts can never be silently compared.
-GROUNDING_EVAL_VERSION = 2
+GROUNDING_EVAL_VERSION = 4
 
 _SENTENCE_SPILT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 _WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9&'\-/]*")
 _NUMBER_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?%?")
 _EMPHASIS_RE = re.compile(r"[*_`]+")
+# A scale follows a figure as a word ("7 million") or as an abbreviation attached
+# to the digits ("$7M", "3.2bn"); the abbreviation must end the word, so "10-K"
+# (hyphen) and "7Mbps" (letters follow) carry no scale.
+_SCALE_RE = re.compile(
+    r"\s*(thousand|million|billion|trillion)\b|(MM|BN|K|M|B|T)(?![A-Za-z])", re.IGNORECASE
+)
+_SCALES = {
+    "thousand": 1e3,
+    "k": 1e3,
+    "million": 1e6,
+    "m": 1e6,
+    "mm": 1e6,
+    "billion": 1e9,
+    "b": 1e9,
+    "bn": 1e9,
+    "trillion": 1e12,
+    "t": 1e12,
+}
+# SEC filing tables state figures in thousands or millions.
+_FILING_UNITS = (1e3, 1e6)
 
 _STOPWORDS = {
     "a",
@@ -125,6 +145,7 @@ class _EvidenceRef:
     text: str
     source_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    filing_text: str | None = None
 
 def evaluate_memo_grounding(
     memo: str,
@@ -161,6 +182,7 @@ def evaluate_memo_grounding(
         cited_claims += 1
         best_score = 0.0
         cited_evidence_texts: list[str] = []
+        cited_filing_texts: list[str] = []
 
         for citation_idx in citations:
             evidence_ref = evidence_map.get(citation_idx)
@@ -168,11 +190,15 @@ def evaluate_memo_grounding(
                 continue
 
             cited_evidence_texts.append(evidence_ref.text)
+            if evidence_ref.filing_text is not None:
+                cited_filing_texts.append(evidence_ref.filing_text)
             overlap_score = _token_overlap_score(cleaned_sentence, evidence_ref.text)
             if overlap_score > best_score:
                 best_score = overlap_score
 
-        numbers_ok, unmatched_numbers = _numbers_supported_any(cleaned_sentence, cited_evidence_texts)
+        numbers_ok, unmatched_numbers = _numbers_supported_any(
+            cleaned_sentence, cited_evidence_texts, cited_filing_texts
+        )
         supported = best_score >= min_overlap_score and numbers_ok
         if supported:
             grounded_claims += 1
@@ -228,6 +254,10 @@ def _build_evidence_map(evidence: Sequence[object]) -> dict[int, _EvidenceRef]:
             continue
 
         text = getattr(item, "text", str(item))
+        filing_text = None
+        if isinstance(item, Mapping) and item.get("source_type") == "sec_filing":
+            body = item.get("text")
+            filing_text = body if isinstance(body, str) else None
         source_id = getattr(item, "chunk_id", None) or getattr(item, "id", None)
         metadata = getattr(item, "metadata", {}) or {}
         refs[index] = _EvidenceRef(
@@ -235,6 +265,7 @@ def _build_evidence_map(evidence: Sequence[object]) -> dict[int, _EvidenceRef]:
             text=text,
             source_id=source_id,
             metadata=metadata,
+            filing_text=filing_text,
         )
 
     return refs
@@ -302,7 +333,34 @@ def _extract_number_tokens(text: str) -> list[tuple[float, int]]:
         tokens.append((value, decimals))
     return tokens
 
-def _numbers_supported_any(claim_text: str, evidence_texts: Sequence[str]) -> tuple[bool, list[str]]:
+def _scale_after(text: str, end: int) -> float:
+    """Scale (1.0 when none) stated right after the number token ending at `end`."""
+    scale = _SCALE_RE.match(text, end)
+    return _SCALES[(scale.group(1) or scale.group(2)).lower()] if scale else 1.0
+
+def _absolute_amounts(texts: Sequence[str], filing_texts: Sequence[str]) -> list[float]:
+    """Every figure in the cited evidence at its own stated scale. Comma-grouped
+    filing-body figures without a scale also count in thousands and millions
+    (SEC tables state them so); years and other plain numbers never scale."""
+    amounts = [
+        value * _scale_after(text, match.end())
+        for text in texts
+        for match, (value, _) in zip(_NUMBER_RE.finditer(text), _extract_number_tokens(text))
+    ]
+    amounts += [
+        value * unit
+        for text in filing_texts
+        for match, (value, _) in zip(_NUMBER_RE.finditer(text), _extract_number_tokens(text))
+        if "," in match.group(0) and _scale_after(text, match.end()) == 1.0
+        for unit in _FILING_UNITS
+    ]
+    return amounts
+
+def _numbers_supported_any(
+    claim_text: str,
+    evidence_texts: Sequence[str],
+    filing_texts: Sequence[str] = (),
+) -> tuple[bool, list[str]]:
     """A claim's numbers are supported if, for EACH number token in the claim, AT
     LEAST ONE cited evidence text contains a value that rounds (at the claim's
     stated precision) to it.
@@ -314,20 +372,30 @@ def _numbers_supported_any(claim_text: str, evidence_texts: Sequence[str]) -> tu
     Returns (all_supported, unmatched) where `unmatched` lists the offending
     number substrings verbatim as they appear in the claim, so a human can
     hand-audit exactly which figures were not found in any cited evidence.
+
+    A claim figure that states a scale ("$356.7 million", "$3.2B") is part of the
+    figure: it is supported only by an evidence figure of the same absolute
+    amount, rounded in the claim's unit at the claim's stated precision. A bare
+    "7" never supports "$7.0 million".
     """
     claim_tokens = _extract_number_tokens(claim_text)
     if not claim_tokens:
         return True, []
 
-    raw_matches = [match.group(0) for match in _NUMBER_RE.finditer(claim_text)]
     evidence_values = [
         value for text in evidence_texts for value, _ in _extract_number_tokens(text)
     ]
+    amounts = _absolute_amounts(evidence_texts, filing_texts)
 
     unmatched: list[str] = []
-    for (value, decimals), raw in zip(claim_tokens, raw_matches):
-        if not any(round(ev, decimals) == value for ev in evidence_values):
-            unmatched.append(raw)
+    for (value, decimals), match in zip(claim_tokens, _NUMBER_RE.finditer(claim_text)):
+        scale = _scale_after(claim_text, match.end())
+        if scale == 1.0:
+            supported = any(round(ev, decimals) == value for ev in evidence_values)
+        else:
+            supported = any(round(amount / scale, decimals) == value for amount in amounts)
+        if not supported:
+            unmatched.append(match.group(0))
 
     return not unmatched, unmatched
 

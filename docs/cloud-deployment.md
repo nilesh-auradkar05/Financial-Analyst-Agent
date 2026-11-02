@@ -1,6 +1,6 @@
 # Cloud Deployment — Accepted Design (S10)
 
-> **Status:** Accepted design. Decisions of 2026-10-08 ([ADR-0006](adr/ADR-0006-production-cloud-deployment.md)), vector store revised 2026-10-11 ([ADR-0014](adr/ADR-0014-opensearch-serverless-vector-store.md)), and **runtime and state moved to scale-to-zero services on 2026-10-11** ([ADR-0015](adr/ADR-0015-scale-to-zero-serverless-deployment.md)). **Nothing here is deployed.** Cloud resources wait for the S10 entry criteria (§9). Costs are projections from stated assumptions, not quotes or measurements.
+> **Status:** Accepted design. Decisions of 2026-10-08 ([ADR-0006](adr/ADR-0006-production-cloud-deployment.md)), vector store revised 2026-10-11 ([ADR-0014](adr/ADR-0014-opensearch-serverless-vector-store.md)), and **runtime and state moved to scale-to-zero services on 2026-10-11** ([ADR-0015](adr/ADR-0015-scale-to-zero-serverless-deployment.md)). **Agent topology and execution memory added 2026-10-31** ([ADR-0017](adr/ADR-0017-agent-topology-and-execution-memory.md)): the worker runs Researcher, Analyst and Reviewer agents and resumes a crashed run at the failed agent (D20). **Nothing here is deployed.** Cloud resources wait for the S10 entry criteria (§9). Costs are projections from stated assumptions, not quotes or measurements.
 >
 > **Authority:** this is a design companion (SPEC §0 rank 6, with the diagrams). Where it disagrees with SPEC, an ADR, test-plan or sprint-plan, those govern.
 >
@@ -22,7 +22,7 @@
 | D08 | Caching | **Revised:** the same versioned keys as DynamoDB items with TTL; exact query-embedding cache; single-flight by conditional put. Valkey is the scale tier | ADR-0013 (+ amendment), ADR-0015 |
 | D09 | LLM plane | DeepSeek V3.2 draft + gpt-oss-120b judge/verifier on Bedrock; same models on Foundry as fallback | ADR-0009 amendment |
 | D10 | Embeddings | Cohere Embed v4, 1024 dims, Bedrock + Foundry fallback behind a parity gate; Gate C bake-off decides adoption | ADR-0011 |
-| D11 | Vector store | Amazon OpenSearch Serverless (next generation, scales to zero) in `us-east-1`; index per release, alias promotion; 45 awake minutes per day as an abuse guard; Qdrant Cloud is the fallback if the paired comparison fails | ADR-0014 (+ amendment) |
+| D11 | Vector store | Amazon OpenSearch Serverless (next generation, scales to zero) in `us-east-1`; index per release, alias promotion; 45 awake minutes per day as an abuse guard; the only store since ADR-0016 (2026-10-23); a failed paired comparison (CM-4) stops work for an owner decision | ADR-0014 (+ amendments), ADR-0016 |
 | D12 | Rerank | Bedrock Cohere Rerank 3.5, off until Gate C shows lift | ADR-0011 |
 | D13 | Sentiment | **Revised:** FinBERT exported to ONNX inside the worker Lambda; scores cached by article hash and model version | ADR-0015 |
 | D14 | Evidence storage | S3 versioned + Object Lock on approved releases; in-region backups only; **no cross-region copies** | ADR-0006 |
@@ -31,8 +31,9 @@
 | D17 | Observability | OpenTelemetry → Grafana Cloud; LangSmith for LLM traces | ADR-0006 |
 | D18 | Network | No VPC for Lambda (function URL streaming does not work inside one), so no NAT gateway; ingestion tasks use a public IP | ADR-0015 |
 | D19 | Cold start | Landing-page warm-up of the worker and the search collection; SnapStart and provisioned concurrency rejected (both bill while idle) | ADR-0015 |
+| D20 | Agents and execution memory | Researcher / Analyst / Reviewer subgraphs in one worker invocation. T2 on DynamoDB: `DynamoDBSaver` behind `FencedCheckpointer` (each write a `TransactWriteItems` with a `ConditionCheck` on the job's `attempt`), effect-journal and envelope items, 14-day TTL; state holds references, so S3 offload stays off the hot path. T3: S3 snapshots, OpenSearch releases, DynamoDB cache items, written only after verification. A redelivered job resumes at the failed agent and reuses journaled model calls | ADR-0017 |
 
-Owner changes, for the record: D01, D02, D09 and D14 on 2026-10-08; D15 challenged and resolved to MWAA Serverless; D11 on 2026-10-11 (OpenSearch Serverless; Azure AI Search as documented mitigation only); D03–D08, D13, D15, D16 revised and D18–D19 added on 2026-10-11 for the recruiter-only usage pattern, with OpenSearch Serverless kept and guest access added.
+Owner changes, for the record: D20 on 2026-10-31; D01, D02, D09 and D14 on 2026-10-08; D15 challenged and resolved to MWAA Serverless; D11 on 2026-10-11 (OpenSearch Serverless; Azure AI Search as documented mitigation only); D03–D08, D13, D15, D16 revised and D18–D19 added on 2026-10-11 for the recruiter-only usage pattern, with OpenSearch Serverless kept and guest access added.
 
 ## 2. Topology
 
@@ -42,10 +43,10 @@ flowchart LR
   subgraph AWS[AWS us-east-1 · the only serving region · nothing runs while idle]
     WEB[Lambda web<br/>Next.js BFF · streaming]
     API[Lambda api<br/>FastAPI · streaming]
-    DDB[(DynamoDB on-demand<br/>jobs · events · sessions<br/>quotas · caches · ledger)]
+    DDB[(DynamoDB on-demand<br/>jobs · events · sessions · quotas<br/>caches · ledger · T2 checkpoints<br/>journal · envelopes)]
     DSP[Lambda dispatcher<br/>stream-triggered]
     SQS[(SQS jobs + DLQ)]
-    WK[Lambda worker<br/>LangGraph · ONNX FinBERT]
+    WK[Lambda worker<br/>Researcher · Analyst · Reviewer<br/>fenced checkpoints · effect journal]
     COG[Cognito<br/>admin only]
     OS[(OpenSearch Serverless<br/>0–2 OCU · 45 min/day cap)]
     S3[(S3 evidence<br/>snapshots · Parquet)]
@@ -110,15 +111,48 @@ sequenceDiagram
   D-)Q: INSERT on jobs → dispatcher → SendMessage(job_id)
   Q->>K: deliver (visibility timeout = lease)
   K->>D: claim: attempt + 1 if queued or lease expired
-  K->>O: hybrid search on sec_chunks_active (already awake)
-  K->>K: freeze EvidenceSnapshot → snapshot_hash
-  K->>M: draft → verify → revise ≤ 2 (Foundry on breaker open)
+  K->>D: load checkpoint thread = job_id (empty on attempt 1)
+  K->>O: Researcher: hybrid search on sec_chunks_active (already awake)
+  K->>K: Researcher: freeze EvidenceSnapshot → snapshot_hash (S3)
+  K->>D: envelope R→A + checkpoint IF attempt = mine
+  K->>M: Analyst: draft (journaled) · Reviewer: verify · revise ≤ 2, stop if no gain
+  K->>D: envelopes + checkpoints per handoff IF attempt = mine
   K->>D: events + terminal write IF attempt = mine
   B->>W: GET /jobs/{id}/events (SSE)
   W->>A: signed stream
   A->>D: poll events after Last-Event-ID
   A-->>B: progress, 15 s heartbeat, terminal event · stream capped at 5 min, client reconnects
 ```
+
+### 3.1 Resume after a worker crash (ADR-0017)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Q as SQS
+  participant K1 as Worker attempt 1
+  participant K2 as Worker attempt 2
+  participant D as DynamoDB (jobs · T2)
+  participant M as Bedrock / Foundry
+  Q->>K1: deliver job_id
+  K1->>D: claim attempt = 1
+  Note over K1: Researcher done · snapshot pinned · envelope R→A committed
+  K1->>D: journal lookup draft key (miss)
+  K1->>M: Analyst draft
+  M-->>K1: completion
+  K1->>D: journal put draft result IF attempt = 1
+  Note over K1: timeout or OOM before the A→V checkpoint
+  Q->>K2: redeliver after the visibility timeout
+  K2->>D: claim attempt = 2 (lease expired)
+  K2->>D: load checkpoint → resume at Analyst
+  K2->>D: journal lookup draft key (hit · no second model call)
+  K2->>D: envelope A→V + checkpoint IF attempt = 2
+  Note over K2: Reviewer verifies · revise ≤ 2
+  K2->>D: terminal write IF attempt = 2
+  K1--xD: any late write from attempt 1 fails the condition
+```
+
+The Researcher does not run again, evidence is not fetched again (the snapshot is read from S3 by hash), and the draft is not paid for twice. A crash in the middle of a streamed call leaves no journal entry; that one call is repeated and counted.
 
 ## 4. Degradation ladders
 
@@ -142,7 +176,10 @@ stateDiagram-v2
 | Daily awake cap reached | Exact memo-cache hits and example memos still served | New retrieval jobs 429 until the next UTC day (`search_awake_cap`) | Running jobs finish |
 | Guest quota reached | Example memos still replay | 429 with `Retry-After` | — |
 | Cache read error | Run cold | — | Unchanged; slower and costlier |
-| Worker crash or timeout | Retry inside the invocation from the last checkpoint; an unrecoverable error makes the message visible again after 10 s; a hard timeout redelivers after 6 min; each retry runs `attempt + 1` | Third receive → DLQ handler writes `failed` and bumps `attempt` | One committed result |
+| Worker crash or timeout | Transient errors retry inside the node; an unrecoverable error makes the message visible again after 10 s; a hard timeout redelivers after 6 min; each redelivery runs `attempt + 1`, loads the last checkpoint and resumes at the failed agent, reusing journaled model and tool results (ADR-0017) | Third receive → DLQ handler writes `failed` and bumps `attempt` | One committed result; one checkpoint chain |
+| Zombie attempt (slow, not dead) | Its checkpoint, journal and result writes fail the `attempt` condition | — | Unchanged; the live attempt's result |
+| Checkpoint write fails | Retry once, then abort the attempt before the next agent starts; SQS redelivers | DLQ after 3 receives | `failed` only if every attempt fails |
+| Review does not converge | Stop at 2 revisions or when a revision does not raise grounding | Best draft, uncited claims removed | `degraded` |
 | Job past its deadline | Lazy expiry on the next read (no sweeper) | — | `failed` (`deadline_exceeded`) |
 | Required filings absent | Other evidence still collected | — | `evidence_missing` |
 | Budget exhausted | Admission flag set by the Budgets action | — | New jobs 503; running jobs finish |
@@ -193,7 +230,7 @@ Assumptions: 20 recruiter sessions a month, each one live memo plus a warm-up; o
 | OpenSearch storage | ≈ $0.05 | — | Price to verify |
 | Generation (Bedrock) | $0 | $0.014 | Query embedding < $0.001 |
 | Lambda (web, api, worker) | $0 | ≈ $0.008 | ≈ 600 GB-s; inside the monthly free tier at this volume |
-| DynamoDB, SQS, stream dispatch | < $0.05 | < $0.001 | On-demand; stream reads by Lambda triggers should be free (to verify) |
+| DynamoDB, SQS, stream dispatch | < $0.05 | < $0.001 | On-demand; stream reads by Lambda triggers should be free (to verify); about 20 small T2 writes per run (ADR-0017) |
 | S3, ECR, CloudWatch Logs (7-day retention) | ≈ $0.35 | — | Storage only |
 | MWAA Serverless + Fargate ingestion | $0 | — | ≈ $0.50 per run (MWAA rate to verify) |
 | Cognito, Cloudflare, Parameter Store, Grafana Cloud, LangSmith, Foundry | $0 | $0 | Free tiers or pay-per-call fallbacks |
@@ -219,11 +256,11 @@ Assumptions: 20 recruiter sessions a month, each one live memo plus a warm-up; o
 
 ## 9. S10 entry criteria and task outline
 
-Before the first `terraform apply` (ADR-0006): Gate A cleared; S2-T00b and S2-T00d done; S7 local seams built (DynamoDB `RunStore` and SQS `JobQueue` against DynamoDB Local and ElasticMQ, caches, guardrails, guest and admin access, ONNX FinBERT with recorded label parity); `eval-replay` CI job in place; DeepSeek V3.2 and gpt-oss-120b qualified on Bedrock against frozen evidence, and the Gate C embedding bake-off done if the embedding model changes.
+Before the first `terraform apply` (ADR-0006): Gate A cleared; S2-T00b and S2-T00d done; S7 local seams built (DynamoDB `RunStore` and SQS `JobQueue` against DynamoDB Local and ElasticMQ, the ADR-0017 fenced checkpointer and effect journal with the resume matrix green on DynamoDB Local, caches, guardrails, guest and admin access, sentiment off the event loop with recorded label parity); `eval-replay` CI job in place; DeepSeek V3.2 and gpt-oss-120b qualified on Bedrock against frozen evidence, and the Gate C embedding bake-off done if the embedding model changes.
 
-Before the environment is left running: Foundry and embedding parity measured against the first apply's deployments (fallbacks stay off until they pass); retrieval parity of OpenSearch Serverless against the Qdrant baseline (ADR-0014; on failure the deployment uses Qdrant Cloud); two clean `apply → smoke → destroy` rehearsals, each recording cold-start latency with and without the warm-up.
+Before the environment is left running: Foundry and embedding parity measured against the first apply's deployments (fallbacks stay off until they pass); retrieval parity of OpenSearch Serverless against the Qdrant baseline (ADR-0014, run as CM-4 under ADR-0016; on failure work stops for an owner decision); two clean `apply → smoke → destroy` rehearsals, each recording cold-start latency with and without the warm-up.
 
-Task outline (detailed in `docs/sprint-plan.md` when S10 opens):
+Task outline (each task is one feature sprint under the sprint-plan "Sprint contract", 2026-11-01):
 
 | Task | Scope | Done when |
 | --- | --- | --- |
@@ -237,6 +274,7 @@ Task outline (detailed in `docs/sprint-plan.md` when S10 opens):
 | S10-T08 | Region-loss runbook (documentation only) | §6 reviewed against the deployed resources |
 | S10-T09 | OpenSearch store, paired comparison and awake cap (ADR-0014) | Contract suite passes; paired result recorded; a capped day refuses a cold wake but serves a cache hit |
 | S10-T10 | Edge and cold start (ADR-0015) | Unsigned requests to the function URL are refused; Worker CPU per request < 10 ms; first-query latency with and without the warm-up recorded |
+| S10-T11 | Deployed resume drill (ADR-0017, added 2026-11-01) | A Lambda timeout mid-Analyst resumes at the Analyst with no repeated draft call; a forced duplicate delivery commits once with one checkpoint chain (test-plan §22.9) |
 
 ## 10. Diagrams
 
@@ -246,6 +284,9 @@ Task outline (detailed in `docs/sprint-plan.md` when S10 opens):
 | Demo tier cold-start request flow | [`serverless/critical-flow.excalidraw`](System-design/serverless/critical-flow.excalidraw) | [`png`](png/serverless/critical-flow.png) · [`svg`](svg/serverless/critical-flow.svg) |
 | Demo tier contracts (tables, conditional writes, guest quotas) | [`serverless/lld.excalidraw`](System-design/serverless/lld.excalidraw) | [`png`](png/serverless/lld.png) · [`svg`](svg/serverless/lld.svg) |
 | Production scale tier (interview design) | [`production/*.excalidraw`](System-design/production/) | [`png/production/`](png/production/) · [`svg/production/`](svg/production/) |
+| Agents and execution memory (ADR-0017): HLD, LLD, crash-resume critical flow | Generator-built (no Excalidraw source) | [`svg/agents/hld.svg`](svg/agents/hld.svg) · [`lld.svg`](svg/agents/lld.svg) · [`critical-flow.svg`](svg/agents/critical-flow.svg) · interactive `alpha-agent-architecture.html` |
+
+The three `serverless/*` diagrams above predate ADR-0017: they show the single-graph worker and do not show T2/T3 or crash resume. The `svg/agents/*` set supersedes them for the worker internals; their edge, admission, ingestion and cost content is unchanged.
 
 ## 11. Verify before implementation
 

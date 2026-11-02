@@ -1,6 +1,6 @@
 # ADR-0011 — Managed embedding and rerank models
 
-**Status:** Accepted (2026-10-08) by owner decisions D10 and D12, **provisional on Gate C**: the embedding model changes only if the paired bake-off passes; rerank is enabled only on measured lift.
+**Status:** Accepted (2026-10-08) by owner decisions D10 and D12, **provisional on Gate C**: the embedding model changes only if the paired bake-off passes; rerank is enabled only on measured lift. **Amended 2026-10-23 by ADR-0016:** the bake-off runs on OpenSearch Serverless (CM-5). The Qwen3 arm is the Gate A vectors copied unchanged (CM-4). If no cloud arm qualifies, the owner decides; Qwen3 is no longer the fallback because it is not served in the cloud.
 **Date:** 2026-10-08
 **Related:** SPEC §§6, 11.1 (Gate C), 11.3; `docs/retrieval-benchmark.md`; ADR-0003 (and its 2026-10-08 addendum); ADR-0006; ADR-0009 amendment; production review findings 6, 13, 14.
 

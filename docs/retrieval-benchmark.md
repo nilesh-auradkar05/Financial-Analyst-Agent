@@ -188,7 +188,7 @@ Rules:
 File: `evaluation/compare_retrieval_results.py`. This is where the prior invalid-comparison lesson is enforced.
 
 - **Fixture match:** result files must share `fixture_version`.
-- **Single-axis rule:** exactly one of `{backend, retrieval_method}` may differ; the other must match. If both differ, reject.
+- **Single-axis rule:** exactly one of `{backend, retrieval_method, embedding_model}` may differ; the others must match. If more than one differs, reject. (`embedding_model` added to the set by S2-T05; §9a.)
 - **Shared case set:** `--strict-case-ids` fails if case sets differ. Always report shared/baseline-only/candidate-only counts.
 - **Paired deltas:** report baseline mean, candidate mean, paired delta, relative delta.
 - **Confidence:** bootstrap CI on paired delta, at least 10k resamples, 95%.
@@ -215,6 +215,14 @@ With identical embeddings and `top_k`, Chroma and Qdrant are doing nearest-neigh
 
 The legitimate case for migrating to Qdrant is operational and forward-looking: payload-index filtering and native sparse/hybrid support needed by S5. If the default switches to Qdrant on those grounds, ADR-0003 must say exactly that. No quality fairy tales. We are not running a pitch deck.
 
+### 9.1 Qdrant → OpenSearch Serverless (CM-4, ADR-0016, 2026-10-23)
+
+- **Arms:** baseline = the Gate A result (Qdrant, `section_aware`, `top_k` 10, `qwen3-embedding:4b`, `alpha-evidence:0.1.0`). Candidate = the same vectors, chunk IDs, text and metadata copied unchanged into an OpenSearch Serverless index, run with the same runner, method, `top_k` and fixture. Only `backend` differs.
+- **Before the run:** the index `_count` equals the source collection's count, and every gold chunk ID in the fixture resolves in the index. Both result files record the same `embedding_model` identifier; if the Gate A file's identifier differs from the canonical `provider:model:dimension` form, the baseline is regenerated first (a baseline regeneration, not a fixture change).
+- **Expectation:** a tie, as above. Approximate nearest-neighbor settings that OpenSearch Serverless chooses itself (ADR-0014 decision 5) can lose some recall; that loss is what this comparison measures.
+- **Tolerance (declared 2026-10-23, before any run):** OpenSearch passes if the lower bound of the 95% bootstrap CI of the paired delta (candidate − baseline) is ≥ −0.03 for both `recall@10` and `section_recall@10`. Otherwise work stops for an owner decision. No fallback backend is pre-chosen.
+- **On a pass:** the candidate result becomes the retrieval baseline for every later comparison (CM-5 onward).
+
 ---
 
 ## 9a. Embedding-model bake-off (Gate C, ADR-0011)
@@ -225,7 +233,8 @@ The embedding model is a comparison axis like any other, under the same single-a
 - Each arm applies its model's documented query and document input convention.
 - Only the embedding model changes: same frozen fixture and `fixture_version`, same backend, same retrieval method and `top_k`, same matcher.
 - Each candidate needs its own index built from the same chunks; `embedding_model` is recorded in every result file.
-- The tolerance is declared before the run. If every candidate loses beyond it, Qwen3 stays (ADR-0011).
+- The tolerance is declared before the run. If every candidate loses beyond it, Qwen3 stays (ADR-0011). Superseded 2026-10-23 by the CM-5 rules below.
+- **CM-5 (ADR-0016, declared 2026-10-23, before any run):** every arm runs on OpenSearch Serverless. The Qwen3 arm is the CM-4 index (copied Gate A vectors); each cloud arm is a separate index built from the same chunk IDs, text and metadata. A cloud arm qualifies if the lower bound of the 95% bootstrap CI of its paired delta against Qwen3 is ≥ −0.05 for both `recall@10` and `section_recall@10`. Among qualifying arms, the highest paired-mean `recall@10` wins; if the paired CI between the top two includes 0, it is a tie and the arm with the lower embedding price per token wins. If no cloud arm qualifies, work stops for an owner decision. Qwen3 is not a fallback because it is not served in the cloud.
 - No arm is measured before the Gate A fixture is frozen. Building the provider switch and the per-arm indexes earlier is allowed; running or citing a comparison is not.
 - Downstream (memo-level) measurement is a second stage and never replaces this retrieval comparison: news and stock evidence replayed from a frozen evidence release, same chat model and settings, filings retrieved again per arm, repeated runs per ticker.
 - A change of embedding model invalidates every earlier retrieval baseline; no retrieval-quality number carries across it.

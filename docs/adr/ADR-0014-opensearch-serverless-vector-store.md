@@ -1,6 +1,6 @@
 # ADR-0014 — Deployed vector store: Amazon OpenSearch Serverless with a daily awake cap
 
-**Status:** Accepted (2026-10-11) by owner decision. Supersedes the ADR-0003 addendum (managed Qdrant Cloud) for the deployed (S10) configuration. Adoption as the deployed default is gated by the paired comparison below. **Amended 2026-10-11 (ADR-0015):** the owner kept OpenSearch Serverless for the scale-to-zero demo tier; the wake ledger moves to DynamoDB, the cap becomes an abuse guard rather than the main spending control, and a landing-page warm-up hides the resume time.
+**Status:** Accepted (2026-10-11) by owner decision. Supersedes the ADR-0003 addendum (managed Qdrant Cloud) for the deployed (S10) configuration. Adoption as the deployed default is gated by the paired comparison below. **Amended 2026-10-11 (ADR-0015):** the owner kept OpenSearch Serverless for the scale-to-zero demo tier; the wake ledger moves to DynamoDB, the cap becomes an abuse guard rather than the main spending control, and a landing-page warm-up hides the resume time. **Amended 2026-10-23 (ADR-0016):** OpenSearch is the only store (local container for development and tests, Serverless in the cloud); the adoption gate is the CM-4 comparison below, and the Qdrant Cloud fallback is withdrawn.
 **Date:** 2026-10-11
 **Related:** SPEC §§3, 6, 11.1 (Gates B, C), 12 (S10); ADR-0003 (Qdrant behind the retrieval interface, local default unchanged); ADR-0006; ADR-0011; ADR-0012; ADR-0013; `docs/cloud-deployment.md`.
 
@@ -75,3 +75,18 @@ OpenSearch Serverless becomes the deployed default only after a paired compariso
 - **Warm-up:** after Turnstile, the landing page triggers one `_count` on `sec_chunks_active` so the ~10 s resume overlaps with the visitor typing. A warm-up is admitted only within the cap, extends the ledger like any retrieval call, and is limited to 3 per IP hash per day.
 - Ingestion runs (monthly or on demand) are accounted for in their own ledger window and limited to two per month; they do not consume the query cap.
 - The ledger and reconciliation logic are unchanged apart from the store.
+
+## Amendment 2026-10-23 — only store; adoption gate is CM-4 (ADR-0016)
+
+- Decision 2 changes: local development, tests and the benchmark run on a local OpenSearch container, not Qdrant. Qdrant and Chroma are retired (ADR-0016).
+- The adoption gate is CM-4: the Gate A `qwen3-embedding:4b` vectors are copied unchanged into a Serverless index and benchmarked against the Gate A Qdrant result, so the backend is the only changed variable. The tolerance is in `docs/retrieval-benchmark.md` §9.
+- The Qdrant Cloud fallback is withdrawn. A loss beyond tolerance stops work for an owner decision.
+- The Serverless collection may exist before the ADR-0006 entry criteria are met (ADR-0016 decision 2), after the CM-1 cost controls and with owner approval for each apply.
+
+## Verified 2026-10-23 (CM-1)
+
+From the official AWS pricing page (https://aws.amazon.com/opensearch-service/pricing/), read 2026-10-23:
+
+- NextGen collections bill OCU-hours on the collection group, per second; there is **no minimum OCU**, and indexing and search OCUs **scale to zero after 10 minutes of inactivity**. Storage bills separately per GB-month. All collections in a group share its OCUs.
+- The page's worked examples use **$0.24 per OCU-hour** and **$0.02 per GB-month** of managed storage. The earlier $0.334 per OCU-hour (third-party estimate, Context above) overstated compute by about 40%; at 2 OCUs an awake hour is about $0.48 and a 10-minute idle tail about $0.08.
+- Still open: cold-start time on the pinned configuration (measured in CM-3), Terraform `aws` support for `NEXTGEN` collection groups, and the hybrid pipeline and filter spike (CM-3).
