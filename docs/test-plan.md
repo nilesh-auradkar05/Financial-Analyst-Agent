@@ -25,6 +25,22 @@ Allowed:
 - DB/file/state assertions after public actions where documented.
 - Event/handler tests only when the event contract is public.
 
+## Test layers (added 2026-11-01)
+
+Every sprint in `sprint-plan.md` lists its cases by layer and closes only when each layer it touches is green and the standing regression suites (sprint-plan "Sprint contract") pass. A layer is defined by what it may touch, not by its directory.
+
+| Layer | Code | Exercises | May use | Never |
+| --- | --- | --- | --- | --- |
+| Unit | U | One module through its public functions | Faithful in-memory fakes | Network, containers, clocks it cannot control |
+| Contract | C | A protocol (`RetrievalStore`, `RunStore`, `JobQueue`, `EffectJournal`, checkpointer) against every adapter | The same suite run per adapter | A test that only one adapter sees |
+| Integration | I | Two or more real components wired together | Local stand-ins: OpenSearch container, SQLite saver, DynamoDB Local, ElasticMQ, a development JWT issuer, provider stand-ins | Cloud credentials |
+| Fault injection | F | Crash, zombie and outage behaviour at named boundaries | `FAIL_AT=<agent>.<node>:<pre\|post>-effect`, `kill -9` of a worker process, paused workers, forced breaker states | Sleeps as synchronization; probabilistic failures without a seed |
+| End to end | E2E | The public API through the compiled graph to a terminal status | Replay of a frozen evidence release; stand-ins as in I | Live evidence (it would make the oracle drift) |
+| Quality | Q | Paired, single-axis comparison on frozen evidence (`retrieval-benchmark.md`, SPEC §11.2) | The eval registry; the comparator | More than one changed axis; live evidence for an approved claim |
+| Performance | P | Latency, concurrency and cost against a stated budget | Recorded artifacts with model and release named | Comparing runs that differ in model or network path |
+| Live | L | Deployed or paid resources (S10, CM) | Owner-approved resources; cost recorded | Being quoted as an approved baseline |
+| Regression | R | The standing suites R1–R6 defined in sprint-plan "Sprint contract" | — | Skipping a suite the contract applies to the sprint |
+
 ---
 
 ## 1. API endpoints
@@ -250,7 +266,10 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 | Orphan citation | Any `[N]` outside the registry → `passed=False`, `orphan_citations=[N]`, status `degraded` |
 | Bracketed year is not a citation | `[2024]` in prose is not counted as a citation index |
 | Layering | `app/` has no import from `evaluation/` (CI grep) |
-| Repair loop bounded (S6) | `attempts ≤ 3` total drafts; loop exits on first `passed=True`; `attempts` returned in response |
+| Repair loop bounded (S6.4; amended 2026-11-01, ADR-0017) | At most 3 drafts (`revision` ≤ 2); the loop exits on the first `passed=True`; the number of drafts is returned in the response and counts drafts, never job attempts |
+| Early stop without improvement (S6.4, ADR-0017) | With a faithful fake verifier whose grounded rate does not rise between draft 1 and draft 2, no third draft is requested; with a rate that rises, the loop continues to the bound |
+| Not converged (S6.4, ADR-0017) | A run that ends without a pass returns the best draft by grounded rate with uncited claims removed, status `degraded`, never `completed`; ties keep the earlier draft |
+| Revision carries only failed claims (S7.6) | The Reviewer → Analyst envelope lists exactly the unsupported or orphan claim ids of the last verification; the revise prompt receives those claims and the pinned snapshot, nothing else from the earlier report |
 | Repair improves or holds | On the frozen release, paired per-case `grounded_claim_rate` with loop ≥ without loop; regressions listed per case |
 | Snapshot lineage in response | `snapshot_hash` and `evidence_as_of` present and stable across two replays of the same release |
 
@@ -446,3 +465,94 @@ Observed through the retrieval boundary (`get_embeddings`, the `RetrievalStore` 
 | Embedding identifier recorded | Every ingested chunk carries the embedding identifier (provider, model, dimension) in its metadata; also closes the open part of S3-T04 |
 | Arm built from the same chunks | Building an arm's index from the baseline copies every chunk id, text and metadata unchanged and re-embeds only the vector; chunk counts match per ticker |
 | Provider client stays inside the boundary | No provider client object is reachable from outside `app/components/retrieval/` |
+
+---
+
+## 22. Agent topology, execution memory and crash resume (ADR-0017; S6.4, S7.3–S7.8, S7.10, S7.12, S10-T11)
+
+Traces to SPEC §§8.5–8.9 and ADR-0017 §6, whose fifteen failure scenarios are normative (column **Sc.**). Unless marked otherwise, cases run on a frozen evidence release with provider stand-ins, so a memo is reproducible and its hash comparable. Crashes are injected with `FAIL_AT=<agent>.<node>:<pre|post>-effect`: `pre` stops the process before the node's external call, `post` after the call returns and before the next checkpoint. "Same memo" means the memo text, citation registry and `snapshot_hash` are byte-identical to an uninterrupted run of the same release, model and prompt.
+
+### 22.1 Topology and handoff envelopes (S7.6)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Three agents | U | — | The compiled graph exposes exactly three agent subgraphs (Researcher, Analyst, Reviewer) and the node sets of SPEC §8.6; no node belongs to two agents |
+| Envelope before next agent | I | 10 | For each handoff (R→A, A→V, V→A), the envelope is readable from T2 before the receiving agent's first node starts |
+| Envelope schema | U | — | An envelope missing a required field, with an unknown agent, `revision` > 2, or `failed_claim_ids` on a handoff other than V→A is rejected before it is written |
+| References, not payloads | U | 12 | Envelopes and checkpointed state contain `snapshot_hash`, chunk ids and `payload_ref` but no filing text, news body or draft text; the largest checkpoint for a 10-K run stays under 64 KB |
+| Topology is quality-neutral | Q | — | On the frozen eval set with the same model, prompts and temperature, the three-agent graph stays within the SPEC §11.2 tolerance of the single graph on `grounded_claim_rate` and `citation_coverage`; topology is the only changed axis |
+
+### 22.2 Checkpoints and resume (S7.3)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Resume at the failed agent | F | 2 | For every agent and node, `FAIL_AT=<agent>.<node>:pre-effect` followed by a new attempt finishes with the same memo; nodes that completed before the crash are not executed again (observed through the node-execution counter) |
+| Finished siblings kept | F | 1 | `retrieve_filings` fails after `research_news` and `fetch_stock` finished in the same super-step: the resumed attempt runs only `retrieve_filings`; the other two report one execution each |
+| One retry policy per node | U | 1 | A node raising a transient error is retried within the node with jittered exponential backoff up to its bound; the other agents' nodes are not re-run |
+| Thread identity | U | — | The checkpointer is called with `thread_id = job_id`; two jobs never read each other's checkpoints |
+| Durable before continuing | F | 10 | With the checkpoint store failing on the A→V handoff, the attempt retries once, then aborts without calling the verifier; the job is redelivered and resumes at the handoff |
+| Uninterrupted run unchanged | E2E | — | With checkpointing on and no fault injected, the memo equals the memo produced with checkpointing off; added wall-time per run is under 0.5 s on the stand-in store |
+| TTL | I | 14 | Every checkpoint, journal entry and envelope is written with an expiry 14 days after the job's creation |
+
+### 22.3 Effect journal and evidence pinning (S7.4)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| No double billing | F | 3 | `FAIL_AT=analyst.draft_memo:post-effect`, then resume: the draft provider stand-in records exactly one call; same memo |
+| Every effect journaled | F | 3 | For each node with an external call (news, quote, retrieval, embedding, sentiment, draft, verify, revise), a `post-effect` crash and resume records zero duplicate calls |
+| Key covers inputs | U | — | Changing any one of `node`, `model_id`, generation parameters, `prompt_version`, the rendered prompt or `snapshot_hash` produces a different journal key; identical inputs produce the same key |
+| Partial stream discarded | F | 4 | A crash during a streamed draft leaves no journal entry; the resume issues the call again, `duplicate_provider_calls_total{reason="partial_stream"}` rises by one, and no partial text appears in any event or response |
+| Pinned evidence after the quote TTL | F | 6 | A resume 10 minutes after `freeze_snapshot` (clock advanced) makes no news, quote or retrieval call and uses the same `snapshot_hash` |
+| Journal is per run | U | — | A journal entry from another `run_id` is never returned, even with an otherwise identical key input |
+
+### 22.4 Fencing and zombie attempts (S7.3 local, S7.8 DynamoDB)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Stale checkpoint refused | C | 5 | With the job at `attempt = 2`, a checkpoint, pending-write, journal or envelope write carrying `attempt = 1` fails and changes nothing; the same suite runs against the SQLite and DynamoDB adapters |
+| No forked history | F | 5 | Pause attempt 1 inside `analyst.draft_memo`, let attempt 2 claim and finish, then unpause attempt 1: its checkpoint writes and result commit are refused, the stored checkpoint history is a single chain, and the result is attempt 2's |
+| Atomic fence (DynamoDB) | I | 5 | Against DynamoDB Local, each checkpoint write is one `TransactWriteItems` with a `ConditionCheck` on the job's `attempt`; bumping `attempt` between read and write makes the transaction fail with no partial item |
+| DLQ fences out the last attempt | I | 9 | After the third receive the DLQ handler writes `failed` and bumps `attempt`; a late write from any earlier attempt is refused |
+
+### 22.5 Error taxonomy (S7.5)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Classification | U | — | 429, 5xx, timeouts and connection resets classify as `Transient`; a parser failure on one filing, a schema-invalid draft after one repair and an absent 10-K as `Deterministic`; an exhausted retry budget, a passed deadline and a checkpoint store down after retry as `Fatal` |
+| Deterministic is not retried | U | 9 | A `Deterministic` error produces its typed outcome (`evidence_missing`, `degraded` or a typed `failed` reason) after exactly one call |
+| Retry bounded by deadline | U | 14 | Backoff never schedules a retry past the run deadline; the run ends `failed` (`deadline_exceeded`) |
+| Non-critical source exhausted | E2E | 1 | News retries exhausted with stock and filings present → memo produced, status `degraded`, `missing` names news |
+
+### 22.6 Model pinning and versioning (S7.10, S7.3)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Model pinned per run | F | 8 | A resume uses the model recorded in T2 for the run, not the first tier of the current ladder |
+| Fallback recorded | I | 8 | With the primary breaker forced open, the new attempt runs on the fallback host; the run record names both models and `fallback=true`; the registry writer refuses to classify it `approved` |
+| Compatible resume | U | 11 | A checkpoint whose `graph_version` matches the worker resumes |
+| Incompatible checkpoint | F | 11 | A checkpoint from an incompatible `graph_version` is not resumed; the run restarts from its pinned snapshot, makes no evidence call, and the restart is counted |
+
+### 22.7 Memory tiers and T3 write policy (S7.4, S7.9)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Verified-only T3 writes | I | 15 | A memo that fails verification is never written to the memo cache; one that passes is written once, with its snapshot, prompt, model and verifier fingerprints |
+| No raw tool text in T3 | U | 15 | A news snippet containing an injection string is present in the frozen snapshot only as framed evidence, and appears in no cache entry, envelope or checkpoint as instructions |
+| Memo is never evidence | U | 15 | No retrieval or snapshot path can return a stored memo as an `EvidencePacket` |
+| Single-flight across agents | I | 13 | N concurrent jobs with the same snapshot produce one Analyst generation; every job links the same artifact hash (complements §20 Single-flight) |
+
+### 22.8 Execution observability (S7.12)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Resume metrics | I | 2, 3 | After one injected crash and resume, `/metrics` shows `runs_resumed_total` +1, `nodes_reexecuted_per_resume` observed once, `journal_hits_on_resume_total` ≥ 1 for a `post-effect` crash, `duplicate_provider_calls_total` unchanged |
+| Stale writes counted | I | 5 | The zombie case in §22.4 raises `stale_writes_rejected_total{kind="checkpoint"}` and `{kind="commit"}` |
+| Revision metrics | U | 7 | `revisions_per_run` records 0, 1 or 2; a non-converged run raises `review_not_converged_total` |
+| Trace continuity | I | 2 | The resumed attempt's spans join the original trace with `attempt` as an attribute; agent spans are named `researcher`, `analyst`, `reviewer` |
+
+### 22.9 Deployed resume drill (S10-T11)
+
+| Case | Layer | Sc. | Expected behavior |
+| --- | --- | --- | --- |
+| Lambda timeout mid-agent | L | 2 | With the worker timeout lowered for the drill and the Analyst delayed past it, SQS redelivers after the visibility timeout; attempt 2 resumes at the Analyst and the job ends in the same terminal status as an undisturbed run; cost of both attempts recorded |
+| Zombie in the cloud | L | 5 | Two invocations of one job (forced duplicate delivery) produce one committed result and a single checkpoint chain in DynamoDB |
