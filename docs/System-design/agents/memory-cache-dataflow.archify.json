@@ -1,0 +1,326 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Memory tiers and cache stages (ADR-0016) — what a request reads, what it writes, and what it may cite",
+    "output": "docs/System-design/agents/memory-cache-dataflow.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "legend": {
+      "entries": {
+        "security": {
+          "label": "memory: context only, never citable"
+        },
+        "dashed": {
+          "label": "written after the fenced commit"
+        },
+        "emphasis": {
+          "label": "evidence path (citable)"
+        }
+      }
+    }
+  },
+  "stages": [
+    {
+      "label": "Request + memory reads"
+    },
+    {
+      "label": "Evidence specialists"
+    },
+    {
+      "label": "Freeze + draft"
+    },
+    {
+      "label": "Verify + persist"
+    },
+    {
+      "label": "Memory writes"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "request",
+      "type": "frontend",
+      "label": "Request",
+      "sublabel": "ticker · controls · customer_id",
+      "stage": 0,
+      "row": 0,
+      "tag": "C0 idempotency"
+    },
+    {
+      "id": "issuer",
+      "type": "database",
+      "label": "Issuer profile",
+      "sublabel": "M2 · C9 · no principal",
+      "stage": 0,
+      "row": 1,
+      "tag": "read"
+    },
+    {
+      "id": "episodic",
+      "type": "database",
+      "label": "Episodic memory",
+      "sublabel": "M1 · per customer_id",
+      "stage": 0,
+      "row": 3,
+      "tag": "read"
+    },
+    {
+      "id": "procedural",
+      "type": "security",
+      "label": "Procedural",
+      "sublabel": "M3 · prompt_version · policy fp",
+      "stage": 0,
+      "row": 4,
+      "tag": "offline only"
+    },
+    {
+      "id": "market",
+      "type": "backend",
+      "label": "market",
+      "sublabel": "quote · profile",
+      "stage": 1,
+      "row": 0,
+      "tag": "C3 60 s"
+    },
+    {
+      "id": "news",
+      "type": "backend",
+      "label": "news",
+      "sublabel": "search · FinBERT",
+      "stage": 1,
+      "row": 1,
+      "tag": "C3 15 min · C6"
+    },
+    {
+      "id": "filings",
+      "type": "backend",
+      "label": "filings",
+      "sublabel": "retrieval ×4 · ingest",
+      "stage": 1,
+      "row": 2,
+      "tag": "C4 · C5"
+    },
+    {
+      "id": "freeze",
+      "type": "backend",
+      "label": "Freeze",
+      "sublabel": "snapshot_hash · memory_ref",
+      "stage": 2,
+      "row": 1,
+      "tag": "before any model call"
+    },
+    {
+      "id": "memocache",
+      "type": "database",
+      "label": "Memo cache",
+      "sublabel": "C1 · single-flight",
+      "stage": 2,
+      "row": 2,
+      "tag": "snapshot-keyed"
+    },
+    {
+      "id": "analyst",
+      "type": "backend",
+      "label": "analyst",
+      "sublabel": "registry + MEMORY block",
+      "stage": 2,
+      "row": 3,
+      "tag": "C7 prefix"
+    },
+    {
+      "id": "verifier",
+      "type": "backend",
+      "label": "verifier",
+      "sublabel": "grounding · policy",
+      "stage": 3,
+      "row": 1,
+      "tag": "C8"
+    },
+    {
+      "id": "jobstore",
+      "type": "database",
+      "label": "Job store",
+      "sublabel": "fenced commit",
+      "stage": 3,
+      "row": 2,
+      "tag": "attempt = fence"
+    },
+    {
+      "id": "episodic_w",
+      "type": "database",
+      "label": "Episodic memory",
+      "sublabel": "M1 · 90 d · guests 24 h",
+      "stage": 4,
+      "row": 0,
+      "tag": "write"
+    },
+    {
+      "id": "memwrite",
+      "type": "backend",
+      "label": "memory_write",
+      "sublabel": "idempotent on job_id",
+      "stage": 4,
+      "row": 1,
+      "tag": "after commit"
+    },
+    {
+      "id": "issuer_w",
+      "type": "database",
+      "label": "Issuer profile",
+      "sublabel": "M2 · until new accession",
+      "stage": 4,
+      "row": 2,
+      "tag": "upsert"
+    }
+  ],
+  "flows": [
+    {
+      "id": "f_req_issuer",
+      "from": "request",
+      "to": "issuer",
+      "label": "ticker lookup"
+    },
+    {
+      "id": "f_req_market",
+      "from": "request",
+      "to": "market",
+      "label": "ticker",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_req_news",
+      "from": "request",
+      "to": "news",
+      "label": "ticker, controls",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_issuer_filings",
+      "from": "issuer",
+      "to": "filings",
+      "label": "name, accession",
+      "variant": "security"
+    },
+    {
+      "id": "f_market_freeze",
+      "from": "market",
+      "to": "freeze",
+      "label": "MarketEvidence",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_news_freeze",
+      "from": "news",
+      "to": "freeze",
+      "label": "News, Sentiment",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_filings_freeze",
+      "from": "filings",
+      "to": "freeze",
+      "label": "FilingEvidence",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_freeze_memo",
+      "from": "freeze",
+      "to": "memocache",
+      "label": "snapshot_hash key"
+    },
+    {
+      "id": "f_memo_analyst",
+      "from": "memocache",
+      "to": "analyst",
+      "label": "miss → draft",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_episodic_analyst",
+      "from": "episodic",
+      "to": "analyst",
+      "label": "MEMORY block",
+      "variant": "security"
+    },
+    {
+      "id": "f_proc_analyst",
+      "from": "procedural",
+      "to": "analyst",
+      "label": "prompt_version",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "f_freeze_verifier",
+      "from": "freeze",
+      "to": "verifier",
+      "label": "citation registry",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_analyst_verifier",
+      "from": "analyst",
+      "to": "verifier",
+      "label": "memo",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_verifier_jobstore",
+      "from": "verifier",
+      "to": "jobstore",
+      "label": "result, status",
+      "variant": "emphasis"
+    },
+    {
+      "id": "f_jobstore_memwrite",
+      "from": "jobstore",
+      "to": "memwrite",
+      "label": "terminal event",
+      "variant": "dashed"
+    },
+    {
+      "id": "f_memwrite_episodic",
+      "from": "memwrite",
+      "to": "episodic_w",
+      "label": "EpisodicRecord",
+      "variant": "dashed"
+    },
+    {
+      "id": "f_memwrite_issuer",
+      "from": "memwrite",
+      "to": "issuer_w",
+      "label": "profile upsert",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Citable path",
+      "items": [
+        "Only packets frozen into the snapshot enter the citation registry",
+        "The memo-cache key is the snapshot hash plus prompt, model and verifier fingerprints",
+        "C1 is written only after verification passes, so a cached memo is always a verified memo"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Memory is context only",
+      "items": [
+        "Issuer profile and episodic records reach the analyst in an uncited MEMORY block",
+        "The verifier rejects a claim whose only support is memory",
+        "Replay reuses the items recorded in memory_ref and never reads live memory"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Writes, lifetimes and tool caches",
+      "items": [
+        "Memory writes follow the fenced commit and are idempotent on job_id; the same two stores are read at the start and written at the end",
+        "Issuer profiles live until a newer accession; episodic records 90 days, guests 24 h; procedural memory changes only offline through the eval registry",
+        "Tool caches C2–C6 (tags on the specialists) share the one cache store with fingerprinted keys"
+      ]
+    }
+  ]
+}

@@ -260,3 +260,5 @@ graphify-out/
 *.tfstate.*
 *.tfvars
 tfplan
+# Archify working folders (candidates, receipts, captures); delivered diagrams live under docs/
+.archify/

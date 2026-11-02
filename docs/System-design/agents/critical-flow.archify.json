@@ -1,0 +1,348 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Critical flow (ADR-0016) — one memo request through the supervisor, and attempt 2 after a crash",
+    "output": "docs/System-design/agents/critical-flow.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "participants": [
+    {
+      "id": "sup",
+      "type": "backend",
+      "label": "Supervisor",
+      "sublabel": "worker · code-routed"
+    },
+    {
+      "id": "mem",
+      "type": "database",
+      "label": "Memory store",
+      "sublabel": "M1 · M2"
+    },
+    {
+      "id": "gw",
+      "type": "security",
+      "label": "Tool gateway",
+      "sublabel": "allowlist · budget"
+    },
+    {
+      "id": "tools",
+      "type": "external",
+      "label": "Tools",
+      "sublabel": "in-process / MCP"
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Cache store",
+      "sublabel": "C1–C9"
+    },
+    {
+      "id": "analyst",
+      "type": "backend",
+      "label": "analyst",
+      "sublabel": "LLM · no tools"
+    },
+    {
+      "id": "verifier",
+      "type": "backend",
+      "label": "verifier",
+      "sublabel": "no tools"
+    },
+    {
+      "id": "jobs",
+      "type": "database",
+      "label": "Job store",
+      "sublabel": "fenced attempts"
+    }
+  ],
+  "segments": [
+    {
+      "from": 162,
+      "to": 300,
+      "label": "Claim and issuer memory"
+    },
+    {
+      "from": 316,
+      "to": 700,
+      "label": "Evidence fan-out — market ‖ news ‖ filings, each under its own budget"
+    },
+    {
+      "from": 716,
+      "to": 850,
+      "label": "Freeze and memo-cache lookup"
+    },
+    {
+      "from": 866,
+      "to": 1225,
+      "label": "Draft and verify — revise at most twice"
+    },
+    {
+      "from": 1240,
+      "to": 1380,
+      "label": "Fenced commit, then memory write"
+    },
+    {
+      "from": 1396,
+      "to": 1620,
+      "label": "Attempt 2 after a crash — lease expired, nothing fetched or drafted again"
+    }
+  ],
+  "messages": [
+    {
+      "from": "sup",
+      "to": "jobs",
+      "y": 184,
+      "label": "claim: attempt + 1, lease, deadline",
+      "variant": "emphasis"
+    },
+    {
+      "from": "sup",
+      "to": "mem",
+      "y": 228,
+      "label": "read IssuerProfile(ticker)"
+    },
+    {
+      "from": "mem",
+      "to": "sup",
+      "y": 268,
+      "label": "profile or none → memory_ref",
+      "variant": "return"
+    },
+    {
+      "from": "sup",
+      "to": "gw",
+      "y": 340,
+      "label": "market.quote — 8 s, 2 calls",
+      "variant": "emphasis",
+      "note": "Three start together; budget per call"
+    },
+    {
+      "from": "gw",
+      "to": "cache",
+      "y": 424,
+      "label": "C3 tool cache lookup (TTL by source)"
+    },
+    {
+      "from": "gw",
+      "to": "tools",
+      "y": 464,
+      "label": "call with timeout, breaker per target",
+      "variant": "security"
+    },
+    {
+      "from": "tools",
+      "to": "gw",
+      "y": 504,
+      "label": "payload → validate → frame as DATA",
+      "variant": "return",
+      "note": "Only model-free specialists see payloads"
+    },
+    {
+      "from": "sup",
+      "to": "gw",
+      "y": 588,
+      "label": "news.search + sentiment.score — 12 s",
+      "variant": "emphasis",
+      "note": "C3 news 15 min; C6 by sha256"
+    },
+    {
+      "from": "sup",
+      "to": "gw",
+      "y": 672,
+      "label": "retrieval.search ×4 concurrent — 20 s",
+      "variant": "emphasis"
+    },
+    {
+      "from": "sup",
+      "to": "cache",
+      "y": 740,
+      "label": "C1 memo lookup — single-flight lock on miss",
+      "variant": "emphasis",
+      "note": "Freeze first → snapshot_hash + manifest"
+    },
+    {
+      "from": "cache",
+      "to": "sup",
+      "y": 824,
+      "label": "miss, lock held",
+      "variant": "return"
+    },
+    {
+      "from": "sup",
+      "to": "mem",
+      "y": 890,
+      "label": "read episodic(customer_id, ticker)",
+      "variant": "security"
+    },
+    {
+      "from": "mem",
+      "to": "sup",
+      "y": 930,
+      "label": "prior runs → MEMORY block, uncited",
+      "variant": "return"
+    },
+    {
+      "from": "sup",
+      "to": "analyst",
+      "y": 970,
+      "label": "draft(registry, MEMORY block, C7 prefix)",
+      "variant": "emphasis"
+    },
+    {
+      "from": "analyst",
+      "to": "sup",
+      "y": 1014,
+      "label": "memo + usage",
+      "variant": "return",
+      "note": "Foundry → Bedrock on breaker open"
+    },
+    {
+      "from": "sup",
+      "to": "verifier",
+      "y": 1098,
+      "label": "verify: grounding + policy; memory-only claims rejected"
+    },
+    {
+      "from": "verifier",
+      "to": "sup",
+      "y": 1138,
+      "label": "RevisionRequest or pass",
+      "variant": "return",
+      "note": "Fail → revise → verify, ≤ 2; then degraded"
+    },
+    {
+      "from": "sup",
+      "to": "cache",
+      "y": 1264,
+      "label": "C1 memo + C8 verification write; release lock"
+    },
+    {
+      "from": "sup",
+      "to": "jobs",
+      "y": 1308,
+      "label": "result + terminal event WHERE attempt = fence",
+      "variant": "emphasis"
+    },
+    {
+      "from": "sup",
+      "to": "mem",
+      "y": 1352,
+      "label": "write episodic after commit",
+      "variant": "dashed"
+    },
+    {
+      "from": "jobs",
+      "to": "sup",
+      "y": 1420,
+      "label": "redeliver → claim attempt = 2",
+      "variant": "emphasis"
+    },
+    {
+      "from": "sup",
+      "to": "cache",
+      "y": 1464,
+      "label": "specialist checkpoints complete and in TTL → fan-out skipped",
+      "note": "Checkpointed specialist results are reused"
+    },
+    {
+      "from": "sup",
+      "to": "cache",
+      "y": 1548,
+      "label": "C1 hit for the same snapshot_hash → no model call"
+    },
+    {
+      "from": "sup",
+      "to": "jobs",
+      "y": 1592,
+      "label": "fenced commit attempt = 2; a late attempt-1 write is refused",
+      "variant": "emphasis"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "sup",
+      "from": 178,
+      "to": 1360,
+      "type": "backend"
+    },
+    {
+      "participant": "mem",
+      "from": 222,
+      "to": 274,
+      "type": "database"
+    },
+    {
+      "participant": "gw",
+      "from": 334,
+      "to": 680,
+      "type": "security"
+    },
+    {
+      "participant": "tools",
+      "from": 458,
+      "to": 510,
+      "type": "external"
+    },
+    {
+      "participant": "cache",
+      "from": 734,
+      "to": 830,
+      "type": "database"
+    },
+    {
+      "participant": "analyst",
+      "from": 964,
+      "to": 1020,
+      "type": "backend"
+    },
+    {
+      "participant": "verifier",
+      "from": 1092,
+      "to": 1144,
+      "type": "backend"
+    },
+    {
+      "participant": "jobs",
+      "from": 1302,
+      "to": 1314,
+      "type": "database"
+    },
+    {
+      "participant": "sup",
+      "from": 1414,
+      "to": 1600,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Ordering that protects correctness",
+      "items": [
+        "The snapshot is frozen before any model call, so every citation and the memo-cache key refer to evidence that cannot change",
+        "Memory is written only after the fenced commit, so a stale attempt never leaves a record for a discarded result",
+        "No partial draft is ever spliced when the provider ladder moves to the next tier"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Where calls are saved",
+      "items": [
+        "C3 collapses tool calls per TTL window during a burst",
+        "C1 collapses identical snapshots to one generation (single-flight)",
+        "C8 means a cached memo is never re-verified"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Crash and resume",
+      "items": [
+        "A re-claimed attempt skips completed, in-TTL specialists and reuses the memo cache",
+        "Every commit and memory write carries the attempt fence",
+        "Exactly one attempt's result is stored; a duplicated model call is recorded as cost, never as a second result"
+      ]
+    }
+  ]
+}

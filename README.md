@@ -93,6 +93,21 @@ flowchart TD
     V --> E([END])
 ```
 
+### Agent architecture revision (proposed, ADR-0016)
+
+[`docs/agent-architecture.md`](docs/agent-architecture.md) is the design for the next step inside the worker, proposed on 2026-11-01 and not yet built: five specialists (`market`, `news`, `filings`, `analyst`, `verifier`) under a deterministic supervisor, four memory tiers under the rule that memory is context and never evidence, a tool gateway fronting in-process tools and allowlisted MCP servers, asynchronous execution with nested deadlines, nine fingerprinted cache stages, and agent-specific reliability contracts with a paired-eval adoption gate. The decision record is [ADR-0016](docs/adr/ADR-0016-agent-architecture-revision.md); the behavior oracle is test-plan §22.
+
+![Agent HLD: five specialists under a deterministic supervisor, with the tool gateway, MCP servers, memory store and staged caches](docs/png/agents/hld.png)
+
+| Diagram | Image | SVG | Interactive | Editable source |
+|---|---|---|---|---|
+| Agent HLD | [`hld.png`](docs/png/agents/hld.png) | [`hld.svg`](docs/svg/agents/hld.svg) | [`hld.html`](docs/System-design/agents/hld.html) | [`hld.archify.json`](docs/System-design/agents/hld.archify.json) |
+| Critical flow, with attempt 2 after a crash | [`critical-flow.png`](docs/png/agents/critical-flow.png) | [`critical-flow.svg`](docs/svg/agents/critical-flow.svg) | [`critical-flow.html`](docs/System-design/agents/critical-flow.html) | [`critical-flow.archify.json`](docs/System-design/agents/critical-flow.archify.json) |
+| LLD: specialist protocol, gateway, memory contracts | [`lld.png`](docs/png/agents/lld.png) | [`lld.svg`](docs/svg/agents/lld.svg) | [`lld.html`](docs/System-design/agents/lld.html) | [`lld.archify.json`](docs/System-design/agents/lld.archify.json) |
+| Analysis job lifecycle | [`run-lifecycle.png`](docs/png/agents/run-lifecycle.png) | [`run-lifecycle.svg`](docs/svg/agents/run-lifecycle.svg) | [`run-lifecycle.html`](docs/System-design/agents/run-lifecycle.html) | [`run-lifecycle.archify.json`](docs/System-design/agents/run-lifecycle.archify.json) |
+| Memory tiers and cache stages | [`memory-cache-dataflow.png`](docs/png/agents/memory-cache-dataflow.png) | [`memory-cache-dataflow.svg`](docs/svg/agents/memory-cache-dataflow.svg) | [`memory-cache-dataflow.html`](docs/System-design/agents/memory-cache-dataflow.html) | [`memory-cache-dataflow.archify.json`](docs/System-design/agents/memory-cache-dataflow.archify.json) |
+| MCP tool plane and trust boundary | [`mcp-tool-plane.png`](docs/png/agents/mcp-tool-plane.png) | [`mcp-tool-plane.svg`](docs/svg/agents/mcp-tool-plane.svg) | [`mcp-tool-plane.html`](docs/System-design/agents/mcp-tool-plane.html) | [`mcp-tool-plane.archify.json`](docs/System-design/agents/mcp-tool-plane.archify.json) |
+
 ### Component diagrams
 
 <details>
