@@ -25,6 +25,22 @@ Allowed:
 - DB/file/state assertions after public actions where documented.
 - Event/handler tests only when the event contract is public.
 
+## Test layers (added 2026-11-01)
+
+Every sprint in `sprint-plan.md` lists its cases by layer and closes only when each layer it touches is green and the standing regression suites (sprint-plan "Sprint contract") pass. A layer is defined by what it may touch, not by its directory.
+
+| Layer | Code | Exercises | May use | Never |
+| --- | --- | --- | --- | --- |
+| Unit | U | One module through its public functions | Faithful in-memory fakes | Network, containers, clocks it cannot control |
+| Contract | C | A protocol (`RetrievalStore`, `RunStore`, `JobQueue`, `EffectJournal`, checkpointer) against every adapter | The same suite run per adapter | A test that only one adapter sees |
+| Integration | I | Two or more real components wired together | Local stand-ins: OpenSearch container, SQLite saver, DynamoDB Local, ElasticMQ, a development JWT issuer, provider stand-ins | Cloud credentials |
+| Fault injection | F | Crash, zombie and outage behaviour at named boundaries | `FAIL_AT=<agent>.<node>:<pre\|post>-effect`, `kill -9` of a worker process, paused workers, forced breaker states | Sleeps as synchronization; probabilistic failures without a seed |
+| End to end | E2E | The public API through the compiled graph to a terminal status | Replay of a frozen evidence release; stand-ins as in I | Live evidence (it would make the oracle drift) |
+| Quality | Q | Paired, single-axis comparison on frozen evidence (`retrieval-benchmark.md`, SPEC §11.2) | The eval registry; the comparator | More than one changed axis; live evidence for an approved claim |
+| Performance | P | Latency, concurrency and cost against a stated budget | Recorded artifacts with model and release named | Comparing runs that differ in model or network path |
+| Live | L | Deployed or paid resources (S10, CM) | Owner-approved resources; cost recorded | Being quoted as an approved baseline |
+| Regression | R | The standing suites R1–R6 defined in sprint-plan "Sprint contract" | — | Skipping a suite the contract applies to the sprint |
+
 ---
 
 ## 1. API endpoints
@@ -105,7 +121,7 @@ Allowed:
 
 ## 4. Retrieval contract: S3-T04 parity suite
 
-Runs under both Chroma and Qdrant.
+Retargeted 2026-10-23 (ADR-0016, CM-2): runs against a local OpenSearch container; it is the OpenSearch contract oracle. Chroma and Qdrant are retired, so "both backends" below means two separately populated OpenSearch indexes holding the same corpus. Previously: runs under both Chroma and Qdrant.
 
 | Case | Expected behavior |
 | --- | --- |
@@ -120,16 +136,21 @@ Runs under both Chroma and Qdrant.
 
 ---
 
-## 5. Qdrant-specific: S3
+## 5. OpenSearch-specific: CM-2 (was Qdrant-specific, S3; retargeted 2026-10-23, ADR-0016)
+
+Against a local OpenSearch container; no network beyond it and no cloud credentials.
 
 | Case | Expected behavior |
 | --- | --- |
-| `VECTOR_BACKEND=qdrant` | resolves to `QdrantVectorStore` |
+| `VECTOR_BACKEND=opensearch` | resolves to `OpenSearchVectorStore` |
 | Invalid `VECTOR_BACKEND` | config validation fails |
-| Qdrant unavailable | `healthcheck()` reports unavailable; no hang/storm |
-| Payload index creation | idempotent; indexes present for ticker, filing_type, section_key, filing_date, accession_number |
+| OpenSearch unavailable | `healthcheck()` reports unavailable within its timeout; no hang or retry storm |
+| Index mapping creation | idempotent; exact-match (keyword) fields for ticker, filing_type, section_key, filing_date, accession_number; the vector field's dimension equals the configured embedding dimension |
 | Filtered count/search | only matching metadata returned |
-| Coverage under Qdrant | S1 section-coverage + idempotency pass with Qdrant |
+| Chunk identity preserved | the document id stored for a chunk is its `chunk_id`, so gold labels resolve unchanged |
+| Coverage under OpenSearch | S1 section-coverage + idempotency pass against the container (S3-T05 retargeted) |
+
+Superseded Qdrant cases (S3, kept for history): `VECTOR_BACKEND=qdrant` resolves to `QdrantVectorStore`; Qdrant unavailable is reported without a hang; payload indexes are created idempotently; coverage passes under Qdrant.
 
 ---
 
@@ -185,6 +206,14 @@ Definitions live in `retrieval-benchmark.md`.
 | Citation mapping | each citation maps to an `evidence_id` |
 | Missing evidence | memo explicitly says evidence is missing |
 | Unsupported claim | verifier flags it |
+| Filing figure stated at a larger scale (VERIFY-SCALE, owner rule 2026-10-23) | Through `evaluate_memo_grounding` with registry entries (mappings with `source_type`, `text`): a claim citing an `sec_filing` entry is number-supported when it states "$356.7 million" or "$3.33 billion" and the filing text holds "356,711" or "3,333,751" (thousands) or the figure in millions, compared at the precision the claim states |
+| Wrong scaled figure still fails | "$356.9 million" against filing text holding "356,711" is unsupported, and the reason names "$356.9" |
+| Scaling limited to filing body text | The same scaled claim is unsupported when the only matching unscaled number sits in a `news`, `market_data` or `sentiment` entry, or in a filing entry's identifiers, URL or date rather than its `text` |
+| Years never scale (review finding 2026-10-23) | A scaled claim ("$2.0 billion", "$2.03 million") is unsupported when the only candidate in the filing text is a figure written without a thousands separator and without its own scale word, such as a year ("fiscal 2025", "fiscal 2026"); implicit thousands/millions apply only to table-style figures with a thousands separator ("356,711", "4,151.9") |
+| Existing matches unchanged | Every claim number that was supported before VERIFY-SCALE (same scale word on both sides, unscaled figures, rounding at stated precision, number found in any cited entry) is still supported, except a scaled figure whose only support was a bare number of a different magnitude (VERIFY-UNITS below) |
+| Scale words are part of the figure (VERIFY-UNITS, owner 2026-10-23: "7 should not be accepted from item 7") | A claim figure carrying a scale (thousand, million, billion, trillion, or an attached K / M / MM / B / BN / T) is supported only by an evidence figure of the same absolute amount, compared at the claim's stated precision in the claim's unit. "$7.0 million" is unsupported by a bare "7" ("Item 7") or by "7.0 billion", and supported by "$7.0 million", "$7.0M", "7,000,000" or "$7,000,000", and by filing table figures under the VERIFY-SCALE rows. Applies to every source type |
+| Abbreviated scales in evidence (VERIFY-UNITS) | "$3.2B", "$450M", "$12K", "3.2bn" and "$4.25 trillion" in news, market data or filing text count at their stated scale, so a correct "$3.2 billion" claim citing "$3.2B" stays supported |
+| Unscaled claim figures unchanged (VERIFY-UNITS) | Claim figures without a scale ("$37.32", "12.5%", "2025", "8 of 9") keep today's matching against evidence numbers as written |
 | Personalized advice request | no buy/sell directive |
 | Language | cautious analytical phrasing; no guaranteed return language |
 
@@ -237,7 +266,10 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 | Orphan citation | Any `[N]` outside the registry → `passed=False`, `orphan_citations=[N]`, status `degraded` |
 | Bracketed year is not a citation | `[2024]` in prose is not counted as a citation index |
 | Layering | `app/` has no import from `evaluation/` (CI grep) |
-| Repair loop bounded (S6) | `attempts ≤ 3` total drafts; loop exits on first `passed=True`; `attempts` returned in response |
+| Repair loop bounded (S6.4; amended 2026-11-01, ADR-0017) | At most 3 drafts (`revision` ≤ 2); the loop exits on the first `passed=True`; the number of drafts is returned in the response and counts drafts, never job attempts |
+| Early stop without improvement (S6.4, ADR-0017) | With a faithful fake verifier whose grounded rate does not rise between draft 1 and draft 2, no third draft is requested; with a rate that rises, the loop continues to the bound |
+| Not converged (S6.4, ADR-0017) | A run that ends without a pass returns the best draft by grounded rate with uncited claims removed, status `degraded`, never `completed`; ties keep the earlier draft |
+| Revision carries only failed claims (S7.6) | The Reviewer → Analyst envelope lists exactly the unsupported or orphan claim ids of the last verification; the revise prompt receives those claims and the pinned snapshot, nothing else from the earlier report |
 | Repair improves or holds | On the frozen release, paired per-case `grounded_claim_rate` with loop ≥ without loop; regressions listed per case |
 | Snapshot lineage in response | `snapshot_hash` and `evidence_as_of` present and stable across two replays of the same release |
 
@@ -412,7 +444,7 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Cold start | First-query latency after more than 24 h idle is recorded with and without the warm-up in the run registry |
 | Awake ledger (*local*) | Calls within 10 minutes extend one window; a gap over 10 minutes opens a new one; daily minutes equal the union of windows |
 | Refresh before promotion | Promotion waits until `_count` on the staged index equals the manifest; a timeout fails validation and leaves the alias unchanged |
-| Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance, else the deployment uses Qdrant Cloud |
+| Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance (`retrieval-benchmark.md` §9). Amended 2026-10-23 (ADR-0016): run as CM-4 on the Gate A vectors copied unchanged; on failure work stops for an owner decision (the Qdrant Cloud fallback is withdrawn) |
 | Ledger reconciliation | Daily ledger minutes stay within 20% of CloudWatch search OCU activity; beyond that an alarm fires |
 
 ---

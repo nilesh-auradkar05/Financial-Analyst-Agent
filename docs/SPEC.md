@@ -7,6 +7,7 @@
 > **Supersedes:** v1.4 (2026-10-11), which superseded v1.3 (2026-09-12) and v1.2 (2026-07-04) from `SPEC-AMENDMENT-v1.3.md` (retired; archived 2026-10-11 to `old_artifacts/docs/`; application record is ADR-0008).
 > **v1.5 change (2026-11-01, owner-requested architecture revision; ADR-0016 proposed):** a bounded five-specialist decomposition under a deterministic supervisor, four memory tiers with the "memory is context, never evidence" invariant, an MCP tool plane behind a gateway, asynchronous execution inside the worker, nine fingerprinted cache stages and agent-specific NFR contracts. Updated §§0, 2, 3, 5, 8.1, 11.1 (Gate F), 11.3, 12 (S11) and 16. Design companion: `docs/agent-architecture.md`. Until ADR-0016 is accepted the v1.4 scope lines stand and the pre-revision graph is the default.
 > **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
+> **Amended 2026-10-23:** ADR-0016 — Qdrant and Chroma retired; OpenSearch (local container for development and tests, Serverless in the cloud) is the only store; the data and model plane moves to managed services ahead of S7 (§§1, 3, 5, 6, 11.1, 12, 16).
 > **Amended 2026-10-17:** ADR-0009 amendment — Azure-first draft ladder (Foundry DeepSeek-V4-Flash → Bedrock `deepseek.v3.2`) and GPT-5.6 Luna judge (Bedrock → Foundry); Foundry is no longer fallback-only (§§3, 4).
 > **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria. Revised 2026-10-11: ADR-0014 moves the deployed index to Amazon OpenSearch Serverless with a daily awake cap (§§3, 5, 6, 16). Revised again 2026-10-11: ADR-0015 makes the deployed demo tier scale-to-zero (Lambda, DynamoDB, SQS, a Cloudflare Worker, guest access for recruiters) and keeps the always-on design as the documented production scale tier (§§0, 3, 5, 12, 16).
 
@@ -60,7 +61,7 @@ and verifies the memo against the returned evidence.
 
 The system is built around LangGraph orchestration, typed retrieval contracts,
 `edgartools` SEC ingestion, local or hosted LLM providers selected by config, and
-Chroma/Qdrant vector stores behind one retrieval boundary.
+an OpenSearch vector store behind one retrieval boundary (local container in development, Amazon OpenSearch Serverless in the cloud; ADR-0016).
 
 ### 1.1 Current State
 
@@ -70,7 +71,7 @@ The implementation already contains:
 - Request controls for filing analysis, news sentiment, and news count.
 - Structured evidence packets and memo verification.
 - Section-aware SEC ingestion with deterministic chunk identity.
-- Chroma and Qdrant implementations behind a retrieval contract.
+- Chroma and Qdrant implementations behind a retrieval contract (retired by ADR-0016; removed in CM-7).
 - Retrieval benchmark precursor fixtures and comparison tooling.
 - Memo-grounding evaluation tooling.
 
@@ -131,8 +132,8 @@ In scope:
 - Section-coverage regression tests.
 - Canonical section metadata and deterministic chunk IDs.
 - Typed retrieval contracts and retrieval services.
-- Chroma and Qdrant implementations behind those contracts.
-- Qdrant local setup and payload indexes.
+- OpenSearch implementation behind those contracts (ADR-0016): a local container for development and tests, Amazon OpenSearch Serverless in the cloud. Chroma and Qdrant are retired and removed in CM-7.
+- Managed data and model plane ahead of S7 (ADR-0016): OpenSearch Serverless, Bedrock and Foundry embeddings and models, hosted sentiment. The app, worker and ingestion keep running locally.
 - Shared retrieval benchmark: fixture, validator, runner, paired comparator.
 - Evidence-grounded memo generation and verification.
 - Evidence snapshots, release registry, quality gates, and replay mode for local-first evaluation governance.
@@ -167,7 +168,7 @@ Deferred, gated work:
 
 3.y Out of scope (ADR-0006 accepted 2026-10-08; ADR-0013):
 
-- Cloud resources before the ADR-0006 entry criteria are met.
+- Cloud resources before the ADR-0006 entry criteria are met, except the data and model plane resources ADR-0016 authorizes (budget alarms, the OpenSearch Serverless collection, model and embedding endpoints), each created only with owner approval.
 - Multi-region serving, cross-region data copies and recovery sites.
 - Production scale-tier components (ECS Fargate services, Aurora PostgreSQL, Valkey, VPC with NAT) before their ADR-0015 graduation triggers are measured; they are designed in `docs/production-scale-architecture.md`, not built.
 - Multi-agent decomposition beyond the five specialists and the single reviewer loop of §8.1 (ADR-0016): no LLM planner, no per-source summarizers, no additional critics without a further ADR.
@@ -219,7 +220,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache (exact, keyed by embedding fingerprint), RetrievalCache (keyed by index release and retrieval config), MemoCache (`snapshot_hash` + `prompt_version` + model and verifier/policy fingerprints). Key formats: ADR-0013.
 - `app/services/` — tools, run store (`RunStore` protocol; DynamoDB adapter per ADR-0015), sentiment (FinBERT wrapped in `to_thread` or out-of-process; ONNX in the deployed worker).
 - `evaluation/` — offline harness + registry; imports from `app/` only, never the reverse.
-- `dataops/` — local-first release contracts, registry, and quality gates. Must not import Qdrant, Chroma, provider SDKs, or cloud SDKs.
+- `dataops/` — local-first release contracts, registry, and quality gates. Must not import vector-store SDKs (OpenSearch, Qdrant, Chroma), provider SDKs, or cloud SDKs.
 - `tests/` — behavior-first tests.
 - `scripts/ci/` — executable governance checks.
 - `.claude/hooks/` — governance hooks (§14); mirrored for Codex via the same scripts.
@@ -232,7 +233,7 @@ Retrieval consumers use typed packets and filters, not backend clients. The
 contract must support document upsert/count/search, filtering by canonical
 metadata, idempotent re-ingest, and backend selection by config.
 
-Chroma, Qdrant and the deployed OpenSearch Serverless store (ADR-0014) may differ operationally, but they must remain substitutable
+The local OpenSearch container and OpenSearch Serverless (ADR-0014, ADR-0016) may differ operationally, but they must remain substitutable
 through public retrieval interfaces.
 
 ---
@@ -359,19 +360,23 @@ Gate A: shared retrieval benchmark oracle is validated and has a baseline.
 Gate B: Qdrant backend passes parity and local operational checks behind the
 retrieval contract. Amended 2026-10-10 (owner decision): Gate B closes at S3
 exit; the Chroma-vs-Qdrant paired comparison is retired and no quality claim is
-made for the backend choice (ADR-0003 addendum).
+made for the backend choice (ADR-0003 addendum). Redefined 2026-10-23 (ADR-0016):
+Gate B is met when the OpenSearch store passes the test-plan §4 contract suite and
+§5 checks against a local container (CM-2) and the CM-4 backend-only paired
+comparison against the Gate A result stays within `retrieval-benchmark.md` §9
+tolerance.
 
 Gate C: retrieval-quality method changes are proven by paired benchmark
 comparisons.
 
 Gate D: answer-quality methodology is stable enough for prompt/model changes.
 
-Gate E: S10 cloud work. ADR-0006 was accepted on 2026-10-08; no cloud resource exists until its entry criteria have recorded evidence.
+Gate E: S10 cloud work. ADR-0006 was accepted on 2026-10-08; no cloud resource exists until its entry criteria have recorded evidence, except the ADR-0016 data and model plane resources (2026-10-23).
 
 Gate F (added v1.5, ADR-0016): the five-specialist supervisor replaces the pre-revision graph only after a paired comparison on the frozen evidence release (same model, temperature and prompt; single-axis rule) shows no regression of `grounded_claim_rate` or `citation_coverage` beyond the predeclared tolerance, and the S11 game days (specialist kill, tool-schema drift, memory outage, provider 429 storm, identical-request burst) each end in their documented terminal status.
 
 Phase 1 evidence freeze is a prerequisite for S2/Gate A work in the v2 DataOps
-plan. No Qdrant or retrieval-method comparison may run on live evidence.
+plan. No backend, embedding or retrieval-method comparison may run on live evidence.
 
 A run on live evidence cannot be classified `approved`.
 
@@ -417,9 +422,9 @@ Committed and gated sequencing:
 | S0 | Spec coherence and baseline verification |
 | S1 | SEC ingestion identity and section coverage |
 | S2 | Shared retrieval benchmark oracle / Gate A |
-| S3 | Qdrant backend parity / Gate B |
+| S3 | Qdrant backend parity / Gate B — retargeted 2026-10-23 to OpenSearch (ADR-0016; S3-T04/T05 run in CM-2, the comparison in CM-4) |
 | S4 | Backend comparison and default decision / Gate B — retired 2026-10-10 (owner decision); Gate B closes at S3 exit |
-| S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C |
+| S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C (the embedding bake-off was pulled forward to CM-5 on 2026-10-23, ADR-0016) |
 | S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
 | S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + job store (DynamoDB `RunStore`, SQS `JobQueue`, DynamoDB checkpointer; local DynamoDB Local and ElasticMQ; ADR-0013 as amended by ADR-0015), provider circuit breaker, FinBERT off the API event loop (ONNX in the worker), auth + rate limit with guest and admin roles (ADR-0010) |
 | S8 | Frontend MVP |
@@ -495,7 +500,6 @@ root cause, prevention rule, whether it was applied, and verification result in
 
 Accepted ADRs:
 
-- `docs/adr/ADR-0003-qdrant-behind-interface.md` (local default; its 2026-10-08 managed-Qdrant addendum is superseded for deployment by ADR-0014 and kept as the fallback)
 - `docs/adr/ADR-0004-edgartools-parser.md`
 - `docs/adr/ADR-0005-unified-dataops-release-registry.md`
 - `docs/adr/ADR-0006-production-cloud-deployment.md` (accepted 2026-10-08; implementation gated by its entry criteria)
@@ -505,13 +509,18 @@ Accepted ADRs:
 - `docs/adr/ADR-0011-managed-embedding-and-rerank-models.md` (provisional on Gate C)
 - `docs/adr/ADR-0012-ingestion-orchestration.md`
 - `docs/adr/ADR-0013-durable-execution-and-caching.md`
-- `docs/adr/ADR-0014-opensearch-serverless-vector-store.md` (accepted 2026-10-11; adoption gated by a paired retrieval comparison)
+- `docs/adr/ADR-0014-opensearch-serverless-vector-store.md` (accepted 2026-10-11; amended 2026-10-23 by ADR-0016: only store, adoption gate is CM-4)
 - `docs/adr/ADR-0015-scale-to-zero-serverless-deployment.md` (accepted 2026-10-11; supersedes in part ADR-0006, ADR-0012 and ADR-0013 for the demo tier; their always-on design is the production scale tier)
+- `docs/adr/ADR-0016-cloud-data-and-model-plane-migration.md` (accepted 2026-10-23; supersedes ADR-0003; data and model plane first, Qdrant and Chroma retired)
 
 Proposed ADRs:
 
 - ADR-0007: production interview scale design. Proposed; interview companion only. Superseded in part on 2026-10-08 and 2026-10-11 by ADR-0006 and ADR-0009 to ADR-0015.
 - `docs/adr/ADR-0016-agent-architecture-revision.md`: agent architecture revision (memory tiers, five specialists, MCP tool plane, async execution, cache stages, agent NFRs, Gate F). Proposed 2026-11-01 at the owner's request; acceptance makes the v1.5 scope lines (§3.z) effective. Companion: `docs/agent-architecture.md`.
+
+Superseded ADRs:
+
+- `docs/adr/ADR-0003-qdrant-behind-interface.md` (accepted 2026-06-04; superseded 2026-10-23 by ADR-0016)
 
 
 ## REST service contract clarification — 2026-09-21

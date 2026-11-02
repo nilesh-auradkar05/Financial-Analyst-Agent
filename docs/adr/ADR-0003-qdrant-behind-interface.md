@@ -1,6 +1,6 @@
 # ADR-0003 — Qdrant behind the retrieval interface
 
-**Status:** Accepted (2026-06-04). Qdrant is the working default backend on operational grounds (below). The paired quality comparison planned for Gate B (S4-T04) was retired by owner decision on 2026-10-10 (addendum below); no quality win is claimed for the backend choice.
+**Status:** **Superseded 2026-10-23 by ADR-0016** (owner decision: Qdrant and Chroma are retired; OpenSearch is the only store). Qdrant remains only as the source of the Gate A vectors copied in CM-4 and is removed in CM-7. Previously: Accepted (2026-06-04). Qdrant is the working default backend on operational grounds (below). The paired quality comparison planned for Gate B (S4-T04) was retired by owner decision on 2026-10-10 (addendum below); no quality win is claimed for the backend choice.
 **Date:** 2026-06-03 (accepted 2026-06-04)
 **Related:** SPEC §1, SPEC §6, SPEC §11, `retrieval-benchmark.md` §9, sprint-plan S3–S4.
 

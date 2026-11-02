@@ -18,6 +18,7 @@ Worded as it will be said once S10 has deployed the demo tier.
 - **Compute:** ECS Fargate on Graviton. Async LangGraph workers each multiplex many I/O-bound jobs; FinBERT becomes its own batched CPU service; web BFF and API run as always-warm services behind an ALB. No Kubernetes.
 - **State:** Aurora PostgreSQL (Multi-AZ) is the system of record: jobs, events, idempotency, customers, entitlements, quotas, run records. The job row is the queue (`FOR UPDATE SKIP LOCKED`) until claim latency or rate crosses its trigger; then a transactional outbox feeds SQS with a dead-letter queue.
 - **Ephemeral state:** ElastiCache Serverless for Valkey for caches, rate-limit windows, single-flight locks and event fan-out. Never durable; losing it loses no job.
+- **Execution memory (ADR-0017):** the same three agents and three tiers as the demo tier. T2 moves to the LangGraph Postgres saver behind `FencedCheckpointer`: every checkpoint, journal and envelope write runs in the same transaction as a fence check on `jobs.attempt`. Crash resume at the failed agent is unchanged; only the store changes.
 - **Search:** OpenSearch Serverless with a non-zero minimum, then a managed domain above about 4 OCUs around the clock. Index per release with alias promotion, unchanged.
 - **Capacity is a token budget.** Admission control, caching and worker concurrency are sized from provider tokens per minute, because model throughput is the first bottleneck at 1M+ users.
 
@@ -31,6 +32,7 @@ Each row is one decision. The demo tier is right until its trigger is measured; 
 | Web BFF and API | Lambda behind a Cloudflare Worker (SigV4) | Fargate services behind an ALB; Cloudflare with authenticated origin pulls (mTLS) | Sustained traffic near the Workers free limits (100k requests/day), or a cold-start latency SLO | Always warm, pooled connections to Postgres and Valkey, no per-request signing |
 | Job store | DynamoDB conditional writes | Aurora PostgreSQL, Multi-AZ | Relational queries in the product (entitlements, billing, audit joins to eval lineage) or transactions above DynamoDB's 100-item limit | SQL joins, row-level security per customer, and the queue in the same transaction as the job |
 | Queue | Streams → dispatcher → SQS | Postgres `SKIP LOCKED`; transactional outbox → SQS + DLQ | Outbox when p95 claim > 200 ms or > 500 claims/s (ADR-0013 D07) | No extra system until claim contention is measured; the outbox keeps accept and enqueue atomic |
+| Execution memory (T2: checkpoints, effect journal, envelopes) | `DynamoDBSaver` behind `FencedCheckpointer` (`TransactWriteItems` + `ConditionCheck`), 14-day TTL | Postgres saver behind `FencedCheckpointer`; fence check in the same transaction; `run_checkpoints` partitioned by day and dropped after 14 days | Moves with the job store (Phase 2) | One transaction covers the fence and the write; no second store to reconcile |
 | Caches, rate limits | DynamoDB items with TTL | ElastiCache Serverless for Valkey | Cache reads where on-demand read cost exceeds Valkey, or a sub-millisecond rate-limit budget | Sub-ms reads, atomic sliding windows, `SET NX PX` locks, pub/sub |
 | Event stream | API polls `job_events` every 500 ms | Valkey pub/sub fan-out; Postgres `job_events` for replay | > ~1,000 concurrent streams | Polling cost grows with watchers; pub/sub grows with events |
 | Identity | Guest mode + Cognito admin | Cognito self-sign-up `analyst`, per-customer quotas and hashed API keys; Lite tier or negotiated price at large MAU | Named users or a paid plan | Accountable identities and per-customer limits |
@@ -184,6 +186,25 @@ UPDATE jobs SET state = $state, result_ref = $ref
 
 Outbox dispatch, once the trigger fires: a relay claims undispatched rows with `SKIP LOCKED`, sends to SQS, then sets `dispatched_at`. Delivery is at-least-once; the fenced claim makes duplicates harmless.
 
+### 6.1a Execution memory (ADR-0017)
+
+```sql
+-- the stock Postgres saver's tables are used unchanged; FencedCheckpointer wraps each write:
+BEGIN;
+  SELECT 1 FROM jobs WHERE id = $run_id AND attempt = $fence AND state = 'running' FOR SHARE;  -- 0 rows ⇒ stale, ROLLBACK
+  INSERT INTO checkpoints (...) VALUES (...);          -- or checkpoint_writes / effect_journal / handoff_envelopes
+COMMIT;
+
+CREATE TABLE effect_journal (run_id uuid, key bytea, attempt integer, result_ref text, created_at timestamptz,
+                             PRIMARY KEY (run_id, key));      -- key = sha256(run_id, node, model_id, params,
+                                                              --   prompt_version, rendered_prompt_hash, snapshot_hash)
+CREATE TABLE handoff_envelopes (run_id uuid, seq integer, attempt integer, from_agent text, to_agent text,
+                                revision smallint, snapshot_hash text, payload_ref text, failed_claim_ids text[],
+                                graph_version text, PRIMARY KEY (run_id, seq));
+```
+
+`FOR SHARE` on the job row blocks a concurrent claim from bumping `attempt` until the write commits, so a write is either fenced in or refused; it never lands after a newer attempt has started. Retention: these tables are partitioned by day and dropped after 14 days, matching the demo tier's TTL.
+
 ### 6.2 Job state machine
 
 ```mermaid
@@ -263,7 +284,10 @@ Error-budget policy: when the acceptance budget is half spent within the month, 
 
 | Failure | Behavior | Residual risk |
 | --- | --- | --- |
-| Worker task dies mid-job | Lease expires (60 s); next claim runs `attempt + 1` from the frozen snapshot and checkpoint; stale commit rejected by the fence | A model call may be duplicated; recorded as cost |
+| Worker task dies mid-job | Lease expires (60 s); next claim runs `attempt + 1`, loads the last checkpoint and resumes at the failed agent; journaled model and tool results are reused; evidence comes from the pinned snapshot (ADR-0017) | Only a call interrupted mid-stream is repeated; recorded as cost |
+| Zombie worker (slow, not dead) | Its checkpoint, journal and commit writes fail the fence check; the checkpoint history stays one chain | — |
+| Deploy changes the graph's state schema mid-run | `graph_version` mismatch: the run restarts from its pinned snapshot instead of resuming | One run's model calls repeated |
+| Reviewer never passes a draft | Stop at 2 revisions or when grounding stops improving; best draft returned `degraded` | Lower quality, disclosed |
 | Bedrock throttled or down | Retries within budget, breaker opens, new attempt on Foundry with the same models; no splicing of partial output | Both providers down ⇒ typed `failed` |
 | Aurora writer failover | Acceptance returns 503 for ~30 s; workers stop claiming and committing; leases protect in-flight work | Short unavailability |
 | Valkey lost | Cold caches, static rate limits, polling streams | Higher cost and latency until restored |
@@ -274,7 +298,7 @@ Error-budget policy: when the acceptance budget is half spent within the month, 
 
 ### 7.5 Observability
 
-Golden signals per service plus the signals that predict the bottlenecks above: oldest ready job age and ready jobs per worker; claim latency p95 and lease expiries; fence rejections (stale attempts); provider 429 rate, breaker state, tokens/min against quota; cost per memo by model; cache hit rate per layer; OpenSearch OCU and p95 latency; open streams; and, sampled from live runs, `grounded_claim_rate` and `citation_coverage` against the approved baseline, alerting on drift. OpenTelemetry to Grafana Cloud and LangSmith, unchanged (ADR-0006 D17).
+Golden signals per service plus the signals that predict the bottlenecks above (and the ADR-0017 execution signals: runs resumed, nodes re-executed per resume, journal hits, duplicate provider calls, stale writes rejected, checkpoint write p99): oldest ready job age and ready jobs per worker; claim latency p95 and lease expiries; fence rejections (stale attempts); provider 429 rate, breaker state, tokens/min against quota; cost per memo by model; cache hit rate per layer; OpenSearch OCU and p95 latency; open streams; and, sampled from live runs, `grounded_claim_rate` and `citation_coverage` against the approved baseline, alerting on drift. OpenTelemetry to Grafana Cloud and LangSmith, unchanged (ADR-0006 D17).
 
 ## 8. Cost
 
@@ -322,7 +346,7 @@ Each phase is an adapter swap or a runtime change behind an existing seam (`RunS
 | --- | --- | --- |
 | 0 | Measure the triggers in the demo tier: worker GB-s per memo, cost per memo, queue age, cache hit by layer, search awake minutes | Dashboards show each trigger metric with its threshold |
 | 1 | Async worker on Fargate consuming the same SQS queue (same image, new entrypoint); Lambda worker kept as overflow | Frozen-evidence replay gives identical outcomes; p95 completion and cost per memo recorded at both |
-| 2 | VPC, Aurora, `RunStore` Postgres adapter; dual-write with DynamoDB primary, then flip reads; outbox replaces the stream dispatcher | test-plan §20 crash, fence, idempotency and replay cases pass on Postgres; reconciliation diff is zero for 7 days |
+| 2 | VPC, Aurora, `RunStore` Postgres adapter; dual-write with DynamoDB primary, then flip reads; outbox replaces the stream dispatcher; T2 on the Postgres saver behind `FencedCheckpointer` (in-flight runs finish on DynamoDB; new runs start on Postgres) | test-plan §20 crash, fence, idempotency and replay cases and the §22 resume matrix pass on Postgres; reconciliation diff is zero for 7 days |
 | 3 | Valkey for caches, rate windows, locks and pub/sub | Hit rates match the DynamoDB cache within noise; Valkey-loss drill passes |
 | 4 | Web and API on Fargate behind an ALB with authenticated origin pulls; Cognito self-sign-up `analyst`, per-customer quotas and API keys | Cross-customer isolation suite passes; canary on acceptance SLO |
 | 5 | Search minimum OCUs above zero; nightly ingestion with per-issuer fan-out; FinBERT service | First-query latency within SLO; freshness SLO met for 2 weeks |
@@ -339,6 +363,8 @@ Each phase is an adapter swap or a runtime change behind an existing seam (`RunS
 | Kafka / MSK instead of SQS | A stated retention or replay requirement (event sourcing, downstream consumers); a consumer count alone does not justify it |
 | Self-hosted Qdrant on EC2 | Above ~2× the managed search spend plus operating time; cheaper at the 10M tier (Qdrant Cloud projections: $2.5k at 1M, $9k at 10M) |
 | Step Functions for ingestion | Per-issuer fan-out beyond what one DAG run handles comfortably |
+| Temporal (or Step Functions) for agent execution instead of LangGraph checkpoints | Workflows that outgrow one graph run, or human-in-the-loop waits measured in days; it replaces the checkpoint semantics ADR-0017 builds on |
+| One agent per queue hop | An agent whose runtime outgrows the worker's job budget; costs three queue round-trips per run |
 | Self-hosted open-weight models on GPU | At 10M, when provisioned GPU cost per token beats on-demand at the measured utilization |
 | Auth0 or WorkOS instead of Cognito | Sign-in that survives an AWS region loss, or enterprise SSO/SCIM as the main audience |
 
@@ -350,6 +376,7 @@ Main risks: provider quotas lag demand (mitigated by admission against the token
 - **"Why is Lambda right for the demo but wrong at scale?"** Lambda bills wall-clock time per job, and this workload spends most of its time waiting on tokens. One async Fargate worker waits on ~50 jobs at once. Break-even is ≈ 540 memos/day (§8.1).
 - **"Why Postgres if DynamoDB already works?"** DynamoDB handles the job path at any of these volumes. Postgres is chosen as the system of record because a paying product adds customers, entitlements, billing and audit queries that join runs to evaluation lineage, and because `SKIP LOCKED` keeps the queue inside the job's transaction until claims are contended. Keeping DynamoDB for jobs is the documented alternative.
 - **"What breaks first at 10×?"** Model token throughput, then search OCUs. CPU and the database come later. That is why admission is a token budget.
+- **"What if one agent fails halfway through?"** The run does not start over. Each agent hands off through an envelope committed with a checkpoint; a new attempt loads the last checkpoint and resumes at the agent that failed. Every model and tool call inside a node is journaled under a key derived from its inputs, so the resumed agent reuses a result it already paid for, and evidence comes from the snapshot pinned by hash, never fetched again. Fencing on `attempt` stops a slow old attempt from writing over the new one (ADR-0017).
 - **"Exactly-once?"** Delivery is at-least-once everywhere. The commit is fenced, so exactly one attempt's result is stored; a duplicated model call can happen and is recorded as cost, never as a second result.
 - **"How do you handle an earnings-day burst?"** Single-flight on `snapshot_hash` collapses identical requests; the 60 s quote TTL bounds the memo-cache window to exactly that burst; admission returns 429 with `Retry-After` before the queue grows without bound; workers are pre-scaled on the earnings calendar.
 - **"How do you deploy without breaking quality?"** Every release replays frozen evidence and is blocked on a regression of `grounded_claim_rate` or `citation_coverage`; then a canary is judged on SLO burn and rolled back automatically.

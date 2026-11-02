@@ -254,5 +254,11 @@ graphify-out/
 
 
 
+# Terraform (CM-1): local state and per-owner variables never enter git
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+tfplan
 # Archify working folders (candidates, receipts, captures); delivered diagrams live under docs/
 .archify/

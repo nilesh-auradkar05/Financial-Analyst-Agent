@@ -21,7 +21,7 @@ These exist from prior work but are **not yet proven by a recorded test run in t
 
 Full detail in `tasks/sprint-review.md §4`. Hard-stop surfaces are **G4** and **G6**.
 
-- **G10** `app/agents/graph.py` imports `evaluation.grounding` — production depends on the eval package (layering inversion). Resolve S2-T00d · **G11** `ci.yml` never invokes `scripts/ci/check_*.py`; governance docs not tracked at HEAD, so no doc rule is enforced. Resolve S2-T00a · **G12** `add_error` mutates `state["errors"]` in place — unsafe under fan-out. Resolve S2-T00c · **G13** `/health` reports `degraded` on Ollama outage regardless of configured provider. Resolve S7.
+- **G10** `app/agents/graph.py` imports `evaluation.grounding` — production depends on the eval package (layering inversion). Resolve S2-T00d · **G11** `ci.yml` never invokes `scripts/ci/check_*.py`; governance docs not tracked at HEAD, so no doc rule is enforced. Resolve S2-T00a · **G12** `add_error` mutates `state["errors"]` in place — unsafe under fan-out. Resolve S2-T00c · **G13** `/health` reports `degraded` on Ollama outage regardless of configured provider. Resolve CM-6a · **G14** (2026-11-01) no checkpointer; jobs run in-process, so a crash restarts the run. Resolve S7.3, S7.4 · **G15** (2026-11-01) stock `DynamoDBSaver` writes are not fenced. Resolve S7.8.
 
 - **G1** stale API test stub (11 errors) · **G2** `EvidencePacket` naming vs SPEC §7 · **G3** `RetrievalStore` shape vs SPEC §6 · **G4** default backend = qdrant vs SPEC §1/ADR-0003 (hard stop) · **G5** no section-coverage regression test (S1-T03) · **G6** benchmark is keyword/section-based, not the content-anchored graded methodology in `retrieval-benchmark.md`; no `source_sections/` cache or `build_source_section_cache.py` (hard stop) · **G7** Qdrant payload indexes miss `accession_number` (4 of 5) · **G8** doc/path name drift (eval scripts, test dirs, API routes) makes several documented verification commands non-runnable as written.
 
@@ -370,7 +370,7 @@ Verification:
 - VECTOR_BACKEND=qdrant uv run pytest tests/rag/test_vector_store_contract.py
 Done: identical pass under both; differences fixed in adapter, never by forking test.
 Non-goals: no method-quality comparison.
-Result: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
+Result: Retargeted 2026-10-23 to OpenSearch (ADR-0016): runs in CM-2 against a local OpenSearch container per test-plan §4; Chroma and Qdrant legs dropped. Earlier: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
 ```
 
 ```text
@@ -380,7 +380,7 @@ Scope: run S1 coverage + idempotency under VECTOR_BACKEND=qdrant; guard that the
 Verification: VECTOR_BACKEND=qdrant uv run pytest tests/ingestion/test_section_coverage.py tests/ingestion/test_ingestion_idempotency.py
 Done: coverage + idempotency pass under Qdrant; embedding identity recorded.
 Non-goals: no benchmark run; no switch.
-Result: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
+Result: Retargeted 2026-10-23 to OpenSearch (ADR-0016): runs in CM-2 per test-plan §5 "Coverage under OpenSearch"; the embedding identifier in ingest metadata lands in CM-2. Earlier: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
 ```
 
 Exit: Qdrant passes the same contract/coverage/idempotency tests Chroma passes; indexes verified; embeddings matched; nothing above `rag/` changed.
@@ -435,7 +435,7 @@ Exit = Gate B. (Superseded 2026-10-10: Gate B closes at S3 exit.)
 
 ---
 
-# HORIZON: gated, detailed only when predecessor gate clears
+# HORIZON (S5–S10): restructured 2026-11-01 into one-feature sprints
 
 - **S5 — Retrieval quality diagnostics → hybrid/rerank (Gate C).** Per-query diagnostics and failure taxonomy first; optional section prior, hybrid dense+sparse, and rerank candidates evaluated on same fixture. Unchanged.
 - **S6 — Answer quality & eval hardening (Gate D). Steps 4–5.** (a) Eval registry `evaluation/registry/runs/*.json` with lineage keys (SPEC §11.2); hook H5 + CI reject unlineaged results. (b) `eval-replay` CI job on the frozen release, fails on >2σ regression of grounded_claim_rate / citation_coverage. (c) Verifier↔judge agreement on ≥50 claims; κ recorded. (d) Bounded draft→verify→revise loop (max 2), `attempts` in response, paired vs no-loop on the same snapshot/model/temperature. (e) Then LLM-as-judge/RAGAS, then GEPA on holdout. Order inside S6 is fixed: (a)→(b)→(c)→(d)→(e).
@@ -445,6 +445,19 @@ Exit = Gate B. (Superseded 2026-10-10: Gate B closes at S3 exit.)
 - **S10 — Cloud (INTEGRATION_PLAN_v2 Phases 4–5). Step 8 (remote).** ADR-0006 accepted 2026-10-08 with ADR-0010 to ADR-0013; ADR-0015 (2026-10-11) makes the demo tier scale-to-zero; SPEC §3 amended in v1.4. Starts only when the ADR-0006 entry criteria have recorded evidence. Task outline (detailed when S10 opens): S10-T01 Terraform demo tier (Lambda, DynamoDB, SQS, Cloudflare Worker), apply → smoke → destroy twice; S10-T02 deploy pipeline with the eval gate and alias shift; S10-T03 Foundry fallback and model parity (S7-AZURE-FALLBACK); S10-T04 embedding parity gate and Gate C outcome; S10-T05 MWAA Serverless ingestion DAG (monthly + admin trigger); S10-T06 guest mode, Cognito admin and RBAC; S10-T07 observability and budget kill switch; S10-T08 region-loss runbook (documentation only); S10-T09 OpenSearch Serverless store, paired retrieval comparison against the Qdrant baseline and the daily awake cap (ADR-0014, added 2026-10-11); S10-T10 edge signing and cold start: unsigned function-URL requests refused, Worker CPU < 10 ms, first-query latency with and without the warm-up recorded (ADR-0015). See `docs/cloud-deployment.md` §9. Moves to the production scale tier follow the ADR-0015 triggers (`docs/production-scale-architecture.md`); Kafka only for a stated retention or replay requirement. This replaces the earlier second-consumer trigger (review 2026-08-24), which the 2026-09-06 review found insufficient.
 - **S11 — Agent architecture revision (ADR-0016, proposed 2026-11-01; SPEC v1.5 §3.z; test-plan §22; `docs/agent-architecture.md`).** Starts after S7 (a)–(e) and Gate D; independent of S10 (it changes only the inside of the worker). Each task is behavior-preserving until Gate F; the pre-revision graph stays the default behind a flag until then. Task outline: S11-T01 `SpecialistAgent` protocol and the six nodes refactored into five specialists under the supervisor (sentiment inside `news`, concurrent filing queries; replay registries byte-identical, no new model call); S11-T02 tool gateway with in-process tools, per-specialist allowlists, budgets, C3 cache and the `tool_calls` log in the release manifest (MCP-0); S11-T03 cache stages C7–C9 with metrics; S11-T04 memory store M1/M2 (in-memory and DynamoDB Local adapters), MEMORY block and code-computed delta, verifier rule, `DELETE /memory`, replay pins `memory_ref`; S11-T05 MCP consumption behind flags (`news-search`, then the `sec-edgar` wrapper) with paired evidence-equality checks and breaker and schema-drift drills; S11-T06 `/mcp` exposure; S11-T07 Gate F paired comparison (single-axis rule) and the game days. New dependency (MCP SDK) enters at S11-T02 via `uv add` with an advisory check.
 
+| Earlier item | Feature sprint(s) |
+| --- | --- |
+| S5 diagnostics, hybrid dense+sparse, rerank, section prior | S5.1 diagnostics · S5.2 hybrid · S5.3 rerank (section prior folded into S5.1 as a diagnosed candidate) |
+| S6 (a) eval registry · (b) eval-replay CI · (c) verifier↔judge κ · (d) bounded repair loop · (e) judge/RAGAS, then GEPA | S6.1 · S6.2 · S6.3 · S6.4 (adds the ADR-0017 early stop) · S6.5, S6.6 |
+| S7 (a) guardrails · (b) auth, rate limit, guest and admin roles | S7.1 · S7.2 |
+| S7 (c) caching | S7.9 (adds the ADR-0017 T3 write policy) |
+| S7 (d) `RunStore` / `JobQueue` / `DynamoDBSaver` | S7.7 (job store and queue) · S7.8 (fenced checkpointer and journal on DynamoDB) |
+| S7 (e) FinBERT off the loop · provider circuit breaker | S7.11 · S7.10 (adds per-run model pinning) |
+| S7 (f) G13 | CM-6a (already scheduled with the model-plane close-out) |
+| — (new, ADR-0017, 2026-10-31) | S7.3 checkpoints and resume · S7.4 effect journal and pinning · S7.5 error taxonomy · S7.6 three-agent split · S7.12 execution observability · S10-T11 deployed resume drill |
+| S8 frontend MVP | S8.1 live run stream · S8.2 guest mode |
+| S9 portfolio polish | S9.1 measured results · S9.2 fresh-clone smoke and demo |
+| S10-T01 … S10-T10 | Unchanged ids, one feature each (cloud-deployment.md §9) |
 
 ### Authorized REST/tracing sequencing exception — 2026-09-21
 
@@ -493,3 +506,425 @@ The owner asked for a system architecture revision adding a memory architecture,
 Result as of 2026-11-01: documents written; four governance checks pass (recorded in the commit). Diagrams added the same day as Archify sources with HTML, SVG and PNG renders under `docs/System-design/agents/`, `docs/svg/agents/` and `docs/png/agents/` (HLD, critical flow, LLD, job lifecycle, memory and cache dataflow, MCP tool plane); every HTML page passed Archify's automated gates and was inspected visually. Pending: owner acceptance of ADR-0016.
 
 Result as of 2026-10-18: implemented on branch feat/embedding-provider-switch. Offline: 492 passed, 2 skipped; ruff, mypy and the four governance checks pass; test-plan §16 rows dated 2026-10-17 (Judge ladder row revised 2026-10-18) covered offline by `tests/unit/test_provider_azure.py` and `tests/unit/test_judge_ladder.py`, including a structured verdict through the DeepEval adapter that falls back to Foundry. Live Azure draft run not yet done; Bedrock Luna is blocked by a zero account quota on `bedrock-runtime`, so only the Foundry judge is live-usable.
+
+### Authorized cloud data and model plane migration (2026-10-23)
+
+Owner decisions, 2026-10-23 (ADR-0016): migrate the data and model plane to managed services first, then benchmark there; Qdrant and Chroma are retired and OpenSearch is the only store (local container for development and tests, Serverless in the cloud); all three cloud embedding arms are measured on OpenSearch Serverless; the backend comparison copies the Gate A vectors instead of re-embedding; sentiment moves to a hosted model. Scope is the data and model plane only; the S10 demo-tier runtime and the S7 seams keep the ADR-0006 entry criteria. Every apply that creates billable resources needs the owner's approval first.
+
+Order (one `task/<id>` branch each; test-author → implementer loop for code):
+
+1. CM-0 — ADR-0016 and doc amendments (SPEC §§1, 3, 5, 6, 11.1, 12, 16; ADR-0003/0006/0007/0011/0014; test-plan §§4, 5, 20; retrieval-benchmark §§8, 9.1, 9a; this note).
+2. VERIFY-SCALE — bug fix, in parallel with CM-1…CM-3: the runtime verifier misses 10-K figures stated in million/billion against tables in thousands (156 of 243 unsupported claims across the nine `degraded` runs; diagnosis in `tasks/todo.md` DEGRADED-DIAG). Owner rule: scale-aware matching for SEC filing evidence only, rounded at the claim's stated precision; a wrong figure must still fail. Trace: SPEC §8.5, test-plan §7 (row added first). Must land before any eval baseline is recorded.
+3. CM-1 — cost controls: AWS Budgets ($10, $25, $100 action), tags, teardown command; official OpenSearch Serverless prices and idle timeout recorded in ADR-0014.
+4. CM-2 — `OpenSearchVectorStore`; test-plan §§4, 5 against a local container (S3-T04, S3-T05 retargeted); embedding identifier in ingest metadata.
+5. CM-3 — Terraform for the Serverless collection group; apply → smoke → destroy once.
+6. CM-4 — copy the Gate A vectors; backend-only comparison (retrieval-benchmark §9.1) → Gate B.
+7. CM-5 — cloud embedding provider switch (EMBED-ARMS, test-plan §21) and the three-arm bake-off (retrieval-benchmark §9a) → Gate C embedding outcome.
+8. CM-6 — model-plane close-out (Azure draft live check, Bedrock Luna quota, G13). CM-6b — hosted sentiment with its own ADR.
+9. CM-7 — remove Qdrant and Chroma; CLAUDE.md/AGENTS.md §8 and `check_doc_sync.py` updated together.
+
+After CM-7: S5 (hybrid/rerank on OpenSearch), S6 (a)…(e), S7 (a)…(f), S9, then the S10 runtime tasks. Superseded 2026-11-01: CM-5 and CM-6 are split into one-feature sprints and the order after CM-7 is the FORWARD PLAN below.
+
+Result: Pending.
+
+---
+
+# FORWARD PLAN: one-feature sprints (from 2026-11-01)
+
+Owner instruction, 2026-11-01: each sprint ships one feature, implemented and tested (unit, integration, regression and the other layers it touches). This replaces the one-line HORIZON for S5–S10 and the post-CM-7 order of the 2026-10-23 note. Architecture inputs: SPEC v1.5, ADR-0017 (Researcher / Analyst / Reviewer agents, three-tier memory, crash resume), ADR-0013 to ADR-0016.
+
+## Sprint contract
+
+**One feature.** A feature is one capability a user, operator or evaluator can observe, with one acceptance oracle (its test-plan rows). If a card needs two oracles, it is two sprints. Refactors ride inside the feature that needs them; they are not sprints.
+
+**Loop per sprint** (unchanged from CLAUDE.md / AGENTS.md): plan in `tasks/todo.md` → test-plan rows exist first (add them in the same branch if missing) → `test(<id>): red` commit with failing tests → implementation → green → regression suites → `Result:` recorded here with commit SHA → `tasks/todo.md` review. One `task/<id>` branch per sprint.
+
+**Test layers** are defined in test-plan "Test layers": U unit · C contract · I integration (local stand-ins) · F fault injection · E2E · Q paired quality · P performance · L live · R regression. A card lists only the layers it touches; every listed layer must be green.
+
+**Standing regression suites.** A sprint closes only when every suite that applies to it is green, run on the sprint's final commit:
+
+| Suite | What | Command (repo root) | Applies |
+| --- | --- | --- | --- |
+| R1 Offline | Lint, types and the full offline test suite (U, C, I with stand-ins) | `uv run ruff check . && uv run mypy . && uv run pytest` | Every sprint |
+| R2 Governance | The four doc checks | `for c in no_scope_residue sprint_map doc_sync test_hygiene; do python scripts/ci/check_$c.py; done` | Every sprint |
+| R3 Replay | Zero-network replay; two replays of `alpha-evidence:0.1.0` give the same `snapshot_hash` and citation registry | `uv run pytest -m replay` (socket guard) | Every sprint |
+| R4 Retrieval oracle | Gate A fixture against the current baseline; zero deltas unless retrieval is the sprint's axis | `uv run python evaluation/run_shared_retrieval_benchmark.py …` then `compare_retrieval_results.py --strict-case-ids` | Sprints that change retrieval, ingestion, embeddings or the store, and every gate exit |
+| R5 Answer quality | `eval-replay` gate: `grounded_claim_rate` and `citation_coverage` within 2σ of the approved baseline | CI job `eval-replay` | Every sprint from S6.2 |
+| R6 Resume matrix | `FAIL_AT` at every agent and node, `pre` and `post` effect: same memo, zero duplicate provider calls after `post` | `uv run pytest -m fault` | Every sprint from S7.3 (from S7.4 for the zero-duplicate assertion) |
+
+**Done, for every card:** the card's tests by layer green; applicable R-suites green; SPEC, test-plan and ADR text match the code; `Result:` names the commit, test counts by layer and suite outputs; nothing claimed that was not run. Billable applies need the owner's approval first; live (L) results record cost and are never approved baselines.
+
+**Order.** Linear: VERIFY-SCALE → CM-1 … CM-7 → S5.1 … S5.3 → S6.1 … S6.6 → S7.1 … S7.12 → S8.1, S8.2 → S9.1, S9.2 → S10 entry evidence → S10-T01 … S10-T11. A sprint opens only when its predecessor has a `Result:`; reordering needs an owner decision recorded here.
+
+## Carried over from the 2026-10-23 cloud data and model plane slice
+
+Same scope as the numbered list in that note; reformatted as feature cards, with CM-5 and CM-6 split so each sprint is one feature.
+
+```text
+VERIFY-SCALE — Scale-aware verification of filing figures (bug fix)
+Feature: the runtime verifier supports "$356.7 million" against a 10-K table in thousands, and still fails a wrong figure.
+Trace: SPEC §8.5; test-plan §7 VERIFY-SCALE and VERIFY-UNITS rows; tasks/todo.md DEGRADED-DIAG
+Depends on: —
+Scope: scale-aware matching for sec_filing body text only, at the claim's stated precision; scale words part of the figure for every source.
+Non-goals: any other verifier change; prompt changes.
+Tests:  U every §7 VERIFY-SCALE / VERIFY-UNITS row · E2E the nine degraded runs replayed: unsupported-claim count recorded before/after
+Regression: R1 R2 R3
+Done: all §7 rows green; existing supported claims unchanged; lands before any eval baseline is recorded.
+Result: Pending.
+```
+
+```text
+CM-1 — Cost controls
+Feature: no cloud spend can exceed the owner's ceiling unnoticed.
+Trace: ADR-0016; cloud-deployment §7 budget controls
+Scope: AWS Budgets ($10 and $25 alerts, $100 action), resource tags, teardown command; official OpenSearch Serverless prices and idle timeout recorded in ADR-0014.
+Tests:  L a test budget threshold fires its alert; teardown leaves only the evidence bucket
+Regression: R1 R2
+Done: alerts received; prices cited with date. Result: Pending.
+```
+
+```text
+CM-2 — OpenSearch store behind the retrieval contract
+Feature: VECTOR_BACKEND=opensearch serves retrieval through the unchanged RetrievalStore contract.
+Trace: SPEC §6, §11.1 Gate B; test-plan §4, §5, §21 "Embedding identifier recorded"; S3-T04, S3-T05 retargeted
+Scope: OpenSearchVectorStore; idempotent mapping; chunk_id as document id; embedding identifier in ingest metadata.
+Tests:  U config selection, invalid backend · C test-plan §4 suite against a local container · I §5 rows incl. coverage and idempotent re-ingest
+Regression: R1 R2 R3 R4
+Done: §4 and §5 green against the container. Result: Pending.
+```
+
+```text
+CM-3 — OpenSearch Serverless collection as code
+Feature: the Serverless collection group is created and destroyed from code.
+Trace: ADR-0014, ADR-0016; cloud-deployment §11
+Scope: Terraform for the collection group, access and network policies; apply → smoke → destroy once.
+Tests:  L apply, CM-2 smoke queries against the collection, destroy; idle timeout and cold start recorded
+Regression: R1 R2
+Done: one clean cycle recorded with cost. Result: Pending.
+```
+
+```text
+CM-4 — Backend-only comparison → Gate B
+Feature: OpenSearch Serverless is adopted only if it matches the Gate A baseline with the vectors held constant.
+Trace: SPEC §11.1 Gate B; retrieval-benchmark §9.1; test-plan §20 "Retrieval adoption gate"
+Scope: copy the Gate A vectors unchanged; run the anchored benchmark; paired comparison, backend the only axis.
+Tests:  Q paired result within §9 tolerance · L collection cost recorded
+Regression: R1 R2 R4
+Done: Gate B recorded; on failure, stop for an owner decision. Result: Pending.
+```
+
+```text
+CM-5a — Cloud embedding provider switch (EMBED-ARMS plumbing)
+Feature: any of the four embedding arms is selected by settings alone, one index per arm.
+Trace: ADR-0011 amendment; test-plan §21
+Scope: provider switch behind the retrieval boundary; per-arm index naming; dimension check; arm built from the same chunks.
+Tests:  U every §21 row with faithful fake transports · C §4 suite on one cloud-arm index (container) · I arm build copies chunk ids unchanged
+Regression: R1 R2 R3 R4
+Done: §21 green; identifier mismatch noted on 2026-10-22 aligned and the baseline regenerated. Result: Pending (plumbing slice of 2026-10-11).
+```
+
+```text
+CM-5b — Embedding bake-off → Gate C embedding outcome
+Feature: the embedding model is chosen on the frozen fixture with the embedding as the only axis.
+Trace: retrieval-benchmark §9a; ADR-0011; SPEC §11.1 Gate C
+Scope: three cloud arms on OpenSearch Serverless against the Gate A arm.
+Tests:  Q one paired comparison per arm, single axis · L cost per arm recorded
+Regression: R1 R2 R4
+Done: outcome recorded in ADR-0011. Result: Pending.
+```
+
+```text
+CM-6a — Provider-aware health (G13)
+Feature: /health reports the configured model plane, not Ollama, as the chat dependency.
+Trace: SPEC §12 G13; test-plan §1 REST hardening (health rows)
+Tests:  U health per provider configuration · I health with Ollama down and Bedrock configured → not degraded
+Regression: R1 R2 R3
+Done: G13 closed. Result: Pending.
+```
+
+```text
+CM-6b — Hosted sentiment
+Feature: sentiment scores come from a hosted model with recorded label parity, off the event loop.
+Trace: ADR-0016 (own ADR required first); test-plan §10 sentiment rows
+Tests:  U adapter with a faithful fake · Q label parity against FinBERT on the frozen news set · P event loop not blocked
+Regression: R1 R2 R3
+Done: ADR accepted; parity recorded. Result: Pending.
+```
+
+```text
+CM-6c — Model ladder live qualification
+Feature: every configured draft and judge tier is proven invocable from this account, or removed from the ladder.
+Trace: SPEC §4; ADR-0009 amendment 2026-10-17; test-plan §16 Azure and judge rows
+Blocked: the configured first draft tier (Foundry DeepSeek-V4-Flash) has no Global Standard quota (increase rejected 2026-10-17) and GPT-5.6 Luna is not available to this AWS account on Bedrock (2026-10-18). Needs an owner decision on the ladder before it opens.
+Tests:  L one bounded call per tier, cost recorded · U ladder skips an unavailable tier
+Regression: R1 R2 R3
+Done: ladder in SPEC §4 equals the tiers proven live. Result: Blocked (owner decision).
+```
+
+```text
+CM-7 — Remove Qdrant and Chroma
+Feature: OpenSearch is the only store in code, compose and docs.
+Trace: ADR-0016; CLAUDE.md/AGENTS.md §8; scripts/ci/check_doc_sync.py
+Tests:  U factory rejects qdrant/chroma · C §4 suite unchanged · R2 doc sync updated together
+Regression: R1 R2 R3 R4
+Done: no import of qdrant_client or chromadb remains. Result: Pending.
+```
+
+## S5 — Retrieval quality → Gate C
+
+```text
+S5.1 — Retrieval diagnostics and failure taxonomy
+Feature: every Gate A miss is explained by a named failure class, so S5.2 and S5.3 test a diagnosed cause.
+Trace: SPEC §12 S5; retrieval-benchmark §§7–8; test-plan §6
+Scope: per-query report (rank of each gold anchor, section hit, lexical overlap, chunk boundary); taxonomy (vocabulary gap, section miss, boundary split, ranking); section prior evaluated here as a candidate.
+Tests:  U classifier on hand-built cases · I report over the 25 baseline misses
+Regression: R1 R2 R3 R4
+Done: every miss classified; candidate list ranked by misses addressed. Result: Pending.
+```
+
+```text
+S5.2 — Hybrid dense + BM25 retrieval
+Feature: retrieval combines dense and keyword scores on OpenSearch.
+Trace: SPEC §11.1 Gate C; retrieval-benchmark §8; test-plan §6 comparator
+Scope: OpenSearch hybrid search pipeline; method label `hybrid`; same fixture, K and embedding.
+Tests:  U fusion normalisation · C §4 suite with method=hybrid · Q paired vs Gate A baseline, method the only axis · P cold/warm latency
+Regression: R1 R2 R3 R4
+Done: adopt only if recall@10 does not drop beyond tolerance; decision recorded. Result: Pending.
+```
+
+```text
+S5.3 — Rerank
+Feature: an optional reranker reorders the top candidates.
+Trace: ADR-0011 (Bedrock Cohere Rerank 3.5); Gate C
+Tests:  U rerank adapter with a faithful fake · Q paired vs the S5.2 winner · P added latency and cost per query
+Regression: R1 R2 R3 R4
+Done: Gate C recorded; rerank off unless it shows lift within the cost budget. Result: Pending.
+```
+
+## S6 — Answer quality → Gate D
+
+```text
+S6.1 — Eval registry with lineage
+Feature: every eval run is an append-only record with full lineage, and unlineaged results are refused.
+Trace: SPEC §11.2; test-plan §14; hook H5
+Tests:  U registry writer rejects each missing key; live runs cannot be approved · C hook H5 and the CI check agree
+Regression: R1 R2 R3
+Result: Pending.
+```
+
+```text
+S6.2 — eval-replay CI regression gate
+Feature: a PR that lowers grounding on frozen evidence beyond 2σ fails CI.
+Trace: SPEC §11.2; test-plan §14 "Regression gate"
+Tests:  I synthetic run 2.5σ below baseline fails; at baseline passes · E2E gate runs with network disabled
+Regression: R1 R2 R3 (R5 starts here)
+Done: approved baseline recorded after VERIFY-SCALE. Result: Pending.
+```
+
+```text
+S6.3 — Verifier ↔ judge agreement
+Feature: the heuristic grounding rate is quoted only with its measured agreement against a judge.
+Trace: SPEC §11.2; test-plan §14, §20 "Judge adoption"
+Tests:  Q κ on ≥ 50 owner-reviewed claims · U agreement report schema
+Regression: R1 R2 R3 R5
+Result: Pending (judge tier depends on CM-6c).
+```
+
+```text
+S6.4 — Bounded revise loop with early stop
+Feature: the Reviewer returns failed claims for at most two revisions, stopping early when a revision does not improve grounding.
+Trace: SPEC §8.1, §8.6; ADR-0017 §2; test-plan §11 repair-loop rows
+State: implemented and tested locally, not pushed (owner, 2026-10-31). This sprint lands it and adds the early stop if missing.
+Tests:  U bound, early stop, not-converged best draft, draft count · E2E degraded on non-convergence · Q paired loop vs no-loop on the frozen release, loop the only axis
+Regression: R1 R2 R3 R5
+Done: §11 rows green; paired result recorded with per-case regressions listed. Result: Pending.
+```
+
+```text
+S6.5 — Judge-based answer-quality suite (LLM-as-judge / RAGAS)
+Feature: answer quality is measured beyond citation grounding on the frozen eval set.
+Trace: SPEC §12 S6; Gate D
+Tests:  U metric adapters with faithful fakes · Q baseline recorded with lineage
+Regression: R1 R2 R3 R5
+Done: Gate D recorded. Result: Pending.
+```
+
+```text
+S6.6 — Prompt optimization on holdout (GEPA)
+Feature: the draft prompt is optimized on a train split and accepted only on a held-out split.
+Trace: SPEC §12 S6; Gate D cleared
+Tests:  Q paired holdout comparison, prompt the only axis · U split is disjoint and frozen
+Regression: R1 R2 R3 R5
+Result: Pending.
+```
+
+## S7 — Service readiness, durable execution and the three agents
+
+```text
+S7.1 — Guardrails
+Feature: untrusted content cannot steer the memo, and output policy holds on every returned memo.
+Trace: SPEC §11.4; test-plan §12
+Tests:  U input schema, framing, output screen · E2E adversarial fixture in CI (injection, price target, guaranteed return)
+Regression: R1 R2 R3 R5
+Result: Pending.
+```
+
+```text
+S7.2 — Identity, roles and guest quotas
+Feature: guests and the admin are authenticated and isolated; quotas hold at admission.
+Trace: ADR-0010 (+ 2026-10-11 amendment); test-plan §20 Issuer allowlist, Customer isolation, Guest access, Guest quotas, Warm-up
+Tests:  U token validation · I development issuer + BFF session; every listed §20 row (local)
+Regression: R1 R2 R3 R5
+Result: Pending.
+```
+
+```text
+S7.3 — Durable checkpoints and crash resume
+Feature: a crashed run resumes at the agent that failed, from its last checkpoint, instead of starting over.
+Trace: SPEC §8.8, §12 G14; ADR-0017 §§3–5; test-plan §22.2, §22.4 "Stale checkpoint refused" (SQLite), §22.6 graph_version rows
+Scope: FencedCheckpointer over the SQLite saver; thread_id = job_id; durability="sync"; graph_version on every checkpoint; local job record with attempt; FAIL_AT harness and the `fault` pytest marker.
+Non-goals: effect journal (S7.4); DynamoDB (S7.8); agent split (S7.6).
+Tests:  U thread identity, compatible resume · C stale-write refusal on the SQLite adapter · F resume at every node (pre-effect), finished siblings kept, durable-before-continuing, incompatible checkpoint · E2E uninterrupted run unchanged (memo hash, < 0.5 s added)
+Regression: R1 R2 R3 R5 (R6 starts here)
+Done: §22.2 green. Result: Pending.
+```
+
+```text
+S7.4 — Effect journal and evidence pinning
+Feature: a resumed agent never repeats a completed model or tool call, and never re-fetches evidence.
+Trace: SPEC §8.7, §8.8; ADR-0017 §§3–4, scenarios 3, 4, 6; test-plan §22.3, §22.7 rows 2–3
+Scope: EffectJournal (SQLite) with the ADR-0017 key; every external call routed through memoize; partial streams discarded; snapshot read by hash on resume.
+Tests:  U key coverage, per-run isolation · F zero duplicate calls after post-effect crash at every node; partial stream; resume after the quote TTL · E2E memo unchanged with the journal on
+Regression: R1 R2 R3 R5 R6
+Done: §22.3 green; R6 asserts zero duplicates from here on. Result: Pending.
+```
+
+```text
+S7.5 — Error taxonomy and node retry policies
+Feature: each failure is retried, turned into a typed outcome or ends the attempt, by class.
+Trace: SPEC §8.8; ADR-0017 §5; test-plan §22.5
+Tests:  U classification table, deterministic not retried, retry bounded by deadline · E2E non-critical source exhausted → degraded · F checkpoint store down → abort and redeliver
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+```text
+S7.6 — Researcher / Analyst / Reviewer agents with handoff envelopes
+Feature: the run is three agents with their own failure domains, handing off through durable typed envelopes.
+Trace: SPEC §8.1, §8.6; ADR-0017 §2, §4; test-plan §22.1, §11 "Revision carries only failed claims"
+Scope: three subgraphs; HandoffEnvelope committed before each receiving agent; revise edge carries failed_claim_ids; progress events name the agent.
+Non-goals: any prompt, model or retrieval change (single axis: topology).
+Tests:  U envelope schema, references only · I envelope before next agent · F R6 matrix re-run over the new node names · Q topology quality-neutral (paired, frozen release)
+Regression: R1 R2 R3 R5 R6
+Done: §22.1 green; paired result within tolerance. Result: Pending.
+```
+
+```text
+S7.7 — Durable job execution on DynamoDB and SQS
+Feature: an accepted job always reaches exactly one terminal result, even when the API or a worker dies.
+Trace: ADR-0013 (+ ADR-0015 amendment); test-plan §20 Acceptance transaction, Fenced commit, Lease expiry, Late worker, Enqueue outbox, Lazy expiry, Concurrency ceiling
+Scope: RunStore protocol + DynamoDB adapter (conditional claim, attempt fence, lazy expiry); JobQueue SQS adapter fed by a Streams dispatcher; DLQ handler; worker entrypoint replacing BackgroundTasks; DynamoDB Local and ElasticMQ in compose.
+Tests:  C RunStore suite on file and DynamoDB adapters · I every listed §20 row · F kill API after acceptance; kill worker after claim and after result write
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+```text
+S7.8 — Execution memory on DynamoDB (fenced checkpointer, journal, envelopes)
+Feature: T2 runs on DynamoDB with the same guarantees as locally, including zombie safety.
+Trace: SPEC §8.8, §12 G15; ADR-0017 §4; test-plan §22.4
+Scope: FencedCheckpointer over DynamoDBSaver (TransactWriteItems + ConditionCheck); journal and envelope items with 14-day TTL; S3 offload stays off the hot path.
+Tests:  C §22.4 stale-write suite on SQLite and DynamoDB adapters · I atomic fence, DLQ fences out · F no forked history (paused zombie) · P checkpoint write p99 recorded
+Regression: R1 R2 R3 R5 R6 (R6 now also on DynamoDB Local)
+Done: G15 closed. Result: Pending.
+```
+
+```text
+S7.9 — Caching with the T3 write policy
+Feature: repeated work is served from versioned caches, and only verified artifacts enter long-term memory.
+Trace: SPEC §11.3; ADR-0013 D08; ADR-0017 §1; test-plan §13 cache rows, §20 Cache versioning, Single-flight, Cache bypass, Awake cap, §22.7
+Tests:  U key composition per cache · I hit/miss counters, single-flight, verified-only writes, cache failure runs cold · F crash between generation and cache write leaves no partial entry
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+```text
+S7.10 — Provider circuit breaker and per-run model pinning
+Feature: a failing provider is isolated without mixing models inside one run.
+Trace: ADR-0009; ADR-0017 §5; test-plan §20 LLM fallback, §22.6 pinning rows
+Tests:  U breaker state machine · I breaker open → new attempt on the fallback host, lineage records both models, run not approvable · F resume uses the pinned model
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+```text
+S7.11 — Sentiment off the API event loop in the worker
+Feature: sentiment never blocks request handling, in the form CM-6b decided (hosted model, or ONNX FinBERT in the worker per D13).
+Trace: SPEC §8.2; cloud-deployment D13; test-plan §10
+Tests:  P event loop not blocked · Q label parity recorded · U adapter
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+```text
+S7.12 — Execution observability
+Feature: an operator can see a resumed run end to end and what each resume cost.
+Trace: ADR-0017 §7; test-plan §22.8
+Tests:  I every §22.8 row · U metric names and labels
+Regression: R1 R2 R3 R5 R6
+Done: a dashboard shows one injected crash and its resume. Result: Pending.
+```
+
+## S8 — Frontend
+
+```text
+S8.1 — Live run stream
+Feature: the workspace follows a run over server-sent events, per agent, including a resumed attempt, without ever showing unverified text.
+Trace: test-plan §20 Event replay, Stream segment; §17; §18
+Scope: GET /jobs/{id}/events (Last-Event-ID, 15 s heartbeat, 5-minute segments); UI replaces polling; agent lanes; "resumed" marker from attempt.
+Tests:  I event replay and segment rows · U UI reducers · E2E reconnect mid-run loses and duplicates nothing
+Regression: R1 R2 R3 R5 R6 + frontend test, type, lint, build
+Result: Pending.
+```
+
+```text
+S8.2 — Guest mode
+Feature: a recruiter can try one live memo without an account, within quotas.
+Trace: ADR-0010 amendment; test-plan §20 Guest access, Guest quotas, Warm-up
+Tests:  I Turnstile-gated session via a development verifier · E2E quota exhaustion shows example memos
+Regression: R1 R2 R3 R5 R6 + frontend suites
+Result: Pending.
+```
+
+## S9 — Portfolio polish
+
+```text
+S9.1 — Measured-results report
+Feature: every number in the README traces to a registry record or result file.
+Trace: SPEC §2 goals; §11.2
+Tests:  U a script resolves every README metric to its record; unresolved fails CI
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+```text
+S9.2 — Fresh-clone smoke and demo
+Feature: a fresh clone reaches a verified memo on replay with one documented command.
+Tests:  E2E fresh-clone script in CI on replay · L recorded demo
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
+
+## S10 — Cloud (Gate E)
+
+Entry criteria and the task outline live in `docs/cloud-deployment.md` §9. Each `S10-Txx` is one feature sprint under this contract; the ids are kept because cloud-deployment.md and test-plan §20 cite them. Added 2026-11-01:
+
+```text
+S10-T11 — Deployed resume drill
+Feature: the deployed demo tier resumes a crashed run at the failed agent and stays zombie-safe.
+Trace: ADR-0017; test-plan §22.9
+Depends on: S10-T01, S7.8
+Tests:  L Lambda timeout mid-agent resumes at the Analyst; forced duplicate delivery commits once with one checkpoint chain; cost of both attempts recorded
+Regression: R1 R2 R3 R5 R6
+Result: Pending.
+```
