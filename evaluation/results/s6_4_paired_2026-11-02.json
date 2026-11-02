@@ -1,0 +1,772 @@
+{
+ "task": "S6.4",
+ "git_sha": "dcb220f",
+ "model": "global.anthropic.claude-sonnet-4-6",
+ "temperature": 0.3,
+ "prompt_version": "unversioned (graph.py at git_sha)",
+ "evidence_release": "alpha-evidence:0.1.0",
+ "snapshot_hash": {
+  "AAPL": "c36e256d5caf56e165f49e337f6155d0a2ef865e7ccdcd27ca9d7adb2b916250",
+  "MSFT": "1f70a8bb43920052d1fffb1bb7438451dec531cb36cc4c10118f5d1a80f830bb",
+  "NVDA": "f52a9f41307fced2046aedf29e52a76587fee087aab9b79033d084a0b799e321"
+ },
+ "fixture_version": null,
+ "approved_baseline": false,
+ "design": "Draft 1 of a run is the no-loop arm: same snapshot, model, temperature and prompt. Loop is the only axis.",
+ "paired_runs": [
+  {
+   "ticker": "AAPL",
+   "status": "completed",
+   "draft_count": 1,
+   "draft_history": [
+    {
+     "draft": 1,
+     "grounded_claim_rate": 0.8571428571428571,
+     "passed": true
+    }
+   ],
+   "final": {
+    "passed": true,
+    "citation_coverage_rate": 0.9423076923076923,
+    "grounded_claim_rate": 0.8571428571428571,
+    "total_claims": 52,
+    "cited_claims": 49,
+    "grounded_claims": 42,
+    "orphan_citations": []
+   },
+   "usage": {
+    "model": "global.anthropic.claude-sonnet-4-6",
+    "input_tokens": 4701,
+    "output_tokens": 3071
+   },
+   "seconds": 36.6,
+   "snapshot_hash": "c36e256d5caf56e165f49e337f6155d0a2ef865e7ccdcd27ca9d7adb2b916250",
+   "returned_failed_claims": [
+    {
+     "sentence": "Beyond Mac and iPad, investors are particularly concerned that similar price increases could be applied to the iPhone, Apple's most critical revenue driver .",
+     "citations": [
+      6
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The fear of higher iPhone prices has amplified the negative sentiment surrounding the stock, as any demand destruction in the iPhone segment would have outsized implications for Apple's overall financial performance .",
+     "citations": [
+      6
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "This represents a near-term crystallization of a previously disclosed risk factor.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "The stock trades at a price-to-earnings (P/E) ratio of 37.32x , a premium valuation that reflects the market's historically high regard for Apple's earnings quality, ecosystem lock-in, and capital return program, though it also implies elevated sensitivity to any earnings disappointment.",
+     "citations": [
+      11
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "*Note: Detailed revenue, earnings per share, gross margin, and balance sheet figures are not available in the provided sources.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "Investors should consult Apple's most recent 10-K and quarterly earnings releases for complete financial statement data.*",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "If similar price increases are applied to the iPhone \u2014 Apple's most critical product \u2014 the demand destruction risk could be material .",
+     "citations": [
+      6
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The unprecedented component cost environment , the risk of iPhone price hikes dampening demand , and the premium valuation of 37.32x earnings argue against aggressive accumulation at $308.63 .",
+     "citations": [
+      10,
+      6,
+      11,
+      11
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "However, Apple's durable ecosystem, AI product pipeline , and the stock's 10% monthly decline suggest that patient investors with a 12\u201324 month horizon may find value on further weakness.",
+     "citations": [
+      8,
+      9
+     ],
+     "reason": "claim numbers not found in cited evidence: 12",
+     "missing_citation": false
+    },
+    {
+     "sentence": "We align with the hold-equivalent rating and $300 price target cited in recent analyst commentary , and would look to accumulate more aggressively on any pullback toward the $270\u2013$285 range, which would offer a more compelling margin of safety relative to the 52-week low of $201.50 and the current challenging cost environment .",
+     "citations": [
+      8,
+      11,
+      10
+     ],
+     "reason": "claim numbers not found in cited evidence: $270, $285",
+     "missing_citation": false
+    }
+   ]
+  },
+  {
+   "ticker": "MSFT",
+   "status": "completed",
+   "draft_count": 1,
+   "draft_history": [
+    {
+     "draft": 1,
+     "grounded_claim_rate": 0.9636363636363636,
+     "passed": true
+    }
+   ],
+   "final": {
+    "passed": true,
+    "citation_coverage_rate": 0.9016393442622951,
+    "grounded_claim_rate": 0.9636363636363636,
+    "total_claims": 61,
+    "cited_claims": 55,
+    "grounded_claims": 53,
+    "orphan_citations": []
+   },
+   "usage": {
+    "model": "global.anthropic.claude-sonnet-4-6",
+    "input_tokens": 4657,
+    "output_tokens": 3012
+   },
+   "seconds": 31.2,
+   "snapshot_hash": "1f70a8bb43920052d1fffb1bb7438451dec531cb36cc4c10118f5d1a80f830bb",
+   "returned_failed_claims": [
+    {
+     "sentence": "The stock has experienced a severe drawdown of approximately 34% from its 52-week high of $555.45, putting it on pace for its worst monthly and first-half performance since 2000 .",
+     "citations": [
+      4,
+      5
+     ],
+     "reason": "claim numbers not found in cited evidence: $555.45",
+     "missing_citation": false
+    },
+    {
+     "sentence": "A 24/7 Wall St.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "**Operational Efficiency:** The planned reduction of up to 2.5% of the workforce, while operationally disruptive in the near term, could be interpreted as a cost discipline measure that improves margins and reallocates resources toward higher-growth AI and cloud initiatives .",
+     "citations": [
+      10
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Deteriorating Sentiment:** Overall news sentiment is negative (5 negative articles vs.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "*ACCUMULATE / SPECULATIVE BUY with a 12\u201318 month horizon.*",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "The combination of a decade-low valuation multiple, triple-digit AI revenue growth, and $54 billion in quarterly cloud revenue creates a compelling long-term entry point for patient investors.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "The near-term risks \u2014 historic underperformance, negative sentiment, massive capex, and workforce restructuring \u2014 are real and should not be dismissed.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "We recommend a staged accumulation strategy, initiating a partial position at current levels near $390 and adding on further weakness toward the 52-week low of $349.20, with a price target range of $450\u2013$550 consistent with the range of analyst estimates cited in available sources.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    }
+   ]
+  },
+  {
+   "ticker": "NVDA",
+   "status": "completed",
+   "draft_count": 1,
+   "draft_history": [
+    {
+     "draft": 1,
+     "grounded_claim_rate": 0.7777777777777778,
+     "passed": true
+    }
+   ],
+   "final": {
+    "passed": true,
+    "citation_coverage_rate": 0.9782608695652174,
+    "grounded_claim_rate": 0.7777777777777778,
+    "total_claims": 46,
+    "cited_claims": 45,
+    "grounded_claims": 35,
+    "orphan_citations": []
+   },
+   "usage": {
+    "model": "global.anthropic.claude-sonnet-4-6",
+    "input_tokens": 4824,
+    "output_tokens": 2603
+   },
+   "seconds": 29.9,
+   "snapshot_hash": "f52a9f41307fced2046aedf29e52a76587fee087aab9b79033d084a0b799e321",
+   "returned_failed_claims": [
+    {
+     "sentence": "Despite recent price weakness \u2014 shares have retreated from a 52-week high of $236.54 and have tested the $200 support level \u2014 overall news sentiment remains positive, and new commercial partnerships signal continued demand for NVIDIA's AI computing infrastructure .",
+     "citations": [
+      2,
+      11,
+      12
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "Australian AI infrastructure company Firmus Technologies announced a strategic partnership with NVIDIA to help provide emerging AI firms with more cost-effective access to computing power; Firmus had raised $1.3 billion in April .",
+     "citations": [
+      7
+     ],
+     "reason": "claim numbers not found in cited evidence: $1.3",
+     "missing_citation": false
+    },
+    {
+     "sentence": "- While the 10-K excerpts provided do not detail specific export control provisions, the broader news environment references the Trump administration's actions affecting AI model access and geopolitical dynamics , which represent an unsupported but plausible area of risk not fully enumerated in the available source excerpts.",
+     "citations": [
+      3
+     ],
+     "reason": "claim numbers not found in cited evidence: 10",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The stock is currently trading approximately 17.6% below its 52-week high of $236.54, and approximately 23.8% above its 52-week low of $157.34, suggesting the stock sits in the lower half of its recent range .",
+     "citations": [
+      11
+     ],
+     "reason": "claim numbers not found in cited evidence: 17.6%, 23.8%",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Continued Commercial Momentum:** New partnerships continue to validate demand.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "The Firmus Technologies deal \u2014 signed with a company that raised $1.3 billion in April \u2014 demonstrates that NVIDIA is expanding its reach to emerging AI firms seeking cost-effective access to compute .",
+     "citations": [
+      7
+     ],
+     "reason": "claim numbers not found in cited evidence: $1.3",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Attractive Entry Point:** The stock is currently trading approximately 17.6% below its 52-week high of $236.54, potentially offering a more attractive entry point for long-term investors relative to peak valuations .",
+     "citations": [
+      11
+     ],
+     "reason": "claim numbers not found in cited evidence: 17.6%",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The recent breach of the $200 support level, while technically negative in the short term, may represent a reset opportunity if AI infrastructure spending trends remain intact .",
+     "citations": [
+      2
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Reasonable Valuation for a Dominant Franchise:** A P/E ratio of approximately 29.84x is relatively modest for a company of NVIDIA's market position and growth trajectory in the AI infrastructure space, particularly given that it is described as the dominant AI chip provider .",
+     "citations": [
+      1,
+      11
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The stock has underperformed relative to its 52-week high, and Barron's has characterized it as a \"chip stock loser\" in the near term .",
+     "citations": [
+      2
+     ],
+     "reason": "claim numbers not found in cited evidence: 52",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The current share price of $194.83 \u2014 approximately 17.6% below the 52-week high \u2014 offers a more attractive entry point than recent peak levels, and the P/E ratio of approximately 29.84x appears reasonable for a franchise of this quality and market position .",
+     "citations": [
+      11
+     ],
+     "reason": "claim numbers not found in cited evidence: 17.6%",
+     "missing_citation": false
+    }
+   ]
+  },
+  {
+   "ticker": "MSFT",
+   "status": "completed",
+   "draft_count": 1,
+   "draft_history": [
+    {
+     "draft": 1,
+     "grounded_claim_rate": 0.9215686274509803,
+     "passed": true
+    }
+   ],
+   "final": {
+    "passed": true,
+    "citation_coverage_rate": 0.9444444444444444,
+    "grounded_claim_rate": 0.9215686274509803,
+    "total_claims": 54,
+    "cited_claims": 51,
+    "grounded_claims": 47,
+    "orphan_citations": []
+   },
+   "usage": {
+    "model": "global.anthropic.claude-sonnet-4-6",
+    "input_tokens": 4657,
+    "output_tokens": 2961
+   },
+   "seconds": 31.3,
+   "snapshot_hash": "1f70a8bb43920052d1fffb1bb7438451dec531cb36cc4c10118f5d1a80f830bb",
+   "returned_failed_claims": [
+    {
+     "sentence": "The stock has experienced a severe drawdown of approximately 34% from its 52-week high of $555.45, placing it on track for its worst monthly and first-half performance since 2000 .",
+     "citations": [
+      4,
+      5
+     ],
+     "reason": "claim numbers not found in cited evidence: $555.45",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The stock is currently trading approximately 34% below its 52-week high of $555.45, representing a market capitalization loss of approximately $570 billion .",
+     "citations": [
+      4,
+      5
+     ],
+     "reason": "claim numbers not found in cited evidence: $555.45",
+     "missing_citation": false
+    },
+    {
+     "sentence": "Overall news sentiment as measured by the FinBERT classifier is negative, with 5 negative articles versus only 1 positive article out of 10 total articles analyzed .",
+     "citations": [
+      12
+     ],
+     "reason": "claim numbers not found in cited evidence: 10",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The Forbes/Trefis bull case targets $550, implying approximately 41% upside from current levels .",
+     "citations": [
+      6,
+      11
+     ],
+     "reason": "claim numbers not found in cited evidence: 41%",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Negative Retail and Institutional Sentiment:** Overall news sentiment is negative (5 negative articles vs.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "**Analytical Judgment (Recommendation):** Based on the cited premises above, we assign a **CAUTIOUS BUY / ACCUMULATE ON WEAKNESS** rating for long-term investors with a 12\u201324 month horizon.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "**For risk-tolerant, long-term investors**, the current valuation compression relative to fundamental AI and cloud growth metrics presents an asymmetric opportunity.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    }
+   ]
+  },
+  {
+   "ticker": "NVDA",
+   "status": "completed",
+   "draft_count": 1,
+   "draft_history": [
+    {
+     "draft": 1,
+     "grounded_claim_rate": 0.7857142857142857,
+     "passed": true
+    }
+   ],
+   "final": {
+    "passed": true,
+    "citation_coverage_rate": 0.9545454545454546,
+    "grounded_claim_rate": 0.7857142857142857,
+    "total_claims": 44,
+    "cited_claims": 42,
+    "grounded_claims": 33,
+    "orphan_citations": []
+   },
+   "usage": {
+    "model": "global.anthropic.claude-sonnet-4-6",
+    "input_tokens": 4824,
+    "output_tokens": 2304
+   },
+   "seconds": 27.6,
+   "snapshot_hash": "f52a9f41307fced2046aedf29e52a76587fee087aab9b79033d084a0b799e321",
+   "returned_failed_claims": [
+    {
+     "sentence": "Firmus had raised $1.3 billion in funding prior to announcing this deal, underscoring the scale of capital flowing into NVIDIA-powered AI infrastructure globally .",
+     "citations": [
+      7
+     ],
+     "reason": "claim numbers not found in cited evidence: $1.3",
+     "missing_citation": false
+    },
+    {
+     "sentence": "Despite these positives, NVIDIA's shares fell below their recent floor of $200 during the week ending June 27, 2026, a technically significant breach that raised concerns among market participants .",
+     "citations": [
+      2
+     ],
+     "reason": "claim numbers not found in cited evidence: 27,",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Concentration and Export Risk:** NVIDIA's business is heavily dependent on a small number of large data-center customers, and any disruption to those relationships \u2014 including U.S.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "For a company of NVIDIA's scale and growth trajectory in AI infrastructure, this P/E multiple is notably modest relative to historical levels for high-growth technology leaders, though it reflects both the company's maturation and near-term macro headwinds facing the semiconductor sector .",
+     "citations": [
+      11,
+      1
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The 52-week trading range of $157.34 to $236.54 reflects a peak-to-trough range of approximately 50%, highlighting the stock's sensitivity to shifts in AI spending sentiment and broader technology market conditions .",
+     "citations": [
+      11
+     ],
+     "reason": "claim numbers not found in cited evidence: 50%",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The continued flow of major data-center deals \u2014 including the recently announced Firmus Technologies partnership and the government AI collaboration with Palantir \u2014 demonstrates that demand for NVIDIA's products and platforms remains robust across commercial and public-sector verticals .",
+     "citations": [
+      7,
+      5
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "At a P/E of approximately 29.8x, the stock trades at a valuation that, if NVIDIA sustains high earnings growth, could prove attractive relative to the long-term earnings power of the franchise .",
+     "citations": [
+      11
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The bear case centers on the risk that NVIDIA's recent share-price weakness is not merely a temporary correction but reflects a more durable deceleration in AI infrastructure spending .",
+     "citations": [
+      2
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The stock's breach of the psychologically important $200 support level is a technically negative signal that may attract further selling pressure .",
+     "citations": [
+      2
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "Furthermore, the broader semiconductor sector is experiencing a slump, and NVIDIA \u2014 as the highest-profile name in the space \u2014 may face outsized downside if AI capital expenditure growth disappoints .",
+     "citations": [
+      1,
+      10
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Recommendation: BUY with a 12-month investment horizon, subject to position sizing appropriate to individual risk tolerance.**",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    }
+   ]
+  },
+  {
+   "ticker": "AAPL",
+   "status": "completed",
+   "draft_count": 1,
+   "draft_history": [
+    {
+     "draft": 1,
+     "grounded_claim_rate": 0.9090909090909091,
+     "passed": true
+    }
+   ],
+   "final": {
+    "passed": true,
+    "citation_coverage_rate": 0.9482758620689655,
+    "grounded_claim_rate": 0.9090909090909091,
+    "total_claims": 58,
+    "cited_claims": 55,
+    "grounded_claims": 50,
+    "orphan_citations": []
+   },
+   "usage": {
+    "model": "global.anthropic.claude-sonnet-4-6",
+    "input_tokens": 4701,
+    "output_tokens": 3019
+   },
+   "seconds": 35.0,
+   "snapshot_hash": "c36e256d5caf56e165f49e337f6155d0a2ef865e7ccdcd27ca9d7adb2b916250",
+   "returned_failed_claims": [
+    {
+     "sentence": "**Component Cost and Supply Chain Risk:** The current price hike episode directly illustrates the supply chain risk Apple faces.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "**Demand Elasticity Risk:** The market's sharp negative reaction to Mac and iPad price hikes \u2014 a greater-than-6% single-day decline \u2014 underscores the risk that price increases could dampen consumer demand, particularly if extended to the iPhone .",
+     "citations": [
+      3,
+      6
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "Specific revenue, earnings, and margin figures beyond what is captured in the market data provided are not available in the supplied source materials and are therefore not cited here.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    },
+    {
+     "sentence": "One analyst has a hold-equivalent 2 rating on the stock with a $300 price target , implying modest downside of approximately 2.8% from the current price of $308.63 .",
+     "citations": [
+      8,
+      8,
+      11
+     ],
+     "reason": "claim numbers not found in cited evidence: 2.8%",
+     "missing_citation": false
+    },
+    {
+     "sentence": "**Pricing Power and Brand Resilience:** Despite the negative market reaction, Apple's ability to raise prices on MacBooks and iPads \u2014 even in a challenging consumer environment \u2014 demonstrates the enduring strength of its brand and ecosystem loyalty .",
+     "citations": [
+      2,
+      3
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "This proactive stance may strengthen customer loyalty and differentiate Apple from competitors in an era of escalating AI-enabled cyber risks .",
+     "citations": [
+      5
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "The recent 10% monthly decline may have created a more attractive entry point for long-term investors relative to the stock's recent trading history .",
+     "citations": [
+      9,
+      11
+     ],
+     "reason": "claim does not align with cited evidence",
+     "missing_citation": false
+    },
+    {
+     "sentence": "However, the AI product cycle, brand resilience, and the stock's proximity to a one-analyst $300 price target suggest limited incremental downside for long-term holders.",
+     "citations": [],
+     "reason": "claim is missing a citation",
+     "missing_citation": true
+    }
+   ]
+  }
+ ],
+ "paired_summary": {
+  "runs": 6,
+  "revisions": 0,
+  "per_case_regressions": []
+ },
+ "stress": {
+  "note": "Never a baseline. Verifier thresholds raised to 0.99 in the harness only, so real revisions happen on the same evidence and model.",
+  "runs": [
+   {
+    "ticker": "AAPL",
+    "status": "degraded",
+    "draft_count": 3,
+    "draft_history": [
+     {
+      "draft": 1,
+      "grounded_claim_rate": 0.8235294117647058,
+      "passed": false
+     },
+     {
+      "draft": 2,
+      "grounded_claim_rate": 0.96,
+      "passed": false
+     },
+     {
+      "draft": 3,
+      "grounded_claim_rate": 1.0,
+      "passed": false
+     }
+    ],
+    "final": {
+     "passed": false,
+     "citation_coverage_rate": 1.0,
+     "grounded_claim_rate": 1.0,
+     "total_claims": 50,
+     "cited_claims": 50,
+     "grounded_claims": 50,
+     "orphan_citations": []
+    },
+    "usage": {
+     "model": "global.anthropic.claude-sonnet-4-6",
+     "input_tokens": 18182,
+     "output_tokens": 9131
+    },
+    "seconds": 89.9,
+    "snapshot_hash": "c36e256d5caf56e165f49e337f6155d0a2ef865e7ccdcd27ca9d7adb2b916250",
+    "returned_failed_claims": []
+   },
+   {
+    "ticker": "MSFT",
+    "status": "degraded",
+    "draft_count": 2,
+    "draft_history": [
+     {
+      "draft": 1,
+      "grounded_claim_rate": 1.0,
+      "passed": false
+     },
+     {
+      "draft": 2,
+      "grounded_claim_rate": 1.0,
+      "passed": false
+     }
+    ],
+    "final": {
+     "passed": false,
+     "citation_coverage_rate": 1.0,
+     "grounded_claim_rate": 1.0,
+     "total_claims": 54,
+     "cited_claims": 54,
+     "grounded_claims": 54,
+     "orphan_citations": []
+    },
+    "usage": {
+     "model": "global.anthropic.claude-sonnet-4-6",
+     "input_tokens": 10665,
+     "output_tokens": 5406
+    },
+    "seconds": 48.0,
+    "snapshot_hash": "1f70a8bb43920052d1fffb1bb7438451dec531cb36cc4c10118f5d1a80f830bb",
+    "returned_failed_claims": []
+   },
+   {
+    "ticker": "NVDA",
+    "status": "degraded",
+    "draft_count": 3,
+    "draft_history": [
+     {
+      "draft": 1,
+      "grounded_claim_rate": 0.875,
+      "passed": false
+     },
+     {
+      "draft": 2,
+      "grounded_claim_rate": 0.9322033898305084,
+      "passed": false
+     },
+     {
+      "draft": 3,
+      "grounded_claim_rate": 0.9491525423728814,
+      "passed": false
+     }
+    ],
+    "final": {
+     "passed": false,
+     "citation_coverage_rate": 1.0,
+     "grounded_claim_rate": 0.9491525423728814,
+     "total_claims": 59,
+     "cited_claims": 59,
+     "grounded_claims": 56,
+     "orphan_citations": []
+    },
+    "usage": {
+     "model": "global.anthropic.claude-sonnet-4-6",
+     "input_tokens": 18406,
+     "output_tokens": 9068
+    },
+    "seconds": 85.5,
+    "snapshot_hash": "f52a9f41307fced2046aedf29e52a76587fee087aab9b79033d084a0b799e321",
+    "returned_failed_claims": [
+     {
+      "sentence": "Firmus said in April it had raised $1.3 billion, underscoring the scale of investment flowing into AI infrastructure partnerships with NVIDIA .",
+      "citations": [
+       7
+      ],
+      "reason": "claim numbers not found in cited evidence: $1.3",
+      "missing_citation": false
+     },
+     {
+      "sentence": "The Firmus Technologies partnership illustrates the global demand for NVIDIA-powered AI infrastructure, with Firmus having said in April it raised $1.3 billion .",
+      "citations": [
+       7
+      ],
+      "reason": "claim numbers not found in cited evidence: $1.3",
+      "missing_citation": false
+     },
+     {
+      "sentence": "*Analytical judgment (resting on cited premises above):* The current pullback to $194.83 \u2014 occurring amid a broader semiconductor sector slump and widespread technology-sector weakness rather than company-specific deterioration \u2014 presents a compelling entry point for long-term investors.",
+      "citations": [
+       11,
+       1,
+       10
+      ],
+      "reason": "claim does not align with cited evidence",
+      "missing_citation": false
+     }
+    ]
+   }
+  ]
+ }
+}

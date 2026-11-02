@@ -738,10 +738,11 @@ Result: Pending (judge tier depends on CM-6c).
 S6.4 — Bounded revise loop with early stop
 Feature: the Reviewer returns failed claims for at most two revisions, stopping early when a revision does not improve grounding.
 Trace: SPEC §8.1, §8.6; ADR-0017 §2; test-plan §11 repair-loop rows
-State: implemented and tested locally, not pushed (owner, 2026-10-31). This sprint lands it and adds the early stop if missing.
+State: pulled ahead of the linear order by the owner, 2026-11-02. No earlier local implementation existed in the working tree, any branch, the stash or the worktrees, so it was built here.
 Tests:  U bound, early stop, not-converged best draft, draft count · E2E degraded on non-convergence · Q paired loop vs no-loop on the frozen release, loop the only axis
 Regression: R1 R2 R3 R5
-Done: §11 rows green; paired result recorded with per-case regressions listed. Result: Pending.
+Done: §11 rows green; paired result recorded with per-case regressions listed.
+Result: DONE (2026-11-02), branch task/s6-4, not pushed. Red ef934c3, 24d1d31; implementation dcb220f. tests/replay/test_revise_loop.py 32 tests unchanged since 24d1d31; four older tests that encoded the pre-loop graph now follow SPEC §8.1. R1 ruff clean, mypy clean on tracked files, pytest 700 passed, 2 skipped. R2 four checks pass. R3 included in that pytest run. R5 not run: S6.2 has no approved baseline yet. Q (evaluation/results/s6_4_paired_2026-11-02.json, not a baseline; alpha-evidence:0.1.0, global.anthropic.claude-sonnet-4-6, loop the only axis, draft 1 is the no-loop arm): 6 of 6 runs passed on draft 1 at grounded rate 0.778–0.964, so 0 revisions and 0 per-case regressions; on this release the paired result shows no effect either way. Stress in the same file (thresholds raised to 0.99 in the harness only, never a baseline): AAPL 0.824 → 0.96 → 1.0, NVDA 0.875 → 0.932 → 0.949, MSFT 1.0 → 1.0 stopped early; all degraded by design. Open: test-plan §18 "All six nodes" needs "plus revise_memo when a revision ran" (H3, owner's ALLOW_SPEC_EDIT); a run that passes after a revision keeps recoverable verification errors from earlier drafts; the frontend's fixed node list does not show revise_memo (S8.1).
 ```
 
 ```text
