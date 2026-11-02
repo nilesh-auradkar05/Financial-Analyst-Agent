@@ -159,7 +159,7 @@ def response_of(final):
 
 def status_of(final) -> str:
     status = response_of(final).status
-    return getattr(status, "value", status)
+    return str(getattr(status, "value", status))
 
 
 def tag_of(memo: str) -> str:
