@@ -1,0 +1,35 @@
+# Isolated OpenSearch for local tests and development (CM-2, ADR-0016).
+# Security plugin is disabled: loopback-only, no credentials, test data only.
+# docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml up -d
+
+x-default-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION:-2.19.2}
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:${OPENSEARCH_STANDALONE_HTTP_PORT:-19200}:9200"
+    volumes:
+      - opensearch-test-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    restart: unless-stopped
+
+volumes:
+  opensearch-test-data:
