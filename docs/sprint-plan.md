@@ -584,7 +584,8 @@ Trace: ADR-0016; cloud-deployment §7 budget controls
 Scope: AWS Budgets ($10 and $25 alerts, $100 action), resource tags, teardown command; official OpenSearch Serverless prices and idle timeout recorded in ADR-0014.
 Tests:  L a test budget threshold fires its alert; teardown leaves only the evidence bucket
 Regression: R1 R2
-Done: alerts received; prices cited with date. Result: Pending.
+Done: alerts received; prices cited with date.
+Result: DONE (2026-11-06), commit 8d6ed8e. `terraform apply` added 5 resources as the deployer role; re-plan exit 0 (no drift). Budget `alpha-analyst-monthly`: $100 limit, alerts at $10/$25/$100 actual and $100 forecast; owner confirmed the alert email arrived. Kill switch STANDBY, automatic at $100, on the runtime role and both model-calling users. Prices cited in ADR-0014 (2026-10-23). Teardown command in infra/terraform/README.md; "leaves only the evidence bucket" is exercised at CM-3, when a second stack exists. Open: the five `Resource: "*"` statements in the manually created IAM policies stay for now by owner decision; constrain them and add the ADR note after full deployment.
 ```
 
 ```text
