@@ -35,6 +35,27 @@ def test_vector_store_factory_selects_qdrant(monkeypatch: pytest.MonkeyPatch):
     assert isinstance(store, FakeQdrant)
 
 
+def test_vector_store_factory_selects_opensearch(monkeypatch: pytest.MonkeyPatch):
+    """test-plan §5: VECTOR_BACKEND=opensearch resolves to OpenSearchVectorStore."""
+    import app.components.retrieval.opensearch_store as opensearch_module
+
+    import app.components.retrieval.vector_store as module
+
+    class FakeOpenSearch:
+        pass
+
+    monkeypatch.setenv("VECTOR_BACKEND", "opensearch")
+    monkeypatch.setattr(opensearch_module, "OpenSearchVectorStore", FakeOpenSearch)
+    module.reset_vector_store()
+
+    try:
+        store = module.get_vector_store()
+    finally:
+        module.reset_vector_store()
+
+    assert isinstance(store, FakeOpenSearch)
+
+
 def test_vector_store_factory_rejects_unknown_backend(monkeypatch: pytest.MonkeyPatch):
     import app.components.retrieval.vector_store as module
 
