@@ -370,7 +370,7 @@ Verification:
 - VECTOR_BACKEND=qdrant uv run pytest tests/rag/test_vector_store_contract.py
 Done: identical pass under both; differences fixed in adapter, never by forking test.
 Non-goals: no method-quality comparison.
-Result: Retargeted 2026-10-23 to OpenSearch (ADR-0016): runs in CM-2 against a local OpenSearch container per test-plan §4; Chroma and Qdrant legs dropped. Earlier: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
+Result: Green 2026-11-06 in CM-2 (65f3e27): `tests/rag/test_vector_store_contract.py` runs test-plan §4 against the local OpenSearch container (two indexes, one corpus). Retargeted 2026-10-23 to OpenSearch (ADR-0016); Chroma and Qdrant legs dropped. Earlier: Pending. No contract suite runs against a real backend: `tests/rag/` does not exist; current store tests use a fake Qdrant client and Chroma monkeypatches. With S4 retired the suite is the Qdrant contract oracle; the Chroma leg is required only while Chroma stays a supported backend (SPEC §6).
 ```
 
 ```text
@@ -380,7 +380,7 @@ Scope: run S1 coverage + idempotency under VECTOR_BACKEND=qdrant; guard that the
 Verification: VECTOR_BACKEND=qdrant uv run pytest tests/ingestion/test_section_coverage.py tests/ingestion/test_ingestion_idempotency.py
 Done: coverage + idempotency pass under Qdrant; embedding identity recorded.
 Non-goals: no benchmark run; no switch.
-Result: Retargeted 2026-10-23 to OpenSearch (ADR-0016): runs in CM-2 per test-plan §5 "Coverage under OpenSearch"; the embedding identifier in ingest metadata lands in CM-2. Earlier: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
+Result: Green 2026-11-06 in CM-2 (65f3e27): `tests/rag/test_opensearch_coverage.py` runs section coverage, idempotent re-ingest and replace_existing against the container; every chunk now carries `embedding_id` (`ollama:<model>:<dimension>`) in its stored metadata. Retargeted 2026-10-23 to OpenSearch (ADR-0016). Earlier: Pending. `tests/ingestion/test_section_coverage.py` and `test_ingestion_idempotency.py` pass, but against an in-memory store, not Qdrant. The embedding identifier is recorded in trace metadata only, not in ingest metadata.
 ```
 
 Exit: Qdrant passes the same contract/coverage/idempotency tests Chroma passes; indexes verified; embeddings matched; nothing above `rag/` changed.
@@ -595,7 +595,7 @@ Trace: SPEC §6, §11.1 Gate B; test-plan §4, §5, §21 "Embedding identifier r
 Scope: OpenSearchVectorStore; idempotent mapping; chunk_id as document id; embedding identifier in ingest metadata.
 Tests:  U config selection, invalid backend · C test-plan §4 suite against a local container · I §5 rows incl. coverage and idempotent re-ingest
 Regression: R1 R2 R3 R4
-Done: §4 and §5 green against the container. Result: Pending.
+Done: §4 and §5 green against the container. Result: Done criterion met 2026-11-06, commit 65f3e27 (tests 72d1db5): `tests/rag` + factory 45 passed against OpenSearch 2.19.2. R1 (710 passed, 2 skipped; ruff; mypy) R2 R3 (87 passed) green. R4 not run — pending owner: the Gate A Qdrant volume `qdrant-financial-analyst-agent-system` is not on the Docker Desktop engine and the native engine is not running. Default backend still qdrant. Lucene HNSW cosinesimil, filters inside k-NN; Serverless-compatible APIs only. CM-3 checks: refresh=wait_for and delete_by_ticker loop under the 5 s refresh; NEXTGEN 32x compression.
 ```
 
 ```text
