@@ -88,9 +88,7 @@ def test_same_filter_gives_identical_filtered_count(stores, filters, expected_me
 
 
 @pytest.mark.parametrize(("filters", "expected_metadata"), FILTER_CASES)
-def test_filtered_search_returns_only_matching_metadata(
-    stores, filters, expected_metadata
-) -> None:
+def test_filtered_search_returns_only_matching_metadata(stores, filters, expected_metadata) -> None:
     """test-plan §5: Filtered count/search -> only matching metadata returned."""
     first, _ = stores
 
@@ -242,7 +240,9 @@ def test_reupserting_same_chunks_never_duplicates_chunk_ids(make_store) -> None:
     assert top.text == edited.text
 
 
-def test_no_backend_client_object_is_observable_above_the_store(make_store, monkeypatch) -> None:
+def test_no_backend_client_object_is_observable_above_the_store(
+    make_store, monkeypatch, opensearch_url, new_index
+) -> None:
     """test-plan §4: Backend client leakage -> no backend client object observable above
     RetrievalService (owner reading: nothing from get_vector_store(), any RetrievalStore
     method, or a public attribute of the store is an opensearchpy object)."""
@@ -258,6 +258,9 @@ def test_no_backend_client_object_is_observable_above_the_store(make_store, monk
         "delete_by_ticker": store.delete_by_ticker("AAPL"),
     }
     monkeypatch.setenv("VECTOR_BACKEND", "opensearch")
+    # test-plan §5: no network beyond the local container, so the configured store targets it.
+    monkeypatch.setenv("OPENSEARCH_URL", opensearch_url)
+    monkeypatch.setenv("OPENSEARCH_INDEX_NAME", new_index())
     vector_store_module.reset_vector_store()
     try:
         configured = vector_store_module.get_vector_store()
@@ -273,4 +276,3 @@ def test_no_backend_client_object_is_observable_above_the_store(make_store, monk
             leaks.extend(find_backend_objects(value, f"{label}.{name}"))
 
     assert leaks == []
-
