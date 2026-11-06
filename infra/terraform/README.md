@@ -14,20 +14,22 @@ that creates billable resources needs the owner's approval first (ADR-0016).
 cd infra/terraform/cost
 cat > terraform.tfvars <<'EOF'   # gitignored
 alert_email       = "<owner email>"
-kill_switch_users = ["<IAM user that calls Bedrock and OpenSearch>"]
+kill_switch_users = ["<IAM users that call Bedrock and OpenSearch, incl. the API key user>"]
+kill_switch_roles = ["<IAM roles assumed for those calls>"]
 EOF
+export AWS_PROFILE=<deployer profile>   # needs the CM-1 deployer policy
 terraform init
 terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
 At $100 of actual monthly spend, AWS Budgets attaches `alpha-analyst-budget-kill-switch`
-to the listed users. It denies Bedrock invocations and OpenSearch Serverless data access
-and creation; deletes stay allowed, so teardown still works. To resume after review, reset
-the action in the AWS Budgets console (or detach the policy from the user).
+to the listed users and roles. It denies Bedrock invocations (incl. Rerank and `bedrock-mantle`)
+and OpenSearch Serverless data access and creation; deletes stay allowed, so teardown still works. To resume after review, reset
+the action in the AWS Budgets console (or detach the policy from the user or role).
 
 Not covered: Azure Foundry spend (set an Azure budget in the Azure portal) and any
-principal not listed in `kill_switch_users`.
+principal not listed in `kill_switch_users` or `kill_switch_roles` (including the deployer).
 
 ## Teardown
 

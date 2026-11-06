@@ -30,7 +30,14 @@ variable "kill_switch_users" {
   description = "IAM users that make model and search calls; the $100 action attaches the deny policy to them."
 }
 
+variable "kill_switch_roles" {
+  type        = list(string)
+  description = "IAM roles that make model and search calls; the $100 action attaches the deny policy to them."
+}
+
 data "aws_partition" "current" {}
+
+data "aws_caller_identity" "current" {}
 
 # Account-wide on purpose: Bedrock and OpenSearch spend is caught even if a resource misses its tags.
 resource "aws_budgets_budget" "monthly" {
@@ -67,8 +74,8 @@ data "aws_iam_policy_document" "kill_switch" {
     actions = [
       "bedrock:InvokeModel",
       "bedrock:InvokeModelWithResponseStream",
-      "bedrock:Converse",
-      "bedrock:ConverseStream",
+      "bedrock:Rerank",
+      "bedrock-mantle:CreateInference",
       "aoss:APIAccessAll",
       "aoss:CreateCollection",
       "aoss:CreateCollectionGroup",
@@ -91,6 +98,17 @@ data "aws_iam_policy_document" "budgets_assume" {
       type        = "Service"
       identifiers = ["budgets.${data.aws_partition.current.dns_suffix}"]
     }
+    # Confused-deputy guard: only Budgets acting for this account's budgets may assume the role.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:budgets::${data.aws_caller_identity.current.account_id}:budget/*"]
+    }
   }
 }
 
@@ -104,11 +122,21 @@ data "aws_iam_user" "kill_switch" {
   user_name = each.value
 }
 
-# Least privilege: the role may attach or detach only the kill-switch policy, only on the listed users.
+# Least privilege: the role may attach or detach only the kill-switch policy, only on the listed principals.
 data "aws_iam_policy_document" "budgets_action" {
   statement {
     actions   = ["iam:AttachUserPolicy", "iam:DetachUserPolicy"]
     resources = [for u in data.aws_iam_user.kill_switch : u.arn]
+    condition {
+      test     = "ArnEquals"
+      variable = "iam:PolicyARN"
+      values   = [aws_iam_policy.kill_switch.arn]
+    }
+  }
+  statement {
+    actions = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
+    # Built from names, so the deployer needs no read rights on the runtime roles.
+    resources = [for r in var.kill_switch_roles : "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${r}"]
     condition {
       test     = "ArnEquals"
       variable = "iam:PolicyARN"
@@ -139,6 +167,7 @@ resource "aws_budgets_budget_action" "kill_switch" {
     iam_action_definition {
       policy_arn = aws_iam_policy.kill_switch.arn
       users      = var.kill_switch_users
+      roles      = var.kill_switch_roles
     }
   }
 
