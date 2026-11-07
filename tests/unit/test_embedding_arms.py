@@ -10,6 +10,7 @@ environment variables only (tests/embedding_arms.py). No network beyond 127.0.0.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from tests.embedding_arms import (
     AWS_ACCESS_KEY_ID,
     AZURE_API_KEY,
     AZURE_SMALL,
+    BEARER_TOKEN,
     BEDROCK_COHERE,
     BEDROCK_TITAN,
     CLOUD_ARMS,
@@ -230,6 +232,39 @@ def test_cloud_arm_asks_its_model_for_the_configured_dimension(
     input_type = "search_document" if arm is BEDROCK_COHERE else ""
     for vector, text in zip(documents, texts):
         assert vector == pytest.approx(vector_for(arm.model, text, dimension, input_type), abs=1e-6)
+
+
+@pytest.mark.parametrize("source", ["dotenv-file", "legacy-env-name"])
+@pytest.mark.parametrize("arm", [BEDROCK_COHERE, BEDROCK_TITAN], ids=lambda arm: arm.name)
+def test_bedrock_arm_authenticates_with_the_bearer_token_that_settings_read(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    providers: FakeEmbeddingProviders,
+    arm: Arm,
+    source: str,
+) -> None:
+    """test-plan §21: Provider selected by configuration (the bearer-token credential the rest of
+    the app reads from settings, whether it sits in a dotenv file or under the legacy name)."""
+    env = {
+        name: value
+        for name, value in arm.routed_to(providers.url).items()
+        if name not in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
+    }
+    if source == "dotenv-file":
+        (tmp_path / ".env").write_text(f"AWS_BEARER_TOKEN_BEDROCK={BEARER_TOKEN}\n")
+    else:
+        env["AWS_BEARER_TOKEN"] = BEARER_TOKEN
+    use_embedding_settings(monkeypatch, tmp_path, env)
+    # Only settings know the token: boto3 would see it only under its canonical environment name.
+    assert "AWS_BEARER_TOKEN_BEDROCK" not in os.environ
+    assert embeddings_api.embedding_identifier() == arm.identifier
+
+    vectors = embeddings_api.get_embeddings().embed_documents(["alpha filing"])
+
+    (request, *_) = providers.requests_to("bedrock")
+    assert (request.scheme, request.credential) == ("bearer", BEARER_TOKEN)
+    assert BEARER_TOKEN not in request.headers.values()
+    assert [len(vector) for vector in vectors] == [arm.dimension]
 
 
 def test_query_and_document_embeddings_of_the_same_text_use_different_input_types(

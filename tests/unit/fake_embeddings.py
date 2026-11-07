@@ -6,7 +6,7 @@ send real requests and this server parses them:
 - Ollama `POST /api/embed` (model `qwen3-embedding:4b`, native 2560 dimensions).
 - Bedrock `POST /model/{modelId}/invoke` (InvokeModel; the model id arrives percent-encoded):
   Titan Text Embeddings V2 (`inputText`, `dimensions`, native 1024) and Cohere Embed v4 (`texts`,
-  `input_type`, `output_dimension`, native 1536). A request that is not SigV4-signed is refused.
+  `input_type`, `output_dimension`, native 1536). A request carrying neither a SigV4 signature nor a bearer token is refused.
 - Azure / Foundry `POST /openai/v1/embeddings` for one deployment (`embed-3-small`, native 1536),
   honouring `encoding_format: "base64"`. `input` must be text; token-id arrays are refused, as a
   deployment cannot be assumed to accept them.
@@ -70,6 +70,7 @@ class ReceivedEmbeddingRequest:
     headers: dict[str, str]
     credential: str
     body: dict[str, Any]
+    scheme: str = ""  # "sigv4", "bearer", "api-key" or "" when the request carried no credential
 
 
 class _RefusedError(Exception):
@@ -215,12 +216,16 @@ class FakeEmbeddingProviders:
                 authorization = headers.get("authorization", "")
                 signed = _SIGV4_CREDENTIAL.match(authorization)
                 if signed:
-                    credential = signed.group("key")
+                    scheme, credential = "sigv4", signed.group("key")
+                elif authorization.startswith("Bearer "):
+                    scheme, credential = "bearer", authorization.removeprefix("Bearer ")
+                elif "api-key" in headers:
+                    scheme, credential = "api-key", headers["api-key"]
                 else:
-                    credential = headers.get("api-key") or authorization.removeprefix("Bearer ")
+                    scheme, credential = "", ""
                 for name in _AUTH_HEADERS:
                     headers.pop(name, None)
-                status, payload = fake._serve(path, raw, headers, credential, signed is not None)
+                status, payload = fake._serve(path, raw, headers, credential, scheme)
                 data = json.dumps(payload).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
@@ -234,7 +239,7 @@ class FakeEmbeddingProviders:
         return Handler
 
     def _serve(
-        self, path: str, raw: bytes, headers: dict[str, str], credential: str, signed: bool
+        self, path: str, raw: bytes, headers: dict[str, str], credential: str, scheme: str
     ) -> tuple[int, dict[str, Any]]:
         bedrock = _BEDROCK_PATH.match(path)
         provider = {OLLAMA_PATH: "ollama", AZURE_PATH: "azure"}.get(
@@ -245,7 +250,7 @@ class FakeEmbeddingProviders:
         except ValueError:
             body = {}
         model = bedrock.group("model") if bedrock else str(body.get("model", ""))
-        request = ReceivedEmbeddingRequest(provider, path, model, headers, credential, body)
+        request = ReceivedEmbeddingRequest(provider, path, model, headers, credential, body, scheme)
         self._record(request)
         try:
             if provider == "ollama":
@@ -253,8 +258,8 @@ class FakeEmbeddingProviders:
             if provider == "azure":
                 return 200, self._azure(request)
             if provider == "bedrock":
-                if not signed:
-                    raise _RefusedError(403, {"message": "Missing SigV4 signature"})
+                if scheme not in ("sigv4", "bearer") or not credential:
+                    raise _RefusedError(403, {"message": "Missing SigV4 signature or bearer token"})
                 return 200, self._bedrock(request)
             raise _RefusedError(404, {"error": {"code": "NotFound", "message": f"no route {path}"}})
         except _RefusedError as refused:
