@@ -655,7 +655,7 @@ Feature: sentiment scores come from a hosted model with recorded label parity, o
 Trace: ADR-0016 (own ADR required first); test-plan §10 sentiment rows
 Tests:  U adapter with a faithful fake · Q label parity against FinBERT on the frozen news set · P event loop not blocked
 Regression: R1 R2 R3
-Done: ADR accepted; parity recorded. Result: Implemented 2026-11-07 (red 8d2a235; tests unchanged since). Sentiment runs on Foundry `sonnet-5-5-sentiment`; FinBERT code, FINBERT_* settings and the startup preload removed (torch/transformers leave in CM-6d). R1: 731 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Parity recorded in ADR-0019: 16/30 = 53.3% agreement with the frozen FinBERT labels; ADR stays Proposed until the owner accepts that rate.
+Done: ADR accepted; parity recorded. Result: Implemented 2026-11-07 (red 8d2a235; tests unchanged since). Sentiment runs on Foundry `sonnet-5-5-sentiment`; FinBERT code, FINBERT_* settings and the startup preload removed (torch/transformers leave in CM-6d). R1: 731 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Parity recorded in ADR-0019: 16/30 = 53.3% agreement with the frozen FinBERT labels; owner accepted the rate 2026-11-07 and ADR-0019 is Accepted. DONE.
 ```
 
 ```text
