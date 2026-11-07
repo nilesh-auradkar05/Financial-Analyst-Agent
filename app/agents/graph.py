@@ -373,7 +373,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
 @app_traceable(name="analyze_sentiment", run_type="chain", tags=["agent"])
 async def analyze_sentiment_node(state: AgentState) -> dict:
     """
-    Analyze sentiment of news articles using FinBERT.
+    Analyze sentiment of news articles with the hosted sentiment model.
 
     Runs batch sentiment analysis on article snippets,
     then aggregates results for the overall sentiment.
@@ -476,7 +476,7 @@ def _format_market_data_text(stock: dict) -> str:
 
 def _format_sentiment_text(sentiment: dict) -> str:
     parts = [
-        f"Overall news sentiment (FinBERT classifier): {sentiment.get('overall_sentiment', 'N/A')}."
+        f"Overall news sentiment: {sentiment.get('overall_sentiment', 'N/A')}."
     ]
     parts.append(
         f"Positive articles: {sentiment.get('positive_count', 0)}. "
@@ -528,14 +528,14 @@ def _build_citation_registry(
         )
         idx += 1
 
-    # NEW: FinBERT sentiment as a citable source (overall tone + article counts).
+    # NEW: sentiment as a citable source (overall tone + article counts).
     sentiment = state.get("sentiment_result", {})
     if sentiment and sentiment.get("overall_sentiment"):
         registry.append(
             {
                 "index": idx,
                 "source_type": "sentiment",
-                "title": "News Sentiment (FinBERT)",
+                "title": "News Sentiment",
                 "text": _format_sentiment_text(sentiment),
                 "url": None,
                 "date": None,

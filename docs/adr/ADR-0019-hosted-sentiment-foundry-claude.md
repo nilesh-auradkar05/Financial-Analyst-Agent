@@ -28,7 +28,32 @@ At $2 / $10 per million input / output tokens (Foundry bills Claude at first-par
 
 Before FinBERT is deleted, both models score the same frozen news sample (the news snapshots of `alpha-evidence:0.1.0`). Recorded here: sample size, label agreement rate, the confusion table and every disagreement with its text preview. Parity is a record of how labels change, not a gate: Claude reads context FinBERT cannot, and the owner chose it for that. A disagreement rate the owner judges too high reopens this ADR.
 
-Result: pending (CM-6b).
+Result (2026-11-07, one live run of the CM-6b adapter, deployment `sonnet-5-5-sentiment`, served `claude-sonnet-5-5`; FinBERT labels are the frozen `ProsusAI/finbert` sentiment snapshots of the release): sample 30 (10 per ticker: AAPL, MSFT, NVDA); agreement 16/30 = 53.3%.
+
+| FinBERT \ Claude | positive | neutral | negative |
+| --- | --- | --- | --- |
+| positive | 2 | 3 | 2 |
+| neutral | 2 | 7 | 4 |
+| negative | 1 | 2 | 7 |
+
+Disagreements (ticker, FinBERT → Claude, text preview):
+
+- AAPL negative → positive: "0 · 16 hours ago ### Video: Our Stockpickers Talk Winners and Other Stuff That Matters 0 · Jun 25, 2026 ### Wa…"
+- AAPL neutral → negative: "00:51 6 minutes ago watch now watch now VIDEO05:24 Wharton's Jeremy Siegel on Apple's price hikes: 'Technology…"
+- AAPL positive → negative: "Apple explained that the company has "never seen a component price increase this much, this quickly," and whil…"
+- AAPL neutral → negative: "Apple: Price Hikes WWDC 2026 Recap Next-Gen AI Platform Privacy Concerns Foldable iPhone Hints Camera-Equipped…"
+- AAPL positive → neutral: "Skip to main content Exclusive news, data and analytics for financial market professionals Learn more about Re…"
+- MSFT neutral → negative: "14 min ago watch now watch now VIDEO06:31 Billionaire investor Jeremy Grantham on crypto: A useless, speculati…"
+- MSFT negative → neutral: "Microsoft (MSFT) stock fell 3.5% over the latest trading session, a dip that has it trading about 34% below it…"
+- MSFT positive → negative: "Microsoft is the worst-performing stock in the "Magnificent Seven" group of equities, and traders believe ther…"
+- MSFT neutral → positive: "This article was written by Doug Nathman, with research by his team at Trefis. A new business within Microsoft…"
+- NVDA neutral → positive: "NvidiaNVDA +1.66% stock was rising early Monday after a difficult week during which the chip maker's shares fe…"
+- NVDA positive → neutral: "Older 46. News • Jun 15, 2026 Markets are cheering the plan to reopen the Strait of Hormuz. But the relief may…"
+- NVDA positive → neutral: "Skip to main content Shorting the Grid: Bloom Energy's $25B AI Power Play Your book attached (Ad) SanDisk's Vo…"
+- NVDA neutral → negative: "Store My Products Founder's ClubSwingTraderLeaderboardMarketSurgeeIBDIBD DigitalIBD Live Recently Searched Res…"
+- NVDA negative → neutral: "Store My Products Founder's ClubSwingTraderLeaderboardMarketSurgeeIBDIBD DigitalIBD Live Recently Searched Res…"
+
+Observations: about half the disagreements are on snippets dominated by scraped page chrome (video menus, navigation, "Skip to main content"), where neither label is well founded — a news-extraction quality issue, not a model issue. On the clean headlines Claude reads context FinBERT misses (for example "worst-performing stock in the Magnificent Seven": FinBERT positive, Claude negative); one call is debatable ("stock fell 3.5%": Claude neutral). Single run; Claude's labels may vary between runs. Status stays Proposed until the owner accepts this disagreement rate (46.7%).
 
 ## Alternatives considered
 
