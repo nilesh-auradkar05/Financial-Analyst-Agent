@@ -132,13 +132,6 @@ def _secret_value(secret: SecretStr | None) -> str | None:
     return secret.get_secret_value()
 
 
-def _env_bool(name: str, *, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
 def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
     """Create a LangChain chat model for RAGAS and custom DeepEval judges."""
 
@@ -252,13 +245,10 @@ def _schema_prompt(prompt: str, schema: type[BaseModel]) -> str:
         f"{schema_json}"
     )
 
-def create_ragas_judge_embeddings(config: JudgeModelConfig) -> Any | None:
+def create_ragas_judge_embeddings() -> Any | None:
     """Create RAGAS compatible embeddings for metrics."""
 
-    provider = os.getenv("RAGAS_EMBEDDINGS_PROVIDER")
-    if provider is None:
-        provider = "openai" if config.provider == JudgeProvider.DEEPEVAL_DEFAULT else "huggingface"
-        provider = provider.strip().lower()
+    provider = (os.getenv("RAGAS_EMBEDDINGS_PROVIDER") or "openai").strip().lower()
 
     if provider in {"", "none", "disabled", "off"}:
         return None
@@ -280,23 +270,6 @@ def create_ragas_judge_embeddings(config: JudgeModelConfig) -> Any | None:
 
         model = os.getenv("RAGAS_EMBEDDINGS_MODEL") or "text-embedding-3-small"
         return OpenAIEmbeddings(client=AsyncOpenAI(api_key=api_key), model=model)
-
-    if provider == "huggingface":
-        try:
-            from ragas.embeddings import HuggingFaceEmbeddings
-        except ImportError as exc:
-            raise ImportError(
-                "Install sentence-transformers"
-            ) from exc
-
-        model = os.getenv("RAGAS_EMBEDDINGS_MODEL") or "sentence-transformers/all-MiniLM-L12-v2"
-        device = os.getenv("RAGAS_EMBEDDINGS_DEVICE") or "cpu"
-        local_files_only = _env_bool("RAGAS_EMBEDDINGS_LOCAL_FILES_ONLY", default=True)
-        return HuggingFaceEmbeddings(
-            model=model,
-            device=device,
-            local_files_only=local_files_only,
-        )
 
     raise ValueError(
         "Unsupported RAGAS_EMBEDDINGS_PROVIDER"
