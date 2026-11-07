@@ -650,3 +650,19 @@ Sentiment is a structured-output call to Claude Sonnet 5.5 on Microsoft Foundry 
 | Model identity recorded | Evidence snapshots of sentiment scores carry the deployment and served model as `model_name`; the trace metadata of the sentiment step names the same model |
 | No local model | Importing and calling the sentiment service loads no torch or transformers module |
 | Label parity recorded (one-time, live) | FinBERT and Claude score the news snapshots of `alpha-evidence:0.1.0`; sample size, agreement rate, confusion table and every disagreement are recorded in ADR-0019 before FinBERT is removed; not a pass/fail gate |
+
+---
+
+## 25. Hosted rerank and no local models: CM-6d (ADR-0011 amendment 2026-11-07)
+
+Reranked hybrid retrieval scores query/document pairs with Cohere Rerank v5 fast on Microsoft Foundry (deployment `cohere-rerank-v5-fast`). Unit cases use a faithful loopback fake of the rerank endpoint that computes relevance from the request; no network, no credentials.
+
+| Case | Expected behavior |
+| --- | --- |
+| Scores in input order | The reranker returns one score per document, in the order the documents were given, whatever order the provider lists its results in |
+| Request contract | `POST {AZURE_OPENAI_ENDPOINT}/providers/cohere/v2/rerank` with the key as a Bearer token; body carries `model` = the configured deployment, the query, the (clipped) document texts and `top_n` = the number of documents |
+| Rerank reorders candidates | `search_reranked_hybrid` returns the candidate the provider scores highest first; each returned chunk records `reranker_score`, its prior scores, and the reranker identity `foundry:<deployment>` |
+| Malformed provider reply | A missing or repeated index, an index out of range, a non-numeric score or invalid JSON → `RerankedHybridSearchUnavailableError`; no partial ranking |
+| Provider failure bounded | 429 or 5xx → at most 2 retries, then `RerankedHybridSearchUnavailableError`; every request has a timeout |
+| Fails closed when unconfigured | Missing endpoint, key or `AZURE_FOUNDRY_RERANK_MODEL` → `RerankedHybridSearchUnavailableError` before any request; with `fail_open_to_dense` set, dense results are returned instead and marked as not reranked |
+| No local model packages | `uv.lock` holds no `torch`, `transformers`, `sentence-transformers`, `triton`, `nvidia-*` or `cuda-*` package; importing the retrieval and sentiment modules loads none of them |

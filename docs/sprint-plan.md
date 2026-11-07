@@ -661,7 +661,7 @@ Done: ADR accepted; parity recorded. Result: Implemented 2026-11-07 (red 8d2a235
 ```text
 CM-6d — Hosted rerank; torch and CUDA removed
 Feature: reranked hybrid retrieval scores pairs with Cohere Rerank v5 fast on Microsoft Foundry (deployment `cohere-rerank-v5-fast`) instead of a local CrossEncoder; no torch or CUDA package remains.
-Trace: ADR-0011 D12 (amendment required first: was Bedrock Cohere Rerank 3.5); test-plan §6 reranked-hybrid rows; owner decision 2026-11-07
+Trace: ADR-0011 D12 (amended 2026-11-07: was Bedrock Cohere Rerank 3.5); retrieval-benchmark rerank axis (amended); test-plan §25 (new; no rerank rows existed before); owner decision 2026-11-07
 Scope: rerank adapter behind the retrieval boundary with timeout and bounded retries; rerank stays off by default until Gate C shows lift; remove sentence-transformers, torch, transformers, docker-compose.gpu.yml, the model-cache volume and CUDA notes in Dockerfile/Compose.
 Tests:  U adapter with a faithful fake transport · I reranked-hybrid eval mode end to end on the fake · R1 dependency check (no torch/nvidia in uv.lock)
 Regression: R1 R2 R3

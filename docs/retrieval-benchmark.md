@@ -238,7 +238,7 @@ The embedding model is a comparison axis like any other, under the same single-a
 - No arm is measured before the Gate A fixture is frozen. Building the provider switch and the per-arm indexes earlier is allowed; running or citing a comparison is not.
 - Downstream (memo-level) measurement is a second stage and never replaces this retrieval comparison: news and stock evidence replayed from a frozen evidence release, same chat model and settings, filings retrieved again per arm, repeated runs per ticker.
 - A change of embedding model invalidates every earlier retrieval baseline; no retrieval-quality number carries across it.
-- Rerank (Cohere Rerank 3.5) is a separate axis and is evaluated only after the embedding decision.
+- Rerank is a separate axis and is evaluated only after the embedding decision. Its model is Cohere Rerank v5 fast on Microsoft Foundry (amended 2026-11-07, ADR-0011; was Cohere Rerank 3.5 on Bedrock). A rerank comparison holds the backend, the embedding arm and the candidate pool fixed and changes only whether rerank is applied; result files record the reranker identity (`foundry:<deployment>`).
 
 ---
 

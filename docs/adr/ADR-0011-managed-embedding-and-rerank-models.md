@@ -60,6 +60,13 @@ The Gate C bake-off compares four embedding models instead of one candidate agai
 - **Sequencing:** the provider switch, per-arm indexes and the embedding identifier in ingest metadata may be built before Gate A. No arm is measured, and no comparison is cited, until the Gate A fixture is frozen.
 - The "Titan Text Embeddings V2 — Control only" row in the alternatives table is superseded by this amendment. `text-embedding-3-large` stays rejected.
 
+## Amendment 2026-11-07 — rerank on Microsoft Foundry (owner decision, CM-6d)
+
+- **D12 changes host and model:** Cohere Rerank v5 fast on Microsoft Foundry, deployment `cohere-rerank-v5-fast` (setting `AZURE_FOUNDRY_RERANK_MODEL`), replaces Bedrock Cohere Rerank 3.5. Called at `POST {AZURE_OPENAI_ENDPOINT}/providers/cohere/v2/rerank` with the Foundry key; verified live 2026-11-07 (1.1 s; `results[{index, relevance_score}]`, `meta.billed_units`).
+- **The local cross-encoder is removed** (sentence-transformers, `Qwen/Qwen3-Reranker-0.6B`), and with it torch, transformers and every CUDA package (owner: cloud-only model plane).
+- **Unchanged:** rerank stays off by default and is enabled for runtime only if Gate C shows lift; evaluation mode fails closed when the reranker is unavailable or unconfigured; there is no cross-host rerank fallback. Cohere's relevance scores are calibrated to [0, 1], unlike the old cross-encoder logits, so the section and keyword prior boosts (`section_prior_boost` 0.20, `keyword_prior_boost` 0.03) act on a different scale; no reranked result was recorded before this change, so nothing becomes non-comparable.
+- **Tests:** test-plan §25.
+
 ## Verify before implementation
 
 - Bedrock batch support for Cohere Embed v4; Foundry deployment of Cohere Embed v4 at 1024 dimensions.
