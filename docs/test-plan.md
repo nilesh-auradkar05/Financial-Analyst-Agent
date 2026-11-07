@@ -640,6 +640,7 @@ Sentiment is a structured-output call to Claude Sonnet 5.5 on Microsoft Foundry 
 | Case | Expected behavior |
 | --- | --- |
 | Result shape | `analyze_sentiment_batch(texts)` returns one `SentimentResult` per input, in input order; `label` ∈ {positive, negative, neutral}; `scores` holds all three labels in [0, 1]; `confidence` equals the score of the label |
+| Request contract | One user message; `model` = the configured deployment; `output_config` has effort `low` and a JSON-schema format; no `thinking` field; at most 20 texts per request, results concatenated in input order |
 | Empty input | `[]`, and the provider is not called |
 | Malformed provider reply | Wrong result count, unknown label, a score outside [0, 1], invalid JSON, `stop_reason` `refusal` or `max_tokens` → typed sentiment error; no partial or fabricated results |
 | Provider failure bounded | Timeout, 429 or 5xx → at most the configured retries, then the typed sentiment error; the call never hangs past its timeout × (retries + 1) |

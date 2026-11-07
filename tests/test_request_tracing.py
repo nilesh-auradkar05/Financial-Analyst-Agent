@@ -233,6 +233,28 @@ def test_nested_app_failure_exports_only_safe_error(traced, evidence, monkeypatc
     assert nested["extra"]["metadata"]["error_code"] == "app_stage_failed"
 
 
+def test_sentiment_trace_names_the_model_that_scored(traced, evidence, foundry, monkeypatch):
+    """test-plan §24: Model identity recorded (trace metadata of the sentiment step)."""
+    from app.agents import graph
+    from app.services import sentiment
+    from tests.unit.fake_foundry import MODEL_IDENTITY
+
+    monkeypatch.setattr(graph, "analyze_sentiment_batch", sentiment.analyze_sentiment_batch)
+    with TestClient(api.app) as client:
+        response = client.post(
+            "/analyze", json={"ticker": "AAPL"}, headers={"X-API-Key": "private-auth-value"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["sentiment"]["overall_sentiment"] == "positive"
+    runs = list(traced.runs.values())
+    step = next(run for run in runs if run["name"] == "analyze_sentiment")
+    scoring = [step, *descendants(runs, str(step["id"]))]
+    metadata = [run.get("extra", {}).get("metadata", {}) for run in scoring]
+    assert any(MODEL_IDENTITY in map(str, values.values()) for values in metadata)
+    assert "test-key" not in str(runs)
+
+
 def test_verifier_failure_never_exports_raw_error(traced, evidence, monkeypatch):
     from app.agents import graph
 
