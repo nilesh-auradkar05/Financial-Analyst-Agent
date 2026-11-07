@@ -185,3 +185,19 @@ def foundry(monkeypatch):
     monkeypatch.setattr(settings.llm, "azure_foundry_sentiment_model", DEPLOYMENT)
     yield server
     server.stop()
+
+
+@pytest.fixture
+def foundry_rerank(monkeypatch):
+    """A loopback Foundry rerank endpoint, with reranked retrieval configured to use it."""
+    from pydantic import SecretStr
+
+    from app.config import settings
+    from tests.unit.fake_foundry import RERANK_DEPLOYMENT, FakeFoundry
+
+    server = FakeFoundry().start()
+    monkeypatch.setattr(settings.llm, "azure_openai_endpoint", server.url)
+    monkeypatch.setattr(settings.llm, "azure_api_key", SecretStr("test-key"))
+    monkeypatch.setattr(settings.llm, "azure_foundry_rerank_model", RERANK_DEPLOYMENT)
+    yield server
+    server.stop()

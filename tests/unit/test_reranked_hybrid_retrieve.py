@@ -1,136 +1,35 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional, Sequence
+import re
 
 from app.components.retrieval.reranked_hybrid_retrieve import (
     RerankedHybridSearchConfig,
     search_reranked_hybrid,
 )
-from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from tests.unit.fake_retrieval_store import FakeQdrantStore
 
 
-@dataclass
-class FakePoint:
-    id: str
-    payload: dict[str, object]
+class OverlapReranker:
+    """A computed scorer at the provider boundary: the share of query words a document contains."""
 
-
-class FakeQdrantClient:
-    def __init__(self, points: list[FakePoint]) -> None:
-        self.points = points
-
-    def scroll(
-        self,
-        *,
-        collection_name: str,
-        scroll_filter: object,
-        limit: int,
-        with_payload: bool,
-        with_vectors: bool,
-        offset: Optional[int] = None,
-    ):
-        del collection_name, scroll_filter, with_payload, with_vectors
-        start = int(offset or 0)
-        end = min(start + limit, len(self.points))
-        next_page = end if end < len(self.points) else None
-        return self.points[start:end], next_page
-
-
-class FakeQdrantStore:
-    collection_name = "sec_filings"
-
-    def __init__(self) -> None:
-        self.client = FakeQdrantClient(
-            [
-                FakePoint(
-                    id="business-1",
-                    payload={
-                        "_retrieval_id": "business-1",
-                        "text": "The company sells devices, services, and accessories worldwide.",
-                        "ticker": "AAPL",
-                        "filing_type": "10-K",
-                        "section_key": "business",
-                    },
-                ),
-                FakePoint(
-                    id="risk-1",
-                    payload={
-                        "_retrieval_id": "risk-1",
-                        "text": "Supply chain disruption, supplier concentration, and manufacturing risks may affect production.",
-                        "ticker": "AAPL",
-                        "filing_type": "10-K",
-                        "section_key": "risk_factors",
-                    },
-                ),
-            ]
-        )
-
-    def _collection_exists(self) -> bool:
-        return True
-
-    def _to_qdrant_filter(self, filters: SearchFilters) -> object:
-        return filters.to_backend_filter()
-
-    def search(
-        self,
-        query: str,
-        filters: Optional[SearchFilters] = None,
-        n_results: int = 5,
-    ) -> SearchResult:
-        del query, filters
-        chunks = [
-            RetrievedChunk(
-                id="business-1",
-                text="The company sells devices, services, and accessories worldwide.",
-                metadata={"ticker": "AAPL", "filing_type": "10-K", "section_key": "business"},
-                distance=0.05,
-            ),
-            RetrievedChunk(
-                id="risk-1",
-                text="Supply chain disruption, supplier concentration, and manufacturing risks may affect production.",
-                metadata={"ticker": "AAPL", "filing_type": "10-K", "section_key": "risk_factors"},
-                distance=0.10,
-            ),
+    def score(self, query: str, documents: list[str]) -> list[float]:
+        wanted = set(re.findall(r"[a-z0-9]+", query.lower()))
+        return [
+            len(wanted & set(re.findall(r"[a-z0-9]+", document.lower()))) / len(wanted)
+            for document in documents
         ]
-        return SearchResult(
-            query="dense",
-            chunks=chunks[:n_results],
-            total_results=min(len(chunks), n_results),
-            search_time_ms=1.0,
-        )
 
 
-class KeywordFakeReranker:
-    def predict(
-        self,
-        sentences: Sequence[tuple[str, str]],
-        *,
-        batch_size: int = 32,
-        show_progress_bar: bool = False,
-    ) -> list[float]:
-        del batch_size, show_progress_bar
-        scores: list[float] = []
-        for _query, document in sentences:
-            text = document.lower()
-            scores.append(10.0 if "supply chain" in text else 1.0)
-        return scores
-
-
-def test_reranked_hybrid_promotes_cross_encoder_preferred_candidate() -> None:
+def test_reranked_hybrid_promotes_reranker_preferred_candidate() -> None:
+    """test-plan §25: Rerank reorders candidates."""
     result = search_reranked_hybrid(
         FakeQdrantStore(),
         query="supply chain supplier risks",
         ticker="AAPL",
         filing_type="10-K",
         top_k=2,
-        reranker=KeywordFakeReranker(),
-        config=RerankedHybridSearchConfig(
-            dense_top_k=2,
-            sparse_top_k=2,
-            final_top_k=2,
-            reranker_model_name="fake-reranker",
-        ),
+        reranker=OverlapReranker(),
+        config=RerankedHybridSearchConfig(dense_top_k=2, sparse_top_k=2, final_top_k=2),
     )
 
     assert result.chunks
@@ -138,25 +37,21 @@ def test_reranked_hybrid_promotes_cross_encoder_preferred_candidate() -> None:
     assert result.filter_used["mode"] == "reranked_hybrid"
     assert result.chunks[0].id == "risk-1"
     assert result.chunks[0].metadata["retrieval_method"] == "dense_bm25_cross_encoder_rerank"
-    assert result.chunks[0].metadata["reranker_score"] == 10.0
+    assert result.chunks[0].metadata["reranker_score"] == 1.0
     assert result.chunks[0].metadata["dense_rank"] == 2
     assert result.chunks[0].metadata["bm25_rank"] is not None
 
 
 def test_reranked_hybrid_reports_candidate_count() -> None:
+    """test-plan §25: Rerank reorders candidates (a supplied reranker scores every candidate)."""
     result = search_reranked_hybrid(
         FakeQdrantStore(),
         query="devices services business",
         ticker="AAPL",
         filing_type="10-K",
         top_k=1,
-        reranker=KeywordFakeReranker(),
-        config=RerankedHybridSearchConfig(
-            dense_top_k=2,
-            sparse_top_k=2,
-            final_top_k=1,
-            reranker_model_name="fake-reranker",
-        ),
+        reranker=OverlapReranker(),
+        config=RerankedHybridSearchConfig(dense_top_k=2, sparse_top_k=2, final_top_k=1),
     )
 
     assert result.filter_used is not None
