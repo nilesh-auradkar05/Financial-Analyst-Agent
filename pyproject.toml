@@ -40,6 +40,7 @@ dependencies = [
     "mypy>=2.1.0",
     "openai>=3.3.0",
     "aws-bedrock-token-generator>=1.1.0",
+    "opensearch-py>=3.1.0",
 ]
 
 [project.scripts]

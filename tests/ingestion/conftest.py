@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any
 
@@ -12,8 +11,7 @@ from app.components.retrieval.vector_store import (
     SearchFilters,
     SearchResult,
 )
-
-CRITICAL_SECTIONS = ["business", "risk_factors", "md&a", "market_risk"]
+from tests.filings import make_filing
 
 
 class InMemoryRetrievalStore:
@@ -123,39 +121,6 @@ class InMemoryRetrievalStore:
         ]
 
 
-def make_filing(
-    ticker: str,
-    *,
-    accession_number: str,
-    filing_date: str,
-    section_names: Iterable[str] | None = None,
-) -> SimpleNamespace:
-    names = list(
-        section_names
-        or [
-            "Item 1. Business",
-            "Item 1A. Risk Factors",
-            "Item 7. Management's Discussion and Analysis",
-            "Item 7A. Quantitative and Qualitative Disclosures About Market Risk",
-        ]
-    )
-    sections = {
-        name: SimpleNamespace(content=_section_text(ticker=ticker, section_name=name))
-        for name in names
-    }
-    return SimpleNamespace(
-        metadata=SimpleNamespace(
-            ticker=ticker.lower(),
-            filing_type="10-K",
-            filing_date=filing_date,
-            company_name=f"{ticker.upper()} Test Corp.",
-            accession_number=accession_number,
-            source_url=f"https://www.sec.gov/Archives/{accession_number}",
-        ),
-        sections=sections,
-    )
-
-
 @pytest.fixture
 def sample_filing() -> SimpleNamespace:
     return make_filing(
@@ -177,13 +142,6 @@ def representative_filings() -> list[SimpleNamespace]:
 @pytest.fixture
 def store() -> InMemoryRetrievalStore:
     return InMemoryRetrievalStore()
-
-
-def _section_text(*, ticker: str, section_name: str) -> str:
-    return (
-        f"{ticker.upper()} {section_name} disclosure describes operations, risks, "
-        "liquidity, market exposure, controls, customers, products, and suppliers. " * 80
-    )
 
 
 def _document_matches(document: IndexDocument, filters: SearchFilters | None) -> bool:

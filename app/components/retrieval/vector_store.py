@@ -203,7 +203,7 @@ class SearchResult:
             for rank, chunk in enumerate(self.chunks, start=1)
         ]
 
-VectorBackend = Literal["chroma", "qdrant"]
+VectorBackend = Literal["chroma", "qdrant", "opensearch"]
 
 class RetrievalStore(Protocol):
     @property
@@ -823,9 +823,9 @@ _default_backend: Optional[VectorBackend] = None
 
 def _get_vector_backend() -> VectorBackend:
     backend = os.getenv("VECTOR_BACKEND", "qdrant").strip().lower()
-    if backend not in {"chroma", "qdrant"}:
+    if backend not in {"chroma", "qdrant", "opensearch"}:
         raise ValueError(
-            f"Unsupported VECTOR_BACKEND: {backend!r}. Expected 'chroma' or 'qdrant'."
+            f"Unsupported VECTOR_BACKEND: {backend!r}. Expected 'chroma', 'qdrant' or 'opensearch'."
         )
     return cast(VectorBackend, backend)
 
@@ -858,6 +858,10 @@ def get_vector_store() -> RetrievalStore:
         from app.components.retrieval.qdrant_store import QdrantVectorStore
 
         _default_store = QdrantVectorStore()
+    elif backend == "opensearch":
+        from app.components.retrieval.opensearch_store import OpenSearchVectorStore
+
+        _default_store = OpenSearchVectorStore()
     else:
         _default_store = ChromaDBVectorStore()
 

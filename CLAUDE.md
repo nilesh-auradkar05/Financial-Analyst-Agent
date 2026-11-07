@@ -156,6 +156,11 @@ uv run pytest tests/ingestion tests/replay
 VECTOR_BACKEND=chroma uv run pytest tests/unit/test_vector_store_factory.py
 VECTOR_BACKEND=qdrant uv run pytest tests/unit/test_vector_store_factory.py
 
+# OpenSearch contract suite (CM-2): needs the local container, so the full
+# `uv run pytest` does too; CI runs the same image as a service
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml up -d --wait
+uv run pytest tests/rag
+
 # benchmark
 uv run python evaluation/validate_retrieval_fixture.py \
   evaluation/fixtures/retrieval_shared_benchmark_v1.json
