@@ -149,6 +149,7 @@ Against a local OpenSearch container; no network beyond it and no cloud credenti
 | Filtered count/search | only matching metadata returned |
 | Chunk identity preserved | the document id stored for a chunk is its `chunk_id`, so gold labels resolve unchanged |
 | Coverage under OpenSearch | S1 section-coverage + idempotency pass against the container (S3-T05 retargeted) |
+| Request signing (CM-3) | `OPENSEARCH_AUTH=sigv4`: every request carries an AWS SigV4 `Authorization` scoped to service `aoss` in `AWS_REGION` (default `us-east-1`) and an `X-Amz-Content-SHA256` header; unset or `none`: requests are unsigned; any other value, or `sigv4` with no resolvable AWS credentials: an error at construction, before any request. No credential appears in `get_stats()` or logs. Tested against a local HTTP stand-in that records headers, with dummy credentials |
 
 Superseded Qdrant cases (S3, kept for history): `VECTOR_BACKEND=qdrant` resolves to `QdrantVectorStore`; Qdrant unavailable is reported without a hang; payload indexes are created idempotently; coverage passes under Qdrant.
 
