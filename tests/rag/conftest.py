@@ -5,10 +5,12 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
 
+from tests.embedding_arms import use_embedding_settings
 from tests.rag.helpers import FakeEmbedder, build_corpus, raw_request
 
 DEFAULT_OPENSEARCH_TEST_URL = "http://127.0.0.1:19200"
@@ -33,6 +35,22 @@ def opensearch_url() -> str:
             pytrace=False,
         )
     return url
+
+
+@pytest.fixture(autouse=True)
+def settings_describe_the_fake_embedder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Configuration names the 16-d fake (ollama:fake-hash-embed:16), so the embedding identifier
+    and index dimension that settings dictate agree with the vectors the fake produces. Tests that
+    exercise another arm call `use_embedding_settings` themselves."""
+    use_embedding_settings(
+        monkeypatch,
+        tmp_path,
+        {
+            "EMBEDDING_PROVIDER": "ollama",
+            "EMBEDDING_MODEL": FakeEmbedder.model,
+            "EMBEDDING_DIMENSIONS": str(FakeEmbedder.dimension),
+        },
+    )
 
 
 @pytest.fixture

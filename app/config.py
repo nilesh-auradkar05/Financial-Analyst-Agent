@@ -5,7 +5,7 @@ This file contains the configuration for the Financial Analyst Agent.
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 """ PATHS CONFIGURATION """
@@ -172,6 +172,40 @@ class LLMSettings(BaseSettings):
             ("openai", self.openai_model, self.openai_api_key),
         ]
         return [(name, model, key) for name, model, key in candidates if key and key.get_secret_value().strip()]
+
+
+class EmbeddingSettings(BaseSettings):
+    """Embedding provider arm: ollama (default), bedrock or azure_openai.
+
+    ENVIRONMENT VARIABLES:
+           EMBEDDING_PROVIDER: ollama | bedrock | azure_openai
+           EMBEDDING_MODEL: model id, or the Azure deployment name (required for cloud arms)
+           EMBEDDING_DIMENSIONS: vector size (required for cloud arms)
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        hide_input_in_errors=True,
+    )
+
+    provider: Literal["ollama", "bedrock", "azure_openai"] = Field(
+        default="ollama", validation_alias="EMBEDDING_PROVIDER"
+    )
+    model: str = Field(default="", validation_alias="EMBEDDING_MODEL")
+    dimensions: int = Field(default=2560, gt=0, validation_alias="EMBEDDING_DIMENSIONS")
+
+    @model_validator(mode="after")
+    def _cloud_arm_is_complete(self) -> "EmbeddingSettings":
+        if self.provider != "ollama":
+            if not self.model.strip():
+                raise ValueError(f"EMBEDDING_MODEL is required for EMBEDDING_PROVIDER={self.provider}")
+            if "dimensions" not in self.model_fields_set:
+                raise ValueError(
+                    f"EMBEDDING_DIMENSIONS is required for EMBEDDING_PROVIDER={self.provider}"
+                )
+        return self
 
 
 class TavilySettings(BaseSettings):
@@ -348,11 +382,13 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     # Nested Settings objects
     llm: LLMSettings = Field(default_factory=LLMSettings)
     ollama: OllamaSettings = Field(default_factory=OllamaSettings)
+    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     tavily: TavilySettings = Field(default_factory=TavilySettings)
     langsmith: LangSmithSettings = Field(default_factory=LangSmithSettings)
     chroma: ChromaDBSettings = Field(default_factory=ChromaDBSettings)
@@ -380,6 +416,18 @@ class Settings(BaseSettings):
     )
     api_rate_limit: int = Field(default=10, ge=1, description="Mutating requests per window.")
     api_rate_window_seconds: int = Field(default=60, ge=1)
+
+    @model_validator(mode="after")
+    def _embedding_arm_matches_credentials(self) -> "Settings":
+        if not self.embedding.model.strip():
+            self.embedding.model = self.ollama.embed_model
+        if self.embedding.provider == "azure_openai":
+            key = self.llm.azure_api_key
+            if not self.llm.azure_openai_endpoint:
+                raise ValueError("AZURE_OPENAI_ENDPOINT is required for EMBEDDING_PROVIDER=azure_openai")
+            if not (key and key.get_secret_value().strip()):
+                raise ValueError("AZURE_API_KEY is required for EMBEDDING_PROVIDER=azure_openai")
+        return self
 
 
 settings = Settings()

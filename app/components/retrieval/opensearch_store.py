@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Iterator
 from typing import Any, Optional
 
 from langchain_core.embeddings import Embeddings
@@ -17,7 +18,12 @@ from langsmith import get_current_run_tree
 from loguru import logger
 from opensearchpy import NotFoundError, OpenSearch, OpenSearchException, RequestError, helpers
 
-from app.components.retrieval.embeddings import get_embeddings
+from app.components.retrieval.embeddings import (
+    EmbeddingDimensionMismatchError,
+    embedding_identifier,
+    embedding_index_name,
+    get_embeddings,
+)
 from app.components.retrieval.vector_store import (
     IndexDocument,
     RetrievalStore,
@@ -46,6 +52,7 @@ FILTER_FIELDS = frozenset(
     }
 )
 DELETE_PAGE_SIZE = 500
+ITER_PAGE_SIZE = 500
 
 
 class OpenSearchVectorStore(RetrievalStore):
@@ -62,14 +69,14 @@ class OpenSearchVectorStore(RetrievalStore):
         timeout_s: Optional[float] = None,
         embeddings: Optional[Embeddings] = None,
     ):
-        default_index_name: str = settings.chroma.collection_name or "sec_filings"
+        default_index_name = embedding_index_name(settings.chroma.collection_name or "sec_filings")
         self.index_name: str = (
             index_name or os.getenv("OPENSEARCH_INDEX_NAME") or default_index_name
         )
         self.url: str = url or os.getenv("OPENSEARCH_URL") or DEFAULT_OPENSEARCH_URL
         timeout = timeout_s or float(os.getenv("OPENSEARCH_TIMEOUT_S", DEFAULT_TIMEOUT_S))
         self._embeddings = embeddings or get_embeddings()
-        self._embedding_model: str = str(getattr(self._embeddings, "model"))
+        self._dimension_verified = False
         self._client = OpenSearch(
             hosts=[self.url],
             timeout=timeout,
@@ -107,8 +114,8 @@ class OpenSearchVectorStore(RetrievalStore):
             if missing:
                 raise ValueError(f"Document {doc.id!r} is missing required metadata: {missing}")
 
+        self._ensure_index()
         vectors = self._embeddings.embed_documents([doc.text for doc in normalized_documents])
-        self._ensure_index(dimension=len(vectors[0]))
 
         actions = [
             {
@@ -118,7 +125,7 @@ class OpenSearchVectorStore(RetrievalStore):
                 "_source": {
                     **doc.metadata,
                     "text": doc.text,
-                    "embedding_id": f"ollama:{self._embedding_model}:{len(vector)}",
+                    "embedding_id": embedding_identifier(),
                     VECTOR_FIELD: vector,
                 },
             }
@@ -142,8 +149,10 @@ class OpenSearchVectorStore(RetrievalStore):
         try:
             if run := get_current_run_tree():
                 run.metadata.update(
-                    embedding_model=self._embedding_model, embedding_provider="ollama"
+                    embedding_model=settings.embedding.model,
+                    embedding_provider=settings.embedding.provider,
                 )
+            self._require_configured_dimension()
             knn: dict[str, Any] = {
                 "vector": self._embeddings.embed_query(query),
                 "k": n_results,
@@ -251,6 +260,32 @@ class OpenSearchVectorStore(RetrievalStore):
         )
         return result
 
+    def iter_documents(self) -> Iterator[IndexDocument]:
+        """Yield every chunk (id, text, metadata) without its vector, page by page."""
+        search_after: Optional[list[Any]] = None
+        while True:
+            body: dict[str, Any] = {
+                "size": ITER_PAGE_SIZE,
+                "_source": {"excludes": [VECTOR_FIELD]},
+                "query": {"match_all": {}},
+                "sort": [{"_id": "asc"}],
+            }
+            if search_after:
+                body["search_after"] = search_after
+            try:
+                hits = self._client.search(index=self.index_name, body=body)["hits"]["hits"]
+            except NotFoundError:
+                return
+            except OpenSearchException as exc:
+                raise RuntimeError(f"OpenSearch scan failed: {type(exc).__name__}: {exc}") from exc
+            for hit in hits:
+                source = dict(hit["_source"])
+                text = str(source.pop("text", ""))
+                yield IndexDocument(id=hit["_id"], text=text, metadata=source)
+            if len(hits) < ITER_PAGE_SIZE:
+                return
+            search_after = hits[-1]["sort"]
+
     def delete_by_ticker(self, ticker: str) -> int:
         """Delete all documents for a ticker."""
         filter_query = self._to_filter_query(SearchFilters(ticker=ticker.upper().strip()))
@@ -349,9 +384,26 @@ class OpenSearchVectorStore(RetrievalStore):
 
         return primary_result, total_search_time_ms
 
-    def _ensure_index(self, dimension: int) -> None:
-        if self._client.indices.exists(index=self.index_name):
+    def _require_configured_dimension(self) -> None:
+        """Refuse an existing index whose vectors differ in size from the configured embedding."""
+        if self._dimension_verified:
             return
+        mapping = self._client.indices.get_mapping(index=self.index_name)
+        properties = mapping[self.index_name]["mappings"]["properties"]
+        found = int(properties[VECTOR_FIELD]["dimension"])
+        configured = settings.embedding.dimensions
+        if found != configured:
+            raise EmbeddingDimensionMismatchError(
+                f"Index {self.index_name!r} holds {found}-dimensional vectors but "
+                f"EMBEDDING_DIMENSIONS is {configured}"
+            )
+        self._dimension_verified = True
+
+    def _ensure_index(self) -> None:
+        if self._client.indices.exists(index=self.index_name):
+            self._require_configured_dimension()
+            return
+        dimension = settings.embedding.dimensions
         try:
             self._client.indices.create(
                 index=self.index_name,
@@ -386,6 +438,7 @@ class OpenSearchVectorStore(RetrievalStore):
             if exc.error != "resource_already_exists_exception":
                 raise
             return
+        self._dimension_verified = True
         logger.info(f"Created OpenSearch index '{self.index_name}' with dimension={dimension}")
 
     def _bulk(self, actions: list[dict[str, Any]]) -> None:

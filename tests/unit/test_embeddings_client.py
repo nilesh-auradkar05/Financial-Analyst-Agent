@@ -23,10 +23,6 @@ class TestGetEmbeddings:
         assert hasattr(emb, "embed_documents")
         assert hasattr(emb, "embed_query")
 
-    def test_custom_model(self):
-        emb = get_embeddings(model="nomic-embed-text")
-        assert emb.model == "nomic-embed-text"
-
 
 # Medium: sync wrappers
 
