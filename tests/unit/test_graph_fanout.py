@@ -1,7 +1,8 @@
 """Trace: docs/test-plan.md §10, concurrency and event-loop hygiene (S2-T00c).
 
 Tool-level fakes compute their outputs from their inputs and run through the real
-nodes and the real compiled graph. No network, no FinBERT, no real LLM.
+nodes and the real compiled graph. No network, no real LLM. The one test that reaches the real
+sentiment service talks to the loopback Foundry fake (tests/unit/fake_foundry.py).
 """
 
 import asyncio
@@ -16,7 +17,6 @@ from app import main as api
 from app.agents import graph
 from app.agents.graph import run_agent
 from app.agents.state import create_initial_state
-from app.services import sentiment
 
 BRANCH_SECONDS = 1.0
 EVIDENCE_STEPS = {"research_news", "fetch_stock", "retrieve_filings"}
@@ -146,10 +146,8 @@ async def test_errors_from_two_branches_both_survive(monkeypatch):
     assert branch_errors(final) == ["fetch_stock", "research_news"]
 
 
-async def test_health_answers_while_sentiment_scores_50_snippets(monkeypatch):
-    def slow_batch(texts):
-        time.sleep(0.6)  # CPU-bound scoring holds its thread
-        return [SimpleNamespace(label=_label(text)) for text in texts]
+async def test_health_answers_while_sentiment_scores_50_snippets(monkeypatch, foundry):
+    foundry.delay = 0.5  # provider latency: every request holds its thread for half a second
 
     async def healthy(**_kwargs):
         return True
@@ -157,7 +155,6 @@ async def test_health_answers_while_sentiment_scores_50_snippets(monkeypatch):
     async def langsmith_status():
         return {"connected": False}
 
-    monkeypatch.setattr(graph, "analyze_sentiment_batch", slow_batch)
     monkeypatch.setattr(api, "check_ollama_health", healthy)
     monkeypatch.setattr(api, "get_vector_store", lambda: SimpleNamespace(count=0))
     monkeypatch.setattr(api, "check_langsmith_connection", langsmith_status)
@@ -174,6 +171,7 @@ async def test_health_answers_while_sentiment_scores_50_snippets(monkeypatch):
         update = await scoring
 
     assert update["sentiment_result"]["positive_count"] == 50
+    assert len(foundry.requests) >= 3  # 50 snippets do not fit one request
     assert elapsed < 0.2, f"/health took {elapsed:.2f}s while sentiment was scoring"
 
 
@@ -219,45 +217,3 @@ async def test_filing_queries_do_not_depend_on_the_stock_branch(
 
     assert final["filing_chunks"]
     assert all(f" {expected} " in chunk["text"] for chunk in final["filing_chunks"])
-
-
-MODEL_LOAD_SECONDS = 0.4
-
-
-class SlowLoadingAnalyzer:
-    """Stands in for FinBERT: loading is slow, scoring is computed from the text."""
-
-    model_name = "fake-finbert"
-
-    def _load_model(self):
-        time.sleep(MODEL_LOAD_SECONDS)
-
-    def analyze_batch(self, texts):
-        return [SimpleNamespace(text=text, label=_label(text)) for text in texts]
-
-
-@pytest.mark.parametrize("preload", [True, False])
-async def test_preload_takes_the_model_load_off_the_first_request(monkeypatch, preload):
-    async def healthy(**_kwargs):
-        return True
-
-    monkeypatch.setattr(sentiment, "_default_analyzer", None)
-    monkeypatch.setattr(sentiment, "SentimentAnalyzer", SlowLoadingAnalyzer)
-    monkeypatch.setattr(api.settings.finbert, "preload", preload, raising=False)
-    monkeypatch.setattr(api, "check_ollama_health", healthy)
-    monkeypatch.setattr(api, "get_vector_store", lambda: SimpleNamespace(count=0))
-
-    started = time.perf_counter()
-    async with api.lifespan(api.app):
-        startup = time.perf_counter() - started
-        await asyncio.sleep(MODEL_LOAD_SECONDS + 0.2)
-        started = time.perf_counter()
-        results = await asyncio.to_thread(sentiment.analyze_sentiment_batch, ["revenue growth"])
-        first_request = time.perf_counter() - started
-
-    assert results[0].label == "positive"
-    assert startup < MODEL_LOAD_SECONDS / 2, f"startup waited {startup:.2f}s for the model"
-    if preload:
-        assert first_request < MODEL_LOAD_SECONDS / 2, f"first request still paid {first_request:.2f}s"
-    else:
-        assert first_request >= MODEL_LOAD_SECONDS

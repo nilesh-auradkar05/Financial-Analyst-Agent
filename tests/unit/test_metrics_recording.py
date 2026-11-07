@@ -20,7 +20,6 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(api.settings, "api_key", "private-auth-value")
     monkeypatch.setattr(api.settings.langsmith, "tracing_v2", False)
     monkeypatch.setattr(api.settings.langsmith, "api_key", None)
-    monkeypatch.setattr(api.settings.finbert, "preload", False)
     with TestClient(api.app) as test_client:
         yield test_client
 

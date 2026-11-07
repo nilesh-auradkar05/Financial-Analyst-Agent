@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import sentiment
-from app.services.sentiment import SentimentResult
 from app.services.tools import edgartools_sec_extractor as sec_tool
 from app.services.tools import stock_data_tool, web_search_tool
+from tests.unit.fake_foundry import MODEL_IDENTITY
 
 
 def _snapshot_records(root: Path) -> list[dict]:
@@ -163,21 +163,7 @@ def test_sec_extractor_honors_edgar_identity_env(monkeypatch) -> None:
     assert configured == ["agent@example.com"]
 
 
-def test_sentiment_records_score_snapshots_only_when_enabled(monkeypatch, tmp_path) -> None:
-    class FakeAnalyzer:
-        def analyze_batch(self, texts: list[str]) -> list[SentimentResult]:
-            return [
-                SentimentResult(
-                    text=text,
-                    label="positive",
-                    confidence=0.91,
-                    scores={"positive": 0.91, "negative": 0.04, "neutral": 0.05},
-                )
-                for text in texts
-            ]
-
-    monkeypatch.setattr(sentiment, "_get_default_analyzer", lambda: FakeAnalyzer())
-
+def test_sentiment_records_score_snapshots_only_when_enabled(foundry, tmp_path) -> None:
     results = sentiment.analyze_sentiment_batch(
         ["Apple services revenue rose."],
         evidence_output_dir=tmp_path,
@@ -198,3 +184,4 @@ def test_sentiment_records_score_snapshots_only_when_enabled(monkeypatch, tmp_pa
     assert records[0]["snapshot"]["source_type"] == "sentiment_score"
     assert records[0]["snapshot"]["ticker"] == "AAPL"
     assert records[0]["payload"]["label"] == "positive"
+    assert records[0]["payload"]["model_name"] == MODEL_IDENTITY

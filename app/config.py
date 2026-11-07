@@ -105,6 +105,11 @@ class LLMSettings(BaseSettings):
     azure_foundry_judge_model: Optional[str] = Field(
         default=None, validation_alias="AZURE_FOUNDRY_JUDGE_MODEL", description="Foundry judge deployment name."
     )
+    azure_foundry_sentiment_model: Optional[str] = Field(
+        default=None,
+        validation_alias="AZURE_FOUNDRY_SENTIMENT_MODEL",
+        description="Foundry sentiment deployment name.",
+    )
     openai_api_key: Optional[SecretStr] = Field(default=None, validation_alias="OPENAI_API_KEY")
     temperature: float = Field(
         default=1.0,
@@ -266,39 +271,6 @@ class ChromaDBSettings(BaseSettings):
     )
 
 
-class FinBERTSettings(BaseSettings):
-    """
-    Configuration for FinBERT sentiment analysis model
-
-    Environment Variables:
-           FINBERT_MODEL_NAME: HuggingFace model identifier
-           DEVICE: Device to use for inference (cpu or cuda)
-           FINBERT_PRELOAD: load the model at API startup (default false)
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="FINBERT_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # HuggingFace model name
-    model_name: str = Field(
-        default="ProsusAI/finbert", description="FinBERT model name"
-    )
-
-    # Device to use for inference (cpu or cuda)
-    device: Optional[str] = Field(
-        default=None, description="Device to use for inference"
-    )
-
-    preload: bool = Field(
-        default=False,
-        description="Load the model in the background at API startup instead of on the first request",
-    )
-
-
 class SECSettings(BaseSettings):
     """
     Configuration for SEC EDGAR API access.
@@ -379,7 +351,6 @@ class Settings(BaseSettings):
     tavily: TavilySettings = Field(default_factory=TavilySettings)
     langsmith: LangSmithSettings = Field(default_factory=LangSmithSettings)
     chroma: ChromaDBSettings = Field(default_factory=ChromaDBSettings)
-    finbert: FinBERTSettings = Field(default_factory=FinBERTSettings)
     sec: SECSettings = Field(default_factory=SECSettings)
     retry: RetrySettings = Field(default_factory=RetrySettings)
 

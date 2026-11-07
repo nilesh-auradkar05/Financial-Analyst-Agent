@@ -527,6 +527,8 @@ Order (one `task/<id>` branch each; test-author → implementer loop for code):
 8. CM-6 — model-plane close-out (Azure draft live check, Bedrock Luna quota, G13). CM-6b — hosted sentiment with its own ADR.
 9. CM-7 — remove Qdrant and Chroma; CLAUDE.md/AGENTS.md §8 and `check_doc_sync.py` updated together.
 
+Reordered 2026-11-07 (owner: the project is cloud-only; no local CUDA, torch or Ollama): after CM-2, run CM-6b (sentiment on Foundry Claude Sonnet 5.5) → CM-6d (rerank on Foundry Cohere Rerank v5 fast; torch and every CUDA package removed) → CM-5a (cloud embedding provider switch, build only) → CM-3 → CM-4 → CM-5b → CM-6e (Ollama removed). Ollama stays on the host until CM-4 and CM-5b have run, because both search the copied Qwen3 index and embed each benchmark query with `qwen3-embedding:4b`. CM-6b keeps its one FinBERT label-parity run before FinBERT is deleted.
+
 After CM-7: S5 (hybrid/rerank on OpenSearch), S6 (a)…(e), S7 (a)…(f), S9, then the S10 runtime tasks. Superseded 2026-11-01: CM-5 and CM-6 are split into one-feature sprints and the order after CM-7 is the FORWARD PLAN below.
 
 Result: Pending.
@@ -649,11 +651,32 @@ Done: G13 closed. Result: Pending.
 
 ```text
 CM-6b — Hosted sentiment
-Feature: sentiment scores come from a hosted model with recorded label parity, off the event loop.
+Feature: sentiment scores come from a hosted model with recorded label parity, off the event loop. Owner choice 2026-11-07: Claude Sonnet 5.5 on Microsoft Foundry, deployment `sonnet-5-5-sentiment` (FinBERT is not offered on AWS or Azure); FinBERT, transformers and FINBERT_* settings are removed after the parity run.
 Trace: ADR-0016 (own ADR required first); test-plan §10 sentiment rows
 Tests:  U adapter with a faithful fake · Q label parity against FinBERT on the frozen news set · P event loop not blocked
 Regression: R1 R2 R3
-Done: ADR accepted; parity recorded. Result: Pending.
+Done: ADR accepted; parity recorded. Result: Implemented 2026-11-07 (red 8d2a235; tests unchanged since). Sentiment runs on Foundry `sonnet-5-5-sentiment`; FinBERT code, FINBERT_* settings and the startup preload removed (torch/transformers leave in CM-6d). R1: 731 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Parity recorded in ADR-0019: 16/30 = 53.3% agreement with the frozen FinBERT labels; ADR stays Proposed until the owner accepts that rate.
+```
+
+```text
+CM-6d — Hosted rerank; torch and CUDA removed
+Feature: reranked hybrid retrieval scores pairs with Cohere Rerank v5 fast on Microsoft Foundry (deployment `cohere-rerank-v5-fast`) instead of a local CrossEncoder; no torch or CUDA package remains.
+Trace: ADR-0011 D12 (amendment required first: was Bedrock Cohere Rerank 3.5); test-plan §6 reranked-hybrid rows; owner decision 2026-11-07
+Scope: rerank adapter behind the retrieval boundary with timeout and bounded retries; rerank stays off by default until Gate C shows lift; remove sentence-transformers, torch, transformers, docker-compose.gpu.yml, the model-cache volume and CUDA notes in Dockerfile/Compose.
+Tests:  U adapter with a faithful fake transport · I reranked-hybrid eval mode end to end on the fake · R1 dependency check (no torch/nvidia in uv.lock)
+Regression: R1 R2 R3
+Done: uv.lock has no torch or nvidia-*/triton package; image builds without them. Result: Pending.
+```
+
+```text
+CM-6e — Ollama removed
+Feature: no code, config, Compose entry or health check depends on Ollama.
+Trace: ADR-0016 decision 7; SPEC §5 provider policy; owner decision 2026-11-07
+Blocked until: CM-4 and CM-5b have run (both embed benchmark queries with qwen3 on the copied index).
+Scope: remove langchain-ollama, OllamaSettings, the Ollama startup and `/health` checks (with CM-6a), OLLAMA_* Compose variables; default embedding = the Gate C winner.
+Tests:  U health and config without Ollama · I ingestion and search on the winning cloud arm (fake transport)
+Regression: R1 R2 R3 R4
+Done: no `ollama` reference in app/, dataops/, evaluation/, Compose or pyproject. Result: Pending.
 ```
 
 ```text
