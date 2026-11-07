@@ -8,15 +8,24 @@ document `_id`, so higher layers see the same IDs they wrote. Only index create/
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from collections.abc import Iterator
 from typing import Any, Optional
 
+import botocore.session
 from langchain_core.embeddings import Embeddings
 from langsmith import get_current_run_tree
 from loguru import logger
-from opensearchpy import NotFoundError, OpenSearch, OpenSearchException, RequestError, helpers
+from opensearchpy import (
+    NotFoundError,
+    OpenSearch,
+    OpenSearchException,
+    RequestError,
+    Urllib3AWSV4SignerAuth,
+    helpers,
+)
 
 from app.components.retrieval.embeddings import (
     EmbeddingDimensionMismatchError,
@@ -53,6 +62,25 @@ FILTER_FIELDS = frozenset(
 )
 DELETE_PAGE_SIZE = 500
 ITER_PAGE_SIZE = 500
+DEFAULT_AWS_REGION = "us-east-1"
+SIGV4_SERVICE = "aoss"
+
+
+def _request_signer() -> Urllib3AWSV4SignerAuth | None:
+    """Return the SigV4 signer selected by OPENSEARCH_AUTH, or None for unsigned requests."""
+    mode = os.getenv("OPENSEARCH_AUTH") or "none"
+    if mode == "none":
+        return None
+    if mode != "sigv4":
+        raise ValueError(f"OPENSEARCH_AUTH must be 'none' or 'sigv4', got {mode!r}")
+    credentials = botocore.session.get_session().get_credentials()
+    if credentials is None:
+        raise ValueError("OPENSEARCH_AUTH=sigv4 but no AWS credentials could be resolved")
+    # botocore.auth logs the canonical request at DEBUG, which carries the session token.
+    logging.getLogger("botocore.auth").setLevel(logging.WARNING)
+    return Urllib3AWSV4SignerAuth(
+        credentials, os.getenv("AWS_REGION") or DEFAULT_AWS_REGION, SIGV4_SERVICE
+    )
 
 
 class OpenSearchVectorStore(RetrievalStore):
@@ -79,6 +107,7 @@ class OpenSearchVectorStore(RetrievalStore):
         self._dimension_verified = False
         self._client = OpenSearch(
             hosts=[self.url],
+            http_auth=_request_signer(),
             timeout=timeout,
             max_retries=0,
             retry_on_timeout=False,
