@@ -18,11 +18,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.components.retrieval.embeddings import embedding_identifier
 from app.components.retrieval.ingestion import CHUNK_OVERLAP, CHUNK_SIZE
 from app.components.retrieval.qdrant_store import QdrantVectorStore
 from app.components.retrieval.section_aware_search import search_section_aware
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters
-from app.config import settings
 from dataops.git_state import current_code_version
 from evaluation.validate_retrieval_fixture import (
     AnchoredCase,
@@ -310,7 +310,7 @@ def _run_anchored_cli(args: argparse.Namespace, parser: argparse.ArgumentParser)
             "fixture_path": str(args.fixture),
             "collection": args.collection,
             "git_sha": current_code_version(),
-            "embedding_model": settings.ollama.embed_model,
+            "embedding_model": embedding_identifier(),
             "evidence_release": args.evidence_release,
             "chunker": {"chunk_size": CHUNK_SIZE, "chunk_overlap": CHUNK_OVERLAP},
             "generated_at": datetime.now(timezone.utc).isoformat(),
