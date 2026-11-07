@@ -38,7 +38,6 @@ def test_vector_store_factory_selects_qdrant(monkeypatch: pytest.MonkeyPatch):
 def test_vector_store_factory_selects_opensearch(monkeypatch: pytest.MonkeyPatch):
     """test-plan §5: VECTOR_BACKEND=opensearch resolves to OpenSearchVectorStore."""
     import app.components.retrieval.opensearch_store as opensearch_module
-
     import app.components.retrieval.vector_store as module
 
     class FakeOpenSearch:
