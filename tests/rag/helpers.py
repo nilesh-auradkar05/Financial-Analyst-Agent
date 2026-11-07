@@ -50,8 +50,23 @@ class FakeEmbedder(Embeddings):
         return vector
 
 
-def raw_request(base_url: str, method: str, path: str) -> tuple[int, dict[str, Any]]:
-    request = urllib.request.Request(f"{base_url.rstrip('/')}{path}", method=method)
+class SizedFakeEmbedder(FakeEmbedder):
+    """The same hashed bag-of-words fake at any dimension and under any model name."""
+
+    def __init__(self, dimension: int, model: str = "fake-hash-embed") -> None:
+        self.dimension = dimension
+        self.model = model
+
+
+def raw_request(
+    base_url: str, method: str, path: str, body: bytes | None = None
+) -> tuple[int, dict[str, Any]]:
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}{path}",
+        method=method,
+        data=body,
+        headers={"Content-Type": "application/json"} if body is not None else {},
+    )
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             return response.status, json.loads(response.read() or b"{}")
@@ -80,6 +95,54 @@ def field_types(properties: dict[str, Any]) -> dict[str, set[str]]:
     return found
 
 
+def raw_create_index(base_url: str, index: str, dimension: int) -> None:
+    """Create an index the way a previous run would have, without going through the store."""
+    body = {
+        "settings": {"index": {"knn": True}},
+        "mappings": {
+            "properties": {
+                "embedding": {
+                    "type": "knn_vector",
+                    "dimension": dimension,
+                    "method": {"name": "hnsw", "engine": "lucene", "space_type": "cosinesimil"},
+                }
+            }
+        },
+    }
+    status, reply = raw_request(base_url, "PUT", f"/{index}", json.dumps(body).encode())
+    assert status == 200, reply
+
+
+def raw_index_documents(
+    base_url: str, index: str, documents: list[IndexDocument], dimension: int
+) -> None:
+    """Write documents with constant `dimension`-long vectors straight to the index."""
+    lines: list[str] = []
+    for document in documents:
+        lines.append(json.dumps({"index": {"_index": index, "_id": document.id}}))
+        lines.append(
+            json.dumps({**document.metadata, "text": document.text, "embedding": [0.1] * dimension})
+        )
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}/_bulk?refresh=true",
+        method="POST",
+        data=("\n".join(lines) + "\n").encode(),
+        headers={"Content-Type": "application/x-ndjson"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        assert json.loads(response.read())["errors"] is False
+
+
+def raw_count(base_url: str, index: str) -> int:
+    _, body = raw_request(base_url, "GET", f"/{index}/_count")
+    return int(body["count"])
+
+
+def raw_vector(base_url: str, index: str, document_id: str) -> list[float]:
+    _, body = raw_document(base_url, index, document_id)
+    return [float(value) for value in body["_source"]["embedding"]]
+
+
 def knn_dimensions(properties: dict[str, Any]) -> list[int]:
     dimensions: list[int] = []
     for spec in properties.values():
@@ -93,13 +156,19 @@ def all_chunk_ids(store: RetrievalStore) -> list[str]:
     return [chunk.id for chunk in store.search("all chunks", n_results=1000).chunks]
 
 
-def find_backend_objects(value: Any, path: str = "value", *, _seen: set[int] | None = None) -> list[str]:
-    """Locations holding an ``opensearchpy`` object, found by module name (public surface only)."""
+def find_backend_objects(
+    value: Any,
+    path: str = "value",
+    *,
+    modules: tuple[str, ...] = ("opensearchpy",),
+    _seen: set[int] | None = None,
+) -> list[str]:
+    """Locations holding an object from one of `modules`, found by module name (public surface only)."""
     seen = _seen if _seen is not None else set()
     if id(value) in seen or isinstance(value, str | bytes | int | float | bool | type(None)):
         return []
     seen.add(id(value))
-    if type(value).__module__.startswith("opensearchpy"):
+    if type(value).__module__.startswith(modules):
         return [f"{path}: {type(value).__module__}.{type(value).__qualname__}"]
 
     children: dict[str, Any]
@@ -121,7 +190,7 @@ def find_backend_objects(value: Any, path: str = "value", *, _seen: set[int] | N
 
     found: list[str] = []
     for child_path, child in children.items():
-        found.extend(find_backend_objects(child, child_path, _seen=seen))
+        found.extend(find_backend_objects(child, child_path, modules=modules, _seen=seen))
     return found
 
 
