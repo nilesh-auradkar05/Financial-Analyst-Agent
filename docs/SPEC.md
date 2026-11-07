@@ -8,6 +8,7 @@
 > **Amended 2026-10-31 (ADR recorded 2026-11-01; SPEC text recorded 2026-11-02):** ADR-0017 accepted — three agents (Researcher, Analyst, Reviewer) inside one run, three-tier execution memory (T1 working, T2 execution, T3 long-term), fenced checkpoints, an effect journal, handoff envelopes and crash resume at the failed agent (§§2, 3, 5, 8.6–8.8, 12 G14–G15, 16). No per-ticker episodic memory (owner decision).
 > **v1.5 change (2026-11-01, owner-requested architecture revision; ADR-0018 proposed, renumbered from a colliding "ADR-0016" on 2026-11-02):** a bounded five-specialist decomposition under a deterministic supervisor, memory tiers with the "memory is context, never evidence" invariant, an MCP tool plane behind a gateway, asynchronous execution inside the worker, nine fingerprinted cache stages and agent-specific NFR contracts. Updated §§0, 2, 3, 5, 8.1, 11.1 (Gate F), 11.3, 12 (S11) and 16. Design companion: `docs/agent-architecture.md`. ADR-0018 is a proposed extension of the accepted ADR-0017; where they overlap ADR-0017 governs (three agents are the baseline, T1–T3 is the memory model, episodic memory is excluded unless the owner reverses ADR-0017 §1). Until ADR-0018 is accepted the §3.z scope lines are inactive.
 > **Amended 2026-10-10:** S4 backend comparison retired; Gate B closes at S3 exit (§11.1, §12).
+> **Amended 2026-11-07:** ADR-0019 (proposed) — news sentiment is a structured-output call to Claude Sonnet 5.5 on Microsoft Foundry; FinBERT and every local model leave the runtime (§§5, 7, 8.2); the model plane is cloud-only (owner decision).
 > **Amended 2026-10-23:** ADR-0016 — Qdrant and Chroma retired; OpenSearch (local container for development and tests, Serverless in the cloud) is the only store; the data and model plane moves to managed services ahead of S7 (§§1, 3, 5, 6, 11.1, 12, 16).
 > **Amended 2026-10-17:** ADR-0009 amendment — Azure-first draft ladder (Foundry DeepSeek-V4-Flash → Bedrock `deepseek.v3.2`) and GPT-5.6 Luna judge (Bedrock → Foundry); Foundry is no longer fallback-only (§§3, 4).
 > **v1.4 change (2026-10-08):** ADR-0006 accepted with ADR-0010 to ADR-0013 and amendments to ADR-0003, ADR-0007 and ADR-0009. Updated §§0, 2, 3, 4, 5, 11.1, 11.3, 12 and 16. Cloud work stays gated by the ADR-0006 entry criteria. Revised 2026-10-11: ADR-0014 moves the deployed index to Amazon OpenSearch Serverless with a daily awake cap (§§3, 5, 6, 16). Revised again 2026-10-11: ADR-0015 makes the deployed demo tier scale-to-zero (Lambda, DynamoDB, SQS, a Cloudflare Worker, guest access for recruiters) and keeps the always-on design as the documented production scale tier (§§0, 3, 5, 12, 16).
@@ -188,7 +189,7 @@ Out of scope unless this section is explicitly changed and backed by an ADR:
 
 ## 4. Architecture Overview
 
-Runtime provider policy (authorized 2026-09-29, ADR-0009; configuration amended 2026-09-30; ladder amended 2026-10-17): one variable per provider tier. Draft ladder, local and deployed: Microsoft Foundry DeepSeek-V4-Flash (AZURE_OPENAI_ENDPOINT, AZURE_API_KEY, AZURE_FOUNDRY_MODEL = deployment name; used only when all three are set) → Bedrock (AWS_BEDROCK_MODEL, default `deepseek.v3.2`) → personal Anthropic (CLAUDE_LLM_MODEL with ANTHROPIC_API_KEY) → personal OpenAI (OPENAI_LLM_MODEL with OPENAI_API_KEY). Each attempt is bounded; a failure, timeout or rate-limit response moves to the next configured tier; an unconfigured tier is skipped. There is no generic provider selector and no Ollama chat path; Ollama serves embeddings only. Native traces identify actual attempted models. Judge ladder (evaluation only): GPT-5.6 Luna on Bedrock (`bedrock-mantle`) → GPT-5.6-luna on Foundry (AZURE_FOUNDRY_JUDGE_MODEL); the runtime gate stays the heuristic grounding verifier. Personal Anthropic and OpenAI keys are development-only.
+Runtime provider policy (authorized 2026-09-29, ADR-0009; configuration amended 2026-09-30; ladder amended 2026-10-17): one variable per provider tier. Draft ladder, local and deployed: Microsoft Foundry DeepSeek-V4-Flash (AZURE_OPENAI_ENDPOINT, AZURE_API_KEY, AZURE_FOUNDRY_MODEL = deployment name; used only when all three are set) → Bedrock (AWS_BEDROCK_MODEL, default `deepseek.v3.2`) → personal Anthropic (CLAUDE_LLM_MODEL with ANTHROPIC_API_KEY) → personal OpenAI (OPENAI_LLM_MODEL with OPENAI_API_KEY). Each attempt is bounded; a failure, timeout or rate-limit response moves to the next configured tier; an unconfigured tier is skipped. There is no generic provider selector and no Ollama chat path; Ollama serves embeddings only, until CM-6e removes it. Sentiment is a separate single-tier call (Foundry Claude Sonnet 5.5, `AZURE_FOUNDRY_SENTIMENT_MODEL`; ADR-0019) with no fallback: a failure is a sentiment gap, never a substitute model. Native traces identify actual attempted models. Judge ladder (evaluation only): GPT-5.6 Luna on Bedrock (`bedrock-mantle`) → GPT-5.6-luna on Foundry (AZURE_FOUNDRY_JUDGE_MODEL); the runtime gate stays the heuristic grounding verifier. Personal Anthropic and OpenAI keys are development-only.
 
 Ingest on miss (authorized 2026-10-10): when analysis finds zero indexed chunks for a ticker, it ingests that ticker's latest 10-K once, off the event loop and under a time bound, then retrieves again. A ticker that already has indexed chunks is never re-ingested by analysis. An ingestion failure is reported as filing_ingestion_failed, distinct from an absent 10-K.
 
@@ -220,7 +221,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
 - `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Runtime replay and the snapshot hash live here (S2-T00b); release contracts, registry and gates stay in repo-root `dataops/`.
 - `app/cache/` — EvidenceCache (per-source TTL), QueryEmbeddingCache (exact, keyed by embedding fingerprint), RetrievalCache (keyed by index release and retrieval config), MemoCache (`snapshot_hash` + `prompt_version` + model and verifier/policy fingerprints). Key formats: ADR-0013.
-- `app/services/` — tools, run store (`RunStore` protocol; DynamoDB adapter per ADR-0015), sentiment (FinBERT wrapped in `to_thread` or out-of-process; ONNX in the deployed worker).
+- `app/services/` — tools, run store (`RunStore` protocol; DynamoDB adapter per ADR-0015), sentiment (Claude Sonnet 5.5 on Microsoft Foundry, deployment set by `AZURE_FOUNDRY_SENTIMENT_MODEL`, structured output, bounded timeout and retries; ADR-0019).
 - `evaluation/` — offline harness + registry; imports from `app/` only, never the reverse.
 - `dataops/` — local-first release contracts, registry, and quality gates. Must not import vector-store SDKs (OpenSearch, Qdrant, Chroma), provider SDKs, or cloud SDKs.
 - `tests/` — behavior-first tests.
@@ -318,9 +319,9 @@ START → guard_inputs → memory_read_issuer
 
 Rules: the supervisor is code; its only data-dependent branch is the verifier's bounded loop. `market`, `news` and `filings` make no model call; `analyst` and `verifier` call no tool. Memory items carry no citation index and the verifier rejects a claim supported only by memory. Memory is written only after the fenced terminal commit. Replay runs `memo_cache_lookup → analyst → verifier → guard_output` from the release manifest and reads no live tool or memory.
 
-8.2 No node may block the event loop: CPU-bound work (FinBERT, tokenization)
-runs via `asyncio.to_thread` or a separate process; store calls are awaited or
-threaded.
+8.2 No node may block the event loop: CPU-bound work (tokenization) and
+blocking provider calls (sentiment, ADR-0019) run via `asyncio.to_thread` or an
+async client; store calls are awaited or threaded.
 
 8.3 The compiled graph is a module-level singleton; LLM clients are constructed
 once per process.
@@ -531,6 +532,7 @@ Proposed ADRs:
 
 - ADR-0007: production interview scale design. Proposed; interview companion only. Superseded in part on 2026-10-08 and 2026-10-11 by ADR-0006 and ADR-0009 to ADR-0015.
 - `docs/adr/ADR-0018-agent-architecture-revision.md`: agent architecture revision (five specialists refining ADR-0017's three agents, memory tiers mapped onto T1–T3 with episodic memory conditional, MCP tool plane, async execution, cache stages, agent NFRs, Gate F). Proposed 2026-11-01 at the owner's request as "ADR-0016"; renumbered 2026-11-02 because that number was already taken by the accepted cloud data and model plane record. Acceptance makes the §3.z scope lines effective. Companion: `docs/agent-architecture.md`.
+- `docs/adr/ADR-0019-hosted-sentiment-foundry-claude.md` (proposed 2026-11-07; sentiment on Claude Sonnet 5.5 via Microsoft Foundry, FinBERT removed; accepted when the CM-6b label-parity run is recorded; amends ADR-0013 D13 and ADR-0015 §1)
 
 Superseded ADRs:
 
