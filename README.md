@@ -190,6 +190,11 @@ AZURE_FOUNDRY_MODEL=
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_EMBED_MODEL=qwen3-embedding:4b
 
+# Embedding arm (default ollama / qwen3-embedding:4b / 2560; cloud arms need MODEL and DIMENSIONS)
+EMBEDDING_PROVIDER=ollama        # or bedrock | azure_openai
+EMBEDDING_MODEL=                 # e.g. cohere.embed-v4:0, amazon.titan-embed-text-v2:0, embed-3-small
+EMBEDDING_DIMENSIONS=            # 1024 for the cloud arms
+
 # Vector store
 VECTOR_BACKEND=qdrant            # or chroma
 QDRANT_URL=http://localhost:16333   # standalone Qdrant; omit for the full Docker stack

@@ -473,7 +473,7 @@ class ChromaDBVectorStore:
         try:
             # Generate query embedding
             if run := get_current_run_tree():
-                run.metadata.update(embedding_model=self._embeddings.model, embedding_provider="ollama")
+                run.metadata.update(embedding_model=settings.embedding.model, embedding_provider="ollama")
             query_embedding = self._embeddings.embed_query(query)
 
             # Build query Kwargs

@@ -2,9 +2,8 @@
 RAG Embeddings Module
 ------------------------------
 
-This module provides text embeddings using the ollama's embedding model.
-
-Model used qwen3-embedding:4b model.
+This module provides text embeddings for the configured arm (settings.embedding):
+Ollama (default, qwen3-embedding:4b), Bedrock or Azure OpenAI.
 
 Usage:
     from app.components.retrieval.embeddings import get_embeddings, embed_texts, embed_query
@@ -21,10 +20,15 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from dataclasses import dataclass
 from typing import Optional, cast
 
+from botocore.config import Config
+from langchain_aws import BedrockEmbeddings
+from langchain_core.embeddings import Embeddings
 from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from loguru import logger
 
 from app.config import settings
@@ -61,23 +65,35 @@ class EmbeddingResult:
 
 
 
+DEFAULT_EMBEDDING_IDENTIFIER = "ollama:qwen3-embedding:4b:2560"
+
+
+class EmbeddingDimensionMismatchError(ValueError):
+    """An index holds vectors of a size other than the configured embedding dimension."""
+
+
+def embedding_identifier() -> str:
+    """Stable name of the configured arm: provider:model:dimensions."""
+    arm = settings.embedding
+    return f"{arm.provider}:{arm.model}:{arm.dimensions}"
+
+
+def embedding_index_name(base: str = "sec_filings") -> str:
+    """Index name for the configured arm; the default arm keeps `base` unchanged."""
+    identifier = embedding_identifier()
+    if identifier == DEFAULT_EMBEDDING_IDENTIFIER:
+        return base
+    return f"{base}__{re.sub(r'[^a-z0-9]+', '-', identifier.lower())}"
+
+
 # Langchain Embeddings (for ChromaDB)
 
-def get_embeddings(
-    model: Optional[str] = None,
-    base_url: Optional[str] = None,
-) -> OllamaEmbeddings:
+def get_embeddings() -> Embeddings:
     """
-    Get Langchain-compatible OllamaEmbeddings instance.
+    Get the Langchain-compatible embeddings for the configured arm.
 
-    This is the primary way to get embeddings for ChromaDB and other Langchain integrated vector stores.
-
-    Args:
-        model: Ollama embedding model name. Defaults to settings.ollama.embed_model
-        base_url: Ollama server URL. Defaults to settings.ollama.base_url
-
-    Returns:
-        OllamaEmbeddings instance
+    The arm (ollama, bedrock or azure_openai), model and dimensions come from
+    settings.embedding. Every client has a request timeout and bounded retries.
 
     Example:
         embeddings = get_embeddings()
@@ -88,14 +104,41 @@ def get_embeddings(
         # Embed query
         query_vector = embeddings.embed_query("search query")
     """
-    model = model or settings.ollama.embed_model
-    base_url = base_url or os.getenv("OLLAMA_EMBED_BASE_URL") or settings.ollama.base_url
+    arm = settings.embedding
+    logger.info(f"Creating embeddings ({arm.provider}, model={arm.model})")
 
-    logger.info(f"Creating OllamaEmbeddings (model={model})")
+    if arm.provider == "bedrock":
+        return BedrockEmbeddings(
+            model_id=arm.model,
+            dimensions=arm.dimensions,
+            region_name=settings.llm.aws_region,
+            config=Config(
+                connect_timeout=settings.retry.http_timeout_seconds,
+                read_timeout=settings.retry.http_timeout_seconds,
+                retries={"max_attempts": settings.retry.max_attempts, "mode": "standard"},
+            ),
+        )
+
+    if arm.provider == "azure_openai":
+        foundry = settings.llm.azure_deployment(arm.model)
+        if foundry is None:
+            raise ValueError("EMBEDDING_PROVIDER=azure_openai needs AZURE_OPENAI_ENDPOINT and AZURE_API_KEY")
+        base_url, deployment, key = foundry
+        return OpenAIEmbeddings(
+            model=deployment,
+            dimensions=arm.dimensions,
+            base_url=base_url,
+            api_key=key,
+            check_embedding_ctx_length=False,
+            timeout=settings.retry.http_timeout_seconds,
+            max_retries=settings.retry.max_attempts,
+        )
 
     return OllamaEmbeddings(
-        model=model,
-        base_url=base_url,
+        model=arm.model,
+        base_url=os.getenv("OLLAMA_EMBED_BASE_URL") or settings.ollama.base_url,
+        dimensions=arm.dimensions,
+        client_kwargs={"timeout": settings.ollama.timeout},
     )
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
