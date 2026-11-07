@@ -665,7 +665,7 @@ Trace: ADR-0011 D12 (amended 2026-11-07: was Bedrock Cohere Rerank 3.5); retriev
 Scope: rerank adapter behind the retrieval boundary with timeout and bounded retries; rerank stays off by default until Gate C shows lift; remove sentence-transformers, torch, transformers, docker-compose.gpu.yml, the model-cache volume and CUDA notes in Dockerfile/Compose.
 Tests:  U adapter with a faithful fake transport · I reranked-hybrid eval mode end to end on the fake · R1 dependency check (no torch/nvidia in uv.lock)
 Regression: R1 R2 R3
-Done: uv.lock has no torch or nvidia-*/triton package; image builds without them. Result: Pending.
+Done: uv.lock has no torch or nvidia-*/triton package; image builds without them. Result: Implemented 2026-11-07 (red bd824c5; tests unchanged since). Rerank calls Foundry `cohere-rerank-v5-fast` through `FoundryCohereReranker` (httpx, 30 s timeout, 3 attempts); sentence-transformers, torch and transformers removed: 27 locked packages gone (torch, transformers, sentence-transformers, triton, 15 nvidia-*, 3 cuda-*, plus safetensors, scikit-learn, joblib, threadpoolctl, cloudpickle), none added; pip-audit shows no new advisory. docker-compose.gpu.yml deleted; model-cache mount and HF/TORCH cache env removed (the Docker volume itself is kept). R1: 756 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Image build not run in this task. Open: the RAGAS `huggingface` embeddings option in evaluation/ now needs a package the project no longer has (owner decision).
 ```
 
 ```text

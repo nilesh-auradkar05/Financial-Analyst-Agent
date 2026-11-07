@@ -1,5 +1,4 @@
-# Financial Analyst local stack. Host Ollama handles Qwen3 embeddings;
-# enable docker-compose.gpu.yml when FinBERT in the API needs NVIDIA GPU access.
+# Financial Analyst local stack. Host Ollama handles Qwen3 embeddings.
 # External-facing deployments should use TLS, authentication and a reverse proxy.
 
 x-default-logging: &default-logging
@@ -49,6 +48,7 @@ services:
       AZURE_FOUNDRY_MODEL:
       AZURE_FOUNDRY_JUDGE_MODEL:
       AZURE_FOUNDRY_SENTIMENT_MODEL:
+      AZURE_FOUNDRY_RERANK_MODEL:
       LLM_TEMPERATURE:
       LLM_MAX_TOKENS:
       LLM_REQUEST_TIMEOUT_SECONDS:
@@ -59,8 +59,7 @@ services:
       - chroma-data:/app/data/chroma
       - filings-data:/app/data/filings
       - runs-data:/app/.runtime
-      - model-cache:/app/.cache
-    # Mirrors Dockerfile HEALTHCHECK. Long grace period supports FinBERT preload.
+    # Mirrors Dockerfile HEALTHCHECK.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=8).close()"]
       interval: 30s
@@ -180,9 +179,6 @@ volumes:
     external: true
   runs-data:
     name: financial-analyst-runs
-    external: true
-  model-cache:
-    name: financial-analyst-model-cache
     external: true
   prometheus-data:
     name: financial-analyst-prometheus

@@ -7,12 +7,12 @@ A single-agent financial research system: give it a stock ticker and it gathers 
 [![FastAPI](https://img.shields.io/badge/FastAPI-service-teal.svg)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Ollama embeddings · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · FinBERT · edgartools · Tavily · yfinance · Prometheus · LangSmith
+**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Ollama embeddings · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · Claude Sonnet 5.5 sentiment and Cohere Rerank v5 on Microsoft Foundry · edgartools · Tavily · yfinance · Prometheus · LangSmith
 
 ### What it does
 
 1. **Collects evidence**: recent news (Tavily), a market snapshot (yfinance) and sections of the company's latest 10-K filing (Business, Risk Factors, MD&A, Market Risk) retrieved from a vector store.
-2. **Scores sentiment** on the news with FinBERT.
+2. **Scores sentiment** on the news with Claude Sonnet 5.5 on Microsoft Foundry.
 3. **Builds a citation registry**: every source gets a number *before* the model is called, so the model can only cite sources that exist.
 4. **Drafts the memo** in seven fixed sections, from executive summary to recommendation.
 5. **Verifies the memo**: it extracts factual claims, matches their numbers within a tolerance and checks semantic similarity (≥ 0.45) against the cited evidence. It reports `citation_coverage_rate`, `grounded_claim_rate` and any citations that point to no source.
@@ -73,7 +73,7 @@ flowchart TD
     S([START]) --> N[research_news<br/>Tavily news]
     S --> K[fetch_stock<br/>yfinance snapshot]
     S --> F[retrieve_filings<br/>10-K sections from vector store]
-    N --> A[analyze_sentiment<br/>FinBERT]
+    N --> A[analyze_sentiment<br/>Foundry Claude]
     K --> A
     F --> A
     A --> D[draft_memo<br/>citation registry + LLM]
@@ -282,7 +282,7 @@ make docker-down
 | `ticker` | required | 1–10 characters, e.g. `AAPL` |
 | `company_name` | looked up | Optional override |
 | `include_filing_analysis` | `true` | Use SEC filing evidence |
-| `include_news_sentiment` | `true` | Run FinBERT on the news |
+| `include_news_sentiment` | `true` | Score news sentiment (Foundry Claude) |
 | `max_news_articles` | `10` | 1–50 |
 
 **Ingestion request options** (`POST /ingest`): `ticker` (required), `filing_type` (default `10-K`), `force_refresh` (default `false`).
