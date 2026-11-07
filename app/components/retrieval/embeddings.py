@@ -26,6 +26,7 @@ from typing import Optional, cast
 
 from botocore.config import Config
 from langchain_aws import BedrockEmbeddings
+from langchain_aws.utils import create_aws_client
 from langchain_core.embeddings import Embeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
@@ -108,15 +109,26 @@ def get_embeddings() -> Embeddings:
     logger.info(f"Creating embeddings ({arm.provider}, model={arm.model})")
 
     if arm.provider == "bedrock":
+        config = Config(
+            connect_timeout=settings.retry.http_timeout_seconds,
+            read_timeout=settings.retry.http_timeout_seconds,
+            retries={"max_attempts": settings.retry.max_attempts, "mode": "standard"},
+        )
+        token = settings.llm.aws_bearer_token_bedrock
+        client = None
+        if token and token.get_secret_value().strip():
+            client = create_aws_client(
+                service_name="bedrock-runtime",
+                region_name=settings.llm.aws_region,
+                config=config,
+                api_key=token,
+            )
         return BedrockEmbeddings(
             model_id=arm.model,
             dimensions=arm.dimensions,
             region_name=settings.llm.aws_region,
-            config=Config(
-                connect_timeout=settings.retry.http_timeout_seconds,
-                read_timeout=settings.retry.http_timeout_seconds,
-                retries={"max_attempts": settings.retry.max_attempts, "mode": "standard"},
-            ),
+            config=config,
+            client=client,
         )
 
     if arm.provider == "azure_openai":
