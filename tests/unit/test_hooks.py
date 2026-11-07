@@ -208,7 +208,11 @@ def test_h7_replay_command_rewritten_with_isolation(tmp_path: Path, cmd: str) ->
     assert out["permissionDecision"] == "allow"
     new_cmd = out["updatedInput"]["command"]
     assert "NO_NETWORK_APPLIED=1" in new_cmd
-    assert "unshare -n" in new_cmd or "HTTP_PROXY=http://127.0.0.1:9" in new_cmd
+    if "unshare -rn" in new_cmd:
+        # A fresh network namespace starts with loopback down; the guard's control connect needs it.
+        assert "ip link set lo up" in new_cmd
+    else:
+        assert "HTTP_PROXY=http://127.0.0.1:9" in new_cmd
     assert "pytest" in new_cmd and "replay" in new_cmd
 
 
@@ -217,7 +221,7 @@ def test_h7_replay_command_rewritten_with_isolation(tmp_path: Path, cmd: str) ->
     [
         "uv run pytest tests/unit -q",
         "NO_NETWORK_APPLIED=1 pytest -m replay",
-        "unshare -n pytest -m replay",
+        "unshare -rn pytest -m replay",
     ],
 )
 def test_h7_non_replay_or_already_isolated_untouched(tmp_path: Path, cmd: str) -> None:
