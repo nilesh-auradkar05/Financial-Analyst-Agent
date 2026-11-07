@@ -627,7 +627,7 @@ Trace: ADR-0011 amendment; test-plan §21
 Scope: provider switch behind the retrieval boundary; per-arm index naming; dimension check; arm built from the same chunks.
 Tests:  U every §21 row with faithful fake transports · C §4 suite on one cloud-arm index (container) · I arm build copies chunk ids unchanged
 Regression: R1 R2 R3 R4
-Done: §21 green; identifier mismatch noted on 2026-10-22 aligned and the baseline regenerated. Result: Pending (plumbing slice of 2026-10-11).
+Done: §21 green; identifier mismatch noted on 2026-10-22 aligned and the baseline regenerated. Result: DONE (2026-11-07). Red 101e8dd and 53706fe; feature 47e9f63, d5213a7 and 6951362; baseline acce359. EMBEDDING_PROVIDER / EMBEDDING_MODEL / EMBEDDING_DIMENSIONS select the arm (default ollama qwen3-embedding:4b at 2560). Each arm gets its own OpenSearch index named from `embedding_identifier()`. An index with another vector size is refused before any write or search. `evaluation/build_embedding_arm.py` copies the baseline chunks into an arm's index. The Bedrock arm authenticates with the settings bearer token. Benchmark provenance now records `ollama:qwen3-embedding:4b:2560`. The Gate A collection had been lost, so it was rebuilt from alpha-evidence:0.1.0 (532 points) and the baseline regenerated: all 75 cases return the same ranked chunk ids and the metrics are exactly equal. pytest 834 passed, 2 skipped; ruff; mypy apart from the git-ignored probe file; governance 4/4. Replay under `unshare -n` is blocked on this host (AppArmor user-namespace restriction); the replay tests pass in the full suite. The default stays ollama; arms are measured in CM-5b.
 ```
 
 ```text
