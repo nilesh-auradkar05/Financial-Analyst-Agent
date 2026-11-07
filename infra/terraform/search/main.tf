@@ -1,6 +1,8 @@
-# CM-3 search stack (ADR-0014, ADR-0016): one next-generation OpenSearch Serverless vector
-# collection that scales to zero when idle. Apply only with owner approval; destroy before the
-# cost stack.
+# CM-3 search stack (ADR-0014, ADR-0016). The project uses the existing next-generation
+# OpenSearch Serverless collection `zcech-banking-emb` (owner decision 2026-11-07). The
+# collection, its group and its encryption/network policies are owner-managed and only read
+# here; this stack owns the data access policy for the project's IAM user. `destroy` removes
+# that policy only.
 terraform {
   required_version = ">= 1.6"
   required_providers {
@@ -28,51 +30,47 @@ variable "data_access_user" {
 }
 
 locals {
-  group_name      = "alpha-analyst-search"
-  collection_name = "alpha-analyst-vectors"
+  collection_name = "zcech-banking-emb"
+  group_name      = "nextgen-sec-filings-vec-emb" # the collection data source does not export its group
+  max_ocu         = 2                             # ADR-0014 decision 1; the budget assumes it
 }
 
 data "aws_iam_user" "data_access" {
   user_name = var.data_access_user
 }
 
-resource "aws_opensearchserverless_collection_group" "search" {
-  name             = local.group_name
-  generation       = "NEXTGEN" # omitted → CLASSIC, which keeps 2 OCUs on around the clock
-  standby_replicas = "ENABLED" # required by NEXTGEN
+data "aws_opensearchserverless_collection" "vectors" {
+  name = local.collection_name
 
-  # Minimums must be written as 0; leaving them out taints the group on apply.
-  capacity_limits {
-    min_indexing_capacity_in_ocu = 0
-    max_indexing_capacity_in_ocu = 2
-    min_search_capacity_in_ocu   = 0
-    max_search_capacity_in_ocu   = 2
+  lifecycle {
+    postcondition {
+      condition     = self.type == "VECTORSEARCH"
+      error_message = "Collection ${local.collection_name} must be a VECTORSEARCH collection."
+    }
   }
 }
 
-resource "aws_opensearchserverless_security_policy" "encryption" {
-  name = "${local.collection_name}-enc"
-  type = "encryption"
-  policy = jsonencode({
-    Rules       = [{ ResourceType = "collection", Resource = ["collection/${local.collection_name}"] }]
-    AWSOwnedKey = true
-  })
-}
+# Cost guard: fail the plan if the owner-managed group drifts off NEXTGEN or above max_ocu.
+data "aws_opensearchserverless_collection_group" "search" {
+  name = local.group_name
 
-# Public endpoint, IAM (SigV4) authorization only (ADR-0014 decision 6); a VPC endpoint is priced first.
-resource "aws_opensearchserverless_security_policy" "network" {
-  name = "${local.collection_name}-net"
-  type = "network"
-  policy = jsonencode([{
-    Rules           = [{ ResourceType = "collection", Resource = ["collection/${local.collection_name}"] }]
-    AllowFromPublic = true
-  }])
+  lifecycle {
+    postcondition {
+      condition = self.generation == "NEXTGEN" && alltrue([
+        for c in self.capacity_limits : c.max_indexing_capacity_in_ocu <= local.max_ocu
+        && c.max_search_capacity_in_ocu <= local.max_ocu
+        && c.min_indexing_capacity_in_ocu == 0 && c.min_search_capacity_in_ocu == 0
+      ])
+      error_message = "Collection group must be NEXTGEN with min 0 and max <= ${local.max_ocu} OCU for indexing and search."
+    }
+  }
 }
 
 # Explicit permissions, no aoss:* (CLAUDE.md §5).
 resource "aws_opensearchserverless_access_policy" "data" {
-  name = "${local.collection_name}-data"
-  type = "data"
+  name        = "alpha-analyst-agent-data"
+  type        = "data"
+  description = "alpha-analyst: ${var.data_access_user} reads and writes its indexes"
   policy = jsonencode([{
     Rules = [
       {
@@ -102,21 +100,10 @@ resource "aws_opensearchserverless_access_policy" "data" {
   }])
 }
 
-resource "aws_opensearchserverless_collection" "vectors" {
-  name                  = local.collection_name
-  type                  = "VECTORSEARCH"
-  collection_group_name = aws_opensearchserverless_collection_group.search.name # sets NEXTGEN
-
-  depends_on = [
-    aws_opensearchserverless_security_policy.encryption,
-    aws_opensearchserverless_security_policy.network,
-  ]
-}
-
 output "group_generation" {
-  value = aws_opensearchserverless_collection_group.search.generation
+  value = data.aws_opensearchserverless_collection_group.search.generation
 }
 
 output "collection_endpoint" {
-  value = aws_opensearchserverless_collection.vectors.collection_endpoint
+  value = data.aws_opensearchserverless_collection.vectors.collection_endpoint
 }
