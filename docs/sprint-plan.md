@@ -655,17 +655,17 @@ Feature: sentiment scores come from a hosted model with recorded label parity, o
 Trace: ADR-0016 (own ADR required first); test-plan §10 sentiment rows
 Tests:  U adapter with a faithful fake · Q label parity against FinBERT on the frozen news set · P event loop not blocked
 Regression: R1 R2 R3
-Done: ADR accepted; parity recorded. Result: Implemented 2026-11-07 (red 8d2a235; tests unchanged since). Sentiment runs on Foundry `sonnet-5-5-sentiment`; FinBERT code, FINBERT_* settings and the startup preload removed (torch/transformers leave in CM-6d). R1: 731 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Parity recorded in ADR-0019: 16/30 = 53.3% agreement with the frozen FinBERT labels; ADR stays Proposed until the owner accepts that rate.
+Done: ADR accepted; parity recorded. Result: Implemented 2026-11-07 (red 8d2a235; tests unchanged since). Sentiment runs on Foundry `sonnet-5-5-sentiment`; FinBERT code, FINBERT_* settings and the startup preload removed (torch/transformers leave in CM-6d). R1: 731 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Parity recorded in ADR-0019: 16/30 = 53.3% agreement with the frozen FinBERT labels; owner accepted the rate 2026-11-07 and ADR-0019 is Accepted. DONE.
 ```
 
 ```text
 CM-6d — Hosted rerank; torch and CUDA removed
 Feature: reranked hybrid retrieval scores pairs with Cohere Rerank v5 fast on Microsoft Foundry (deployment `cohere-rerank-v5-fast`) instead of a local CrossEncoder; no torch or CUDA package remains.
-Trace: ADR-0011 D12 (amendment required first: was Bedrock Cohere Rerank 3.5); test-plan §6 reranked-hybrid rows; owner decision 2026-11-07
+Trace: ADR-0011 D12 (amended 2026-11-07: was Bedrock Cohere Rerank 3.5); retrieval-benchmark rerank axis (amended); test-plan §25 (new; no rerank rows existed before); owner decision 2026-11-07
 Scope: rerank adapter behind the retrieval boundary with timeout and bounded retries; rerank stays off by default until Gate C shows lift; remove sentence-transformers, torch, transformers, docker-compose.gpu.yml, the model-cache volume and CUDA notes in Dockerfile/Compose.
 Tests:  U adapter with a faithful fake transport · I reranked-hybrid eval mode end to end on the fake · R1 dependency check (no torch/nvidia in uv.lock)
 Regression: R1 R2 R3
-Done: uv.lock has no torch or nvidia-*/triton package; image builds without them. Result: Pending.
+Done: uv.lock has no torch or nvidia-*/triton package; image builds without them. Result: Implemented 2026-11-07 (red bd824c5; tests unchanged since). Rerank calls Foundry `cohere-rerank-v5-fast` through `FoundryCohereReranker` (httpx, 30 s timeout, 3 attempts); sentence-transformers, torch and transformers removed: 27 locked packages gone (torch, transformers, sentence-transformers, triton, 15 nvidia-*, 3 cuda-*, plus safetensors, scikit-learn, joblib, threadpoolctl, cloudpickle), none added; pip-audit shows no new advisory. docker-compose.gpu.yml deleted; model-cache mount and HF/TORCH cache env removed (the Docker volume itself is kept). R1: 756 passed, 2 skipped; ruff; mypy (only the git-ignored probe file). R2 4/4. R3 replay 87 passed. Image build not run in this task. Open: the RAGAS `huggingface` embeddings option in evaluation/ now needs a package the project no longer has (owner decision).
 ```
 
 ```text

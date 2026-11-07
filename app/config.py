@@ -110,6 +110,11 @@ class LLMSettings(BaseSettings):
         validation_alias="AZURE_FOUNDRY_SENTIMENT_MODEL",
         description="Foundry sentiment deployment name.",
     )
+    azure_foundry_rerank_model: Optional[str] = Field(
+        default=None,
+        validation_alias="AZURE_FOUNDRY_RERANK_MODEL",
+        description="Foundry rerank deployment name.",
+    )
     openai_api_key: Optional[SecretStr] = Field(default=None, validation_alias="OPENAI_API_KEY")
     temperature: float = Field(
         default=1.0,

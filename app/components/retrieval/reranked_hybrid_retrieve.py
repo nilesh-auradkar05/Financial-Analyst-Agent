@@ -1,14 +1,14 @@
-"""Dense + BM25 candidate generation followed by cross-encoder reranking.
+"""Dense + BM25 candidate generation followed by hosted reranking.
 
 This module implements the standard two-stage retrieval stack:
 
 1. Generate a broad candidate set with dense vector search and BM25 lexical
    search.
 2. Deduplicate candidates while preserving dense/BM25 provenance.
-3. Score query/document pairs with a sentence-transformers CrossEncoder.
+3. Score query/document pairs with Cohere Rerank v5 fast on Microsoft Foundry.
 4. Return top-k evidence chunks with explicit reranker metadata.
 
-The module is intentionally strict for evaluation: if the cross-encoder cannot
+The module is intentionally strict for evaluation: if the reranker cannot
 run, it raises instead of silently falling back to non-reranked hybrid output.
 Silent fallback is how mislabeled result files happen. Humanity has suffered
 enough JSON fraud.
@@ -16,11 +16,11 @@ enough JSON fraud.
 
 from __future__ import annotations
 
-import os
+import math
 import time
-from functools import lru_cache
-from typing import Any, Optional, Protocol, Sequence, cast
+from typing import Any, Optional, Protocol
 
+import httpx
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 from loguru import logger
@@ -34,6 +34,7 @@ from app.components.retrieval.hybrid_retrieve import (
     _stable_chunk_id,
 )
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
+from app.config import settings
 
 try:
     from app.components.retrieval.section_intent import (
@@ -52,25 +53,19 @@ except ImportError:
         return value.strip().lower()
 
 
-DEFAULT_RERANKER_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 DEFAULT_DENSE_TOP_K = 30
 DEFAULT_SPARSE_TOP_K = 30
 DEFAULT_FINAL_TOP_K = 5
 DEFAULT_MAX_DOCUMENT_CHARS = 4_000
 DEFAULT_RETRIEVAL_METHOD = "dense_bm25_cross_encoder_rerank"
+_RERANK_TIMEOUT_SECONDS = 30.0
+_RERANK_ATTEMPTS = 3
+_RERANK_BACKOFF_SECONDS = 0.1
 
 
-class CrossEncoderLike(Protocol):
-    """Protocol for sentence-transformers CrossEncoder-compatible models."""
-
-    def predict(
-        self,
-        sentences: Sequence[tuple[str, str]],
-        *,
-        batch_size: int = 32,
-        show_progress_bar: bool = False,
-    ) -> Any:
-        """Score query/document pairs; higher is better."""
+class RerankerLike(Protocol):
+    def score(self, query: str, documents: list[str]) -> list[float]:
+        """One relevance score per document, in input order; higher is better."""
 
 
 class RerankedHybridSearchConfig(BaseModel):
@@ -83,14 +78,6 @@ class RerankedHybridSearchConfig(BaseModel):
     final_top_k: int = Field(default=DEFAULT_FINAL_TOP_K, ge=1)
     candidate_pool_size: int = Field(default=512, ge=1)
     qdrant_scroll_batch_size: int = Field(default=128, ge=1)
-    reranker_model_name: str = Field(
-        default_factory=lambda: os.getenv(
-            "RERANKER_MODEL_NAME",
-            DEFAULT_RERANKER_MODEL,
-        )
-    )
-    reranker_batch_size: int = Field(default=16, ge=1)
-    reranker_device: Optional[str] = Field(default_factory=lambda: os.getenv("RERANKER_DEVICE"))
     max_document_chars: int = Field(default=DEFAULT_MAX_DOCUMENT_CHARS, ge=256)
     fail_open_to_dense: bool = False
     use_section_prior: bool = True
@@ -141,6 +128,87 @@ class RerankedHybridSearchUnavailableError(RuntimeError):
     """Raised when reranked hybrid search cannot be executed."""
 
 
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+class FoundryCohereReranker:
+    """Cohere Rerank v5 fast on Microsoft Foundry (ADR-0011)."""
+
+    @property
+    def identity(self) -> str:
+        return f"foundry:{(settings.llm.azure_foundry_rerank_model or '').strip()}"
+
+    def score(self, query: str, documents: list[str]) -> list[float]:
+        llm = settings.llm
+        endpoint = (llm.azure_openai_endpoint or "").strip().rstrip("/")
+        key = llm.azure_api_key.get_secret_value().strip() if llm.azure_api_key else ""
+        deployment = (llm.azure_foundry_rerank_model or "").strip()
+        if not (endpoint and key and deployment):
+            raise RerankedHybridSearchUnavailableError(
+                "Hosted rerank needs AZURE_OPENAI_ENDPOINT, AZURE_API_KEY and "
+                "AZURE_FOUNDRY_RERANK_MODEL."
+            )
+        payload = {
+            "model": deployment,
+            "query": query,
+            "documents": documents,
+            "top_n": len(documents),
+        }
+        reply = self._post(f"{endpoint}/providers/cohere/v2/rerank", key, payload)
+        return self._parse_scores(reply, len(documents))
+
+    @staticmethod
+    def _post(url: str, key: str, payload: dict[str, Any]) -> httpx.Response:
+        for attempt in range(1, _RERANK_ATTEMPTS + 1):
+            try:
+                reply = httpx.post(
+                    url,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {key}"},
+                    timeout=_RERANK_TIMEOUT_SECONDS,
+                )
+                failure = f"HTTP {reply.status_code}"
+                retryable = reply.status_code == 429 or reply.status_code >= 500
+                if reply.is_success:
+                    return reply
+            except httpx.TransportError as exc:
+                failure = f"unreachable ({type(exc).__name__})"
+                retryable = True
+            if not retryable or attempt == _RERANK_ATTEMPTS:
+                raise RerankedHybridSearchUnavailableError(
+                    f"Rerank provider failed: {failure}."
+                )
+            time.sleep(_RERANK_BACKOFF_SECONDS * 2 ** (attempt - 1))
+        raise AssertionError("unreachable")
+
+    @staticmethod
+    def _parse_scores(reply: httpx.Response, count: int) -> list[float]:
+        try:
+            results = reply.json()["results"]
+            scores: dict[int, float] = {}
+            for item in results:
+                index, score = item["index"], item["relevance_score"]
+                if (
+                    isinstance(index, bool)
+                    or not isinstance(index, int)
+                    or not 0 <= index < count
+                    or index in scores
+                    or not _is_number(score)
+                ):
+                    raise ValueError
+                scores[index] = float(score)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise RerankedHybridSearchUnavailableError(
+                "Rerank reply was not the expected JSON."
+            ) from exc
+        if len(scores) != count:
+            raise RerankedHybridSearchUnavailableError(
+                "Rerank reply did not score every document exactly once."
+            )
+        return [scores[index] for index in range(count)]
+
+
 def search_reranked_hybrid(
     store: Any,
     *,
@@ -149,12 +217,12 @@ def search_reranked_hybrid(
     filing_type: Optional[str] = None,
     top_k: int = DEFAULT_FINAL_TOP_K,
     config: Optional[RerankedHybridSearchConfig] = None,
-    reranker: Optional[CrossEncoderLike] = None,
+    reranker: Optional[RerankerLike] = None,
 ) -> SearchResult:
-    """Run dense + BM25 retrieval, then cross-encoder rerank to top-k.
+    """Run dense + BM25 retrieval, then hosted rerank to top-k.
 
-    Evaluation mode fails closed by default. If sentence-transformers is missing
-    or the reranker fails, this function raises unless ``fail_open_to_dense`` is
+    Evaluation mode fails closed by default. If the reranker is unconfigured
+    or fails, this function raises unless ``fail_open_to_dense`` is
     explicitly set. That keeps result files honest: reranked output must contain
     reranker scores.
     """
@@ -203,6 +271,7 @@ def search_reranked_hybrid(
         )
 
     intent = infer_section_intent(query) if cfg.use_section_prior else None
+    reranker = reranker or FoundryCohereReranker()
 
     try:
         scored_candidates = _rerank_candidates(
@@ -215,8 +284,8 @@ def search_reranked_hybrid(
     except Exception as exc:
         if not cfg.fail_open_to_dense:
             raise RerankedHybridSearchUnavailableError(
-                "Cross-encoder reranking failed. Install sentence-transformers, "
-                "fix the model/device, or choose a non-reranked retrieval mode."
+                "Hosted reranking failed. Check the Foundry rerank configuration "
+                "or choose a non-reranked retrieval mode."
             ) from exc
         logger.warning("Reranked hybrid failed; falling back to dense results: {}", exc)
         return SearchResult(
@@ -233,9 +302,10 @@ def search_reranked_hybrid(
             },
         )
 
+    reranker_model = getattr(reranker, "identity", None)
     top_candidates = scored_candidates[: cfg.final_top_k]
     chunks = [
-        _candidate_to_chunk(candidate, rank=rank)
+        _candidate_to_chunk(candidate, rank=rank, reranker_model=reranker_model)
         for rank, candidate in enumerate(top_candidates, start=1)
     ]
 
@@ -254,7 +324,7 @@ def search_reranked_hybrid(
             "final_top_k": cfg.final_top_k,
             "candidate_count": len(candidates),
             "sparse_corpus_size": len(sparse_documents),
-            "reranker_model": cfg.reranker_model_name,
+            "reranker_model": reranker_model,
             "use_section_prior": cfg.use_section_prior,
             "section_prior_target_sections": _intent_sections(intent),
         },
@@ -324,23 +394,14 @@ def _rerank_candidates(
     query: str,
     candidates: list[RerankedCandidate],
     config: RerankedHybridSearchConfig,
-    reranker: Optional[CrossEncoderLike] = None,
+    reranker: RerankerLike,
     intent: Any = None,
 ) -> list[RerankedCandidate]:
-    model = reranker or _get_cross_encoder(
-        model_name=config.reranker_model_name,
-        device=config.reranker_device,
-    )
-    pairs = [
-        (query, _clip_document_text(candidate.document.page_content, config.max_document_chars))
+    documents = [
+        _clip_document_text(candidate.document.page_content, config.max_document_chars)
         for candidate in candidates
     ]
-    scores = model.predict(
-        pairs,
-        batch_size=config.reranker_batch_size,
-        show_progress_bar=False,
-    )
-    score_values = [float(score) for score in list(scores)]
+    score_values = [float(score) for score in reranker.score(query, documents)]
     if len(score_values) != len(candidates):
         raise ValueError(
             "Reranker returned a different number of scores than candidates: "
@@ -369,28 +430,15 @@ def _rerank_candidates(
     )
 
 
-@lru_cache(maxsize=4)
-def _get_cross_encoder(*, model_name: str, device: Optional[str]) -> CrossEncoderLike:
-    try:
-        from sentence_transformers import CrossEncoder
-    except ImportError as exc:  # pragma: no cover - depends on environment.
-        raise RerankedHybridSearchUnavailableError(
-            "sentence-transformers is required for reranked hybrid retrieval. "
-            "Install it or use a non-reranked retrieval mode."
-        ) from exc
-
-    kwargs: dict[str, Any] = {}
-    if device:
-        kwargs["device"] = device
-    return cast(CrossEncoderLike, CrossEncoder(model_name, **kwargs))
-
-
-def _candidate_to_chunk(candidate: RerankedCandidate, *, rank: int) -> RetrievedChunk:
+def _candidate_to_chunk(
+    candidate: RerankedCandidate, *, rank: int, reranker_model: Optional[str]
+) -> RetrievedChunk:
     metadata = dict(candidate.document.metadata)
     metadata["chunk_id"] = candidate.chunk_id
     metadata["hybrid_rank"] = rank
     metadata["reranker_rank"] = rank
     metadata["reranker_score"] = candidate.reranker_score
+    metadata["reranker_model"] = reranker_model
     metadata["section_prior_score"] = candidate.section_prior_score
     metadata["keyword_prior_score"] = candidate.keyword_prior_score
     metadata["final_rerank_score"] = candidate.final_rerank_score

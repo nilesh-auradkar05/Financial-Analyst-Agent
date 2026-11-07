@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 from evaluation.retrieval_eval import RetrievalEvalCase, _search
+from tests.unit.fake_foundry import RERANK_DEPLOYMENT, RERANK_PATH
 
 
 class FakeStore:
@@ -22,17 +23,8 @@ class FakeStore:
         )
 
 
-class FakeReranker:
-    def predict(self, sentences, *, batch_size=32, show_progress_bar=False):
-        del batch_size, show_progress_bar
-        return [1.0 for _ in sentences]
-
-
-def test_retrieval_eval_routes_reranked_hybrid_mode(monkeypatch) -> None:
-    import app.components.retrieval.reranked_hybrid_retrieve as module
-
-    monkeypatch.setattr(module, "_get_cross_encoder", lambda model_name, device: FakeReranker())
-
+def test_retrieval_eval_routes_reranked_hybrid_mode(foundry_rerank) -> None:
+    """test-plan §25: Rerank reorders candidates (the eval mode reranks on the hosted provider)."""
     case = RetrievalEvalCase(
         id="reranked_hybrid_eval",
         ticker="MSFT",
@@ -47,7 +39,8 @@ def test_retrieval_eval_routes_reranked_hybrid_mode(monkeypatch) -> None:
 
     assert result.has_results
     assert result.filter_used is not None
-    assert result.filter_used["mode"] in {
-        "reranked_hybrid",
-        "reranked_hybrid_empty_candidate_fallback",
-    }
+    assert result.filter_used["mode"] == "reranked_hybrid"
+    assert result.chunks[0].metadata["reranker_model"] == f"foundry:{RERANK_DEPLOYMENT}"
+    (request,) = foundry_rerank.requests
+    assert request.path == RERANK_PATH
+    assert request.body["query"] == case.query

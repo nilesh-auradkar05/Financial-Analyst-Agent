@@ -1,6 +1,6 @@
 # ADR-0019 — Hosted sentiment: Claude Sonnet 5.5 on Microsoft Foundry
 
-**Status:** Proposed (2026-11-07) by owner decision; accepted when the CM-6b label-parity run is recorded below. Amends ADR-0015 §1 (ONNX FinBERT in the worker) and ADR-0013 D13 (sentiment placement); implements ADR-0016 decision 6.
+**Status:** Accepted (2026-11-07) by owner decision, after the CM-6b label-parity run below (owner accepted 16/30 = 53.3% agreement). Amends ADR-0015 §1 (ONNX FinBERT in the worker) and ADR-0013 D13 (sentiment placement); implements ADR-0016 decision 6.
 **Date:** 2026-11-07
 **Related:** SPEC §§5, 7, 8.2; ADR-0009 (provider policy); ADR-0013; ADR-0015; ADR-0016; test-plan §§2, 10, 13, 24; sprint-plan CM-6b.
 
@@ -53,7 +53,7 @@ Disagreements (ticker, FinBERT → Claude, text preview):
 - NVDA neutral → negative: "Store My Products Founder's ClubSwingTraderLeaderboardMarketSurgeeIBDIBD DigitalIBD Live Recently Searched Res…"
 - NVDA negative → neutral: "Store My Products Founder's ClubSwingTraderLeaderboardMarketSurgeeIBDIBD DigitalIBD Live Recently Searched Res…"
 
-Observations: about half the disagreements are on snippets dominated by scraped page chrome (video menus, navigation, "Skip to main content"), where neither label is well founded — a news-extraction quality issue, not a model issue. On the clean headlines Claude reads context FinBERT misses (for example "worst-performing stock in the Magnificent Seven": FinBERT positive, Claude negative); one call is debatable ("stock fell 3.5%": Claude neutral). Single run; Claude's labels may vary between runs. Status stays Proposed until the owner accepts this disagreement rate (46.7%).
+Observations: about half the disagreements are on snippets dominated by scraped page chrome (video menus, navigation, "Skip to main content"), where neither label is well founded — a news-extraction quality issue, not a model issue. On the clean headlines Claude reads context FinBERT misses (for example "worst-performing stock in the Magnificent Seven": FinBERT positive, Claude negative); one call is debatable ("stock fell 3.5%": Claude neutral). Single run; Claude's labels may vary between runs. Owner accepted this disagreement rate (46.7%) on 2026-11-07.
 
 ## Alternatives considered
 

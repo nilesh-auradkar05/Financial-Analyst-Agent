@@ -1,9 +1,12 @@
-"""A faithful fake of the Foundry Anthropic Messages endpoint (`POST /anthropic/v1/messages`).
+"""A faithful fake of the Foundry endpoints the app calls: Anthropic Messages
+(`POST /anthropic/v1/messages`) and Cohere Rerank v2 (`POST /providers/cohere/v2/rerank`).
 
 A real HTTP server on 127.0.0.1: the production client builds and sends real requests, this
-server parses them and computes the reply from the request. It reads the `<article index="N">`
-blocks of the user content, unescapes them and scores each text with a small fixed lexicon.
-It never replays an answer supplied by a test. No network beyond loopback.
+server parses them and computes the reply from the request. For Messages it reads the
+`<article index="N">` blocks of the user content, unescapes them and scores each text with a small
+fixed lexicon. For rerank it scores each document by the fraction of query words it contains and
+lists the results best first, not in input order (as the real endpoint does). It never replays an
+answer supplied by a test. No network beyond loopback.
 """
 
 from __future__ import annotations
@@ -23,8 +26,12 @@ NEGATIVE_WORDS = ("fell", "warned", "lawsuit", "decline", "missed")
 SERVED_MODEL = "claude-sonnet-5-5"
 DEPLOYMENT = "sonnet-5-5-sentiment"
 MODEL_IDENTITY = "foundry:sonnet-5-5-sentiment:claude-sonnet-5-5"
+MESSAGES_PATH = "/anthropic/v1/messages"
+RERANK_PATH = "/providers/cohere/v2/rerank"
+RERANK_DEPLOYMENT = "cohere-rerank-v5-fast"
 
 _ARTICLE = re.compile(r'<article index="(\d+)">(.*?)</article>', re.DOTALL)
+_WORD = re.compile(r"[a-z0-9]+")
 _AUTH_HEADERS = ("api-key", "x-api-key", "authorization")
 
 
@@ -36,6 +43,7 @@ class ReceivedRequest:
     headers: dict[str, str]
     credential: str
     body: dict[str, Any]
+    bearer: bool = False
 
     @property
     def system(self) -> str:
@@ -71,15 +79,24 @@ def lexicon_label(text: str) -> str:
     return "neutral"
 
 
+def relevance(query: str, document: str) -> float:
+    """Fraction of the query's distinct words that appear in the document, in [0, 1]."""
+    wanted = set(_WORD.findall(query.lower()))
+    if not wanted:
+        return 0.0
+    return len(wanted & set(_WORD.findall(document.lower()))) / len(wanted)
+
+
 def _scores(label: str) -> dict[str, float]:
     return {name: (0.8 if name == label else 0.1) for name in ("positive", "negative", "neutral")}
 
 
 class FakeFoundry:
-    """Serves Messages replies computed from each request.
+    """Serves Messages and rerank replies computed from each request.
 
     `status` makes every request fail with that HTTP status; `fail_first` fails only the first N
-    requests. `corrupt` edits the computed reply body before it is sent (a malformed provider).
+    requests. `corrupt` edits the computed reply body before it is sent (a malformed provider);
+    `raw_reply` replaces a successful reply with those bytes (a provider that is not speaking JSON).
     `delay` is seconds of latency per request.
     """
 
@@ -90,6 +107,7 @@ class FakeFoundry:
         self.fail_status = 500
         self.corrupt: Callable[[dict[str, Any]], None] | None = None
         self.delay = 0.0
+        self.raw_reply: bytes | None = None
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
@@ -108,7 +126,7 @@ class FakeFoundry:
         self._server.server_close()
         self._thread.join(timeout=5)
 
-    def _reply(self, request: ReceivedRequest) -> tuple[int, dict[str, Any]]:
+    def _reply(self, request: ReceivedRequest) -> tuple[int, dict[str, Any] | bytes]:
         with self._lock:
             self.requests.append(request)
             attempt = len(self.requests)
@@ -120,12 +138,58 @@ class FakeFoundry:
                 "type": "error",
                 "error": {"type": "api_error", "message": "provider unavailable"},
             }
+        if request.path == RERANK_PATH:
+            status, body = self._rerank(request, attempt)
+        elif request.path == MESSAGES_PATH:
+            status, body = 200, self._messages(request, attempt)
+        else:
+            return 404, {"error": {"code": "NotFound", "message": f"no route {request.path}"}}
+        if status == 200:
+            if self.corrupt:
+                self.corrupt(body)
+            if self.raw_reply is not None:
+                return 200, self.raw_reply
+        return status, body
+
+    def _rerank(self, request: ReceivedRequest, attempt: int) -> tuple[int, dict[str, Any]]:
+        body = request.body
+        documents = body.get("documents")
+        top_n = body.get("top_n")
+        valid = (
+            request.credential != ""
+            and request.bearer
+            and isinstance(body.get("model"), str)
+            and body["model"] != ""
+            and isinstance(body.get("query"), str)
+            and isinstance(documents, list)
+            and all(isinstance(text, str) for text in documents)
+            and isinstance(top_n, int)
+            and 1 <= top_n <= len(documents)
+        )
+        if not valid:
+            return 400, {"error": {"code": "BadRequest", "message": "invalid rerank request"}}
+        assert documents is not None
+        scored = [
+            {"index": index, "relevance_score": relevance(body["query"], text)}
+            for index, text in enumerate(documents)
+        ]
+        scored.sort(key=lambda row: (-row["relevance_score"], row["index"]))
+        return 200, {
+            "id": f"rerank_{attempt}",
+            "results": scored[: body["top_n"]],
+            "meta": {
+                "api_version": {"version": "2"},
+                "billed_units": {"input_tokens": sum(len(text.split()) for text in documents)},
+            },
+        }
+
+    def _messages(self, request: ReceivedRequest, attempt: int) -> dict[str, Any]:
         results = [
             {"index": index, "label": label, "scores": _scores(label)}
             for index, text in request.articles
             for label in [lexicon_label(text)]
         ]
-        body: dict[str, Any] = {
+        return {
             "id": f"msg_{attempt}",
             "type": "message",
             "role": "assistant",
@@ -138,9 +202,6 @@ class FakeFoundry:
                 "output_tokens": len(results),
             },
         }
-        if self.corrupt:
-            self.corrupt(body)
-        return 200, body
 
     def _handler(self) -> type[BaseHTTPRequestHandler]:
         fake = self
@@ -158,10 +219,13 @@ class FakeFoundry:
                     ),
                     "",
                 )
+                bearer = headers.get("authorization", "").startswith("Bearer ")
                 for name in _AUTH_HEADERS:
                     headers.pop(name, None)
-                status, payload = fake._reply(ReceivedRequest(self.path, headers, credential, body))
-                data = json.dumps(payload).encode()
+                status, payload = fake._reply(
+                    ReceivedRequest(self.path, headers, credential, body, bearer)
+                )
+                data = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
