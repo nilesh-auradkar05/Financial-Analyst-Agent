@@ -472,7 +472,7 @@ async def run_ragas(
     try:
         metric_classes = _load_ragas_collection_metric_classes()
         ragas_llm = create_ragas_judge_llm(judge_config)
-        ragas_embeddings = create_ragas_judge_embeddings(judge_config)
+        ragas_embeddings = create_ragas_judge_embeddings()
 
         metrics = []
         for metric_class in metric_classes:
@@ -662,7 +662,7 @@ def main() -> None:
     parser.add_argument("--judge-max-tokens", type=int, default=None)
     parser.add_argument(
         "--ragas-embeddings-provider",
-        choices=["openai", "huggingface", "none"],
+        choices=["openai", "none"],
         default=os.getenv("RAGAS_EMBEDDINGS_PROVIDER"),
         help="RAGAS embeddings provider for metrics such as AnswerRelevancy",
     )
