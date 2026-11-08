@@ -4,19 +4,30 @@ OpenSearch retrieval backend.
 Implements the RetrievalStore contract on an OpenSearch k-NN index. Chunk IDs are the
 document `_id`, so higher layers see the same IDs they wrote. Only index create/exists,
 `_bulk`, `_search` and `_count` are used, so the adapter also fits OpenSearch Serverless.
+The vector field names neither an engine nor a mode (Serverless rejects both) and sets
+`compression_level`; searches rescore at full precision, so distances are exact at either level.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from collections.abc import Iterator
 from typing import Any, Optional
 
+import botocore.session
 from langchain_core.embeddings import Embeddings
 from langsmith import get_current_run_tree
 from loguru import logger
-from opensearchpy import NotFoundError, OpenSearch, OpenSearchException, RequestError, helpers
+from opensearchpy import (
+    NotFoundError,
+    OpenSearch,
+    OpenSearchException,
+    RequestError,
+    Urllib3AWSV4SignerAuth,
+    helpers,
+)
 
 from app.components.retrieval.embeddings import (
     EmbeddingDimensionMismatchError,
@@ -38,6 +49,9 @@ from app.config import settings
 
 DEFAULT_OPENSEARCH_URL = "http://localhost:9200"
 DEFAULT_TIMEOUT_S = 5.0
+SIGV4_DEFAULT_TIMEOUT_S = 30.0
+COMPRESSION_LEVELS = ("1x", "32x")
+DEFAULT_COMPRESSION_LEVEL = "32x"
 VECTOR_FIELD = "embedding"
 REQUIRED_METADATA_KEYS = ("ticker", "filing_type", "filing_date", "accession_number", "section_key")
 FILTER_FIELDS = frozenset(
@@ -53,13 +67,44 @@ FILTER_FIELDS = frozenset(
 )
 DELETE_PAGE_SIZE = 500
 ITER_PAGE_SIZE = 500
+DEFAULT_AWS_REGION = "us-east-1"
+SIGV4_SERVICE = "aoss"
+
+
+class IndexCompressionMismatchError(ValueError):
+    """The index's vector compression level differs from OPENSEARCH_COMPRESSION_LEVEL."""
+
+
+def _compression_level() -> str:
+    level = os.getenv("OPENSEARCH_COMPRESSION_LEVEL") or DEFAULT_COMPRESSION_LEVEL
+    if level not in COMPRESSION_LEVELS:
+        raise ValueError(f"OPENSEARCH_COMPRESSION_LEVEL must be '1x' or '32x', got {level!r}")
+    return level
+
+
+def _request_signer() -> Urllib3AWSV4SignerAuth | None:
+    """Return the SigV4 signer selected by OPENSEARCH_AUTH, or None for unsigned requests."""
+    mode = os.getenv("OPENSEARCH_AUTH") or "none"
+    if mode == "none":
+        return None
+    if mode != "sigv4":
+        raise ValueError(f"OPENSEARCH_AUTH must be 'none' or 'sigv4', got {mode!r}")
+    credentials = botocore.session.get_session().get_credentials()
+    if credentials is None:
+        raise ValueError("OPENSEARCH_AUTH=sigv4 but no AWS credentials could be resolved")
+    # botocore.auth logs the canonical request at DEBUG, which carries the session token.
+    logging.getLogger("botocore.auth").setLevel(logging.WARNING)
+    return Urllib3AWSV4SignerAuth(
+        credentials, os.getenv("AWS_REGION") or DEFAULT_AWS_REGION, SIGV4_SERVICE
+    )
 
 
 class OpenSearchVectorStore(RetrievalStore):
     """OpenSearch-backed implementation of the retrieval contract.
 
-    Vectors use cosine similarity on a Lucene HNSW index, which applies metadata filters
-    inside the k-NN query, so a filtered search returns up to `n_results` matching chunks.
+    Vectors use cosine similarity on an HNSW index at the configured compression level;
+    metadata filters apply inside the k-NN query, so a filtered search returns up to
+    `n_results` matching chunks, rescored at full precision.
     """
 
     def __init__(
@@ -74,13 +119,19 @@ class OpenSearchVectorStore(RetrievalStore):
             index_name or os.getenv("OPENSEARCH_INDEX_NAME") or default_index_name
         )
         self.url: str = url or os.getenv("OPENSEARCH_URL") or DEFAULT_OPENSEARCH_URL
-        timeout = timeout_s or float(os.getenv("OPENSEARCH_TIMEOUT_S", DEFAULT_TIMEOUT_S))
+        self._compression_level = _compression_level()
+        signer = _request_signer()
+        default_timeout = DEFAULT_TIMEOUT_S if signer is None else SIGV4_DEFAULT_TIMEOUT_S
+        timeout = timeout_s or float(os.getenv("OPENSEARCH_TIMEOUT_S") or default_timeout)
+        # Serverless rejects refresh=wait_for; its writes become searchable after a short lag.
+        self._write_options: dict[str, Any] = {} if signer else {"refresh": "wait_for"}
         self._embeddings = embeddings or get_embeddings()
-        self._dimension_verified = False
+        self._index_verified = False
         self._client = OpenSearch(
             hosts=[self.url],
+            http_auth=signer,
             timeout=timeout,
-            max_retries=0,
+            max_retries=0 if signer is None else 1,
             retry_on_timeout=False,
         )
         logger.info(f"OpenSearch initialized (index={self.index_name})")
@@ -90,10 +141,12 @@ class OpenSearchVectorStore(RetrievalStore):
         return self.count_documents()
 
     def healthcheck(self) -> bool:
+        # Serverless answers `/` with 404, so probe the index; a missing index is still reachable.
         try:
-            return bool(self._client.ping())
+            self._client.indices.exists(index=self.index_name)
         except OpenSearchException:
             return False
+        return True
 
     def add_documents(self, documents: list[IndexDocument]) -> int:
         """Embed and upsert the documents, keyed by chunk id."""
@@ -152,10 +205,11 @@ class OpenSearchVectorStore(RetrievalStore):
                     embedding_model=settings.embedding.model,
                     embedding_provider=settings.embedding.provider,
                 )
-            self._require_configured_dimension()
+            self._require_compatible_index()
             knn: dict[str, Any] = {
                 "vector": self._embeddings.embed_query(query),
                 "k": n_results,
+                "rescore": True,
             }
             if filter_query:
                 knn["filter"] = filter_query
@@ -289,26 +343,34 @@ class OpenSearchVectorStore(RetrievalStore):
     def delete_by_ticker(self, ticker: str) -> int:
         """Delete all documents for a ticker."""
         filter_query = self._to_filter_query(SearchFilters(ticker=ticker.upper().strip()))
-        deleted = 0
+        ids: list[str] = []
+        search_after: Optional[list[Any]] = None
 
+        # Page every id first and never search again after deleting: Serverless search is
+        # eventually consistent, so deleted ids would keep coming back.
         while True:
+            body: dict[str, Any] = {
+                "size": DELETE_PAGE_SIZE,
+                "_source": False,
+                "query": filter_query,
+                "sort": [{"_id": "asc"}],
+            }
+            if search_after:
+                body["search_after"] = search_after
             try:
-                response = self._client.search(
-                    index=self.index_name,
-                    body={"size": DELETE_PAGE_SIZE, "_source": False, "query": filter_query},
-                )
+                hits = self._client.search(index=self.index_name, body=body)["hits"]["hits"]
             except NotFoundError:
                 break
-            ids = [hit["_id"] for hit in response["hits"]["hits"]]
-            if not ids:
+            ids.extend(hit["_id"] for hit in hits)
+            if len(hits) < DELETE_PAGE_SIZE:
                 break
-            self._bulk(
-                [{"_op_type": "delete", "_index": self.index_name, "_id": doc_id} for doc_id in ids]
-            )
-            deleted += len(ids)
+            search_after = hits[-1]["sort"]
 
-        logger.info(f"Deleted {deleted} OpenSearch documents for {ticker.upper().strip()}")
-        return deleted
+        self._bulk(
+            [{"_op_type": "delete", "_index": self.index_name, "_id": doc_id} for doc_id in ids]
+        )
+        logger.info(f"Deleted {len(ids)} OpenSearch documents for {ticker.upper().strip()}")
+        return len(ids)
 
     def count_documents(self, filters: Optional[SearchFilters] = None) -> int:
         """Count documents using optional exact-match metadata filters."""
@@ -384,24 +446,30 @@ class OpenSearchVectorStore(RetrievalStore):
 
         return primary_result, total_search_time_ms
 
-    def _require_configured_dimension(self) -> None:
-        """Refuse an existing index whose vectors differ in size from the configured embedding."""
-        if self._dimension_verified:
+    def _require_compatible_index(self) -> None:
+        """Refuse an existing index whose vector size or compression differs from the configuration."""
+        if self._index_verified:
             return
         mapping = self._client.indices.get_mapping(index=self.index_name)
-        properties = mapping[self.index_name]["mappings"]["properties"]
-        found = int(properties[VECTOR_FIELD]["dimension"])
+        vector = mapping[self.index_name]["mappings"]["properties"][VECTOR_FIELD]
+        found = int(vector["dimension"])
         configured = settings.embedding.dimensions
         if found != configured:
             raise EmbeddingDimensionMismatchError(
                 f"Index {self.index_name!r} holds {found}-dimensional vectors but "
                 f"EMBEDDING_DIMENSIONS is {configured}"
             )
-        self._dimension_verified = True
+        found_level = vector.get("compression_level", "1x")
+        if found_level != self._compression_level:
+            raise IndexCompressionMismatchError(
+                f"Index {self.index_name!r} uses compression level {found_level!r} but "
+                f"OPENSEARCH_COMPRESSION_LEVEL is {self._compression_level!r}"
+            )
+        self._index_verified = True
 
     def _ensure_index(self) -> None:
         if self._client.indices.exists(index=self.index_name):
-            self._require_configured_dimension()
+            self._require_compatible_index()
             return
         dimension = settings.embedding.dimensions
         try:
@@ -424,11 +492,8 @@ class OpenSearchVectorStore(RetrievalStore):
                             VECTOR_FIELD: {
                                 "type": "knn_vector",
                                 "dimension": dimension,
-                                "method": {
-                                    "name": "hnsw",
-                                    "engine": "lucene",
-                                    "space_type": "cosinesimil",
-                                },
+                                "compression_level": self._compression_level,
+                                "method": {"name": "hnsw", "space_type": "cosinesimil"},
                             },
                         },
                     },
@@ -438,16 +503,23 @@ class OpenSearchVectorStore(RetrievalStore):
             if exc.error != "resource_already_exists_exception":
                 raise
             return
-        self._dimension_verified = True
+        self._index_verified = True
         logger.info(f"Created OpenSearch index '{self.index_name}' with dimension={dimension}")
 
     def _bulk(self, actions: list[dict[str, Any]]) -> None:
-        try:
-            helpers.bulk(self._client, actions, refresh="wait_for")
-        except helpers.BulkIndexError as exc:
+        _, errors = helpers.bulk(
+            self._client, actions, raise_on_error=False, **self._write_options
+        )
+        # A delete of an id that is already gone is the outcome the caller asked for.
+        failures = [
+            item
+            for item in errors
+            if not any(op == "delete" and detail.get("status") == 404 for op, detail in item.items())
+        ]
+        if failures:
             raise RuntimeError(
-                f"OpenSearch bulk write failed for {len(exc.errors)} items; first: {exc.errors[0]}"
-            ) from exc
+                f"OpenSearch bulk write failed for {len(failures)} items; first: {failures[0]}"
+            )
 
     @staticmethod
     def _to_filter_query(filters: Optional[SearchFilters]) -> Optional[dict[str, Any]]:

@@ -20,11 +20,11 @@ ev = read_event()
 ti = ev.get("tool_input", {}) or {}
 cmd = ti.get("command", "") or ""
 is_replay = "pytest" in cmd and ("-m replay" in cmd or "EVIDENCE_MODE=replay" in cmd or "tests/replay" in cmd)
-if not is_replay or "unshare -n" in cmd or "NO_NETWORK_APPLIED=1" in cmd:
+if not is_replay or "unshare -rn" in cmd or "NO_NETWORK_APPLIED=1" in cmd:
     raise SystemExit(0)
 if platform.system() == "Linux" and shutil.which("unshare"):
-    new_cmd = f"NO_NETWORK_APPLIED=1 unshare -n sh -c {_q(cmd)}"
-    note = "network namespace disabled via unshare -n"
+    new_cmd = f"NO_NETWORK_APPLIED=1 unshare -rn sh -c {_q('ip link set lo up && ' + cmd)}"
+    note = "network namespace disabled via unshare -rn (loopback up)"
 else:
     new_cmd = ("NO_NETWORK_APPLIED=1 HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 "
                f"NO_PROXY= {cmd}")
