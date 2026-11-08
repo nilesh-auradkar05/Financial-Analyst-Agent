@@ -53,6 +53,13 @@ def settings_describe_the_fake_embedder(monkeypatch: pytest.MonkeyPatch, tmp_pat
     )
 
 
+@pytest.fixture(autouse=True)
+def full_precision_vectors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The store suites index at full precision (`1x`), as the CM-3 test-plan row requires; tests
+    that exercise another level set OPENSEARCH_COMPRESSION_LEVEL themselves."""
+    monkeypatch.setenv("OPENSEARCH_COMPRESSION_LEVEL", "1x")
+
+
 @pytest.fixture
 def embedder() -> FakeEmbedder:
     return FakeEmbedder()
