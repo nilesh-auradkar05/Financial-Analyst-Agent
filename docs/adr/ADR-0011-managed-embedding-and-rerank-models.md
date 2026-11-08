@@ -77,6 +77,15 @@ On-demand input-token prices; the §9a tie rule compares these.
 | Bedrock `amazon.titan-embed-text-v2:0` | $0.02 | AWS Price List API, `AmazonBedrock` us-east-1 (published 2026-11-06): `TitanEmbeddingV2-Text-input-tokens`, $0.00002 per 1K |
 | Azure `text-embedding-3-small` (deployment `embed-3-small`) | $0.022 | azure.microsoft.com/pricing/details/azure-openai, embedding models: $0.000022 per 1K |
 
+## Outcome 2026-11-08 — Gate C embedding (CM-5b): no arm qualified; owner override adopts Cohere Embed v4
+
+- **Run:** three cloud arms (1024 d) built from the CM-4 index (532 chunks, chunk ids unchanged, `embedding_id` verified) on OpenSearch Serverless at 1x, section_aware, top_k 10, anchored fixture v1; each paired with the Qwen3 arm (Gate B result), 75 shared cases, bootstrap seed 13, 10,000 samples. Results commit 8dd1d4a (`evaluation/results/gate_c_<arm>_opensearch_section_aware_retrieval_anchored_benchmark_v1.json`).
+- **K=10 paired Δ vs Qwen3 [95% CI]:** Cohere v4 recall +0.000 [−0.060, +0.060] (4 wins / 67 ties / 4 losses), section_recall +0.000 [−0.040, +0.040], MRR +0.011; Titan V2 recall −0.053 [−0.127, +0.020], section_recall +0.013 [−0.027, +0.067]; Azure 3-small recall −0.033 [−0.107, +0.033], section_recall −0.013 [−0.053, +0.027]. Cloud pairs: Cohere − Titan recall +0.053 [−0.013, +0.120]; Cohere − Azure +0.033 [−0.027, +0.093]; Titan − Azure −0.020 [−0.100, +0.060].
+- **Rule result:** no arm qualifies under retrieval-benchmark §9a (recall@10 CI lower bound below −0.05 for all three; Cohere −0.060). The interval width comes from n = 75 with half-credit scoring; Cohere's means equal Qwen3's. 21 of 75 cases have recall@10 = 0 on all four arms (a shared ceiling, not the embedding).
+- **Decision (owner, 2026-11-08): override, not a qualification.** Cohere Embed v4 at 1024 d (`bedrock:cohere.embed-v4:0:1024`) is adopted as the embedding model; CM-6e makes it the default. Not gated and accepted with it: warm query latency +477 ms p50 vs local Qwen3 (cloud round trip), price $0.12 per million tokens.
+- **Unchanged:** the Foundry fallback stays off until the cross-host parity gate above passes; rerank remains a separate, later axis on the Cohere arm.
+- **Cost:** 0.92 OCU-h ≈ $0.22 (search 2 OCU 20:35–20:53Z, indexing 1 OCU 20:36–20:52Z) plus ≈ $0.02 tokens (estimate).
+
 ## Verify before implementation
 
 - Bedrock batch support for Cohere Embed v4; Foundry deployment of Cohere Embed v4 at 1024 dimensions.

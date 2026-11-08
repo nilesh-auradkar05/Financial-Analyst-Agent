@@ -638,7 +638,7 @@ Trace: retrieval-benchmark §9a; ADR-0011; SPEC §11.1 Gate C
 Scope: three cloud arms on OpenSearch Serverless against the Gate A arm.
 Tests:  Q one paired comparison per arm, single axis · L cost per arm recorded
 Regression: R1 R2 R4
-Done: outcome recorded in ADR-0011. Result: Pending.
+Done: outcome recorded in ADR-0011. Result: DONE 2026-11-08 — no arm qualified under §9a; owner override adopts Cohere Embed v4 (1024 d). Test-plan §21 row amended 08104eb (arm build waits for Serverless write visibility); red c8e593f; feat 971961a (tests unchanged since red); prices and tie-break declared before the run 1d15fba; results 8dd1d4a. Three arms built from the CM-4 index (532 chunks each, per-ticker counts equal, `embedding_id` verified), Serverless 1x, run 20:33–20:42Z. Paired vs Qwen3 at K=10: Cohere recall +0.000 [−0.060, +0.060], section_recall +0.000 [−0.040, +0.040]; Titan recall −0.053 [−0.127, +0.020]; Azure recall −0.033 [−0.107, +0.033]. Cost 0.92 OCU-h ≈ $0.22 + ≈ $0.02 tokens. Arm indexes kept. Details: ADR-0011 "Outcome 2026-11-08". CM-6e unblocked: default = Cohere v4.
 ```
 
 ```text
