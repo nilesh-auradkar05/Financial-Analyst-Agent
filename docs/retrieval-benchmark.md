@@ -241,6 +241,7 @@ The embedding model is a comparison axis like any other, under the same single-a
 - A change of embedding model invalidates every earlier retrieval baseline; no retrieval-quality number carries across it.
 - Rerank is a separate axis and is evaluated only after the embedding decision. Its model is Cohere Rerank v5 fast on Microsoft Foundry (amended 2026-11-07, ADR-0011; was Cohere Rerank 3.5 on Bedrock). A rerank comparison holds the backend, the embedding arm and the candidate pool fixed and changes only whether rerank is applied; result files record the reranker identity (`foundry:<deployment>`).
 - **CM-5b result (2026-11-08):** no cloud arm qualified (recall@10 CI lower bound vs Qwen3: Cohere v4 −0.060, Azure 3-small −0.107, Titan V2 −0.127); Cohere v4 tied Qwen3 on both gated means. The owner overrode the rule and adopted Cohere Embed v4 — an override, not a qualification; the threshold is unchanged. Details and all six pairs: ADR-0011 "Outcome 2026-11-08".
+- **CM-5b amendment (2026-11-08):** a fourth arm, Cohere Embed v5 fast on Foundry, qualifies (Δ vs Qwen3: recall@10 +0.067 [+0.007, +0.133], section_recall@10 +0.000 [+0.000, +0.000]) and is adopted as the default, superseding the v4 override. Details: ADR-0011 "Outcome 2026-11-08 (amended)".
 
 ---
 

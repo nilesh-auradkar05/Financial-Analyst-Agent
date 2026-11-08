@@ -638,7 +638,7 @@ Trace: retrieval-benchmark §9a; ADR-0011; SPEC §11.1 Gate C
 Scope: three cloud arms on OpenSearch Serverless against the Gate A arm.
 Tests:  Q one paired comparison per arm, single axis · L cost per arm recorded
 Regression: R1 R2 R4
-Done: outcome recorded in ADR-0011. Result: DONE 2026-11-08 — no arm qualified under §9a; owner override adopts Cohere Embed v4 (1024 d). Test-plan §21 row amended 08104eb (arm build waits for Serverless write visibility); red c8e593f; feat 971961a (tests unchanged since red); prices and tie-break declared before the run 1d15fba; results 8dd1d4a. Three arms built from the CM-4 index (532 chunks each, per-ticker counts equal, `embedding_id` verified), Serverless 1x, run 20:33–20:42Z. Paired vs Qwen3 at K=10: Cohere recall +0.000 [−0.060, +0.060], section_recall +0.000 [−0.040, +0.040]; Titan recall −0.053 [−0.127, +0.020]; Azure recall −0.033 [−0.107, +0.033]. Cost 0.92 OCU-h ≈ $0.22 + ≈ $0.02 tokens. Arm indexes kept. Details: ADR-0011 "Outcome 2026-11-08". CM-6e unblocked: default = Cohere v4.
+Done: outcome recorded in ADR-0011. Result: DONE 2026-11-08 — no arm qualified under §9a; owner override adopts Cohere Embed v4 (1024 d). Test-plan §21 row amended 08104eb (arm build waits for Serverless write visibility); red c8e593f; feat 971961a (tests unchanged since red); prices and tie-break declared before the run 1d15fba; results 8dd1d4a. Three arms built from the CM-4 index (532 chunks each, per-ticker counts equal, `embedding_id` verified), Serverless 1x, run 20:33–20:42Z. Paired vs Qwen3 at K=10: Cohere recall +0.000 [−0.060, +0.060], section_recall +0.000 [−0.040, +0.040]; Titan recall −0.053 [−0.127, +0.020]; Azure recall −0.033 [−0.107, +0.033]. Cost 0.92 OCU-h ≈ $0.22 + ≈ $0.02 tokens. Arm indexes kept. Details: ADR-0011 "Outcome 2026-11-08". Amended 2026-11-08 (owner request): a fourth arm, Cohere Embed v5 fast on Foundry (Cohere-native route, one-off harness adapter), qualifies under §9a — vs Qwen3 recall@10 +0.067 [+0.007, +0.133], section_recall +0.000 [+0, +0]; vs Cohere v4 recall +0.067 [+0.007, +0.133]; latency not measured (HTTP 429 throttling). The owner adopts it as the default, superseding the v4 override; results 19c634a; details ADR-0011 "Outcome 2026-11-08 (amended)". CM-6e unblocked: default = Cohere Embed v5 fast.
 ```
 
 ```text
@@ -672,9 +672,9 @@ Done: uv.lock has no torch or nvidia-*/triton package; image builds without them
 ```text
 CM-6e — Ollama removed
 Feature: no code, config, Compose entry or health check depends on Ollama.
-Trace: ADR-0016 decision 7; SPEC §5 provider policy; owner decision 2026-11-07
+Trace: ADR-0016 decision 7; SPEC §5 provider policy; owner decision 2026-11-07; ADR-0011 "Outcome 2026-11-08 (amended)"
 Blocked until: CM-4 and CM-5b have run (both embed benchmark queries with qwen3 on the copied index).
-Scope: remove langchain-ollama, OllamaSettings, the Ollama startup and `/health` checks (with CM-6a), OLLAMA_* Compose variables; default embedding = the Gate C winner.
+Scope: remove langchain-ollama, OllamaSettings, the Ollama startup and `/health` checks (with CM-6a), OLLAMA_* Compose variables; default embedding = the Gate C winner, Cohere Embed v5 fast on Foundry. It is served only on Foundry's Cohere-native `/providers/cohere/v2/embed` route, so CM-6e adds that embedding arm and re-runs the CM-5b anchored benchmark through it to confirm the amended Gate C result.
 Tests:  U health and config without Ollama · I ingestion and search on the winning cloud arm (fake transport)
 Regression: R1 R2 R3 R4
 Done: no `ollama` reference in app/, dataops/, evaluation/, Compose or pyproject. Result: Pending.
