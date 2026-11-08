@@ -454,6 +454,8 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Awake ledger (*local*) | Calls within 10 minutes extend one window; a gap over 10 minutes opens a new one; daily minutes equal the union of windows |
 | Refresh before promotion | Promotion waits until `_count` on the staged index equals the manifest; a timeout fails validation and leaves the alias unchanged |
 | Retrieval adoption gate | On the frozen fixture, OpenSearch Serverless vs the Qdrant baseline (backend the only changed variable) stays within the predeclared recall@k and section-coverage tolerance (`retrieval-benchmark.md` §9). Amended 2026-10-23 (ADR-0016): run as CM-4 on the Gate A vectors copied unchanged; on failure work stops for an owner decision (the Qdrant Cloud fallback is withdrawn) |
+| Gate vector copy (CM-4, added 2026-11-08) | Copying a Qdrant collection into an OpenSearch index writes every point with its chunk ID (payload `_retrieval_id`), text, metadata and vector unchanged, with no embedding call; a text that carries two different vectors fails before any write. The copy then waits until `_count` equals the source count and every fixture gold anchor matches a chunk in the index, and fails (no benchmark run) if either is not true before the timeout |
+| Anchored runner on OpenSearch (CM-4, added 2026-11-08) | `--backend opensearch --collection <index>` runs the anchored fixture against that OpenSearch index; the result records `backend: opensearch`, the index name, its compression level and the same `embedding_model` identifier a Qdrant run records under the same settings |
 | Ledger reconciliation | Daily ledger minutes stay within 20% of CloudWatch search OCU activity; beyond that an alarm fires |
 
 ---
