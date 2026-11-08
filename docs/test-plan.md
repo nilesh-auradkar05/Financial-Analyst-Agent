@@ -474,7 +474,7 @@ Observed through the retrieval boundary (`get_embeddings`, the `RetrievalStore` 
 | One index per arm | Two arms never share a collection: the collection name is derived from the embedding identifier, is stable across runs, and the default arm keeps `sec_filings` |
 | Dimension mismatch refused | Opening a collection whose vector size differs from the configured model's dimension fails with a clear error before any write or search |
 | Embedding identifier recorded | Every ingested chunk carries the embedding identifier (provider, model, dimension) in its metadata; also closes the open part of S3-T04 |
-| Arm built from the same chunks | Building an arm's index from the baseline copies every chunk id, text and metadata unchanged and re-embeds only the vector; chunk counts match per ticker |
+| Arm built from the same chunks | Building an arm's index from the baseline copies every chunk id, text and metadata unchanged and re-embeds only the vector; chunk counts match per ticker once the writes are visible: the build polls until the arm index count equals the source count and every fixture gold anchor matches a chunk, and fails naming the index if either is not true before the timeout (amended 2026-11-08, CM-5b: Serverless write lag) |
 | Provider client stays inside the boundary | No provider client object is reachable from outside `app/components/retrieval/` |
 
 ---
