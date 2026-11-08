@@ -618,7 +618,7 @@ Trace: SPEC §11.1 Gate B; retrieval-benchmark §9.1; test-plan §20 "Retrieval 
 Scope: copy the Gate A vectors unchanged; run the anchored benchmark; paired comparison, backend the only axis.
 Tests:  Q paired result within §9 tolerance · L collection cost recorded
 Regression: R1 R2 R4
-Done: Gate B recorded; on failure, stop for an owner decision. Result: Pending.
+Done: Gate B recorded; on failure, stop for an owner decision. Result: DONE 2026-11-08, Gate B PASS. Rows e64a215; red d56fe32 (15 failed); feat 6caafb7 (`evaluation/copy_gate_vectors.py`, runner `--backend opensearch`; tests unchanged since red); result 4d6ca3b. Owner approvals 2026-11-08: tolerance −0.03 confirmed, one copy + one run, keep the index. `copy_gate_vectors` wrote the 532 Gate A points (chunk id, text, metadata, vector; no embedding call) into Serverless index `sec_filings_bench_alpha_evidence_0_1_0` at 1x in 46 s; `_count` 532 = source and every gold anchor matched. Paired comparison (`--strict-case-ids`, shared 75): every metric ties on every case at K=5 and K=10; CI [+0, +0] for recall@10 0.6022 and section_recall@10 0.7733. Item level: 750/750 ranked chunk IDs identical in order, scores within 3.6e-7, no tie reorders. Warm p50 133 → 321 ms (cloud round trip; not gated). Cost (CloudWatch, financial-agent): search 2 OCU 18:29–18:39Z = 0.37 OCU-h, indexing 1 OCU 18:28–18:37Z = 0.17 OCU-h; 0.53 OCU-h × $0.24 ≈ $0.13; both pools 0 by 18:40Z. Index kept as the CM-5b source. Details: retrieval-benchmark §9.1 Result. Agents: `.claude/agents/` is missing, so general-purpose Sonnet (high effort) stood in for test-author and implementer.
 ```
 
 ```text
