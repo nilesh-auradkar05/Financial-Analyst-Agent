@@ -1,8 +1,8 @@
 # CM-3 search stack (ADR-0014, ADR-0016). The project uses the existing next-generation
 # OpenSearch Serverless collection `zcech-banking-emb` (owner decision 2026-11-07). The
 # collection, its group and its encryption/network policies are owner-managed and only read
-# here; this stack owns the data access policy for the project's IAM user. `destroy` removes
-# that policy only.
+# here; this stack owns the project's two data access policies (IAM user, runtime role), both
+# limited to `sec_*` indexes. `destroy` removes those policies only.
 terraform {
   required_version = ">= 1.6"
   required_providers {
@@ -31,9 +31,12 @@ variable "data_access_user" {
 
 locals {
   collection_name = "zcech-banking-emb"
-  group_name      = "nextgen-sec-filings-vec-emb" # the collection data source does not export its group
-  max_ocu         = 2                             # ADR-0014 decision 1; the budget assumes it
+  group_name      = "nextgen-sec-filings-vec-emb"          # the collection data source does not export its group
+  max_ocu         = 2                                      # ADR-0014 decision 1; the budget assumes it
+  index_pattern   = "index/${local.collection_name}/sec_*" # every project index is sec_filings[__<arm>]
 }
+
+data "aws_caller_identity" "current" {}
 
 data "aws_iam_user" "data_access" {
   user_name = var.data_access_user
@@ -85,7 +88,7 @@ resource "aws_opensearchserverless_access_policy" "data" {
       },
       {
         ResourceType = "index"
-        Resource     = ["index/${local.collection_name}/*"]
+        Resource     = [local.index_pattern]
         Permission = [
           "aoss:CreateIndex",
           "aoss:DeleteIndex",
@@ -97,6 +100,41 @@ resource "aws_opensearchserverless_access_policy" "data" {
       },
     ]
     Principal = [data.aws_iam_user.data_access.arn]
+  }])
+}
+
+# Owner-made policy for the runtime role, imported 2026-11-08 (id `opensearch-access-policy/data`):
+# it named `zech-banking-emb` (typo) and granted nothing. Same permissions as the owner wrote them.
+
+resource "aws_opensearchserverless_access_policy" "runtime" {
+  name = "opensearch-access-policy"
+  type = "data"
+  policy = jsonencode([{
+    Rules = [
+      {
+        ResourceType = "collection"
+        Resource     = ["collection/${local.collection_name}"]
+        Permission = [
+          "aoss:CreateCollectionItems",
+          "aoss:DescribeCollectionItems",
+          "aoss:UpdateCollectionItems",
+        ]
+      },
+      {
+        ResourceType = "index"
+        Resource     = [local.index_pattern]
+        Permission = [
+          "aoss:CreateIndex",
+          "aoss:DescribeIndex",
+          "aoss:UpdateIndex",
+          "aoss:DeleteIndex",
+          "aoss:ReadDocument",
+          "aoss:WriteDocument",
+        ]
+      },
+    ]
+    Principal   = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/alpha-analyst-runtime"]
+    Description = "Runtime role: per-arm indexes and documents"
   }])
 }
 
