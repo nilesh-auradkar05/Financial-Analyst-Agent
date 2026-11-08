@@ -67,6 +67,16 @@ The Gate C bake-off compares four embedding models instead of one candidate agai
 - **Unchanged:** rerank stays off by default and is enabled for runtime only if Gate C shows lift; evaluation mode fails closed when the reranker is unavailable or unconfigured; there is no cross-host rerank fallback. Cohere's relevance scores are calibrated to [0, 1], unlike the old cross-encoder logits, so the section and keyword prior boosts (`section_prior_boost` 0.20, `keyword_prior_boost` 0.03) act on a different scale; no reranked result was recorded before this change, so nothing becomes non-comparable.
 - **Tests:** test-plan §25.
 
+## Prices for the CM-5b tie-break (recorded 2026-11-08, before any arm run)
+
+On-demand input-token prices; the §9a tie rule compares these.
+
+| Arm | Price per million input tokens | Source |
+| --- | --- | --- |
+| Bedrock `cohere.embed-v4:0` | $0.12 | AWS Price List API, `AmazonBedrockFoundationModels` us-east-1 (published 2026-10-12): "Cohere Embed 4 Model (Amazon Bedrock Edition)" |
+| Bedrock `amazon.titan-embed-text-v2:0` | $0.02 | AWS Price List API, `AmazonBedrock` us-east-1 (published 2026-11-06): `TitanEmbeddingV2-Text-input-tokens`, $0.00002 per 1K |
+| Azure `text-embedding-3-small` (deployment `embed-3-small`) | $0.022 | azure.microsoft.com/pricing/details/azure-openai, embedding models: $0.000022 per 1K |
+
 ## Verify before implementation
 
 - Bedrock batch support for Cohere Embed v4; Foundry deployment of Cohere Embed v4 at 1024 dimensions.
