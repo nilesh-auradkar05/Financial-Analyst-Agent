@@ -90,3 +90,17 @@ From the official AWS pricing page (https://aws.amazon.com/opensearch-service/pr
 - NextGen collections bill OCU-hours on the collection group, per second; there is **no minimum OCU**, and indexing and search OCUs **scale to zero after 10 minutes of inactivity**. Storage bills separately per GB-month. All collections in a group share its OCUs.
 - The page's worked examples use **$0.24 per OCU-hour** and **$0.02 per GB-month** of managed storage. The earlier $0.334 per OCU-hour (third-party estimate, Context above) overstated compute by about 40%; at 2 OCUs an awake hour is about $0.48 and a 10-minute idle tail about $0.08.
 - Still open: cold-start time on the pinned configuration (measured in CM-3), Terraform `aws` support for `NEXTGEN` collection groups, and the hybrid pipeline and filter spike (CM-3).
+
+## Verified 2026-11-08 (CM-3)
+
+Measured on the owner's NEXTGEN collection `zcech-banking-emb` (group `nextgen-sec-filings-vec-emb`, min 0 / max 2 OCU for indexing and search), which the project uses by owner decision (2026-11-07) instead of creating its own group.
+
+- **Terraform:** the `aws` provider (6.49 or later) exposes `generation = "NEXTGEN"` on collection groups; `awscc` is not needed. The stack in `infra/terraform/search/` reads the collection and group as data sources, fails the plan unless the group is NEXTGEN with min 0 and max ≤ 2 OCU (cost guard), and owns only the data access policy for the project's IAM user.
+- **Access:** requests are SigV4-signed for service `aoss` (`OPENSEARCH_AUTH=sigv4`). The identity needs `aoss:APIAccessAll` in IAM as well as the collection's data access policy; without it every request is 403.
+- **Idle timeout:** compute scaled to zero about 7–10 minutes after the last request (CloudWatch `AWS/AOSS` SearchOCU and IndexingOCU).
+- **Cold start:** 12.9–19.9 s for the first write and 14.9–19.9 s for the first search after scale-to-zero (three measurements). This is above the earlier ~10 s estimate, so the store's default timeout under SigV4 is 30 s.
+- **Write visibility:** 0.2–5.6 s after the write returns. Serverless rejects `refresh=wait_for`, so writes are not refreshed and readers poll `_count`.
+- **Engine settings:** NEXTGEN sets faiss HNSW, cosine, 2 shards, `on_disk` mode and 32× compression by default. It rejects `engine` and `mode` in a mapping, but accepts `compression_level` (`1x` or `32x`) and HNSW `m` / `ef_construction`. Decision 5 is therefore amended: precision is tunable through `compression_level`. Owner rule (2026-11-08): `32x` is the default; full precision (`1x`) is for tests and the CM-4 benchmark only.
+- **Scores:** at 32× without rescoring, local scores are quantized (1.0 / 0.333 / 0.333 against exact 1.0 / 0.973 / 0.943). Searches therefore send `rescore: true`, after which 32× distances matched 1× within 1.6e-6 on Serverless. faiss and Lucene use the same cosine score scale, (1 + cos) / 2.
+- **Filters and hybrid search:** term filters on `ticker` and `section_key` applied inside the k-NN query returned only matching chunks. A normalization search pipeline with a `hybrid` query (BM25 + k-NN) worked. The pipeline outcome only is recorded here; it is adopted in S5.
+- **Other Serverless differences:** `/` answers 404, so the health check probes the index; pooled connections idle for minutes are closed by the server, so SigV4 requests retry a dropped connection once. A `search_after` pass sorted on `_id` works.
