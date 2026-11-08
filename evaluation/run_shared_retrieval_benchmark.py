@@ -20,6 +20,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.components.retrieval.embeddings import embedding_identifier
 from app.components.retrieval.ingestion import CHUNK_OVERLAP, CHUNK_SIZE
+from app.components.retrieval.opensearch_store import (
+    DEFAULT_COMPRESSION_LEVEL,
+    OpenSearchVectorStore,
+)
 from app.components.retrieval.qdrant_store import QdrantVectorStore
 from app.components.retrieval.section_aware_search import search_section_aware
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters
@@ -297,24 +301,33 @@ def _run_anchored_cli(args: argparse.Namespace, parser: argparse.ArgumentParser)
     except FixtureValidationError as error:
         raise SystemExit(f"Invalid anchored fixture {args.fixture}:\n{error}") from error
 
-    store = QdrantVectorStore(collection_name=args.collection)
+    store: QdrantVectorStore | OpenSearchVectorStore
+    if args.backend == "opensearch":
+        store = OpenSearchVectorStore(index_name=args.collection)
+    else:
+        store = QdrantVectorStore(collection_name=args.collection)
     if store.count == 0:
         raise SystemExit(f"Collection {args.collection!r} is empty; build the index first.")
 
+    provenance: dict[str, object] = {
+        "fixture_path": str(args.fixture),
+        "collection": args.collection,
+        "git_sha": current_code_version(),
+        "embedding_model": embedding_identifier(),
+        "evidence_release": args.evidence_release,
+        "chunker": {"chunk_size": CHUNK_SIZE, "chunk_overlap": CHUNK_OVERLAP},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if args.backend == "opensearch":
+        provenance["compression_level"] = (
+            os.getenv("OPENSEARCH_COMPRESSION_LEVEL") or DEFAULT_COMPRESSION_LEVEL
+        )
     result = run_anchored_benchmark(
         fixture,
         store,
         backend=args.backend,
         retrieval_method=args.methods[0],
-        provenance={
-            "fixture_path": str(args.fixture),
-            "collection": args.collection,
-            "git_sha": current_code_version(),
-            "embedding_model": embedding_identifier(),
-            "evidence_release": args.evidence_release,
-            "chunker": {"chunk_size": CHUNK_SIZE, "chunk_overlap": CHUNK_OVERLAP},
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        },
+        provenance=provenance,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -334,8 +347,10 @@ def main() -> None:
             "For an anchored fixture, pass exactly one of: dense, section_aware."
         ),
     )
-    parser.add_argument("--backend", choices=["qdrant"], default="qdrant")
-    parser.add_argument("--collection", help="Qdrant collection to search (anchored fixture).")
+    parser.add_argument("--backend", choices=["qdrant", "opensearch"], default="qdrant")
+    parser.add_argument(
+        "--collection", help="Qdrant collection or OpenSearch index to search (anchored fixture)."
+    )
     parser.add_argument("--output", type=Path, help="Result file (anchored fixture).")
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)
     parser.add_argument("--evidence-release", help="Evidence release id, recorded as provenance.")
