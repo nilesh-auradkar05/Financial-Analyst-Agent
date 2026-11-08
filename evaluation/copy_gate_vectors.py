@@ -119,7 +119,10 @@ def wait_until_ready(
             unreachable = _unreachable_cases(store, fixture)
             if not unreachable:
                 return
-            problem = f"gold anchors not found in the index for cases: {', '.join(unreachable)}"
+            problem = (
+                f"gold anchors not found in index {store.index_name!r} "
+                f"for cases: {', '.join(unreachable)}"
+            )
         if time.monotonic() >= deadline:
             raise RuntimeError(f"{problem} after {timeout_s:g}s")
         time.sleep(poll_s)
