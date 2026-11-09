@@ -1,11 +1,14 @@
 """Trace: docs/test-plan.md §21, embedding provider switch and per-arm indexes (CM-5a; ADR-0011
 amendment 2026-10-11).
 
-The four embedding arms (Ollama Qwen3, Bedrock Cohere Embed v4, Bedrock Titan V2, Azure
-`text-embedding-3-small`) are driven through `get_embeddings()` and the settings that select them.
-The real provider clients run against one loopback fake that serves the three wire formats and
+The four embedding arms (Foundry Cohere Embed v5 fast, Bedrock Cohere Embed v4, Bedrock Titan V2,
+Azure `text-embedding-3-small`) are driven through `get_embeddings()` and the settings that select
+them. The real provider clients run against one loopback fake that serves the wire formats and
 computes every vector from the request (tests/unit/fake_embeddings.py). Settings come from
 environment variables only (tests/embedding_arms.py). No network beyond 127.0.0.1, dummy credentials.
+CM-6e (2026-11-09): Ollama Qwen3 is gone; the default arm is Foundry Cohere Embed v5 fast, and every
+arm, the default included, has an index named from its identifier. The Foundry arm paces its
+requests, so every test here runs on the fake clock (tests/conftest.py `fake_clock`).
 """
 
 from __future__ import annotations
@@ -30,7 +33,7 @@ from tests.embedding_arms import (
     BEDROCK_COHERE,
     BEDROCK_TITAN,
     CLOUD_ARMS,
-    OLLAMA,
+    FOUNDRY_COHERE,
     SECRET_VALUES,
     Arm,
     embeddings_api,
@@ -39,7 +42,8 @@ from tests.embedding_arms import (
 )
 from tests.rag.helpers import SizedFakeEmbedder, find_backend_objects
 from tests.unit.fake_embeddings import (
-    OLLAMA_PATH,
+    FOUNDRY_PATH,
+    FakeClock,
     FakeEmbeddingProviders,
     vector_for,
 )
@@ -50,19 +54,27 @@ PROVIDER_MODULES = (
     "boto3",
     "botocore",
     "openai",
-    "ollama",
     "httpx",
     "langchain_aws",
     "langchain_openai",
-    "langchain_ollama",
 )
 DIMENSION_FIELD = {"bedrock": "dimensions", "azure": "dimensions"}
-CREDENTIAL = {"ollama": "", "bedrock": AWS_ACCESS_KEY_ID, "azure": AZURE_API_KEY}
+CREDENTIAL = {
+    "foundry_cohere": AZURE_API_KEY,
+    "bedrock": AWS_ACCESS_KEY_ID,
+    "azure": AZURE_API_KEY,
+}
+COHERE_STYLE_ARMS = (FOUNDRY_COHERE, BEDROCK_COHERE)
+
+
+@pytest.fixture(autouse=True)
+def clock(fake_clock: FakeClock) -> FakeClock:
+    return fake_clock
 
 
 @pytest.fixture
-def providers() -> Iterator[FakeEmbeddingProviders]:
-    server = FakeEmbeddingProviders().start()
+def providers(clock: FakeClock) -> Iterator[FakeEmbeddingProviders]:
+    server = FakeEmbeddingProviders(clock).start()
     yield server
     server.stop()
 
@@ -83,24 +95,61 @@ def select(
 
 
 def _dimension_field(arm: Arm) -> str:
-    return "output_dimension" if arm is BEDROCK_COHERE else DIMENSION_FIELD[arm.provider]
+    return "output_dimension" if arm in COHERE_STYLE_ARMS else DIMENSION_FIELD[arm.provider]
 
 
-def test_default_is_qwen3_on_ollama_with_the_sec_filings_collection(
+def test_default_is_cohere_embed_v5_fast_on_foundry_with_its_own_collection(
     select: Select, providers: FakeEmbeddingProviders
 ) -> None:
-    """test-plan §21: Default unchanged."""
-    select(OLLAMA)
+    """test-plan §21: Default arm (no embedding setting at all selects it)."""
+    select(FOUNDRY_COHERE)
 
-    assert embeddings_api.embedding_identifier() == "ollama:qwen3-embedding:4b:2560"
+    assert embeddings_api.embedding_identifier() == "foundry_cohere:cohere-embed-v5-fast:1024"
     vectors = embeddings_api.get_embeddings().embed_documents(["alpha"])
-    (request, *_) = providers.requests_to("ollama")
-    assert request.path == OLLAMA_PATH
-    assert request.body["model"] == "qwen3-embedding:4b"
-    assert len(vectors[0]) == 2560
-    assert embeddings_api.embedding_index_name() == "sec_filings"
-    store = OpenSearchVectorStore(url=UNREACHABLE_OPENSEARCH, embeddings=SizedFakeEmbedder(2560))
-    assert store.index_name == "sec_filings"
+    (request, *_) = providers.requests_to("foundry_cohere")
+    assert request.path == FOUNDRY_PATH
+    assert request.body["model"] == "cohere-embed-v5-fast"
+    assert len(vectors[0]) == 1024
+    expected = "sec_filings__foundry-cohere-cohere-embed-v5-fast-1024"
+    assert embeddings_api.embedding_index_name() == expected
+    store = OpenSearchVectorStore(url=UNREACHABLE_OPENSEARCH, embeddings=SizedFakeEmbedder(1024))
+    assert store.index_name == expected
+    assert store.index_name != "sec_filings"
+
+
+def test_default_settings_name_the_foundry_arm(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """test-plan §21: Default arm (the provider default; deployment and dimensions are checked
+    through the identifier in the test above)."""
+    isolate_environment(monkeypatch, tmp_path)
+
+    loaded = Settings()
+
+    assert loaded.embedding.provider == "foundry_cohere"
+
+
+def test_foundry_arm_loads_without_any_credential(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """test-plan §21: Unknown or incomplete configuration (the foundry_cohere arm loads without
+    credentials; the missing setting is reported on first use)."""
+    isolate_environment(monkeypatch, tmp_path, {"EMBEDDING_PROVIDER": "foundry_cohere"})
+
+    loaded = Settings()
+
+    assert loaded.embedding.provider == "foundry_cohere"
+    assert not loaded.llm.azure_openai_endpoint
+    assert not loaded.llm.azure_api_key
+
+
+def test_the_settings_object_has_no_ollama_section() -> None:
+    """test-plan §21 / §25: Ollama is removed; its settings class and section are gone."""
+    import app.config
+
+    assert not hasattr(app.config, "OllamaSettings")
+    assert not hasattr(app.config.settings, "ollama")
+    assert "ollama" not in Settings.model_fields
 
 
 @pytest.mark.parametrize("arm", ARMS, ids=lambda arm: arm.name)
@@ -139,6 +188,13 @@ REJECTED_SETTINGS = [
         (),
         "EMBEDDING_PROVIDER",
         id="unknown-provider",
+    ),
+    pytest.param(
+        BEDROCK_COHERE,
+        {"EMBEDDING_PROVIDER": "ollama"},
+        (),
+        "EMBEDDING_PROVIDER",
+        id="ollama-is-rejected",
     ),
     pytest.param(
         BEDROCK_COHERE, {}, ("EMBEDDING_MODEL",), "EMBEDDING_MODEL", id="bedrock-no-model"
@@ -219,7 +275,7 @@ def test_cloud_arm_asks_its_model_for_the_configured_dimension(
     select(arm, EMBEDDING_DIMENSIONS=str(dimension))
     texts = ["first filing text", "second filing text", "third filing text"]
 
-    assert embeddings_api.embedding_identifier().endswith(f":{dimension}")
+    assert embeddings_api.embedding_identifier() == f"{arm.identifier.rpartition(':')[0]}:{dimension}"
     embeddings = embeddings_api.get_embeddings()
     documents = embeddings.embed_documents(texts)
     query = embeddings.embed_query("a question about the filing")
@@ -229,7 +285,7 @@ def test_cloud_arm_asks_its_model_for_the_configured_dimension(
         assert request.body[_dimension_field(arm)] == dimension
     assert [len(vector) for vector in documents] == [dimension] * len(texts)
     assert len(query) == dimension
-    input_type = "search_document" if arm is BEDROCK_COHERE else ""
+    input_type = "search_document" if arm in COHERE_STYLE_ARMS else ""
     for vector, text in zip(documents, texts):
         assert vector == pytest.approx(vector_for(arm.model, text, dimension, input_type), abs=1e-6)
 
@@ -267,12 +323,13 @@ def test_bedrock_arm_authenticates_with_the_bearer_token_that_settings_read(
     assert [len(vector) for vector in vectors] == [arm.dimension]
 
 
+@pytest.mark.parametrize("arm", COHERE_STYLE_ARMS, ids=lambda arm: arm.name)
 def test_query_and_document_embeddings_of_the_same_text_use_different_input_types(
-    select: Select, providers: FakeEmbeddingProviders
+    select: Select, providers: FakeEmbeddingProviders, arm: Arm
 ) -> None:
     """test-plan §21: Query and document conventions."""
-    select(BEDROCK_COHERE)
-    assert embeddings_api.embedding_identifier() == BEDROCK_COHERE.identifier
+    select(arm)
+    assert embeddings_api.embedding_identifier() == arm.identifier
     embeddings = embeddings_api.get_embeddings()
     text = "supply chain concentration risk"
 
@@ -287,7 +344,9 @@ def test_query_and_document_embeddings_of_the_same_text_use_different_input_type
 
 
 EXPECTED_INDEX_NAMES = [
-    pytest.param(OLLAMA, "sec_filings", id="ollama-qwen3"),
+    pytest.param(
+        FOUNDRY_COHERE, "sec_filings__foundry-cohere-cohere-embed-v5-fast-1024", id="foundry-cohere"
+    ),
     pytest.param(
         BEDROCK_COHERE, "sec_filings__bedrock-cohere-embed-v4-0-1024", id="bedrock-cohere"
     ),
@@ -300,7 +359,7 @@ EXPECTED_INDEX_NAMES = [
 
 @pytest.mark.parametrize(("arm", "expected"), EXPECTED_INDEX_NAMES)
 def test_each_arm_names_its_own_stable_collection(select: Select, arm: Arm, expected: str) -> None:
-    """test-plan §21: One index per arm (derived from the identifier; the default keeps sec_filings)."""
+    """test-plan §21: One index per arm (derived from the identifier for every arm, the default included)."""
     select(arm)
     first = embeddings_api.embedding_index_name()
     select(arm)
@@ -324,13 +383,13 @@ def test_arms_never_share_a_collection_and_a_base_name_is_kept(select: Select) -
     names["cohere-512"] = embeddings_api.embedding_index_name()
     select(BEDROCK_COHERE)
     based = embeddings_api.embedding_index_name("other_base")
-    select(OLLAMA)
+    select(FOUNDRY_COHERE)
     default_based = embeddings_api.embedding_index_name("other_base")
 
     assert len(set(names.values())) == len(names)
     assert names["cohere-512"] == "sec_filings__bedrock-cohere-embed-v4-0-512"
     assert based == "other_base__bedrock-cohere-embed-v4-0-1024"
-    assert default_based == "other_base"
+    assert default_based == "other_base__foundry-cohere-cohere-embed-v5-fast-1024"
 
 
 def test_an_explicit_index_name_still_wins_verbatim(

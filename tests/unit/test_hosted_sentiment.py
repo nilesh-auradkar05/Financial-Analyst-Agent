@@ -264,16 +264,12 @@ def test_importing_and_calling_sentiment_loads_no_local_model(foundry):
 
 
 @pytest.fixture
-def client(monkeypatch, tmp_path):
-    async def healthy(**_kwargs):
-        return True
-
+def client(monkeypatch, tmp_path, foundry):
     monkeypatch.setattr(api, "run_store", FileBackedRunStore(tmp_path / "runs.json"))
     monkeypatch.setattr(api, "submission_limiter", api.SubmissionRateLimiter())
     monkeypatch.setattr(api.settings, "api_key", "private-auth-value")
     monkeypatch.setattr(api.settings.langsmith, "tracing_v2", False)
     monkeypatch.setattr(api.settings.langsmith, "api_key", None)
-    monkeypatch.setattr(api, "check_ollama_health", healthy)
     with TestClient(api.app) as test_client:
         yield test_client
 

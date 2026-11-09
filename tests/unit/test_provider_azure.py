@@ -160,12 +160,9 @@ def test_run_metadata_and_attempt_count_follow_the_first_configured_tier(
 
 @pytest.mark.asyncio
 async def test_health_accepts_azure_as_the_configured_chat_provider(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, embedding_arm_configured: None
 ) -> None:
     from app import main
-
-    async def embedding_available(*, model: str | None = None) -> bool:
-        return True
 
     async def langsmith_status() -> dict[str, bool]:
         return {"connected": False}
@@ -175,7 +172,6 @@ async def test_health_accepts_azure_as_the_configured_chat_provider(
 
     monkeypatch.setattr(main.settings, "llm", _azure_settings(monkeypatch).llm)
     monkeypatch.setattr(main.settings.llm, "aws_region", None)
-    monkeypatch.setattr(main, "check_ollama_health", embedding_available)
     monkeypatch.setattr(main, "check_langsmith_connection", langsmith_status)
     monkeypatch.setattr(main, "get_vector_store", lambda: Store())
 

@@ -1,8 +1,8 @@
 """Building an embedding arm's index from the baseline chunks (test-plan §21; CM-5a, CM-5b, layer I).
 
-The baseline is a 2560-d index stamped with the default identifier; the arm is a 1024-d Bedrock
-Cohere index. Both live on the local OpenSearch test container, each filled through the store with a
-hashed fake embedder of its dimension. The build runs under the arm's settings, as the CLI does, so
+The baseline is a 512-d index stamped with the Bedrock Titan identifier at 512 dimensions; the arm
+is a 1024-d Bedrock Cohere index. Both live on the local OpenSearch test container, each filled
+through the store with a hashed fake embedder of its dimension. The build runs under the arm's settings, as the CLI does, so
 reading the baseline must not be refused because its vector size differs from the configured one.
 
 CM-5b (test-plan §21, amended 2026-11-08): the build also waits for the arm index to become visible
@@ -26,12 +26,15 @@ import pytest
 from app.components.retrieval.opensearch_store import OpenSearchVectorStore
 from app.components.retrieval.vector_store import IndexDocument, SearchFilters
 from evaluation.validate_retrieval_fixture import AnchoredFixture
-from tests.embedding_arms import BEDROCK_COHERE, OLLAMA, use_embedding_settings
+from tests.embedding_arms import BEDROCK_COHERE, BEDROCK_TITAN, use_embedding_settings
 from tests.rag.gate_support import SECTIONS, build_gate_chunks, load_fixture_from
 from tests.rag.helpers import SizedFakeEmbedder, raw_vector
 
 NO_ENDPOINT = "http://127.0.0.1:1"
-SOURCE_EMBEDDER = SizedFakeEmbedder(OLLAMA.dimension, model="qwen-like")
+SOURCE_DIMENSION = 512
+SOURCE_SETTINGS = BEDROCK_TITAN.with_dimension(SOURCE_DIMENSION)
+SOURCE_IDENTIFIER = f"bedrock:{BEDROCK_TITAN.model}:{SOURCE_DIMENSION}"
+SOURCE_EMBEDDER = SizedFakeEmbedder(SOURCE_DIMENSION, model="source-like")
 TARGET_EMBEDDER = SizedFakeEmbedder(BEDROCK_COHERE.dimension, model="cohere-like")
 TIMEOUT_S = 0.6
 POLL_S = 0.05
@@ -111,7 +114,9 @@ def arm_pair(
         defer: Callable[[IndexDocument], bool] = lambda document: False,
         release_after_s: float | None = None,
     ) -> tuple[OpenSearchVectorStore, DeferringTargetStore]:
-        use_embedding_settings(monkeypatch, tmp_path, OLLAMA.routed_to(NO_ENDPOINT))
+        use_embedding_settings(
+            monkeypatch, tmp_path, {**BEDROCK_TITAN.routed_to(NO_ENDPOINT), **SOURCE_SETTINGS}
+        )
         source = _store(opensearch_url, new_index(), SOURCE_EMBEDDER)
         source.add_documents(documents)
         use_embedding_settings(monkeypatch, tmp_path, BEDROCK_COHERE.routed_to(NO_ENDPOINT))
@@ -164,7 +169,7 @@ def test_arm_is_built_from_the_same_chunks_re_embedding_only_the_vector(
     assert copied.keys() == original.keys() == {document.id for document in corpus}
     for chunk_id, document in copied.items():
         assert document.text == original[chunk_id].text
-        assert original[chunk_id].metadata["embedding_id"] == OLLAMA.identifier
+        assert original[chunk_id].metadata["embedding_id"] == SOURCE_IDENTIFIER
         assert document.metadata["embedding_id"] == BEDROCK_COHERE.identifier
         unchanged = {k: v for k, v in document.metadata.items() if k != "embedding_id"}
         assert unchanged == {

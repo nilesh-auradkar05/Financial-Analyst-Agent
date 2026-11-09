@@ -201,11 +201,6 @@ def no_live_tools(monkeypatch: pytest.MonkeyPatch) -> None:
         (embeddings, "get_embeddings"),
         (embeddings, "embed_texts"),
         (embeddings, "embed_query"),
-        (embeddings, "embed_texts_async"),
-        (embeddings, "embed_query_async"),
-        (embeddings.EmbeddingsClient, "embed_single"),
-        (embeddings.EmbeddingsClient, "embed_texts"),
-        (embeddings.EmbeddingsClient, "embed_query"),
     ]
     for owner, attribute in targets:
         monkeypatch.setattr(

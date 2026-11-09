@@ -89,10 +89,6 @@ async def fake_run_agent(
     )
 
 
-async def fake_check_ollama_health() -> bool:
-    return True
-
-
 async def fake_check_langsmith_connection() -> dict:
     return {"connected": True}
 
@@ -106,14 +102,13 @@ async def fake_ingest_10k_for_ticker(ticker: str):
         error=None,
     )
 
-def test_runtime_hardened_pipeline_end_to_end(tmp_path: Path, monkeypatch):
+def test_runtime_hardened_pipeline_end_to_end(tmp_path: Path, monkeypatch, embedding_arm_configured):
     run_store_path = tmp_path / "run_store.json"
     temp_store = FileBackedRunStore(run_store_path)
 
     monkeypatch.setattr(main, "run_store", temp_store)
     monkeypatch.setattr(main, "get_vector_store", lambda: FakeVectorStore())
     monkeypatch.setattr(main, "run_agent", fake_run_agent)
-    monkeypatch.setattr(main, "check_ollama_health", fake_check_ollama_health)
     monkeypatch.setattr(main, "check_langsmith_connection", fake_check_langsmith_connection)
     monkeypatch.setattr(main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
 
@@ -122,7 +117,7 @@ def test_runtime_hardened_pipeline_end_to_end(tmp_path: Path, monkeypatch):
         assert health.status_code == 200
         health_payload = health.json()
         assert health_payload["status"] == "healthy"
-        assert health_payload["components"]["ollama"]["ok"] is True
+        assert health_payload["components"]["embedding"]["ok"] is True
         assert health_payload["components"]["vector_store"]["ok"] is True
 
         ingest = client.post(

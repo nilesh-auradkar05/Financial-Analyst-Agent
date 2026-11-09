@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from app.config import (
     LLMSettings,
-    OllamaSettings,
     RetrySettings,
     Settings,
     settings,
@@ -19,10 +18,6 @@ class TestSettingsDefaults:
     def test_settings_singleton_exists(self):
         assert settings is not None
         assert isinstance(settings, Settings)
-
-    def test_ollama_defaults(self):
-        assert settings.ollama.base_url == "http://localhost:11434"
-        assert settings.ollama.embed_model == "qwen3-embedding:4b"
 
     def test_chroma_defaults(self):
         assert settings.chroma.collection_name == "sec_filings"
@@ -51,14 +46,6 @@ class TestSettingsDefaults:
 
 class TestSettingsCustomValues:
     """Medium — verify custom instantiation."""
-
-    def test_ollama_custom_values(self):
-        custom = OllamaSettings(
-            base_url="http://custom:11434",
-            temperature=0.5,
-        )
-        assert custom.base_url == "http://custom:11434"
-        assert custom.temperature == 0.5
 
     def test_retry_custom_values(self):
         custom = RetrySettings(

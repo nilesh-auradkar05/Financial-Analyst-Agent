@@ -75,7 +75,7 @@ def test_anchored_run_on_an_opensearch_index_records_backend_index_level_and_emb
     assert provenance["collection"] == index_name
     assert provenance["compression_level"] == level
     assert provenance["embedding_model"] == embedding_identifier()
-    assert provenance["embedding_model"] == "ollama:fake-hash-embed:16"
+    assert provenance["embedding_model"] == "bedrock:fake-hash-embed:16"
     indexed_ids = {chunk.id for chunk in chunks}
     retrieved = {row["chunk_id"] for case in result["cases"] for row in case["retrieved"]}
     assert result["summary"]["n_cases"] == len(result["cases"]) > 50

@@ -49,14 +49,11 @@ class RunCollector:
 
 
 @pytest.fixture
-def offline(monkeypatch, tmp_path):
+def offline(monkeypatch, tmp_path, embedding_arm_configured):
     from types import SimpleNamespace
 
     import app.observability.langsmith as tracing
     from app.services.run_store import FileBackedRunStore
-    async def healthy(**kwargs):
-        return True
-    monkeypatch.setattr(api, "check_ollama_health", healthy)
     monkeypatch.setattr(api, "get_vector_store", lambda: SimpleNamespace(count=0))
     monkeypatch.setattr(api, "run_store", FileBackedRunStore(tmp_path / "runs.json"))
     monkeypatch.setattr(api, "submission_limiter", api.SubmissionRateLimiter())

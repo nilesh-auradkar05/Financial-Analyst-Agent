@@ -348,7 +348,7 @@ def env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> pytest.MonkeyPatch:
         monkeypatch,
         tmp_path,
         {
-            "EMBEDDING_PROVIDER": "ollama",
+            "EMBEDDING_PROVIDER": "bedrock",
             "EMBEDDING_MODEL": FakeEmbedder.model,
             "EMBEDDING_DIMENSIONS": str(FakeEmbedder.dimension),
         },

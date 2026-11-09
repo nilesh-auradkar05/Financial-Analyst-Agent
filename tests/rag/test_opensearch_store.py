@@ -106,7 +106,7 @@ def test_ingested_chunks_carry_the_embedding_identifier(
     chunks = store.search("all chunks", n_results=1000).chunks
     assert result.success is True
     assert len(chunks) == store.count_documents() > 0
-    expected = f"ollama:{embedder.model}:{embedder.dimension}"
+    expected = f"bedrock:{embedder.model}:{embedder.dimension}"
     assert {chunk.metadata.get("embedding_id") for chunk in chunks} == {expected}
 
 

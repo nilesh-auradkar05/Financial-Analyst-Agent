@@ -189,11 +189,10 @@ def test_unconfigured_fallbacks_are_skipped() -> None:
 
 
 @pytest.mark.asyncio
-async def test_health_accepts_configured_personal_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_health_accepts_configured_personal_fallback(
+    monkeypatch: pytest.MonkeyPatch, embedding_arm_configured: None
+) -> None:
     from app import main
-
-    async def embedding_available(*, model: str | None = None) -> bool:
-        return True
 
     async def langsmith_status() -> dict[str, bool]:
         return {"connected": False}
@@ -203,7 +202,6 @@ async def test_health_accepts_configured_personal_fallback(monkeypatch: pytest.M
 
     monkeypatch.setattr(main.settings.llm, "aws_region", None)
     monkeypatch.setattr(main.settings.llm, "anthropic_api_key", SecretStr("dummy"))
-    monkeypatch.setattr(main, "check_ollama_health", embedding_available)
     monkeypatch.setattr(main, "check_langsmith_connection", langsmith_status)
     monkeypatch.setattr(main, "get_vector_store", lambda: Store())
 

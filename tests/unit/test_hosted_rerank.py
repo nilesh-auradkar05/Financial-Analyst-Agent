@@ -240,7 +240,15 @@ def test_lockfile_holds_no_local_model_package():
     forbidden = {
         name
         for name in names
-        if name in {"torch", "transformers", "sentence-transformers", "triton"}
+        if name
+        in {
+            "torch",
+            "transformers",
+            "sentence-transformers",
+            "triton",
+            "ollama",
+            "langchain-ollama",
+        }
         or name.startswith(("nvidia-", "cuda-"))
     }
 
@@ -253,7 +261,9 @@ def test_importing_retrieval_and_sentiment_loads_no_local_model():
         "import json, sys\n"
         "import app.components.retrieval.reranked_hybrid_retrieve\n"
         "import app.services.sentiment\n"
-        "banned = {'torch', 'transformers', 'sentence_transformers'}\n"
+        "import app.components.retrieval.embeddings\n"
+        "import app.components.retrieval.ingestion\n"
+        "banned = {'torch', 'transformers', 'sentence_transformers', 'ollama', 'langchain_ollama'}\n"
         "loaded = sorted(m for m in sys.modules if m.split('.')[0] in banned)\n"
         "print(json.dumps(loaded))\n"
     )
@@ -268,3 +278,10 @@ def test_importing_retrieval_and_sentiment_loads_no_local_model():
 
     assert done.returncode == 0, done.stderr[-2000:]
     assert json.loads(done.stdout.strip().splitlines()[-1]) == []
+
+
+def test_compose_file_sets_no_ollama_variable():
+    """test-plan §25: No local model packages (docker-compose.yml)."""
+    lines = (ROOT / "docker-compose.yml").read_text(encoding="utf-8").splitlines()
+
+    assert [line for line in lines if "OLLAMA_" in line] == []

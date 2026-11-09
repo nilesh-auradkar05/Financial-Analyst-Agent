@@ -39,14 +39,14 @@ def opensearch_url() -> str:
 
 @pytest.fixture(autouse=True)
 def settings_describe_the_fake_embedder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Configuration names the 16-d fake (ollama:fake-hash-embed:16), so the embedding identifier
+    """Configuration names the 16-d fake (bedrock:fake-hash-embed:16), so the embedding identifier
     and index dimension that settings dictate agree with the vectors the fake produces. Tests that
     exercise another arm call `use_embedding_settings` themselves."""
     use_embedding_settings(
         monkeypatch,
         tmp_path,
         {
-            "EMBEDDING_PROVIDER": "ollama",
+            "EMBEDDING_PROVIDER": "bedrock",
             "EMBEDDING_MODEL": FakeEmbedder.model,
             "EMBEDDING_DIMENSIONS": str(FakeEmbedder.dimension),
         },
