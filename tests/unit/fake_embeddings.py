@@ -82,11 +82,11 @@ class FakeClock:
 
     Real time keeps flowing underneath, so asyncio's loop clock (which reads `time.monotonic`)
     still advances, and the offset never shrinks between tests. A new clock starts with the
-    process idle for a while, so the first request of a test is never held back by the pacing
-    of an earlier test.
+    process idle for longer than the pacing window (60 s of request and token budget), so the
+    first request of a test is never held back by an earlier test.
     """
 
-    IDLE_AT_START_SECONDS = 10.0
+    IDLE_AT_START_SECONDS = 70.0
 
     def __init__(self) -> None:
         self.sleeps: list[float] = []
