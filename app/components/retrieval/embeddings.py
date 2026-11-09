@@ -21,6 +21,8 @@ from __future__ import annotations
 import re
 import threading
 import time
+from collections import deque
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -33,15 +35,20 @@ from loguru import logger
 
 from app.config import settings
 
-# Cohere Embed v5 fast on Foundry allows 20 requests per minute; stay under it.
+# Cohere Embed v5 fast on Foundry allows 20 requests and 20,000 tokens per minute; stay under both.
 FOUNDRY_COHERE_MIN_INTERVAL_SECONDS = 60 / 18
+FOUNDRY_COHERE_TOKENS_PER_MINUTE = 18_000
+FOUNDRY_COHERE_MAX_REQUEST_TOKENS = 6_000
+# The provider counts a rolling 60 s from its own clock; one second of slack covers network latency.
+_FOUNDRY_COHERE_WINDOW_SECONDS = 61.0
 _FOUNDRY_COHERE_MAX_TEXTS = 96
 _FOUNDRY_COHERE_MAX_RETRY_WAIT_SECONDS = 60.0
 
-# ponytail: per-process limiter; several processes sharing one deployment need a shared
-# limiter (S7.9 cache store).
+# ponytail: per-process limiter, and tokens are estimated as ceil(chars / 4), which can
+# under-count dense text (the retry covers small misses). Several processes sharing one
+# deployment need a shared limiter (S7.9 cache store); provider token counts are the upgrade.
 _pacing_lock = threading.Lock()
-_last_request_start: float | None = None
+_recent_starts: deque[tuple[float, int]] = deque()  # (start time, estimated tokens)
 
 
 class EmbeddingUnavailableError(RuntimeError):
@@ -63,15 +70,52 @@ def embedding_index_name(base: str = "sec_filings") -> str:
     return f"{base}__{re.sub(r'[^a-z0-9]+', '-', embedding_identifier().lower())}"
 
 
-def _wait_for_request_slot() -> None:
-    """Block until a request may start, then claim the slot; an idle process is not delayed."""
-    global _last_request_start
+def estimate_tokens(text: str) -> int:
+    return -(-len(text) // 4)
+
+
+def _drop_expired_starts(now: float) -> None:
+    while _recent_starts and _recent_starts[0][0] <= now - _FOUNDRY_COHERE_WINDOW_SECONDS:
+        _recent_starts.popleft()
+
+
+def _wait_for_request_slot(tokens: int) -> None:
+    """Block until a request of `tokens` may start, then claim the slot; an idle process is not delayed."""
     with _pacing_lock:
-        if _last_request_start is not None:
-            wait = _last_request_start + FOUNDRY_COHERE_MIN_INTERVAL_SECONDS - time.monotonic()
-            if wait > 0:
-                time.sleep(wait)
-        _last_request_start = time.monotonic()
+        now = time.monotonic()
+        _drop_expired_starts(now)
+        wait = 0.0
+        if _recent_starts:
+            wait = _recent_starts[-1][0] + FOUNDRY_COHERE_MIN_INTERVAL_SECONDS - now
+            in_window = sum(started_tokens for _, started_tokens in _recent_starts)
+            for started, started_tokens in _recent_starts:
+                if in_window + tokens <= FOUNDRY_COHERE_TOKENS_PER_MINUTE:
+                    break
+                in_window -= started_tokens
+                wait = max(wait, started + _FOUNDRY_COHERE_WINDOW_SECONDS - now)
+        if wait > 0:
+            time.sleep(wait)
+        now = time.monotonic()
+        _drop_expired_starts(now)
+        _recent_starts.append((now, tokens))
+
+
+def _batches(texts: list[str]) -> Iterator[list[str]]:
+    """Consecutive batches of at most 96 texts and 6,000 estimated tokens; an oversized text goes alone."""
+    batch: list[str] = []
+    batch_tokens = 0
+    for text in texts:
+        tokens = estimate_tokens(text)
+        if batch and (
+            len(batch) == _FOUNDRY_COHERE_MAX_TEXTS
+            or batch_tokens + tokens > FOUNDRY_COHERE_MAX_REQUEST_TOKENS
+        ):
+            yield batch
+            batch, batch_tokens = [], 0
+        batch.append(text)
+        batch_tokens += tokens
+    if batch:
+        yield batch
 
 
 def _retry_wait_seconds(retry_after: str | None) -> float:
@@ -89,8 +133,7 @@ class FoundryCohereEmbeddings(Embeddings):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
-        for start in range(0, len(texts), _FOUNDRY_COHERE_MAX_TEXTS):
-            batch = texts[start : start + _FOUNDRY_COHERE_MAX_TEXTS]
+        for batch in _batches(texts):
             vectors.extend(self._embed(batch, "search_document"))
         return vectors
 
@@ -121,8 +164,9 @@ class FoundryCohereEmbeddings(Embeddings):
 
     @staticmethod
     def _post(url: str, key: str, payload: dict[str, Any]) -> httpx.Response:
+        tokens = sum(estimate_tokens(text) for text in payload["texts"])
         for attempt in (1, 2):
-            _wait_for_request_slot()
+            _wait_for_request_slot(tokens)
             retry_after = None
             try:
                 reply = httpx.post(
