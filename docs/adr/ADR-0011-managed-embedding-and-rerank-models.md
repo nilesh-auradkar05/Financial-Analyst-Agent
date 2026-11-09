@@ -107,6 +107,14 @@ Recorded before the CM-6e confirmation run.
 - **Ceiling (`ponytail`):** the pacing is per process. Several API or worker processes sharing one deployment can still exceed 20 RPM together; a shared limiter (for example in the cache store, S7.9) is the upgrade when more than one process embeds queries.
 - **Health:** `/health` reports the embedding arm from configuration only, because a live probe would spend the quota. Ollama is removed from code, Compose and dependencies (ADR-0016 decision 7).
 
+## Outcome 2026-11-09 (CM-6e confirmation) — the product arm confirms Gate C
+
+- **Run:** product arm `foundry_cohere` (deployment `cohere-embed-v5-fast`, 1024 d) at git 1da05d4, built with `evaluation/build_embedding_arm.py` from the CM-4 index into `sec_filings_bench_alpha_evidence_0_1_0__foundry-cohere-cohere-embed-v5-fast-1024` (532 chunks: AAPL 125, MSFT 209, NVDA 198; every chunk `embedding_id` = the identifier), Serverless 1x, section_aware, top_k 10, anchored fixture v1, seed 13, 10,000 samples. Build 17:40:31–17:47:23Z, benchmark 17:47:27–18:01:30Z. Result: `evaluation/results/gate_c_foundry-cohere-embed-v5-fast_opensearch_section_aware_retrieval_anchored_benchmark_v1.json`. Index kept (owner, 2026-11-09).
+- **Quality:** identical to the CM-5b v5 arm on every metric at K=5 and K=10, and item by item: 75/75 cases with the same 750 ranked chunk ids in the same order, max score difference 3.8e-4. vs Qwen3 (Gate B) at K=10: recall +0.067 [+0.007, +0.133], section_recall +0.000 [+0.000, +0.000], pass +0.067 [+0.000, +0.133] → qualifies under retrieval-benchmark §9a. This result is the R4 baseline from now on.
+- **Quota behaviour:** a first build at 08:50Z (git 646979f, request pacing only) failed with HTTP 429 after two 96-chunk batches: the deployment's 20,000 tokens-per-minute limit (see the amendment above). With token pacing the build made 21 requests, all 200, no 429; estimated tokens 98,362 vs billed 76,571 (the ⌈characters ÷ 4⌉ estimate over-counts by about 28%, the safe side); lowest remaining-token header 4,170. The benchmark made 236 query requests, all 200, no 429; one transport `ConnectError` recovered on its single retry.
+- **Latency (now measured):** per-request embedding latency p50 527 ms, p95 965 ms (HTTP, no 429). The runner's per-case warm latency (p50-paired mean 5,220 ms vs Qwen3 292 ms) is dominated by the client's own pacing: each case issues several queries back to back and waits 60/18 s between them (607 s of pacing over the run). It measures the 20 RPM quota, not the model.
+- **Cost:** run 2 0.883 OCU-h (search 2 OCU 17:43–18:01Z, indexing 1 OCU 17:44–17:58Z) ≈ $0.21 plus ≈ 80k billed tokens ≈ $0.01; the failed first build 0.483 OCU-h ≈ $0.12. Total ≈ $0.34. Both pools 0 by 18:02Z.
+
 ## Verify before implementation
 
 - Bedrock batch support for Cohere Embed v4; Foundry deployment of Cohere Embed v4 at 1024 dimensions.
