@@ -153,12 +153,16 @@ async def test_construction_and_timeout_failures_reach_next_provider(
     settings = _settings()
     settings.llm.anthropic_api_key = SecretStr("dummy")
     settings.llm.openai_api_key = SecretStr("dummy")
+    # The attempt budget must cover thread handoff and the start callback (normally 2-11 ms,
+    # stalls seen past 100 ms under load) as well as force the timeout; 50 ms lost the
+    # anthropic span about 1 run in 200 even on an idle machine.
+    settings.llm.request_timeout_seconds = 0.5
 
     def broken_bedrock(_: Settings) -> EchoModel:
         raise RuntimeError("unavailable")
 
     monkeypatch.setattr(provider, "_bedrock_model", broken_bedrock)
-    monkeypatch.setattr("langchain_anthropic.ChatAnthropic", lambda **_: EchoModel(provider_name="anthropic", delay=0.2))
+    monkeypatch.setattr("langchain_anthropic.ChatAnthropic", lambda **_: EchoModel(provider_name="anthropic", delay=30))
     monkeypatch.setattr("langchain_openai.ChatOpenAI", lambda **_: EchoModel(provider_name="openai"))
     events = TraceEvents()
     response = await provider.get_llm(settings).ainvoke("check", config={"callbacks": [events]})
