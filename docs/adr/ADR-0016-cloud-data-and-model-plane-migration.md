@@ -1,6 +1,6 @@
 # ADR-0016 — Cloud data and model plane first; Qdrant and Chroma retired
 
-**Status:** Accepted (2026-10-23) by owner decision. Amended 2026-11-07: decision 6 resolved by ADR-0019 (Claude Sonnet 5.5 on Foundry); decision 3 corrected — copying the vectors avoids re-embedding the corpus, but every benchmark query is still embedded with `qwen3-embedding:4b`, so CM-4 and CM-5b need host Ollama; Ollama is removed after them (CM-6e). Supersedes ADR-0003. Amends ADR-0006 (entry criteria scope), ADR-0011 (bake-off substrate and fallback rule) and ADR-0014 (only store; adoption gate).
+**Status:** Accepted (2026-10-23) by owner decision. Amended 2026-11-07: decision 6 resolved by ADR-0019 (Claude Sonnet 5.5 on Foundry); decision 3 corrected — copying the vectors avoids re-embedding the corpus, but every benchmark query is still embedded with `qwen3-embedding:4b`, so CM-4 and CM-5b need host Ollama; Ollama is removed after them (CM-6e). Amended 2026-11-09: decision 7 resolved — Ollama removed in CM-6e. Supersedes ADR-0003. Amends ADR-0006 (entry criteria scope), ADR-0011 (bake-off substrate and fallback rule) and ADR-0014 (only store; adoption gate).
 **Date:** 2026-10-23
 **Related:** SPEC §§1, 3, 5, 6, 11.1, 12, 16; ADR-0003; ADR-0006; ADR-0011; ADR-0014; ADR-0015; `docs/retrieval-benchmark.md` §§8, 9, 9a; test-plan §§4, 5, 20, 21; sprint-plan "Authorized cloud data and model plane migration (2026-10-23)".
 
@@ -21,7 +21,7 @@ On 2026-10-23 the owner set a new priority: move the project onto managed cloud 
 4. **Embedding bake-off on OpenSearch Serverless (CM-5).** Titan Text Embeddings V2 and Cohere Embed v4 (Bedrock) and `text-embedding-3-small` (Foundry), each at 1024 dimensions, are built from the same chunks as one index each and compared with the copied Qwen3 index; only the embedding differs. The bake-off tolerance and winner rule are in `docs/retrieval-benchmark.md` §9a. If no cloud arm qualifies, work stops and the owner decides; Qwen3 is not a fallback because it is not served in the cloud.
 5. **Cost controls before the first resource (CM-1).** AWS Budgets alerts at $10 and $25 and the $100 action, resource tags, and a written teardown command exist before any cloud resource is created. Every `apply` that creates billable resources is approved by the owner first.
 6. **Sentiment moves to a hosted model (CM-6b).** The choice between a hosted FinBERT endpoint and an LLM classification call is made after a spike and recorded in its own ADR, which amends ADR-0015 §1 (ONNX FinBERT in the worker). Label parity against local FinBERT is recorded before the switch.
-7. **Ollama.** No new code depends on Ollama. Whether it leaves the default development path is decided in CM-6.
+7. **Ollama.** Removed in CM-6e (2026-11-09): no code, configuration, Compose entry, dependency or health check depends on Ollama; the default embedding arm is Cohere Embed v5 fast on Foundry (ADR-0011 amendment 2026-11-09).
 
 ## Ordered tasks
 

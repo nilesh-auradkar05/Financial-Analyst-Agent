@@ -1,6 +1,6 @@
 # ADR-0011 — Managed embedding and rerank models
 
-**Status:** Accepted (2026-10-08) by owner decisions D10 and D12, **provisional on Gate C**: the embedding model changes only if the paired bake-off passes; rerank is enabled only on measured lift. **Amended 2026-10-23 by ADR-0016:** the bake-off runs on OpenSearch Serverless (CM-5). The Qwen3 arm is the Gate A vectors copied unchanged (CM-4). If no cloud arm qualifies, the owner decides; Qwen3 is no longer the fallback because it is not served in the cloud.
+**Status:** Accepted (2026-10-08) — amended 2026-11-09 (CM-6e: Foundry Cohere default arm, 20 RPM constraint) by owner decisions D10 and D12, **provisional on Gate C**: the embedding model changes only if the paired bake-off passes; rerank is enabled only on measured lift. **Amended 2026-10-23 by ADR-0016:** the bake-off runs on OpenSearch Serverless (CM-5). The Qwen3 arm is the Gate A vectors copied unchanged (CM-4). If no cloud arm qualifies, the owner decides; Qwen3 is no longer the fallback because it is not served in the cloud.
 **Date:** 2026-10-08
 **Related:** SPEC §§6, 11.1 (Gate C), 11.3; `docs/retrieval-benchmark.md`; ADR-0003 (and its 2026-10-08 addendum); ADR-0006; ADR-0009 amendment; production review findings 6, 13, 14.
 
@@ -95,6 +95,17 @@ On-demand input-token prices; the §9a tie rule compares these.
 - **Decision (owner, 2026-11-08):** Cohere Embed v5 fast at 1024 d replaces Cohere Embed v4 as the embedding default, superseding the override above. CM-6e adds the Cohere-native Foundry embedding arm, makes it the default and re-runs this benchmark through that arm to confirm.
 - **Not measured:** query latency (the deployment's rate limit forced 114 HTTP 429 retries; recorded latencies include backoff waits); price not yet cited.
 - **Cost:** 0.80 OCU-h ≈ $0.19 through 22:28Z plus the idle tail; tokens not estimated.
+
+## Amendment 2026-11-09 (CM-6e) — the Foundry Cohere default arm and its quota
+
+Recorded before the CM-6e confirmation run.
+
+- **Price:** Cohere Embed v5 fast (Global) is $0.08 per million text tokens on Microsoft Foundry (azure.microsoft.com/pricing/details/ai-foundry-models/cohere, read 2026-11-09; Cohere's Embed 5 announcement lists the same price).
+- **Arm:** provider `foundry_cohere`, deployment `cohere-embed-v5-fast`, 1024 d, identifier `foundry_cohere:cohere-embed-v5-fast:1024`. It calls Foundry's Cohere-native `/providers/cohere/v2/embed` route (`input_type` `search_document` / `search_query`, at most 96 texts per request). This replaces the CM-5b harness label `azure_openai:cohere-embed-v5-fast:1024`, which named the wrong route. Every arm, the default included, gets an index named from its identifier; `sec_filings` keeps its 2560-d Qwen3 vectors and is not reused. Existing tickers are ingested again into the new index on first use (ingest-on-miss). Nothing is deleted.
+- **Quota as a design constraint (owner, 2026-11-08):** the deployment allows 20 requests per minute. That is the maximum for this deployment, and it cannot be raised. Ingestion is not limited by it, because one request carries 96 chunks (532 chunks take 6 requests). Queries are: an analysis embeds 4–9 queries, so one deployment serves about 2–5 analyses per minute system-wide until the exact query-embedding cache lands (S7.9, unchanged).
+- **Client behaviour (owner, 2026-11-09):** the arm spaces its own requests at no more than 18 per minute. On HTTP 429, a 5xx reply or a transport error, it waits for `Retry-After` (at most 60 s) and retries once; if the retry fails too, it raises a typed `EmbeddingUnavailableError`; the analysis records `filing_retrieval_failed` and reports the filings gap (`evidence_missing`, SPEC §8.5). There is no fallback to another model: a query vector from another model is meaningless against this index, and the dimension guard cannot catch it because both are 1024 d. The cross-host parity fallback above stays off; v5 fast is served only on Foundry.
+- **Ceiling (`ponytail`):** the pacing is per process. Several API or worker processes sharing one deployment can still exceed 20 RPM together; a shared limiter (for example in the cache store, S7.9) is the upgrade when more than one process embeds queries.
+- **Health:** `/health` reports the embedding arm from configuration only, because a live probe would spend the quota. Ollama is removed from code, Compose and dependencies (ADR-0016 decision 7).
 
 ## Verify before implementation
 

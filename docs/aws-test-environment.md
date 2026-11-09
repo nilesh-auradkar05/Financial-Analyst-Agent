@@ -20,7 +20,7 @@ Use the current AWS documentation when account, operating system, networking, or
 
 - Use a short-lived EC2 instance.
 - Restrict inbound SSH to your current public IP.
-- Do not expose the API, Qdrant, Ollama, Grafana, or Prometheus publicly.
+- Do not expose the API, Qdrant, Grafana, or Prometheus publicly.
 - Use SSH port forwarding for API smoke tests.
 - Do not place secrets in user data, shell history, committed files, screenshots, or task logs.
 - Stop or terminate the instance when testing is complete.
@@ -38,7 +38,6 @@ On your local machine:
 Recommended instance sizes:
 
 - `t3.large` or `t3.xlarge` for dependency install, static checks, and API smoke tests without local LLM load.
-- A GPU instance, such as the appropriate current `g5` family option in your region, for serious live Ollama testing.
 
 Size and cost depend on region, model choice, and runtime. Verify pricing before launch.
 
@@ -218,10 +217,7 @@ Create `.env` without secrets you do not need:
 
 ```bash
 cat > .env <<'EOF'
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_EMBED_MODEL=qwen3-embedding:4b
-OLLAMA_TIMEOUT=600
-OLLAMA_TEMPERATURE=0.7
+EMBEDDING_PROVIDER=foundry_cohere
 
 VECTOR_BACKEND=qdrant
 QDRANT_URL=http://127.0.0.1:6333
@@ -309,13 +305,11 @@ curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/stats
 ```
 
-`/health` can be `degraded` until Ollama and optional LangSmith are configured. The API should still return a structured response.
+`/health` can be `degraded` until the embedding and chat settings are configured. The API should still return a structured response.
 
 ## Step 11 - Optional live analysis on EC2
 
-Install and run Ollama only when live LLM and embedding tests are required. CPU-only instances can be very slow for the configured models.
-
-After Ollama is running and models are pulled:
+Live tests need the Foundry embedding deployment (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`) and a chat model. With those set:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ingest \

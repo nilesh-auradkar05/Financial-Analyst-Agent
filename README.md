@@ -7,7 +7,7 @@ A single-agent financial research system: give it a stock ticker and it gathers 
 [![FastAPI](https://img.shields.io/badge/FastAPI-service-teal.svg)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Ollama embeddings · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · Claude Sonnet 5.5 sentiment and Cohere Rerank v5 on Microsoft Foundry · edgartools · Tavily · yfinance · Prometheus · LangSmith
+**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Cohere Embed v5 fast embeddings on Microsoft Foundry · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · Claude Sonnet 5.5 sentiment and Cohere Rerank v5 on Microsoft Foundry · edgartools · Tavily · yfinance · Prometheus · LangSmith
 
 ### What it does
 
@@ -149,7 +149,7 @@ The accepted ADR-0017 design is drawn in [`hld.svg`](docs/svg/adr-0017/hld.svg) 
 | Requirement | Needed for |
 |---|---|
 | Python 3.12 and [`uv`](https://docs.astral.sh/uv/) | everything |
-| [Ollama](https://ollama.com) with `qwen3-embedding:4b` | embeddings for ingestion and retrieval |
+| A Microsoft Foundry resource with a `cohere-embed-v5-fast` deployment (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`) | embeddings for ingestion and retrieval (20 requests per minute per deployment) |
 | AWS credentials with Amazon Bedrock access | the primary chat model (`AWS_BEDROCK_MODEL`) |
 | Docker | Qdrant, and the optional API + Prometheus + Grafana stack |
 | Tavily API key | news search |
@@ -186,14 +186,10 @@ LLM_THINKING_MODE=off            # off | enabled | adaptive
 # Azure fallback (reserved; not invoked until S7-AZURE-FALLBACK)
 AZURE_FOUNDRY_MODEL=
 
-# Ollama (embeddings only)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_EMBED_MODEL=qwen3-embedding:4b
-
-# Embedding arm (default ollama / qwen3-embedding:4b / 2560; cloud arms need MODEL and DIMENSIONS)
-EMBEDDING_PROVIDER=ollama        # or bedrock | azure_openai
-EMBEDDING_MODEL=                 # e.g. cohere.embed-v4:0, amazon.titan-embed-text-v2:0, embed-3-small
-EMBEDDING_DIMENSIONS=            # 1024 for the cloud arms
+# Embedding arm (default foundry_cohere / cohere-embed-v5-fast / 1024; uses AZURE_OPENAI_ENDPOINT + AZURE_API_KEY)
+EMBEDDING_PROVIDER=foundry_cohere   # or bedrock | azure_openai (these two need MODEL and DIMENSIONS)
+EMBEDDING_MODEL=                    # e.g. cohere.embed-v4:0, amazon.titan-embed-text-v2:0, embed-3-small
+EMBEDDING_DIMENSIONS=               # 1024 for every cloud arm
 
 # Vector store
 VECTOR_BACKEND=qdrant            # or chroma
@@ -210,7 +206,7 @@ LANGSMITH_API_KEY=
 
 Set `AWS_BEARER_TOKEN_BEDROCK` for Bedrock API-key authentication (`AWS_BEARER_TOKEN` is an alias), or use the standard AWS credential chain. `CLAUDE_LLM_MODEL` and `OPENAI_LLM_MODEL` select the personal Anthropic and OpenAI fallback models; a fallback whose key is missing is skipped. Each provider attempt is bounded by `LLM_REQUEST_TIMEOUT_SECONDS`. Native traces identify actual attempted models.
 
-There is no provider selector: `AWS_BEDROCK_MODEL` is the only Bedrock model variable and Ollama serves embeddings only. Azure variables (`AZURE_API_KEY`, `AZURE_PROJECT_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_FOUNDRY_MODEL`) are preserved in Compose, but Azure invocation is deferred to S7-AZURE-FALLBACK. Do not commit `.env`.
+There is no provider selector: `AWS_BEDROCK_MODEL` is the only Bedrock model variable; embeddings come from the `EMBEDDING_*` arm (default Cohere Embed v5 fast on Foundry). Each arm has its own index, so switching arms, or upgrading from the old Qwen3 default, re-ingests a ticker on its first analysis. Azure variables (`AZURE_API_KEY`, `AZURE_PROJECT_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_FOUNDRY_MODEL`) are preserved in Compose, but Azure invocation is deferred to S7-AZURE-FALLBACK. Do not commit `.env`.
 
 Apply code/config changes with `docker compose up -d --build --no-deps api` once active jobs finish. Editing `.env` alone does not update an existing container. Missing filings return a specific ingestion error; analysis can still return available news, prices, sentiment and a memo stating **SEC Filings: Not Available**, with terminal status `evidence_missing`.
 
@@ -222,7 +218,6 @@ Set `API_KEY` in the frontend server environment to the same shared key as the A
 
 ```bash
 docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml up -d   # Qdrant on :16333, own volume
-ollama pull qwen3-embedding:4b                        # embedding model
 ```
 
 The standalone Qdrant listens on `:16333`, so a host-run API needs `QDRANT_URL=http://localhost:16333`; the full Compose stack keeps `:6333` and its own volume. See [docs/docker-setup.md](docs/docker-setup.md).

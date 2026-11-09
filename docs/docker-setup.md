@@ -15,11 +15,11 @@ Additional file: `.env.example` (required settings). `docker-compose.gpu.yml` wa
 
 ## Important findings
 
-1. Updated 2026-11-07 (CM-6b, CM-6d; ADR-0019, ADR-0011): sentiment (Claude Sonnet 5.5) and rerank (Cohere Rerank v5 fast) run on Microsoft Foundry, so `torch`, `transformers`, `sentence-transformers`, `triton` and every NVIDIA/CUDA package are gone from the lockfile and the image. Before that, `site-packages` was about 6.3 GB, mostly NVIDIA libraries (3.2 GB), `torch` (1.1 GB) and `triton` (894 MB), for FinBERT. Qwen3 embeddings are still sent to host Ollama until CM-6e.
+1. Updated 2026-11-07 (CM-6b, CM-6d; ADR-0019, ADR-0011): sentiment (Claude Sonnet 5.5) and rerank (Cohere Rerank v5 fast) run on Microsoft Foundry, so `torch`, `transformers`, `sentence-transformers`, `triton` and every NVIDIA/CUDA package are gone from the lockfile and the image. Before that, `site-packages` was about 6.3 GB, mostly NVIDIA libraries (3.2 GB), `torch` (1.1 GB) and `triton` (894 MB), for FinBERT. Since 2026-11-09 (CM-6e) embeddings use Cohere Embed v5 fast on Foundry; host Ollama is no longer used.
 2. Original `uv sync --frozen --group api` implicitly included default dependency groups (usually `dev`), unless configured otherwise. The new Dockerfile uses `--no-default-groups --group api`.
 3. Original API `COPY . .` added 373 MB. New ignore rules keep datasets, model files, runtime files, caches, credentials, monitoring and frontend out of the API build context. Check whether any app runtime assets were inadvertently excluded and add explicit `COPY` instructions or mounts if necessary.
 4. BuildKit caching now uses `RUN --mount=type=cache` for uv/npm downloads. These caches live outside the image but **still consume local disk**. Use `docker builder prune`/BuildKit GC to manage them. The largest improvement may be build-cache cleanup, not final runtime image size.
-5. No container reserves a GPU (the FinBERT GPU override was removed with FinBERT on 2026-11-07). Host Ollama, used for embeddings until CM-6e, has its own setup outside Compose.
+5. No container reserves a GPU (the FinBERT GPU override was removed with FinBERT on 2026-11-07).
 6. Existing Grafana hardcoded `admin/admin`, public ports were broadly bound, and Qdrant used `latest`. New configurations bind local ports to loopback, require secrets for app/Grafana, and use version tags. For external access use an authenticated TLS reverse proxy.
 7. Standalone Qdrant previously used the same fixed container name and **same named volume** as full Compose, which risks concurrent access/storage corruption. The corrected standalone stack uses its own volume and ports 16333/16334. It therefore does **not** automatically contain the existing 916 MB Qdrant dataset.
 8. Previous Next.js Dockerfile omitted `public/` and did not set cache ownership; the new one copies `public/` even when absent originally and runs as `node`.
@@ -62,7 +62,7 @@ Additional file: `.env.example` (required settings). `docker-compose.gpu.yml` wa
    docker buildx du
    ```
 
-   The Qwen3 embedding model is hosted in Ollama outside this API container and is not verified by these commands.
+   `/health` checks the Foundry embedding arm from configuration only; it does not call the model, so it cannot prove the deployment answers.
 
 ## Separate Qdrant-only tests
 
@@ -96,5 +96,4 @@ docker buildx du
 - Compose `API_KEY` and other external provider credentials remain injected as environment variables for compatibility with your app. A true secret-file migration requires corresponding app-side `_FILE` or file-reading support. Never send secret values as build args or expose them in browser `NEXT_PUBLIC_*` variables.
 - Pin images by digest for truly immutable CI/CD builds and add an image scan + SBOM step. The updated Dockerfiles pin uv and the major language runtime/OS release, but base images still receive patched updates.
 - No model weights are stored locally any more. The old `financial-analyst-model-cache` volume is no longer mounted; it was not deleted — remove it with `docker volume rm financial-analyst-model-cache` only after confirming it holds nothing you need.
-- Host Ollama is configured via `host.docker.internal`. On Linux, host Ollama must listen on an address reachable via the bridge gateway; binding *only* 127.0.0.1 on the host may not suffice. Restrict any wider listening with a firewall.
 - Qdrant service healthcheck checks TCP availability (like the existing one); it does **not** guarantee collection/index readiness. API client retries are still important during restart.
