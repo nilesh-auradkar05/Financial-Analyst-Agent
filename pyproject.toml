@@ -27,7 +27,6 @@ dependencies = [
     "yfinance>=1.1",
     "httpx>=0.28",
     "tavily-python>=0.7",
-    "langchain-ollama>=1.0.1",
     "tenacity>=9.1.4",
     "qdrant-client>=1.17.1,<2",
     "langchain-classic>=1.0.5",

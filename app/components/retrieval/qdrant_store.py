@@ -166,7 +166,7 @@ class QdrantVectorStore(RetrievalStore):
             )
 
         if run := get_current_run_tree():
-            run.metadata.update(embedding_model=settings.embedding.model, embedding_provider="ollama")
+            run.metadata.update(embedding_model=settings.embedding.model, embedding_provider=settings.embedding.provider)
         query_embedding = self._embeddings.embed_query(query)
         query_filter = self._to_qdrant_filter(filters)
 

@@ -1,5 +1,5 @@
 """
-This module exposes LLM prompts and health checks.
+This module exposes LLM prompts and access.
 
 Usage:
 ------------------------
@@ -13,9 +13,7 @@ Usage:
 
 from typing import Any
 
-import httpx
 from langchain_core.runnables import Runnable
-from loguru import logger
 
 from app.config import Settings, settings
 from app.llm.provider import get_llm as get_provider_llm
@@ -28,46 +26,6 @@ from app.llm.provider import get_llm as get_provider_llm
 def get_llm(config: Settings = settings) -> Runnable[Any, Any]:
     """Backward-compatible wrapper for provider-based LLM construction."""
     return get_provider_llm(config)
-
-
-# =============================================================================
-# HEALTH CHECK
-# =============================================================================
-
-
-async def check_ollama_health(*, model: str, log_failure: bool = False) -> bool:
-    """Check if Ollama server is running and model is available."""
-    tags_url = f"{settings.ollama.base_url.rstrip('/')}/api/tags"
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                tags_url,
-                timeout=5.0,
-            )
-
-            if response.status_code != 200:
-                if log_failure:
-                    logger.warning(
-                        f"Ollama health check failed at {tags_url}: HTTP {response.status_code}"
-                    )
-                return False
-
-            # Check if our model is available
-            data = response.json()
-            models = [m.get("name", "") for m in data.get("models", [])]
-
-            model_available = any(m == model or m == f"{model}:latest" for m in models)
-            if not model_available and log_failure:
-                logger.warning(
-                    f"Ollama model {model!r} not found. "
-                    f"Available models: {models}"
-                )
-            return model_available
-
-    except Exception as exc:
-        if log_failure:
-            logger.warning(f"Ollama health check failed at {tags_url}: {exc}")
-        return False
 
 
 # =============================================================================

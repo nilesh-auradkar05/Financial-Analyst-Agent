@@ -223,9 +223,9 @@ def _search_filing_chunks(
     return store.search_by_ticker(query, ticker=ticker, n_results=n_results)
 
 
-# ponytail: reuses the embedding timeout as the bound on one ingest-on-miss. Give it
+# ponytail: a fixed bound on one ingest-on-miss (the former local embedding timeout). Give it
 # its own setting once a real 10-K ingestion has been timed.
-INGEST_TIMEOUT_SECONDS: float = settings.ollama.timeout
+INGEST_TIMEOUT_SECONDS: float = 600.0
 
 
 def _filing_error(code: str, message: str) -> dict:
