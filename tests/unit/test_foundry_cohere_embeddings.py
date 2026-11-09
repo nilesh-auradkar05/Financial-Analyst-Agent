@@ -290,6 +290,180 @@ def test_an_idle_process_is_not_held_back(
     assert clock.slept == 0
 
 
+# ---- token budget (amended 2026-11-09) ------------------------------------------------------
+
+MAX_REQUEST_TOKENS = 6_000
+TOKENS_PER_MINUTE = 18_000
+
+
+def _tokens(text: str) -> int:
+    """The documented estimate: ceil(characters / 4)."""
+    return -(-len(text) // 4)
+
+
+def _request_tokens(request: ReceivedEmbeddingRequest) -> int:
+    return sum(_tokens(text) for text in request.body["texts"])
+
+
+def _chunks(count: int, characters: int = 1000) -> list[str]:
+    """Distinct filing-sized passages of exactly `characters` characters."""
+    return [f"{n:05d} ".ljust(characters, "x") for n in range(count)]
+
+
+def test_the_token_budget_constants_are_public() -> None:
+    """test-plan §21: Foundry Cohere request shape / pacing (the documented limits)."""
+    assert embeddings_api.FOUNDRY_COHERE_MAX_REQUEST_TOKENS == MAX_REQUEST_TOKENS
+    assert embeddings_api.FOUNDRY_COHERE_TOKENS_PER_MINUTE == TOKENS_PER_MINUTE
+
+
+@pytest.mark.parametrize(
+    ("text", "tokens"),
+    [
+        ("", 0),
+        ("a", 1),
+        ("abcd", 1),
+        ("abcde", 2),
+        ("x" * 8000, 2000),
+        ("x" * 8001, 2001),
+        ("\u00e9" * 5, 2),
+    ],
+    ids=["empty", "one-char", "four-chars", "five-chars", "8000", "8001", "non-ascii"],
+)
+def test_the_token_estimate_is_characters_over_four_rounded_up(text: str, tokens: int) -> None:
+    """test-plan §21: Foundry Cohere request shape (estimate = ceil(characters / 4))."""
+    assert embeddings_api.estimate_tokens(text) == tokens
+
+
+def test_requests_are_split_by_estimated_tokens_as_well_as_by_text_count(
+    select: Select, providers: FakeEmbeddingProviders
+) -> None:
+    """test-plan §21: Foundry Cohere request shape (at most 96 texts and 6,000 estimated tokens)."""
+    select()
+    texts = _chunks(100)  # 96 of these would be 24,000 estimated tokens
+
+    vectors = embeddings_api.get_embeddings().embed_documents(texts)
+
+    requests = _foundry(providers)
+    assert len(requests) > 2
+    for request in requests:
+        assert len(request.body["texts"]) <= FOUNDRY_MAX_TEXTS
+        assert _request_tokens(request) <= MAX_REQUEST_TOKENS
+    assert [text for request in requests for text in request.body["texts"]] == texts
+    assert len(vectors) == len(texts)
+    for vector, text in zip(vectors, texts):
+        assert vector == pytest.approx(vector_for(FOUNDRY_MODEL, text, 1024, "search_document"))
+
+
+def test_a_single_text_over_the_request_budget_goes_alone(
+    select: Select, providers: FakeEmbeddingProviders
+) -> None:
+    """test-plan §21: Foundry Cohere request shape (a single text over 6,000 goes alone)."""
+    select()
+    huge = "y" * 30_000  # 7,500 estimated tokens
+    texts = ["short passage one", huge, "short passage two"]
+
+    vectors = embeddings_api.get_embeddings().embed_documents(texts)
+
+    requests = _foundry(providers)
+    carrying_huge = [request for request in requests if huge in request.body["texts"]]
+    assert [len(request.body["texts"]) for request in carrying_huge] == [1]
+    assert [text for request in requests for text in request.body["texts"]] == texts
+    assert vectors[1] == pytest.approx(vector_for(FOUNDRY_MODEL, huge, 1024, "search_document"))
+    assert vectors[2] == pytest.approx(
+        vector_for(FOUNDRY_MODEL, texts[2], 1024, "search_document")
+    )
+
+
+@pytest.mark.parametrize(
+    ("count", "characters"),
+    [(200, 1000), (60, 4000), (400, 400)],
+    ids=["filing-200-chunks", "fat-chunks", "many-small-chunks"],
+)
+def test_estimated_tokens_in_any_60_second_window_stay_within_18000(
+    select: Select, providers: FakeEmbeddingProviders, count: int, characters: int
+) -> None:
+    """test-plan §21: Foundry Cohere pacing (token budget over any 60 s window)."""
+    select()
+
+    embeddings_api.get_embeddings().embed_documents(_chunks(count, characters))
+
+    requests = _foundry(providers)
+    total = sum(_request_tokens(request) for request in requests)
+    assert total > 2 * TOKENS_PER_MINUTE  # the call spans several windows
+    window = 60 - TOLERANCE  # arrival times carry loopback jitter
+    for first in requests:
+        started_with = sum(
+            _request_tokens(other)
+            for other in requests
+            if first.arrived_at <= other.arrived_at < first.arrived_at + window
+        )
+        assert started_with <= TOKENS_PER_MINUTE, first.arrived_at
+
+
+def test_a_filing_is_ingested_through_a_provider_enforcing_20_rpm_and_20000_tpm_without_a_429(
+    select: Select, providers: FakeEmbeddingProviders
+) -> None:
+    """test-plan §21: Foundry Cohere pacing (about 200 chunks finish without an HTTP 429)."""
+    select()
+    providers.enforce_quota(requests_per_minute=20, tokens_per_minute=20_000)
+    chunks = _chunks(200)
+
+    vectors = embeddings_api.get_embeddings().embed_documents(chunks)
+
+    assert len(vectors) == 200
+    assert providers.quota_rejections == []
+    assert len(_foundry(providers)) > 2
+
+
+def test_the_quota_stand_in_refuses_a_burst_that_exceeds_the_token_limit(
+    providers: FakeEmbeddingProviders,
+) -> None:
+    """Guards the test above against passing vacuously: the stand-in answers 429 with Retry-After
+    when 20,000 tokens are exceeded within 60 s."""
+    import httpx
+
+    providers.enforce_quota(requests_per_minute=20, tokens_per_minute=20_000)
+    body = {
+        "model": FOUNDRY_MODEL,
+        "texts": _chunks(24),  # 6,000 estimated tokens
+        "input_type": "search_document",
+        "embedding_types": ["float"],
+        "output_dimension": 1024,
+    }
+
+    statuses = [
+        httpx.post(providers.url + FOUNDRY_PATH, json=body, headers={"api-key": "k"}).status_code
+        for _ in range(4)
+    ]
+
+    assert statuses == [200, 200, 200, 429]
+    assert len(providers.quota_rejections) == 1
+
+
+def test_a_query_is_not_delayed_by_the_token_budget_while_the_window_has_room(
+    select: Select, clock: FakeClock
+) -> None:
+    """test-plan §21: Foundry Cohere pacing (a query is not delayed by the token budget)."""
+    select()
+    embeddings = embeddings_api.get_embeddings()
+    embeddings.embed_documents(_chunks(40))  # 10,000 estimated tokens in the window
+    clock.advance(INTERVAL + 0.5)  # the request-rate spacing is satisfied
+    slept_before = clock.slept
+
+    embeddings.embed_query("what are the main supply chain risks")
+
+    assert clock.slept == slept_before
+
+
+def test_a_query_on_an_idle_process_is_not_delayed(select: Select, clock: FakeClock) -> None:
+    """test-plan §21: Foundry Cohere pacing (an idle process; only request spacing applies)."""
+    select()
+
+    embeddings_api.embed_query("what are the main supply chain risks")
+
+    assert clock.slept == 0
+
+
 # ---- throttle ------------------------------------------------------------------------------
 
 RETRIED = [

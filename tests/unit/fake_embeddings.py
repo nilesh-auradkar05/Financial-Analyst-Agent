@@ -8,6 +8,8 @@ send real requests and this server parses them:
   scripted to misbehave the way the 20 RPM deployment does (429 with or without `Retry-After`, 5xx,
   4xx, a dropped connection, a wrong vector count or length); unscripted requests get honest
   vectors. Every error body carries `LEAKY_BODY_MARKER`, so a test can show no error text echoes it.
+  `enforce_quota` makes it enforce the deployment's rolling 60 s limits (requests and tokens, a
+  text counting ceil(characters / 4) tokens), answering 429 with `Retry-After` when exceeded.
 - Bedrock `POST /model/{modelId}/invoke` (InvokeModel; the model id arrives percent-encoded):
   Titan Text Embeddings V2 (`inputText`, `dimensions`, native 1024) and Cohere Embed v4 (`texts`,
   `input_type`, `output_dimension`, native 1536). A request carrying neither a SigV4 signature nor a bearer token is refused.
@@ -175,6 +177,9 @@ class FakeEmbeddingProviders:
         self.requests: list[ReceivedEmbeddingRequest] = []
         self._clock: Callable[[], float] = clock.monotonic if clock else (lambda: 0.0)
         self._script: deque[ScriptedReply] = deque()
+        self._quota: tuple[int, int] | None = None
+        self._admitted: deque[tuple[float, int]] = deque()
+        self.quota_rejections: list[ReceivedEmbeddingRequest] = []
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
@@ -197,6 +202,38 @@ class FakeEmbeddingProviders:
         """Answer the next Foundry requests with these replies, in order; honest replies after."""
         with self._lock:
             self._script.extend(replies)
+
+    def enforce_quota(self, *, requests_per_minute: int, tokens_per_minute: int) -> None:
+        """Refuse Foundry requests that would exceed either limit within the last 60 s of the fake clock."""
+        with self._lock:
+            self._quota = (requests_per_minute, tokens_per_minute)
+
+    def _quota_wait(self, now: float, tokens: int) -> int | None:
+        """Seconds until a request of `tokens` fits, or None when it fits now (and is admitted)."""
+        with self._lock:
+            if self._quota is None:
+                return None
+            max_requests, max_tokens = self._quota
+            window = [(at, used) for at, used in self._admitted if now - at < 60.0]
+            self._admitted = deque(window)
+
+            def fits(held: list[tuple[float, int]]) -> bool:
+                return (
+                    len(held) + 1 <= max_requests
+                    and sum(used for _, used in held) + tokens <= max_tokens
+                )
+
+            if fits(window):
+                self._admitted.append((now, tokens))
+                return None
+            wait = 60.0
+            remaining = list(window)
+            while remaining:
+                freed_at = remaining.pop(0)[0] + 60.0 - now
+                if fits(remaining):
+                    wait = freed_at
+                    break
+            return max(1, math.ceil(wait))
 
     def requests_to(self, provider: str) -> list[ReceivedEmbeddingRequest]:
         return [request for request in self.requests if request.provider == provider]
@@ -238,6 +275,16 @@ class FakeEmbeddingProviders:
             raise _bad_request(f"output_dimension must be one of {FOUNDRY_DIMENSIONS}")
         if body.get("embedding_types") != ["float"]:
             raise _bad_request("embedding_types must be ['float']")
+        tokens = sum(math.ceil(len(text) / 4) for text in texts)
+        wait = self._quota_wait(request.arrived_at, tokens)
+        if wait is not None:
+            with self._lock:
+                self.quota_rejections.append(request)
+            raise _RefusedError(
+                429,
+                {"error": {"code": "429", "message": LEAKY_BODY_MARKER}},
+                {"Retry-After": str(wait)},
+            )
         shape = scripted.shape if scripted else ""
         served = dimension - 1 if shape == "wrong_length" else dimension
         vectors = [vector_for(FOUNDRY_MODEL, text, served, input_type) for text in texts]
