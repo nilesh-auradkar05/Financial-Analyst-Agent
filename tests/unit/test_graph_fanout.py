@@ -149,13 +149,9 @@ async def test_errors_from_two_branches_both_survive(monkeypatch):
 async def test_health_answers_while_sentiment_scores_50_snippets(monkeypatch, foundry):
     foundry.delay = 0.5  # provider latency: every request holds its thread for half a second
 
-    async def healthy(**_kwargs):
-        return True
-
     async def langsmith_status():
         return {"connected": False}
 
-    monkeypatch.setattr(api, "check_ollama_health", healthy)
     monkeypatch.setattr(api, "get_vector_store", lambda: SimpleNamespace(count=0))
     monkeypatch.setattr(api, "check_langsmith_connection", langsmith_status)
     state = create_initial_state("AAPL")

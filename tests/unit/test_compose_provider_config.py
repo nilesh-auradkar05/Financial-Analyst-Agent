@@ -47,7 +47,7 @@ def test_compose_preserves_provider_settings(tmp_path, values):
         key: value
         for key, value in os.environ.items()
         if not key.startswith(
-            ("AWS_", "AZURE_", "ANTHROPIC_", "OPENAI_", "CLAUDE_", "LLM_", "OLLAMA_", "COMPOSE_")
+            ("AWS_", "AZURE_", "ANTHROPIC_", "OPENAI_", "CLAUDE_", "LLM_", "COMPOSE_")
         )
     }
     root = Path(__file__).resolve().parents[2]
@@ -71,6 +71,7 @@ def test_compose_preserves_provider_settings(tmp_path, values):
         check=True,
     )
     rendered = json.loads(result.stdout)["services"]["api"]["environment"]
+    assert [key for key in rendered if key.startswith("OLLAMA_")] == []
     for key, value in values.items():
         assert rendered[key] == value
     for key in (

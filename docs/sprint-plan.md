@@ -638,7 +638,7 @@ Trace: retrieval-benchmark §9a; ADR-0011; SPEC §11.1 Gate C
 Scope: three cloud arms on OpenSearch Serverless against the Gate A arm.
 Tests:  Q one paired comparison per arm, single axis · L cost per arm recorded
 Regression: R1 R2 R4
-Done: outcome recorded in ADR-0011. Result: Pending.
+Done: outcome recorded in ADR-0011. Result: DONE 2026-11-08 — no arm qualified under §9a; owner override adopts Cohere Embed v4 (1024 d). Test-plan §21 row amended 08104eb (arm build waits for Serverless write visibility); red c8e593f; feat 971961a (tests unchanged since red); prices and tie-break declared before the run 1d15fba; results 8dd1d4a. Three arms built from the CM-4 index (532 chunks each, per-ticker counts equal, `embedding_id` verified), Serverless 1x, run 20:33–20:42Z. Paired vs Qwen3 at K=10: Cohere recall +0.000 [−0.060, +0.060], section_recall +0.000 [−0.040, +0.040]; Titan recall −0.053 [−0.127, +0.020]; Azure recall −0.033 [−0.107, +0.033]. Cost 0.92 OCU-h ≈ $0.22 + ≈ $0.02 tokens. Arm indexes kept. Details: ADR-0011 "Outcome 2026-11-08". Amended 2026-11-08 (owner request): a fourth arm, Cohere Embed v5 fast on Foundry (Cohere-native route, one-off harness adapter), qualifies under §9a — vs Qwen3 recall@10 +0.067 [+0.007, +0.133], section_recall +0.000 [+0, +0]; vs Cohere v4 recall +0.067 [+0.007, +0.133]; latency not measured (HTTP 429 throttling). The owner adopts it as the default, superseding the v4 override; results 19c634a; details ADR-0011 "Outcome 2026-11-08 (amended)". CM-6e unblocked: default = Cohere Embed v5 fast.
 ```
 
 ```text
@@ -647,7 +647,7 @@ Feature: /health reports the configured model plane, not Ollama, as the chat dep
 Trace: SPEC §12 G13; test-plan §1 REST hardening (health rows)
 Tests:  U health per provider configuration · I health with Ollama down and Bedrock configured → not degraded
 Regression: R1 R2 R3
-Done: G13 closed. Result: Pending.
+Done: G13 closed. Result: DONE 2026-11-09, folded into CM-6e (owner 2026-11-09): `/health` reports `components.embedding` = {ok, provider, model, check: configuration_only} with no embedding call and no Ollama dependency; chat stays configuration-only; 503 when embedding, chat or vector store is not ok. Test-plan §1 REST hardening bullet amended 202480d; tests tests/unit/test_health_embedding.py (red 8cb14b6), feat d253725. SPEC §12 G13 marked resolved (646979f).
 ```
 
 ```text
@@ -672,12 +672,12 @@ Done: uv.lock has no torch or nvidia-*/triton package; image builds without them
 ```text
 CM-6e — Ollama removed
 Feature: no code, config, Compose entry or health check depends on Ollama.
-Trace: ADR-0016 decision 7; SPEC §5 provider policy; owner decision 2026-11-07
+Trace: ADR-0016 decision 7; SPEC §5 provider policy; owner decision 2026-11-07; ADR-0011 "Outcome 2026-11-08 (amended)"
 Blocked until: CM-4 and CM-5b have run (both embed benchmark queries with qwen3 on the copied index).
-Scope: remove langchain-ollama, OllamaSettings, the Ollama startup and `/health` checks (with CM-6a), OLLAMA_* Compose variables; default embedding = the Gate C winner.
+Scope: remove langchain-ollama, OllamaSettings, the Ollama startup and `/health` checks (with CM-6a), OLLAMA_* Compose variables; default embedding = the Gate C winner, Cohere Embed v5 fast on Foundry. It is served only on Foundry's Cohere-native `/providers/cohere/v2/embed` route, so CM-6e adds that embedding arm and re-runs the CM-5b anchored benchmark through it to confirm the amended Gate C result.
 Tests:  U health and config without Ollama · I ingestion and search on the winning cloud arm (fake transport)
 Regression: R1 R2 R3 R4
-Done: no `ollama` reference in app/, dataops/, evaluation/, Compose or pyproject. Result: Pending.
+Done: no `ollama` reference in app/, dataops/, evaluation/, Compose or pyproject. Result: DONE 2026-11-09 (CM-6a folded in, owner 2026-11-09). Rows 202480d, 3d87ac9, 8232082 (throttle row corrected: a failed filings step gives `evidence_missing`), e51b466 (token budget); red 8cb14b6 and 45f6688; test isolation fix c77a599 (implementer dispute accepted: fake clock idle 10 s → 70 s, no assertion changed); feat d253725 and 1da05d4 (tests unchanged since c77a599); docs 646979f. Default arm `foundry_cohere:cohere-embed-v5-fast:1024` (Foundry Cohere-native route) with client pacing ≤18 requests and ≤18,000 estimated tokens per minute and one throttled retry, then a typed error (owner 2026-11-09; no fallback model); every arm gets an identifier-derived index; `/health` reports the embedding arm from configuration only. Removed: langchain-ollama and ollama (uv.lock, none added; pip-audit shows no new advisory), OllamaSettings, the Ollama startup and health checks, EmbeddingsClient and the async helpers, OLLAMA_* and host-gateway from Compose. Done grep clean over app/, dataops/, evaluation/*.py, pyproject, uv.lock, Compose, Dockerfile; frozen fixture and recorded result JSONs keep `ollama` provenance (owner 2026-11-09). R1: ruff; mypy only the git-ignored probe file; pytest 995 passed, 2 skipped (incl. tests/rag on the OpenSearch container). R2 4/4. R3 replay inside R1 under H7's rewrite `unshare -rn sh -c 'ip link set lo up && …pytest…'` (run with the sandbox off). R4: product-arm confirmation run (ADR-0011 "Outcome 2026-11-09 (CM-6e confirmation)"): reproduces the CM-5b v5 ranking on 75/75 cases, qualifies vs Qwen3 (recall@10 +0.067 [+0.007, +0.133]); new R4 baseline `evaluation/results/gate_c_foundry-cohere-embed-v5-fast_…_v1.json`; 0 HTTP 429 in 257 requests; embedding p50 527 ms, p95 965 ms; cost ≈ $0.34 incl. a first build that hit the 20k TPM limit (led to token pacing). Existing local indexes built with Qwen3 are not reused; tickers re-ingest on first analysis.
 ```
 
 ```text

@@ -6,10 +6,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "app"
 RETRIEVAL = APP / "components" / "retrieval"
-EMBEDDING_CLIENT_MODULES = {"langchain_ollama", "ollama"}
+LOCAL_MODEL_SERVER_MODULES = {"langchain_ollama", "ollama"}
 LANGCHAIN_EMBEDDING_NAMES = {
     "langchain_aws": {"BedrockEmbeddings"},
     "langchain_openai": {"OpenAIEmbeddings", "AzureOpenAIEmbeddings"},
+    "app.components.retrieval.embeddings": {"FoundryCohereEmbeddings"},
+    "app.components.retrieval": {"FoundryCohereEmbeddings"},
 }
 
 
@@ -40,15 +42,7 @@ def _embedding_client_uses(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     found: list[str] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            found.extend(
-                alias.name
-                for alias in node.names
-                if alias.name.split(".")[0] in EMBEDDING_CLIENT_MODULES
-            )
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            if node.module.split(".")[0] in EMBEDDING_CLIENT_MODULES:
-                found.append(node.module)
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             found.extend(
                 f"{node.module}.{alias.name}"
                 for alias in node.names
@@ -67,13 +61,26 @@ def _embedding_client_uses(path: Path) -> list[str]:
 
 def test_no_embedding_provider_client_is_built_outside_the_retrieval_boundary() -> None:
     """test-plan §21 Provider client stays inside the boundary: no module outside
-    `app/components/retrieval/` (in `app/`, `evaluation/` or `dataops/`) imports an Ollama,
-    Bedrock or OpenAI embedding client or opens a bedrock-runtime client."""
+    `app/components/retrieval/` (in `app/`, `evaluation/` or `dataops/`) imports the Foundry Cohere
+    adapter or a Bedrock or OpenAI embedding client, or opens a bedrock-runtime client."""
     offenders = [
         f"{path.relative_to(ROOT)}: {use}"
         for package in ("app", "evaluation", "dataops")
         for path in sorted((ROOT / package).rglob("*.py"))
         if RETRIEVAL not in path.parents
         for use in _embedding_client_uses(path)
+    ]
+    assert offenders == []
+
+
+def test_no_module_imports_a_local_model_server_client() -> None:
+    """test-plan §25 No local model packages (CM-6e): nothing in `app/`, `evaluation/` or
+    `dataops/`, the retrieval boundary included, imports `ollama` or `langchain_ollama`."""
+    offenders = [
+        f"{path.relative_to(ROOT)}: {name}"
+        for package in ("app", "evaluation", "dataops")
+        for path in sorted((ROOT / package).rglob("*.py"))
+        for name in _imported_modules(path)
+        if name.split(".")[0] in LOCAL_MODEL_SERVER_MODULES
     ]
     assert offenders == []

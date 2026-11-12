@@ -153,12 +153,16 @@ async def test_construction_and_timeout_failures_reach_next_provider(
     settings = _settings()
     settings.llm.anthropic_api_key = SecretStr("dummy")
     settings.llm.openai_api_key = SecretStr("dummy")
+    # The attempt budget must cover thread handoff and the start callback (normally 2-11 ms,
+    # stalls seen past 100 ms under load) as well as force the timeout; 50 ms lost the
+    # anthropic span about 1 run in 200 even on an idle machine.
+    settings.llm.request_timeout_seconds = 0.5
 
     def broken_bedrock(_: Settings) -> EchoModel:
         raise RuntimeError("unavailable")
 
     monkeypatch.setattr(provider, "_bedrock_model", broken_bedrock)
-    monkeypatch.setattr("langchain_anthropic.ChatAnthropic", lambda **_: EchoModel(provider_name="anthropic", delay=0.2))
+    monkeypatch.setattr("langchain_anthropic.ChatAnthropic", lambda **_: EchoModel(provider_name="anthropic", delay=30))
     monkeypatch.setattr("langchain_openai.ChatOpenAI", lambda **_: EchoModel(provider_name="openai"))
     events = TraceEvents()
     response = await provider.get_llm(settings).ainvoke("check", config={"callbacks": [events]})
@@ -189,11 +193,10 @@ def test_unconfigured_fallbacks_are_skipped() -> None:
 
 
 @pytest.mark.asyncio
-async def test_health_accepts_configured_personal_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_health_accepts_configured_personal_fallback(
+    monkeypatch: pytest.MonkeyPatch, embedding_arm_configured: None
+) -> None:
     from app import main
-
-    async def embedding_available(*, model: str | None = None) -> bool:
-        return True
 
     async def langsmith_status() -> dict[str, bool]:
         return {"connected": False}
@@ -203,7 +206,6 @@ async def test_health_accepts_configured_personal_fallback(monkeypatch: pytest.M
 
     monkeypatch.setattr(main.settings.llm, "aws_region", None)
     monkeypatch.setattr(main.settings.llm, "anthropic_api_key", SecretStr("dummy"))
-    monkeypatch.setattr(main, "check_ollama_health", embedding_available)
     monkeypatch.setattr(main, "check_langsmith_connection", langsmith_status)
     monkeypatch.setattr(main, "get_vector_store", lambda: Store())
 

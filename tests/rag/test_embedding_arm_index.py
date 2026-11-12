@@ -18,7 +18,7 @@ from app.components.retrieval.vector_store import IndexDocument
 from tests.embedding_arms import (
     BEDROCK_COHERE,
     BEDROCK_TITAN,
-    OLLAMA,
+    FOUNDRY_COHERE,
     Arm,
     embeddings_api,
     use_embedding_settings,
@@ -34,7 +34,7 @@ from tests.rag.helpers import (
 )
 
 NO_ENDPOINT = "http://127.0.0.1:1"
-EXISTING_DIMENSION = 2560  # the Qwen3 baseline index
+EXISTING_DIMENSION = 2560  # an index built with vectors of another size than the configured one
 CONFIGURED_DIMENSION = BEDROCK_TITAN.dimension
 
 
@@ -96,7 +96,7 @@ def test_collection_with_the_configured_vector_size_is_used(
     assert len(store.search("supply chain risk", n_results=3).chunks) == 3
 
 
-@pytest.mark.parametrize("arm", [OLLAMA, BEDROCK_COHERE], ids=lambda arm: arm.name)
+@pytest.mark.parametrize("arm", [FOUNDRY_COHERE, BEDROCK_COHERE], ids=lambda arm: arm.name)
 def test_every_ingested_chunk_carries_the_embedding_identifier(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

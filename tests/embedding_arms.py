@@ -20,7 +20,7 @@ from app.config import Settings, settings
 from tests.unit.fake_embeddings import (
     AZURE_DEPLOYMENT,
     COHERE_MODEL,
-    OLLAMA_MODEL,
+    FOUNDRY_MODEL,
     TITAN_MODEL,
 )
 
@@ -38,11 +38,6 @@ _CLEARED = (
     "EMBEDDING_PROVIDER",
     "EMBEDDING_MODEL",
     "EMBEDDING_DIMENSIONS",
-    "OLLAMA_BASE_URL",
-    "OLLAMA_EMBED_BASE_URL",
-    "OLLAMA_EMBED_MODEL",
-    "OLLAMA_HOST",
-    "OLLAMA_API_KEY",
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_API_KEY",
     "OPENSEARCH_INDEX_NAME",
@@ -81,9 +76,6 @@ def isolate_environment(
     monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
     monkeypatch.setenv("AWS_CONFIG_FILE", str(workdir / "no-aws-config"))
     monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(workdir / "no-aws-credentials"))
-    # A default Ollama may be listening on this host; no test may reach it by accident.
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:1")
-    monkeypatch.setenv("OLLAMA_EMBED_BASE_URL", "http://127.0.0.1:1")
     monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
     monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
     for name, value in (env or {}).items():
@@ -96,11 +88,8 @@ def use_embedding_settings(
     """Make the process-wide settings read exactly `env` (and no `.env` file, shell value or default profile)."""
     isolate_environment(monkeypatch, workdir, env)
     fresh = Settings()
-    # `embedding` exists once the provider switch lands; until then only llm/ollama are swapped.
-    for name in ("embedding", "llm", "ollama"):
-        value = getattr(fresh, name, None)
-        if value is not None:
-            monkeypatch.setattr(settings, name, value)
+    for name in ("embedding", "llm"):
+        monkeypatch.setattr(settings, name, getattr(fresh, name))
 
 
 @dataclass(frozen=True)
@@ -117,8 +106,6 @@ class Arm:
 
     def routed_to(self, url: str) -> dict[str, str]:
         """The arm's variables plus the ones that point its client at a loopback fake at `url`."""
-        if self.provider == "ollama":
-            return {**self.env, "OLLAMA_EMBED_BASE_URL": url, "OLLAMA_BASE_URL": url}
         if self.provider == "bedrock":
             return {
                 **self.env,
@@ -132,13 +119,14 @@ class Arm:
         return {**self.env, "EMBEDDING_DIMENSIONS": str(dimension)}
 
 
-OLLAMA = Arm(
-    name="ollama-qwen3",
-    provider="ollama",
-    model=OLLAMA_MODEL,
-    dimension=2560,
-    identifier="ollama:qwen3-embedding:4b:2560",
-    index_name="sec_filings",
+# The default arm: no embedding variable at all selects it.
+FOUNDRY_COHERE = Arm(
+    name="foundry-cohere-v5-fast",
+    provider="foundry_cohere",
+    model=FOUNDRY_MODEL,
+    dimension=1024,
+    identifier="foundry_cohere:cohere-embed-v5-fast:1024",
+    index_name="sec_filings__foundry-cohere-cohere-embed-v5-fast-1024",
 )
 BEDROCK_COHERE = Arm(
     name="bedrock-cohere-v4",
@@ -179,8 +167,8 @@ AZURE_SMALL = Arm(
         "EMBEDDING_DIMENSIONS": "1024",
     },
 )
-ARMS = (OLLAMA, BEDROCK_COHERE, BEDROCK_TITAN, AZURE_SMALL)
-CLOUD_ARMS = (BEDROCK_COHERE, BEDROCK_TITAN, AZURE_SMALL)
+ARMS = (FOUNDRY_COHERE, BEDROCK_COHERE, BEDROCK_TITAN, AZURE_SMALL)
+CLOUD_ARMS = ARMS
 
 # Present in the environment of every incomplete-configuration case, so a secret echoed into an
 # error message would be caught.

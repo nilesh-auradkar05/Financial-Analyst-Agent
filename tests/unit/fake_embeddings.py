@@ -3,7 +3,13 @@
 One real HTTP server on 127.0.0.1 serves three wire formats, so the production clients build and
 send real requests and this server parses them:
 
-- Ollama `POST /api/embed` (model `qwen3-embedding:4b`, native 2560 dimensions).
+- Foundry Cohere `POST /providers/cohere/v2/embed` (deployment `cohere-embed-v5-fast`, up to 96
+  texts per request, float embeddings, `output_dimension` among 256/512/1024/1536). Replies can be
+  scripted to misbehave the way the 20 RPM deployment does (429 with or without `Retry-After`, 5xx,
+  4xx, a dropped connection, a wrong vector count or length); unscripted requests get honest
+  vectors. Every error body carries `LEAKY_BODY_MARKER`, so a test can show no error text echoes it.
+  `enforce_quota` makes it enforce the deployment's rolling 60 s limits (requests and tokens, a
+  text counting ceil(characters / 4) tokens), answering 429 with `Retry-After` when exceeded.
 - Bedrock `POST /model/{modelId}/invoke` (InvokeModel; the model id arrives percent-encoded):
   Titan Text Embeddings V2 (`inputText`, `dimensions`, native 1024) and Cohere Embed v4 (`texts`,
   `input_type`, `output_dimension`, native 1536). A request carrying neither a SigV4 signature nor a bearer token is refused.
@@ -28,19 +34,24 @@ import random
 import re
 import struct
 import threading
-from dataclasses import dataclass
+import time
+from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
-OLLAMA_MODEL = "qwen3-embedding:4b"
-OLLAMA_NATIVE_DIMENSION = 2560
+FOUNDRY_MODEL = "cohere-embed-v5-fast"
+FOUNDRY_PATH = "/providers/cohere/v2/embed"
+FOUNDRY_DIMENSIONS = (256, 512, 1024, 1536)
+FOUNDRY_MAX_TEXTS = 96
+LEAKY_BODY_MARKER = "upstream-diagnostic-body-must-not-leak"
 TITAN_MODEL = "amazon.titan-embed-text-v2:0"
 COHERE_MODEL = "cohere.embed-v4:0"
 AZURE_DEPLOYMENT = "embed-3-small"
 AZURE_NATIVE_DIMENSION = 1536
 
-OLLAMA_PATH = "/api/embed"
 AZURE_PATH = "/openai/v1/embeddings"
 _BEDROCK_PATH = re.compile(r"^/model/(?P<model>[^/]+)/invoke$")
 _SIGV4_CREDENTIAL = re.compile(r"^AWS4-HMAC-SHA256 Credential=(?P<key>[^/]+)/")
@@ -60,6 +71,46 @@ def vector_for(model: str, text: str, dimension: int, input_type: str = "") -> l
     return [value / norm for value in raw]
 
 
+_REAL_MONOTONIC = time.monotonic
+_clock_offset = 0.0  # only ever grows, so the fake clock is monotonic across tests
+_clock_lock = threading.Lock()
+
+
+class FakeClock:
+    """The process clock with sleeping made free: `time.monotonic()` is the real monotonic clock
+    plus every second slept or advanced so far; `time.sleep(s)` returns at once and adds `s`.
+
+    Real time keeps flowing underneath, so asyncio's loop clock (which reads `time.monotonic`)
+    still advances, and the offset never shrinks between tests. A new clock starts with the
+    process idle for longer than the pacing window (60 s of request and token budget), so the
+    first request of a test is never held back by an earlier test.
+    """
+
+    IDLE_AT_START_SECONDS = 70.0
+
+    def __init__(self) -> None:
+        self.sleeps: list[float] = []
+        self.advance(self.IDLE_AT_START_SECONDS)
+
+    def monotonic(self) -> float:
+        return _REAL_MONOTONIC() + _clock_offset
+
+    def sleep(self, seconds: float) -> None:
+        if seconds < 0:
+            raise ValueError("sleep length must be non-negative")
+        self.sleeps.append(seconds)
+        self.advance(seconds)
+
+    def advance(self, seconds: float) -> None:
+        global _clock_offset
+        with _clock_lock:
+            _clock_offset += seconds
+
+    @property
+    def slept(self) -> float:
+        return sum(self.sleeps)
+
+
 @dataclass
 class ReceivedEmbeddingRequest:
     """One request as the provider saw it. `provider` is the route that served it."""
@@ -71,13 +122,41 @@ class ReceivedEmbeddingRequest:
     credential: str
     body: dict[str, Any]
     scheme: str = ""  # "sigv4", "bearer", "api-key" or "" when the request carried no credential
+    arrived_at: float = 0.0  # the fake clock when the request reached the server
+
+
+@dataclass
+class ScriptedReply:
+    """What the Foundry route answers instead of an honest reply, once.
+
+    `status` >= 400 answers that error (its body carries LEAKY_BODY_MARKER) with `retry_after`
+    as the `Retry-After` header when given. `drop` closes the connection without answering.
+    A 200 with `shape` answers real vectors that are wrong: "short_count" omits the last vector,
+    "wrong_length" returns vectors one dimension too short.
+    """
+
+    status: int = 200
+    retry_after: str | None = None
+    drop: bool = False
+    shape: str = ""
+
+
+@dataclass
+class _Reply:
+    status: int
+    payload: dict[str, Any]
+    headers: dict[str, str] = field(default_factory=dict)
+    drop: bool = False
 
 
 class _RefusedError(Exception):
-    def __init__(self, status: int, payload: dict[str, Any]) -> None:
+    def __init__(
+        self, status: int, payload: dict[str, Any], headers: dict[str, str] | None = None
+    ) -> None:
         super().__init__(status)
         self.status = status
         self.payload = payload
+        self.headers = headers or {}
 
 
 def _bad_request(message: str) -> _RefusedError:
@@ -92,10 +171,15 @@ def _texts(value: Any) -> list[str]:
 
 
 class FakeEmbeddingProviders:
-    """Serves Ollama, Bedrock (Titan V2, Cohere v4) and Azure embedding replies computed from each request."""
+    """Serves Foundry Cohere, Bedrock (Titan V2, Cohere v4) and Azure embedding replies computed from each request."""
 
-    def __init__(self) -> None:
+    def __init__(self, clock: FakeClock | None = None) -> None:
         self.requests: list[ReceivedEmbeddingRequest] = []
+        self._clock: Callable[[], float] = clock.monotonic if clock else (lambda: 0.0)
+        self._script: deque[ScriptedReply] = deque()
+        self._quota: tuple[int, int] | None = None
+        self._admitted: deque[tuple[float, int]] = deque()
+        self.quota_rejections: list[ReceivedEmbeddingRequest] = []
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
@@ -114,6 +198,43 @@ class FakeEmbeddingProviders:
         self._server.server_close()
         self._thread.join(timeout=5)
 
+    def script_foundry(self, *replies: ScriptedReply) -> None:
+        """Answer the next Foundry requests with these replies, in order; honest replies after."""
+        with self._lock:
+            self._script.extend(replies)
+
+    def enforce_quota(self, *, requests_per_minute: int, tokens_per_minute: int) -> None:
+        """Refuse Foundry requests that would exceed either limit within the last 60 s of the fake clock."""
+        with self._lock:
+            self._quota = (requests_per_minute, tokens_per_minute)
+
+    def _quota_wait(self, now: float, tokens: int) -> int | None:
+        """Seconds until a request of `tokens` fits, or None when it fits now (and is admitted)."""
+        with self._lock:
+            if self._quota is None:
+                return None
+            max_requests, max_tokens = self._quota
+            window = [(at, used) for at, used in self._admitted if now - at < 60.0]
+            self._admitted = deque(window)
+
+            def fits(held: list[tuple[float, int]]) -> bool:
+                return (
+                    len(held) + 1 <= max_requests
+                    and sum(used for _, used in held) + tokens <= max_tokens
+                )
+
+            if fits(window):
+                self._admitted.append((now, tokens))
+                return None
+            wait = 60.0
+            remaining = list(window)
+            while remaining:
+                freed_at = remaining.pop(0)[0] + 60.0 - now
+                if fits(remaining):
+                    wait = freed_at
+                    break
+            return max(1, math.ceil(wait))
+
     def requests_to(self, provider: str) -> list[ReceivedEmbeddingRequest]:
         return [request for request in self.requests if request.provider == provider]
 
@@ -121,18 +242,63 @@ class FakeEmbeddingProviders:
         with self._lock:
             self.requests.append(request)
 
-    def _ollama(self, request: ReceivedEmbeddingRequest) -> dict[str, Any]:
+    def _next_scripted(self) -> ScriptedReply | None:
+        with self._lock:
+            return self._script.popleft() if self._script else None
+
+    def _foundry(self, request: ReceivedEmbeddingRequest) -> _Reply:
+        scripted = self._next_scripted()
+        if scripted and scripted.drop:
+            return _Reply(0, {}, drop=True)
+        if scripted and scripted.status >= 400:
+            headers = {"Retry-After": scripted.retry_after} if scripted.retry_after else {}
+            raise _RefusedError(
+                scripted.status,
+                {"error": {"code": str(scripted.status), "message": LEAKY_BODY_MARKER}},
+                headers,
+            )
         body = request.body
-        if body.get("model") != OLLAMA_MODEL:
-            raise _RefusedError(404, {"error": f"model {body.get('model')!r} not found"})
-        dimension = body.get("dimensions") or OLLAMA_NATIVE_DIMENSION
-        texts = _texts(body.get("input"))
-        return {
-            "model": OLLAMA_MODEL,
-            "embeddings": [vector_for(OLLAMA_MODEL, text, dimension) for text in texts],
-            "total_duration": 1,
-            "prompt_eval_count": sum(len(text.split()) for text in texts),
-        }
+        if request.credential == "":
+            raise _RefusedError(401, {"error": {"code": "401", "message": "Access denied: no key"}})
+        if body.get("model") != FOUNDRY_MODEL:
+            raise _RefusedError(
+                404, {"error": {"code": "DeploymentNotFound", "message": "no such deployment"}}
+            )
+        texts = _texts(body.get("texts"))
+        if len(texts) > FOUNDRY_MAX_TEXTS:
+            raise _bad_request(f"at most {FOUNDRY_MAX_TEXTS} texts per request")
+        input_type = body.get("input_type")
+        if input_type not in COHERE_INPUT_TYPES:
+            raise _bad_request(f"input_type must be one of {COHERE_INPUT_TYPES}")
+        dimension = body.get("output_dimension", FOUNDRY_DIMENSIONS[-1])
+        if dimension not in FOUNDRY_DIMENSIONS:
+            raise _bad_request(f"output_dimension must be one of {FOUNDRY_DIMENSIONS}")
+        if body.get("embedding_types") != ["float"]:
+            raise _bad_request("embedding_types must be ['float']")
+        tokens = sum(math.ceil(len(text) / 4) for text in texts)
+        wait = self._quota_wait(request.arrived_at, tokens)
+        if wait is not None:
+            with self._lock:
+                self.quota_rejections.append(request)
+            raise _RefusedError(
+                429,
+                {"error": {"code": "429", "message": LEAKY_BODY_MARKER}},
+                {"Retry-After": str(wait)},
+            )
+        shape = scripted.shape if scripted else ""
+        served = dimension - 1 if shape == "wrong_length" else dimension
+        vectors = [vector_for(FOUNDRY_MODEL, text, served, input_type) for text in texts]
+        if shape == "short_count":
+            vectors = vectors[:-1]
+        return _Reply(
+            200,
+            {
+                "id": "embed_fake",
+                "response_type": "embeddings_by_type",
+                "embeddings": {"float": vectors},
+                "texts": texts,
+            },
+        )
 
     def _bedrock(self, request: ReceivedEmbeddingRequest) -> dict[str, Any]:
         if request.model == TITAN_MODEL:
@@ -225,11 +391,16 @@ class FakeEmbeddingProviders:
                     scheme, credential = "", ""
                 for name in _AUTH_HEADERS:
                     headers.pop(name, None)
-                status, payload = fake._serve(path, raw, headers, credential, scheme)
-                data = json.dumps(payload).encode()
-                self.send_response(status)
+                reply = fake._serve(path, raw, headers, credential, scheme)
+                if reply.drop:
+                    self.close_connection = True
+                    return
+                data = json.dumps(reply.payload).encode()
+                self.send_response(reply.status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
+                for name, value in reply.headers.items():
+                    self.send_header(name, value)
                 self.end_headers()
                 self.wfile.write(data)
 
@@ -240,9 +411,9 @@ class FakeEmbeddingProviders:
 
     def _serve(
         self, path: str, raw: bytes, headers: dict[str, str], credential: str, scheme: str
-    ) -> tuple[int, dict[str, Any]]:
+    ) -> _Reply:
         bedrock = _BEDROCK_PATH.match(path)
-        provider = {OLLAMA_PATH: "ollama", AZURE_PATH: "azure"}.get(
+        provider = {FOUNDRY_PATH: "foundry_cohere", AZURE_PATH: "azure"}.get(
             path, "bedrock" if bedrock else ""
         )
         try:
@@ -250,17 +421,19 @@ class FakeEmbeddingProviders:
         except ValueError:
             body = {}
         model = bedrock.group("model") if bedrock else str(body.get("model", ""))
-        request = ReceivedEmbeddingRequest(provider, path, model, headers, credential, body, scheme)
+        request = ReceivedEmbeddingRequest(
+            provider, path, model, headers, credential, body, scheme, self._clock()
+        )
         self._record(request)
         try:
-            if provider == "ollama":
-                return 200, self._ollama(request)
+            if provider == "foundry_cohere":
+                return self._foundry(request)
             if provider == "azure":
-                return 200, self._azure(request)
+                return _Reply(200, self._azure(request))
             if provider == "bedrock":
                 if scheme not in ("sigv4", "bearer") or not credential:
                     raise _RefusedError(403, {"message": "Missing SigV4 signature or bearer token"})
-                return 200, self._bedrock(request)
+                return _Reply(200, self._bedrock(request))
             raise _RefusedError(404, {"error": {"code": "NotFound", "message": f"no route {path}"}})
         except _RefusedError as refused:
-            return refused.status, refused.payload
+            return _Reply(refused.status, refused.payload, refused.headers)

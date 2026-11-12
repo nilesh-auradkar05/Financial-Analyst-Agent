@@ -245,6 +245,24 @@ tasks/
 test_image/
 aws-user-policies/
 aws-user-policies/
+.claude/commands
+.claude/launch.json
+.claude/loop.md
+.claude/output-styles
+.claude/routines
+./claude/scheduled_tasks.json
+.claude/workflows
+.gitmodules
+.idea
+.mcp.json
+.profile
+.ripgreprc
+.vscode
+.zprofile
+.zshrc
+.bash_profile
+.bashrc
+.gitconfig
 
 # Custom Zip files
 Alpha-Financial-Analyst.zip

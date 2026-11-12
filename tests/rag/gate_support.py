@@ -104,7 +104,7 @@ def write_anchored_fixture(directory: Path) -> tuple[Path, Path]:
     payload = {
         "fixture_version": "cm4-test-1",
         "generated_at": "2026-11-08T00:00:00+00:00",
-        "embedding_model": "ollama:fake-hash-embed:16",
+        "embedding_model": "bedrock:fake-hash-embed:16",
         "cases": cases,
     }
     fixture_path = directory / "anchored_fixture.json"

@@ -56,7 +56,7 @@ const FEATURES = [
   {
     icon: "⇄",
     title: "Model routing",
-    body: "Claude, DeepSeek and OpenAI models on AWS Bedrock behind one typed interface, with a local Ollama fallback.",
+    body: "Claude, DeepSeek and OpenAI models on AWS Bedrock behind one typed interface.",
   },
   {
     icon: "∑",

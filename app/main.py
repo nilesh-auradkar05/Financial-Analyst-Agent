@@ -6,7 +6,7 @@ This module implements the FastAPI service for the financial analyst agent syste
 Features:
     - Sync analysis endpoint
     - Async job-based analysis endpoint.
-    - Health check for ollama server.
+    - Configuration-only health check (embedding, chat and vector store).
     - Filing ingestion endpoint.
     - Proper error handling and logging
     - CORS support for web clients.
@@ -107,7 +107,6 @@ from app.observability.metrics import (
     track_agent_run,
     track_request,
 )
-from app.services.llm import check_ollama_health
 from app.services.run_store import FileBackedRunStore
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
@@ -242,11 +241,6 @@ async def lifespan(app: FastAPI):
     # Setup LangSmith
     setup_langsmith_env()
 
-    # Embeddings always use Ollama, independently of the selected chat provider.
-    embeddings_ok = await check_ollama_health(model=settings.ollama.embed_model, log_failure=True)
-    if not embeddings_ok:
-        logger.warning("Ollama embedding model not available")
-
     try:
         store = get_vector_store()
         logger.info(f"Vector store: {store.count} documents")
@@ -345,7 +339,14 @@ async def root():
 @app.get("/health", response_model=HealthResponse, tags=["Info"], responses={503: {"model": HealthResponse, "description": "Dependency unavailable"}})
 async def health():
     """Health check endpoint."""
-    embedding_ok = await check_ollama_health(model=settings.ollama.embed_model)
+    embedding = settings.embedding
+    llm = settings.llm
+    if embedding.provider == "foundry_cohere":
+        embedding_ok = bool(llm.azure_openai_endpoint and llm.azure_api_key and llm.azure_api_key.get_secret_value().strip())
+    elif embedding.provider == "bedrock":
+        embedding_ok = bool(llm.aws_region)
+    else:
+        embedding_ok = True  # settings validation already required the Azure endpoint and key
     azure_ok = settings.llm.azure_deployment(settings.llm.azure_foundry_model) is not None
     chat_ok = azure_ok or bool(settings.llm.aws_region and settings.llm.model) or bool(settings.llm.personal_fallbacks())
     try:
@@ -360,7 +361,7 @@ async def health():
         timestamp=datetime.now(timezone.utc).isoformat(),
         components={
             "chat_model": {"ok": chat_ok, "provider": "azure" if azure_ok else "bedrock", "check": "configuration_only", "inference_verified": False},
-            "ollama_embeddings": {"ok": embedding_ok},
+            "embedding": {"ok": embedding_ok, "provider": embedding.provider, "model": embedding.model, "check": "configuration_only"},
             "vector_store": {"ok": vector_ok},
             "langsmith": {"connected": langsmith_status.get("connected", False)},
         },

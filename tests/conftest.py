@@ -158,17 +158,10 @@ def sample_agent_state(
 
 
 @pytest.fixture
-def mock_ollama_response():
-    class MockResponse:
-        content = "This is a mock LLM response for testing."
-    return MockResponse()
-
-
-@pytest.fixture
 def mock_embedding_vector():
     import random
     random.seed(42)
-    return [random.random() for _ in range(2560)]
+    return [random.random() for _ in range(1024)]
 
 
 @pytest.fixture
@@ -199,5 +192,64 @@ def foundry_rerank(monkeypatch):
     monkeypatch.setattr(settings.llm, "azure_openai_endpoint", server.url)
     monkeypatch.setattr(settings.llm, "azure_api_key", SecretStr("test-key"))
     monkeypatch.setattr(settings.llm, "azure_foundry_rerank_model", RERANK_DEPLOYMENT)
+    yield server
+    server.stop()
+
+
+@pytest.fixture
+def fake_clock(monkeypatch):
+    """`time.monotonic` and `time.sleep` made free: sleeping returns at once and advances the clock.
+
+    Any test that reaches the Foundry Cohere embedding adapter needs this: the adapter paces its
+    requests (test-plan §21) and would otherwise really sleep between them. Time only moves
+    forward across tests, so the adapter's process-wide pacing state never looks like the future.
+    """
+    import time
+
+    from tests.unit.fake_embeddings import FakeClock
+
+    clock = FakeClock()
+    monkeypatch.setattr(time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(time, "sleep", clock.sleep)
+    return clock
+
+
+@pytest.fixture
+def embedding_arm_configured(monkeypatch):
+    """The default embedding arm (Foundry Cohere) with a dummy endpoint and key.
+
+    `/health` reads configuration only (test-plan §1), so a test that expects a healthy service
+    names the two settings the arm needs; tests/conftest.py blanks the key for every test.
+    """
+    from pydantic import SecretStr
+
+    from app.config import Settings, settings
+
+    for name in ("EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(settings, "embedding", Settings(_env_file=None).embedding)
+    monkeypatch.setattr(settings.llm, "azure_openai_endpoint", "https://embedding.invalid")
+    monkeypatch.setattr(settings.llm, "azure_api_key", SecretStr("dummy-embedding-key"))
+
+
+@pytest.fixture
+def foundry_embed(monkeypatch, fake_clock):
+    """A loopback Foundry Cohere embed endpoint on the fake clock, with the default arm pointed at it.
+
+    The returned server computes vectors from the request and can be scripted to throttle
+    (`script_foundry`). The settings name the default embedding arm and the server's URL.
+    """
+    from pydantic import SecretStr
+
+    from app.config import Settings, settings
+    from tests.embedding_arms import AZURE_API_KEY
+    from tests.unit.fake_embeddings import FakeEmbeddingProviders
+
+    for name in ("EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_DIMENSIONS"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(settings, "embedding", Settings(_env_file=None).embedding)
+    server = FakeEmbeddingProviders(fake_clock).start()
+    monkeypatch.setattr(settings.llm, "azure_openai_endpoint", server.url)
+    monkeypatch.setattr(settings.llm, "azure_api_key", SecretStr(AZURE_API_KEY))
     yield server
     server.stop()

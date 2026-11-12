@@ -19,11 +19,11 @@ Install these before running the project:
 - Python 3.12, or another interpreter supported by `pyproject.toml`.
 - `uv` for Python dependency management.
 - Docker, optional but recommended for Qdrant.
-- Ollama, optional for live LLM and embedding flows.
+- A Microsoft Foundry resource with a `cohere-embed-v5-fast` deployment, for live embedding flows.
 - A SEC EDGAR user-agent contact string.
 - A Tavily API key only if running news search.
 
-The static test suite does not require live Ollama, Tavily, or SEC access. Ingestion and analysis smoke tests do.
+The static test suite does not require Foundry, Tavily, or SEC access. Ingestion and analysis smoke tests do.
 
 ## Step 1 - Open the repository
 
@@ -66,10 +66,7 @@ AWS_REGION=us-east-1
 AWS_BEARER_TOKEN_BEDROCK=
 CLAUDE_LLM_MODEL=claude-sonnet-4-5    # personal fallback 1 (needs ANTHROPIC_API_KEY)
 OPENAI_LLM_MODEL=gpt-4.1               # personal fallback 2 (needs OPENAI_API_KEY)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_EMBED_MODEL=qwen3-embedding:4b
-OLLAMA_TIMEOUT=600
-OLLAMA_TEMPERATURE=0.7
+EMBEDDING_PROVIDER=foundry_cohere      # default arm; uses AZURE_OPENAI_ENDPOINT + AZURE_API_KEY
 
 VECTOR_BACKEND=qdrant
 QDRANT_URL=http://localhost:16333
@@ -99,16 +96,9 @@ Follow logs if Qdrant does not appear healthy:
 docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml logs qdrant
 ```
 
-## Step 5 - Optional Ollama setup
+## Step 5 - Embedding deployment
 
-Install Ollama and pull the configured models if you want to run live ingestion, embedding, or analysis flows:
-
-```bash
-ollama pull qwen3-embedding:4b
-ollama list
-```
-
-If model names change, update `.env` and keep the test evidence in `tasks/todo.md`.
+Live ingestion, embedding and analysis flows call the Foundry deployment `cohere-embed-v5-fast` through `AZURE_OPENAI_ENDPOINT` and `AZURE_API_KEY`. The deployment allows 20 requests and 20,000 tokens per minute; the client paces itself at 18 requests and about 18,000 estimated tokens per minute (ingesting one ticker's 10-K takes two to three minutes) and returns a typed error after one throttled retry. Indexes built with the old Qwen3 default are not reused; each ticker is ingested again on its first analysis.
 
 ## Step 6 - Follow the behavior-first test protocol
 
@@ -171,7 +161,7 @@ curl http://127.0.0.1:8000/stats
 curl http://127.0.0.1:8000/metrics
 ```
 
-`/health` may report `degraded` when Ollama or LangSmith is unavailable. That is acceptable for static development checks, but not for live analysis validation.
+`/health` may report `degraded` when the embedding arm's settings, the chat plane or the vector store are missing. That is acceptable for static development checks, but not for live analysis validation.
 
 ## Step 9 - Optional live ingestion smoke test
 
@@ -193,7 +183,7 @@ curl http://127.0.0.1:8000/stats
 
 ## Step 10 - Optional live analysis smoke test
 
-This requires Ollama, market data access, and retrieval data if filing analysis is enabled. Tavily is required only when `include_news_sentiment` is true.
+This requires the Foundry embedding deployment, market data access, and retrieval data if filing analysis is enabled. Tavily is required only when `include_news_sentiment` is true.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/analyze \
@@ -228,7 +218,7 @@ Local generated data usually lives under `data/` and `.runtime/`. Remove it only
 ## Troubleshooting
 
 - `uv` cannot write to its cache: rerun with `uv --cache-dir /tmp/uv-cache ...`.
-- `/health` is degraded: check Ollama, vector store, and optional LangSmith configuration.
+- `/health` is degraded: check the embedding settings (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`), the chat model settings and the vector store.
 - Qdrant tests fail to connect: confirm `docker ps`, `QDRANT_URL`, and port `6333`.
 - Ingestion fails: confirm network access, SEC user agent, and embedding model availability.
 - News search fails: set `TAVILY_API_KEY` or run analysis with `include_news_sentiment=false`.

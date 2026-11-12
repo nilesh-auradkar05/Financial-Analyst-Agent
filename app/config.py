@@ -24,45 +24,6 @@ FILINGS_DIR.mkdir(exist_ok=True)
 """ SETTINGS CLASSES """
 
 
-class OllamaSettings(BaseSettings):
-    """
-    Configuration for OLLAMA.
-
-    Assuming that the Ollama server is running on the default port (11434)
-
-    ENVIRONMENT VARIABLES:
-           OLLAMA_BASE_URL: URL WHERE OLLAMA SERVER IS RUNNING
-           OLLAMA_EMBED_MODEL: MODEL TO USE FOR EMBEDDINGS
-           OLLAMA_TIMEOUT: REQUEST TIMEOUT IN SECONDS
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="OLLAMA_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # Base URL for Ollama server
-    base_url: str = Field(
-        default="http://localhost:11434",
-        description="Ollama server URL",
-    )
-
-    embed_model: str = Field(
-        default="qwen3-embedding:4b", description="Ollama model for embeddings"
-    )
-
-    embed_batch_size: int = Field(
-        default=8,
-        description="Batch size for embedding requests",
-    )
-
-    timeout: int = Field(default=600, description="Request timeout in seconds (10 minutes)")
-
-    temperature: float = Field(default=0.7, description="LLm temperature(0.0 to 1.0)")
-
-
 class LLMSettings(BaseSettings):
     """Chat models: Foundry (when configured), then Bedrock, then personal Claude, then personal OpenAI."""
 
@@ -175,12 +136,12 @@ class LLMSettings(BaseSettings):
 
 
 class EmbeddingSettings(BaseSettings):
-    """Embedding provider arm: ollama (default), bedrock or azure_openai.
+    """Embedding provider arm: foundry_cohere (default), bedrock or azure_openai.
 
     ENVIRONMENT VARIABLES:
-           EMBEDDING_PROVIDER: ollama | bedrock | azure_openai
-           EMBEDDING_MODEL: model id, or the Azure deployment name (required for cloud arms)
-           EMBEDDING_DIMENSIONS: vector size (required for cloud arms)
+           EMBEDDING_PROVIDER: foundry_cohere | bedrock | azure_openai
+           EMBEDDING_MODEL: model id, or the Azure deployment name (required for bedrock and azure_openai)
+           EMBEDDING_DIMENSIONS: vector size (required for bedrock and azure_openai)
     """
 
     model_config = SettingsConfigDict(
@@ -190,16 +151,16 @@ class EmbeddingSettings(BaseSettings):
         hide_input_in_errors=True,
     )
 
-    provider: Literal["ollama", "bedrock", "azure_openai"] = Field(
-        default="ollama", validation_alias="EMBEDDING_PROVIDER"
+    provider: Literal["foundry_cohere", "bedrock", "azure_openai"] = Field(
+        default="foundry_cohere", validation_alias="EMBEDDING_PROVIDER"
     )
-    model: str = Field(default="", validation_alias="EMBEDDING_MODEL")
-    dimensions: int = Field(default=2560, gt=0, validation_alias="EMBEDDING_DIMENSIONS")
+    model: str = Field(default="cohere-embed-v5-fast", validation_alias="EMBEDDING_MODEL")
+    dimensions: int = Field(default=1024, gt=0, validation_alias="EMBEDDING_DIMENSIONS")
 
     @model_validator(mode="after")
     def _cloud_arm_is_complete(self) -> "EmbeddingSettings":
-        if self.provider != "ollama":
-            if not self.model.strip():
+        if self.provider != "foundry_cohere":
+            if "model" not in self.model_fields_set or not self.model.strip():
                 raise ValueError(f"EMBEDDING_MODEL is required for EMBEDDING_PROVIDER={self.provider}")
             if "dimensions" not in self.model_fields_set:
                 raise ValueError(
@@ -387,7 +348,6 @@ class Settings(BaseSettings):
 
     # Nested Settings objects
     llm: LLMSettings = Field(default_factory=LLMSettings)
-    ollama: OllamaSettings = Field(default_factory=OllamaSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     tavily: TavilySettings = Field(default_factory=TavilySettings)
     langsmith: LangSmithSettings = Field(default_factory=LangSmithSettings)
@@ -419,8 +379,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _embedding_arm_matches_credentials(self) -> "Settings":
-        if not self.embedding.model.strip():
-            self.embedding.model = self.ollama.embed_model
         if self.embedding.provider == "azure_openai":
             key = self.llm.azure_api_key
             if not self.llm.azure_openai_endpoint:

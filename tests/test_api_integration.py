@@ -64,15 +64,13 @@ class StubIngestResult:
     error: str | None = None
 
 
-async def fake_check_ollama_health(*, log_failure: bool = False, model: str | None = None) -> bool:
-    return True
-
-
 async def fake_check_langsmith_connection() -> dict[str, bool]:
     return {"connected": True}
 
 
-async def fake_ingest_10k_for_ticker(ticker: str, replace_existing: bool = False) -> StubIngestResult:
+async def fake_ingest_10k_for_ticker(
+    ticker: str, replace_existing: bool = False
+) -> StubIngestResult:
     return StubIngestResult()
 
 
@@ -165,11 +163,10 @@ async def fake_run_agent(
 
 
 @pytest.fixture()
-def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, embedding_arm_configured):
     temp_store = FileBackedRunStore(tmp_path / "run_store.json")
     monkeypatch.setattr(api_main, "run_store", temp_store)
     monkeypatch.setattr(api_main, "get_vector_store", lambda: StubVectorStore())
-    monkeypatch.setattr(api_main, "check_ollama_health", fake_check_ollama_health)
     monkeypatch.setattr(api_main, "check_langsmith_connection", fake_check_langsmith_connection)
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
@@ -180,13 +177,15 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         test_client.headers["Authorization"] = "Bearer test-secret"
         yield test_client
 
+
 def test_health_endpoint_returns_component_statuses(client: TestClient):
     response = client.get("/health")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "healthy"
-    assert payload["components"]["ollama_embeddings"]["ok"] is True
+    assert payload["components"]["embedding"]["ok"] is True
+    assert "ollama_embeddings" not in payload["components"]
     assert payload["components"]["vector_store"]["ok"] is True
     assert payload["components"]["langsmith"]["connected"] is True
 
@@ -386,7 +385,10 @@ def test_protected_routes_require_auth_but_root_and_health_are_public(client: Te
 def test_input_contract_normalizes_ticker_and_rejects_unsafe_values(client: TestClient):
     assert client.post("/analyze", json={"ticker": "brk.b"}).json()["ticker"] == "BRK.B"
     assert client.post("/analyze", json={"ticker": "AAPL; DROP"}).status_code == 422
-    assert client.post("/analyze", json={"ticker": "AAPL", "company_name": "bad\nname"}).status_code == 422
+    assert (
+        client.post("/analyze", json={"ticker": "AAPL", "company_name": "bad\nname"}).status_code
+        == 422
+    )
     assert client.post("/ingest", json={"ticker": "AAPL", "filing_type": "10-Q"}).status_code == 422
 
 
@@ -421,18 +423,37 @@ def test_openapi_documents_async_and_error_contracts(client: TestClient):
 
 
 # Trace: docs/test-plan.md §1 REST hardening and §11 evidence completeness.
-@pytest.mark.parametrize("patch, expected, missing", [
-    ({"verification_result": {"passed": False}}, "degraded", []),
-    ({"verification_result": {}}, "degraded", []),
-    ({"filing_chunks": []}, "evidence_missing", ["filings"]),
-    ({"stock_data": {}}, "evidence_missing", ["stock"]),
-    ({"filing_chunks": [], "errors": [{"recoverable": False, "message": "secret"}]}, "failed", ["filings"]),
-    ({"filing_chunks": [], "news_articles": [], "include_filing_analysis": False, "include_news_sentiment": False}, "completed", []),
-])
-def test_job_and_result_share_truthful_terminal_status(client, monkeypatch, patch, expected, missing):
+@pytest.mark.parametrize(
+    "patch, expected, missing",
+    [
+        ({"verification_result": {"passed": False}}, "degraded", []),
+        ({"verification_result": {}}, "degraded", []),
+        ({"filing_chunks": []}, "evidence_missing", ["filings"]),
+        ({"stock_data": {}}, "evidence_missing", ["stock"]),
+        (
+            {"filing_chunks": [], "errors": [{"recoverable": False, "message": "secret"}]},
+            "failed",
+            ["filings"],
+        ),
+        (
+            {
+                "filing_chunks": [],
+                "news_articles": [],
+                "include_filing_analysis": False,
+                "include_news_sentiment": False,
+            },
+            "completed",
+            [],
+        ),
+    ],
+)
+def test_job_and_result_share_truthful_terminal_status(
+    client, monkeypatch, patch, expected, missing
+):
     async def run(ticker, company_name, **kwargs):
         state = await fake_run_agent(ticker, company_name)
         return {**state, **patch}
+
     monkeypatch.setattr(api_main, "run_agent", run)
     accepted = client.post("/analyze/async", json={"ticker": "AAPL"})
     response = client.get(accepted.headers["location"])
@@ -466,20 +487,24 @@ def test_auth_fail_closed_and_header_alternative(client, monkeypatch):
 
 def test_ingestion_refresh_changes_existing_content_and_failures_are_safe(client, monkeypatch):
     contents = {"AAPL": 1}
+
     async def ingest(ticker, replace_existing=False):
         if replace_existing:
             contents[ticker] = 2
         return StubIngestResult()
+
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", ingest)
     assert client.post("/ingest", json={"ticker": "AAPL"}).status_code == 200
     assert contents["AAPL"] == 1
     assert client.post("/ingest", json={"ticker": "AAPL", "force_refresh": True}).status_code == 200
     assert contents["AAPL"] == 2
+
     async def failed(ticker, replace_existing=False):
         result = StubIngestResult()
         result.success = False
         result.error = "secret provider details"
         return result
+
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", failed)
     response = client.post("/ingest", json={"ticker": "AAPL"})
     assert response.status_code == 502
@@ -508,7 +533,9 @@ def test_ingestion_returns_typed_missing_filing_reason(client, monkeypatch):
 # Trace: docs/test-plan.md §16, analysis without filings and retrieval failure.
 @pytest.mark.parametrize("retrieval_fails", [False, True])
 @pytest.mark.parametrize("memo_text", ["# Investment Memo\n\nMarket evidence is limited.", ""])
-def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkeypatch, retrieval_fails, memo_text):
+def test_analysis_preserves_evidence_when_filings_are_unavailable(
+    client, monkeypatch, retrieval_fails, memo_text
+):
     from types import SimpleNamespace
 
     from app.agents import graph
@@ -521,13 +548,17 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkey
         return SimpleNamespace(chunks=[])
 
     async def no_10k(ticker, **_kwargs):
-        return IngestionResult(ticker=ticker, filing_type="10-K", error="none", error_code="filing_not_found")
+        return IngestionResult(
+            ticker=ticker, filing_type="10-K", error="none", error_code="filing_not_found"
+        )
 
     class MemoLLM:
         async def ainvoke(self, _messages):
             return SimpleNamespace(content=memo_text)
 
-    monkeypatch.setattr(graph, "get_vector_store", lambda: SimpleNamespace(count_documents=lambda _filters: 0))
+    monkeypatch.setattr(
+        graph, "get_vector_store", lambda: SimpleNamespace(count_documents=lambda _filters: 0)
+    )
     monkeypatch.setattr(graph, "_search_filing_chunks", search)
     monkeypatch.setattr(graph, "ingest_10k_for_ticker", no_10k)
     monkeypatch.setattr(graph, "get_llm", lambda _settings: MemoLLM())
@@ -535,9 +566,15 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkey
     async def run(ticker, company_name, **_kwargs):
         state = create_initial_state(ticker, company_name)
         state["stock_data"] = {"ticker": ticker, "current_price": 123.0}
-        state["news_articles"] = [{"title": "Market update", "snippet": "Shares rose.", "source": "Wire"}]
+        state["news_articles"] = [
+            {"title": "Market update", "snippet": "Shares rose.", "source": "Wire"}
+        ]
         state["sentiment_result"] = {"overall_sentiment": "positive", "positive_count": 1}
-        for node in (graph.retrieve_sec_filings_node, graph.draft_memo_node, graph.verify_memo_node):
+        for node in (
+            graph.retrieve_sec_filings_node,
+            graph.draft_memo_node,
+            graph.verify_memo_node,
+        ):
             state = apply_update(state, await node(state))
         return state
 
@@ -556,16 +593,86 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(client, monkey
         assert not payload["investment_memo"]
     assert all(item["source_type"] != "sec_filing" for item in payload["citations"])
     assert payload["verification"] is not None
-    reason = next(error["message"] for error in payload["errors"] if error["step"] == "retrieve_filings")
-    assert reason == ("Filing retrieval failed for AAPL." if retrieval_fails else "No indexed filings found for AAPL.")
+    reason = next(
+        error["message"] for error in payload["errors"] if error["step"] == "retrieve_filings"
+    )
+    assert reason == (
+        "Filing retrieval failed for AAPL."
+        if retrieval_fails
+        else "No indexed filings found for AAPL."
+    )
     assert "private" not in response.text
+
+
+# Trace: docs/test-plan.md §21 Foundry Cohere throttle (the run keeps its other evidence).
+def test_throttled_embedding_arm_leaves_the_run_with_a_filings_gap_not_a_crash(
+    client, monkeypatch, foundry_embed
+):
+    from types import SimpleNamespace
+
+    from app.agents import graph
+    from app.agents.state import apply_update, create_initial_state
+    from app.components.retrieval import embeddings
+    from tests.embedding_arms import AZURE_API_KEY
+    from tests.unit.fake_embeddings import LEAKY_BODY_MARKER, ScriptedReply
+
+    assert embeddings.embedding_identifier() == "foundry_cohere:cohere-embed-v5-fast:1024"
+    foundry_embed.script_foundry(ScriptedReply(429, "1"), ScriptedReply(429, "1"))
+
+    class EmbeddingStore:
+        def count_documents(self, _filters=None):
+            return 3
+
+        def search_by_ticker(self, query, ticker, n_results=3, section=None):
+            embeddings.embed_query(query)
+            return SimpleNamespace(chunks=[])
+
+    class MemoLLM:
+        async def ainvoke(self, _messages):
+            return SimpleNamespace(content="# Investment Memo\n\nMarket evidence is limited.")
+
+    monkeypatch.setattr(graph, "get_vector_store", lambda: EmbeddingStore())
+    monkeypatch.setattr(graph, "get_llm", lambda _settings: MemoLLM())
+
+    async def run(ticker, company_name, **_kwargs):
+        state = create_initial_state(ticker, company_name)
+        state["stock_data"] = {"ticker": ticker, "current_price": 123.0}
+        state["news_articles"] = [
+            {"title": "Market update", "snippet": "Shares rose.", "source": "Wire"}
+        ]
+        state["sentiment_result"] = {"overall_sentiment": "positive", "positive_count": 1}
+        for node in (
+            graph.retrieve_sec_filings_node,
+            graph.draft_memo_node,
+            graph.verify_memo_node,
+        ):
+            state = apply_update(state, await node(state))
+        return state
+
+    monkeypatch.setattr(api_main, "run_agent", run)
+
+    response = client.post("/analyze", json={"ticker": "AAPL"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "evidence_missing"
+    assert payload["missing"] == ["filings"]
+    assert payload["stock_data"]["current_price"] == 123.0
+    assert len(payload["news_articles"]) == 1
+    failure = next(error for error in payload["errors"] if error["step"] == "retrieve_filings")
+    assert failure["message"] == "Filing retrieval failed for AAPL."
+    assert len(foundry_embed.requests_to("foundry_cohere")) == 2
+    assert AZURE_API_KEY not in response.text
+    assert LEAKY_BODY_MARKER not in response.text
 
 
 def test_health_reports_unavailable_retrieval_and_configuration_only_bedrock(client, monkeypatch):
     response = client.get("/health")
     assert response.json()["components"]["chat_model"]["check"] == "configuration_only"
+
     def unavailable():
         raise RuntimeError("private backend location")
+
     monkeypatch.setattr(api_main, "get_vector_store", unavailable)
     response = client.get("/health")
     assert response.status_code == 503
@@ -574,39 +681,53 @@ def test_health_reports_unavailable_retrieval_and_configuration_only_bedrock(cli
 
 
 def test_idempotent_replay_preserves_original_result(client, monkeypatch):
-    first = client.post("/analyze/async", json={"ticker": "aapl"}, headers={"Idempotency-Key": "same"})
+    first = client.post(
+        "/analyze/async", json={"ticker": "aapl"}, headers={"Idempotency-Key": "same"}
+    )
     original = client.get(first.headers["location"]).json()
+
     async def revised(ticker, company_name, **kwargs):
         state = await fake_run_agent(ticker, company_name)
         state["investment_memo"] = "New underlying evidence"
         return state
+
     monkeypatch.setattr(api_main, "run_agent", revised)
-    replay = client.post("/analyze/async", json={"ticker": "AAPL"}, headers={"Idempotency-Key": "same"})
+    replay = client.post(
+        "/analyze/async", json={"ticker": "AAPL"}, headers={"Idempotency-Key": "same"}
+    )
     assert replay.headers["location"] == first.headers["location"]
     assert client.get(replay.headers["location"]).json() == original
-    fresh = client.post("/analyze/async", json={"ticker": "AAPL"}, headers={"Idempotency-Key": "new"})
-    assert client.get(fresh.headers["location"]).json()["result"]["investment_memo"] == "New underlying evidence"
+    fresh = client.post(
+        "/analyze/async", json={"ticker": "AAPL"}, headers={"Idempotency-Key": "new"}
+    )
+    assert (
+        client.get(fresh.headers["location"]).json()["result"]["investment_memo"]
+        == "New underlying evidence"
+    )
     assert "test-secret" not in api_main.run_store.path.read_text()
 
 
 def test_rate_limit_expires_and_is_scoped_to_key(client, monkeypatch):
     from types import SimpleNamespace
+
     now = [1000.0]
     monkeypatch.setattr(api_main, "time", SimpleNamespace(monotonic=lambda: now[0]))
     monkeypatch.setattr(api_main.settings, "api_rate_limit", 1)
     assert client.post("/analyze", json={"ticker": "AAPL"}).status_code == 200
     assert client.post("/ingest", json={"ticker": "AAPL"}).status_code == 429
     monkeypatch.setattr(api_main.settings, "api_key", "rotated-key")
-    assert client.post("/analyze", json={"ticker": "AAPL"}, headers={"Authorization": "Bearer rotated-key"}).status_code == 200
+    assert (
+        client.post(
+            "/analyze", json={"ticker": "AAPL"}, headers={"Authorization": "Bearer rotated-key"}
+        ).status_code
+        == 200
+    )
     monkeypatch.setattr(api_main.settings, "api_key", "test-secret")
     now[0] += 61
     assert client.post("/ingest", json={"ticker": "AAPL"}).status_code == 200
 
 
-def test_bedrock_does_not_depend_on_ollama_chat_model(client, monkeypatch):
-    async def available(*, model=None, log_failure=False):
-        return model == api_main.settings.ollama.embed_model
-    monkeypatch.setattr(api_main, "check_ollama_health", available)
+def test_chat_health_is_configuration_only_and_needs_some_provider(client, monkeypatch):
     assert client.get("/health").status_code == 200
     monkeypatch.setattr(api_main.settings.llm, "aws_region", None)
     monkeypatch.setattr(api_main.settings.llm, "anthropic_api_key", None)
@@ -619,17 +740,25 @@ def test_openapi_defines_security_and_error_schema(client):
     operation = schema["paths"]["/analyze/async"]["post"]
     assert {"HTTPBearer": []} in operation["security"]
     assert {"APIKeyHeader": []} in operation["security"]
-    assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith("ErrorResponse")
+    assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "ErrorResponse"
+    )
 
 
 # Trace: docs/test-plan.md §1 all-route OpenAPI contracts.
 def test_all_nine_routes_document_actual_success_and_errors(client):
     schema = client.get("/openapi.json").json()
-    routes = [("/", "get", "200"), ("/health", "get", "200"),
-              ("/metrics", "get", "200"), ("/stats", "get", "200"),
-              ("/analyze", "post", "200"), ("/analyze/async", "post", "202"),
-              ("/jobs/{job_id}", "get", "200"), ("/ingest", "post", "200"),
-              ("/ingest/{ticker}", "get", "200")]
+    routes = [
+        ("/", "get", "200"),
+        ("/health", "get", "200"),
+        ("/metrics", "get", "200"),
+        ("/stats", "get", "200"),
+        ("/analyze", "post", "200"),
+        ("/analyze/async", "post", "202"),
+        ("/jobs/{job_id}", "get", "200"),
+        ("/ingest", "post", "200"),
+        ("/ingest/{ticker}", "get", "200"),
+    ]
     for path, method, status in routes:
         operation = schema["paths"][path][method]
         content = operation["responses"][status]["content"]
@@ -639,7 +768,9 @@ def test_all_nine_routes_document_actual_success_and_errors(client):
             assert "application/json" not in content
         else:
             assert content["application/json"]["schema"].get("$ref")
-        assert operation["responses"]["405"]["content"]["application/json"]["schema"]["$ref"].endswith("ErrorResponse")
+        assert operation["responses"]["405"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith("ErrorResponse")
 
 
 def test_job_poll_serves_recorded_progress_and_result_counts(client: TestClient):
@@ -650,12 +781,29 @@ def test_job_poll_serves_recorded_progress_and_result_counts(client: TestClient)
     assert polled["result"]["filing_chunk_count"] == 1
     assert polled["result"]["usage"] is None
 
-    step = {"node": "fetch_stock", "status": "completed", "started_at": "2026-10-07T12:00:00+00:00",
-            "ended_at": "2026-10-07T12:00:01+00:00", "duration_ms": 1000.0}
-    api_main.run_store.record_progress(job_id, [step, {"node": "draft_memo", "status": "running", "started_at": "2026-10-07T12:00:01+00:00"}])
+    step = {
+        "node": "fetch_stock",
+        "status": "completed",
+        "started_at": "2026-10-07T12:00:00+00:00",
+        "ended_at": "2026-10-07T12:00:01+00:00",
+        "duration_ms": 1000.0,
+    }
+    api_main.run_store.record_progress(
+        job_id,
+        [
+            step,
+            {"node": "draft_memo", "status": "running", "started_at": "2026-10-07T12:00:01+00:00"},
+        ],
+    )
     progress = client.get(f"/jobs/{job_id}").json()["progress"]
     assert progress[0] == step
-    assert progress[1] == {"node": "draft_memo", "status": "running", "started_at": "2026-10-07T12:00:01+00:00", "ended_at": None, "duration_ms": None}
+    assert progress[1] == {
+        "node": "draft_memo",
+        "status": "running",
+        "started_at": "2026-10-07T12:00:01+00:00",
+        "ended_at": None,
+        "duration_ms": None,
+    }
 
 
 def test_job_list_returns_newest_first_summaries_without_memo(client: TestClient, monkeypatch):
