@@ -29,8 +29,7 @@ REQUIRED_PHRASES = [
     "Gold labels would be authored against unstable chunk IDs",
     "work is about to be marked done without recorded verification",
     "uv run ruff check .",
-    "VECTOR_BACKEND=chroma",
-    "VECTOR_BACKEND=qdrant",
+    "VECTOR_BACKEND=opensearch",
     "correction, root cause, prevention rule",
 ]
 

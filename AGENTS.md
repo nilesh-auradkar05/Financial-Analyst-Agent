@@ -154,8 +154,7 @@ python scripts/ci/check_test_hygiene.py
 uv run pytest tests/ingestion tests/replay
 
 # backend parity (factory tests until the S3-T04 contract suite lands)
-VECTOR_BACKEND=chroma uv run pytest tests/unit/test_vector_store_factory.py
-VECTOR_BACKEND=qdrant uv run pytest tests/unit/test_vector_store_factory.py
+VECTOR_BACKEND=opensearch uv run pytest tests/unit/test_vector_store_factory.py
 
 # OpenSearch contract suite (CM-2): needs the local container, so the full
 # `uv run pytest` does too; CI runs the same image as a service

@@ -73,7 +73,7 @@ The implementation already contains:
 - Request controls for filing analysis, news sentiment, and news count.
 - Structured evidence packets and memo verification.
 - Section-aware SEC ingestion with deterministic chunk identity.
-- Chroma and Qdrant implementations behind a retrieval contract (retired by ADR-0016; removed in CM-7).
+- Chroma and Qdrant implementations behind a retrieval contract (retired by ADR-0016; removed in CM-7, 2026-11-12).
 - Retrieval benchmark precursor fixtures and comparison tooling.
 - Memo-grounding evaluation tooling.
 
@@ -134,7 +134,7 @@ In scope:
 - Section-coverage regression tests.
 - Canonical section metadata and deterministic chunk IDs.
 - Typed retrieval contracts and retrieval services.
-- OpenSearch implementation behind those contracts (ADR-0016): a local container for development and tests, Amazon OpenSearch Serverless in the cloud. Chroma and Qdrant are retired and removed in CM-7.
+- OpenSearch implementation behind those contracts (ADR-0016): a local container for development and tests, Amazon OpenSearch Serverless in the cloud. Chroma and Qdrant were removed in CM-7 (2026-11-12).
 - Managed data and model plane ahead of S7 (ADR-0016): OpenSearch Serverless, Bedrock and Foundry embeddings and models, hosted sentiment. The app, worker and ingestion keep running locally.
 - Shared retrieval benchmark: fixture, validator, runner, paired comparator.
 - Evidence-grounded memo generation and verification.
@@ -216,7 +216,7 @@ Dependency rule: backend client objects never escape the retrieval boundary.
 - `app/tools/` (S11, ADR-0018) — `ToolGateway`, `ToolSpec` registry from Pydantic settings with pinned schema hashes, in-process adapters, and the only module that imports the MCP SDK client. Read-only tools only.
 - `app/mcp/` (S11, ADR-0018) — the analyst exposed as an MCP server at `/mcp`; a thin adapter over the API routes' services, never over the graph.
 - `app/memory/` (S11, ADR-0018) — `MemoryStore` protocol and `IssuerProfile`, adapters (in-memory, DynamoDB; Postgres at its scale-tier trigger) and `MEMORY` block rendering; `EpisodicRecord` and delta computation only if the owner reverses ADR-0017 §1. No store client escapes it.
-- `app/components/retrieval/` — retrieval contracts, evidence packets, the OpenSearch store (local container and Serverless; ADR-0014, ADR-0016), retrieval methods. The Chroma and Qdrant adapters remain only until CM-7 removes them.
+- `app/components/retrieval/` — retrieval contracts, evidence packets, the OpenSearch store (local container and Serverless; ADR-0014, ADR-0016), retrieval methods. The Chroma and Qdrant adapters were removed in CM-7.
 - `app/verification/` — runtime memo verifier (moved from `evaluation/grounding.py`). `evaluation/` MUST NOT be imported by `app/`.
 - `app/guardrails/` — `input.py` (schema), `content.py` (untrusted-source framing), `output.py` (policy screen).
 - `app/dataops/` — EvidenceSnapshot build/freeze/replay (INTEGRATION_PLAN_v2 §3.4). Runtime replay and the snapshot hash live here (S2-T00b); release contracts, registry and gates stay in repo-root `dataops/`.

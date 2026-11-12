@@ -144,7 +144,7 @@ Against a local OpenSearch container; no network beyond it and no cloud credenti
 | --- | --- |
 | `VECTOR_BACKEND=opensearch` | resolves to `OpenSearchVectorStore`; unset resolves to it too (default since CM-7) |
 | Invalid `VECTOR_BACKEND` | config validation fails; `qdrant` and `chroma` are invalid since CM-7 (2026-11-12, ADR-0016): the error names the value and the only accepted backend, and no other store is built |
-| No retired stores (CM-7) | `uv.lock` holds no `qdrant-client` or `chromadb` package; importing the app, retrieval and evaluation modules loads neither; `docker-compose.yml` defines no `qdrant` service and sets no `QDRANT_*` or `CHROMA_*` variable, and the `api` service reaches an `opensearch` service in the same file |
+| No retired stores (CM-7) | `uv.lock` holds no `qdrant-client` or `chromadb` package; importing the app, retrieval and evaluation modules loads neither; `docker-compose.yml` defines no `qdrant` service and sets no `QDRANT_*` or `CHROMA_*` variable, and the `api` service reaches an `opensearch` service in the same file; no other Compose file in the repo root defines a `qdrant` service; the benchmark runner's `--backend` accepts only `opensearch`, and `qdrant` or `chroma` is a usage error before any fixture or store is read |
 | OpenSearch unavailable | `healthcheck()` reports unavailable within its timeout; no hang or retry storm |
 | Index mapping creation | idempotent; exact-match (keyword) fields for ticker, filing_type, section_key, filing_date, accession_number; the vector field's dimension equals the configured embedding dimension |
 | Filtered count/search | only matching metadata returned |

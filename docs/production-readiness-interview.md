@@ -514,7 +514,7 @@ Cancellation/expiry are proposed service-contract extensions, not claims about c
 | Workflow | Existing single-agent graph/services | More agents only for authorized evaluated need |
 | Ingestion | Python/edgartools, manifests, files/Parquet | Object storage/distributed jobs for backlog, size or recovery |
 | Data platform | Local DataOps artifacts; deployed: `dataops` CLI on Airflow 3 / MWAA Serverless (ADR-0012) | Delta/dbt/Databricks with team/workload/full-cost justification |
-| Vectors | Existing Qdrant adapter locally; deployed: OpenSearch Serverless, scale to zero, landing-page warm-up, 45-minute daily awake cap as an abuse guard (ADR-0014) | Remove the cap and keep minimum OCUs; a managed domain when steady load exceeds about 4 OCUs |
+| Vectors | Local OpenSearch container (Qdrant adapter removed in CM-7); deployed: OpenSearch Serverless, scale to zero, landing-page warm-up, 45-minute daily awake cap as an abuse guard (ADR-0014) | Remove the cap and keep minimum OCUs; a managed domain when steady load exceeds about 4 OCUs |
 | Sparse/reranking | Existing measured baseline | Native sparse/RRF; supported reranker service for coverage/GPU contention |
 | Embeddings | Pinned model/runtime | Batch service/dimensions/quantization after paired evidence |
 | Jobs | Deployed demo tier: DynamoDB conditional-write fencing, SQS fed by DynamoDB Streams (ADR-0015) | Scale tier: Aurora PostgreSQL with `SKIP LOCKED`, outbox → SQS + DLQ when claim latency/throughput justify it (ADR-0013) |
