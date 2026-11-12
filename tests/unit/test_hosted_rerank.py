@@ -22,7 +22,7 @@ from app.components.retrieval.reranked_hybrid_retrieve import (
 )
 from app.config import settings
 from tests.unit.fake_foundry import RERANK_DEPLOYMENT, RERANK_PATH, FakeFoundry
-from tests.unit.fake_retrieval_store import RISK_TEXT, FakeQdrantStore, make_point
+from tests.unit.fake_retrieval_store import RISK_TEXT, FakeRetrievalStore, make_point
 
 ROOT = Path(__file__).resolve().parents[2]
 QUERY = "supply chain supplier risks"
@@ -30,10 +30,10 @@ IDENTITY = f"foundry:{RERANK_DEPLOYMENT}"
 DENSE_ORDER = ["business-1", "risk-1"]
 
 
-def _search(store: FakeQdrantStore | None = None, **config: Any):
+def _search(store: FakeRetrievalStore | None = None, **config: Any):
     cfg = RerankedHybridSearchConfig(dense_top_k=2, sparse_top_k=2, final_top_k=2, **config)
     return search_reranked_hybrid(
-        store or FakeQdrantStore(),
+        store or FakeRetrievalStore(),
         query=QUERY,
         ticker="AAPL",
         filing_type="10-K",
@@ -107,7 +107,7 @@ def test_scores_come_back_in_input_order(foundry_rerank):
 def test_request_follows_the_rerank_contract(foundry_rerank):
     """test-plan §25: Request contract."""
     long_text = RISK_TEXT + " " + "x" * 600
-    store = FakeQdrantStore(
+    store = FakeRetrievalStore(
         [
             make_point("business-1", "The company sells devices.", "business"),
             make_point("risk-1", long_text, "risk_factors"),

@@ -152,6 +152,27 @@ def test_the_settings_object_has_no_ollama_section() -> None:
     assert "ollama" not in Settings.model_fields
 
 
+def test_the_settings_object_has_no_chroma_section() -> None:
+    """test-plan §5 No retired stores / §21: Chroma is removed; its settings class and section are gone."""
+    import app.config
+
+    assert not hasattr(app.config, "ChromaDBSettings")
+    assert not hasattr(app.config.settings, "chroma")
+    assert "chroma" not in Settings.model_fields
+
+
+def test_a_retired_chroma_collection_variable_does_not_name_the_default_index(
+    select: Select,
+) -> None:
+    """test-plan §21 One index per arm (default included): with no explicit name, the index is
+    named from the arm; CHROMA_COLLECTION_NAME has no effect since CM-7."""
+    select(FOUNDRY_COHERE, CHROMA_COLLECTION_NAME="from_the_retired_store")
+
+    store = OpenSearchVectorStore(url=UNREACHABLE_OPENSEARCH, embeddings=SizedFakeEmbedder(1024))
+
+    assert store.index_name == FOUNDRY_COHERE.index_name
+
+
 @pytest.mark.parametrize("arm", ARMS, ids=lambda arm: arm.name)
 def test_each_arm_is_selected_by_settings_alone(
     select: Select, providers: FakeEmbeddingProviders, arm: Arm

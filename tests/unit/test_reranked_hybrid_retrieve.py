@@ -6,7 +6,7 @@ from app.components.retrieval.reranked_hybrid_retrieve import (
     RerankedHybridSearchConfig,
     search_reranked_hybrid,
 )
-from tests.unit.fake_retrieval_store import FakeQdrantStore
+from tests.unit.fake_retrieval_store import FakeRetrievalStore
 
 
 class OverlapReranker:
@@ -23,7 +23,7 @@ class OverlapReranker:
 def test_reranked_hybrid_promotes_reranker_preferred_candidate() -> None:
     """test-plan §25: Rerank reorders candidates."""
     result = search_reranked_hybrid(
-        FakeQdrantStore(),
+        FakeRetrievalStore(),
         query="supply chain supplier risks",
         ticker="AAPL",
         filing_type="10-K",
@@ -45,7 +45,7 @@ def test_reranked_hybrid_promotes_reranker_preferred_candidate() -> None:
 def test_reranked_hybrid_reports_candidate_count() -> None:
     """test-plan §25: Rerank reorders candidates (a supplied reranker scores every candidate)."""
     result = search_reranked_hybrid(
-        FakeQdrantStore(),
+        FakeRetrievalStore(),
         query="devices services business",
         ticker="AAPL",
         filing_type="10-K",
