@@ -38,7 +38,7 @@ from chromadb.config import Settings as ChromaSettings
 from langsmith import get_current_run_tree
 from loguru import logger
 
-from app.components.retrieval.embeddings import get_embeddings
+from app.components.retrieval.embeddings import embedding_index_name, get_embeddings
 from app.components.retrieval.evidence import EvidencePacket
 from app.components.retrieval.sections import (
     canonical_section_display_name,
@@ -313,7 +313,7 @@ class ChromaDBVectorStore:
             collection_name: Name of the ChromaDB collection
             persist_directory: Directory for persistent storage (default: in-memory)
         """
-        self.collection_name = collection_name or settings.chroma.collection_name
+        self.collection_name = collection_name or embedding_index_name(settings.chroma.collection_name or "sec_filings")
         self.persist_directory = persist_directory or settings.chroma.persist_dir
 
         # Initialize ChromaDB client

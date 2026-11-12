@@ -17,7 +17,7 @@ from langsmith import get_current_run_tree
 from loguru import logger
 from qdrant_client import QdrantClient, models
 
-from app.components.retrieval.embeddings import get_embeddings
+from app.components.retrieval.embeddings import embedding_index_name, get_embeddings
 from app.components.retrieval.vector_store import (
     IndexDocument,
     RetrievalStore,
@@ -78,7 +78,7 @@ class QdrantVectorStore(RetrievalStore):
         prefer_grpc: Optional[bool] = None,
         vector_size: Optional[int] = None,
     ):
-        default_collection_name: str = settings.chroma.collection_name or "sec_filings"
+        default_collection_name = embedding_index_name(settings.chroma.collection_name or "sec_filings")
         env_collection_name = os.getenv("QDRANT_COLLECTION_NAME")
         self.collection_name: str = collection_name or env_collection_name or default_collection_name
         self.url = url or os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL)
