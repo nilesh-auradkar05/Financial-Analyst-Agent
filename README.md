@@ -149,7 +149,7 @@ The accepted ADR-0017 design is drawn in [`hld.svg`](docs/svg/adr-0017/hld.svg) 
 | Requirement | Needed for |
 |---|---|
 | Python 3.12 and [`uv`](https://docs.astral.sh/uv/) | everything |
-| A Microsoft Foundry resource with a `cohere-embed-v5-fast` deployment (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`) | embeddings for ingestion and retrieval (20 requests per minute per deployment) |
+| A Microsoft Foundry resource with a `cohere-embed-v5-fast` deployment (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`) | embeddings for ingestion and retrieval (20 requests and 20,000 tokens per minute per deployment) |
 | AWS credentials with Amazon Bedrock access | the primary chat model (`AWS_BEDROCK_MODEL`) |
 | Docker | Qdrant, and the optional API + Prometheus + Grafana stack |
 | Tavily API key | news search |

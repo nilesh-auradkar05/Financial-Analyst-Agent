@@ -98,7 +98,7 @@ docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml log
 
 ## Step 5 - Embedding deployment
 
-Live ingestion, embedding and analysis flows call the Foundry deployment `cohere-embed-v5-fast` through `AZURE_OPENAI_ENDPOINT` and `AZURE_API_KEY`. The deployment allows 20 requests per minute; the client paces itself at 18 and returns a typed error after one throttled retry. Indexes built with the old Qwen3 default are not reused; each ticker is ingested again on its first analysis.
+Live ingestion, embedding and analysis flows call the Foundry deployment `cohere-embed-v5-fast` through `AZURE_OPENAI_ENDPOINT` and `AZURE_API_KEY`. The deployment allows 20 requests and 20,000 tokens per minute; the client paces itself at 18 requests and about 18,000 estimated tokens per minute (ingesting one ticker's 10-K takes two to three minutes) and returns a typed error after one throttled retry. Indexes built with the old Qwen3 default are not reused; each ticker is ingested again on its first analysis.
 
 ## Step 6 - Follow the behavior-first test protocol
 

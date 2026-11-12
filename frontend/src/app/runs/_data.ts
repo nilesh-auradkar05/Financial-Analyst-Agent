@@ -66,7 +66,7 @@ export const RUNS: readonly RunRow[] = [
   { id: "r_0f3a7c", ticker: "NWSC", snapshot: "9f3a…c21e", model: "Bedrock · DeepSeek V3.2", status: "completed", grounded: 0.88, coverage: 0.9, latencyS: 27.2, costUsd: 0.041 },
   { id: "r_0f39e2", ticker: "HLXR", snapshot: "51bd…07aa", model: "Bedrock · Claude", status: "completed", grounded: 0.95, coverage: 0.96, latencyS: 29.4, costUsd: 0.104 },
   { id: "r_0f39b8", ticker: "QRTZ", snapshot: null, model: "Bedrock · Claude", status: "evidence_missing", grounded: null, coverage: null, latencyS: 3.1, costUsd: 0.002 },
-  { id: "r_0f3960", ticker: "HLXR", snapshot: "51bd…07aa", model: "Ollama · fallback", status: "completed", grounded: 0.84, coverage: 0.87, latencyS: 58.6, costUsd: 0 },
+  { id: "r_0f3960", ticker: "HLXR", snapshot: "51bd…07aa", model: "Azure · DeepSeek V4 Flash", status: "completed", grounded: 0.84, coverage: 0.87, latencyS: 58.6, costUsd: 0 },
   { id: "r_0f390d", ticker: "VNTA", snapshot: "c7e0…9b13", model: "Bedrock · Claude", status: "completed", grounded: 0.93, coverage: 0.94, latencyS: 30.0, costUsd: 0.098 },
   { id: "r_0f38c4", ticker: "VNTA", snapshot: "c7e0…9b13", model: "Bedrock · OpenAI", status: "completed", grounded: 0.9, coverage: 0.92, latencyS: 26.5, costUsd: 0.087 },
   { id: "r_0f3871", ticker: "ORBL", snapshot: "2a19…e4f0", model: "Bedrock · Claude", status: "degraded", grounded: 0.86, coverage: 0.89, latencyS: 34.9, costUsd: 0.109 },
