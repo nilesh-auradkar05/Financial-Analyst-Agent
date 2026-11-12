@@ -8,17 +8,76 @@ scored on the same chunks and the chunk IDs stay stable.
 from __future__ import annotations
 
 import argparse
+import time
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
 from app.components.retrieval.opensearch_store import OpenSearchVectorStore
 from app.components.retrieval.vector_store import IndexDocument, SearchFilters
-from evaluation.copy_gate_vectors import DEFAULT_FIXTURE, wait_until_ready
 from evaluation.run_shared_retrieval_benchmark import DEFAULT_SOURCE_DIR
-from evaluation.validate_retrieval_fixture import AnchoredFixture, load_anchored_fixture
+from evaluation.validate_retrieval_fixture import (
+    AnchoredFixture,
+    load_anchored_fixture,
+    normalize_text,
+)
 
 BATCH_SIZE = 100
+DEFAULT_FIXTURE = Path("evaluation/fixtures/retrieval_anchored_benchmark_v1.json")
+
+
+def _unreachable_cases(store: OpenSearchVectorStore, fixture: AnchoredFixture) -> list[str]:
+    """Case IDs with a gold anchor that no indexed chunk holds (same matcher as the benchmark)."""
+    chunks = [
+        (
+            document.metadata.get("accession_number"),
+            document.metadata.get("section_key"),
+            normalize_text(document.text),
+        )
+        for document in store.iter_documents()
+    ]
+    return [
+        case.case_id
+        for case in fixture.cases
+        if any(
+            not any(
+                accession == gold.accession_number
+                and section_key == gold.section_key
+                and normalize_text(gold.anchor_text) in text
+                for accession, section_key, text in chunks
+            )
+            for gold in case.gold_evidence
+        )
+    ]
+
+
+def wait_until_ready(
+    store: OpenSearchVectorStore,
+    *,
+    expected_count: int,
+    fixture: AnchoredFixture,
+    timeout_s: float,
+    poll_s: float = 2.0,
+) -> None:
+    """Return once the index holds `expected_count` documents and reaches every gold anchor."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        count = store.count
+        if count != expected_count:
+            problem = (
+                f"index {store.index_name!r} holds {count} documents, expected {expected_count}"
+            )
+        else:
+            unreachable = _unreachable_cases(store, fixture)
+            if not unreachable:
+                return
+            problem = (
+                f"gold anchors not found in index {store.index_name!r} "
+                f"for cases: {', '.join(unreachable)}"
+            )
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"{problem} after {timeout_s:g}s")
+        time.sleep(poll_s)
 
 
 def build_embedding_arm(

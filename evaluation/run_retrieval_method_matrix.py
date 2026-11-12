@@ -35,7 +35,6 @@ MODE_ALIASES = {
     "query": "semantic",
     "section-aware": "section_aware",
     "langchain_hybrid": "hybrid",
-    "qdrant_hybrid": "hybrid",
     "hybrid_rerank": "reranked_hybrid",
     "dense_bm25_rerank": "reranked_hybrid",
 }

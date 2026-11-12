@@ -8,10 +8,12 @@ Dockerfile                     # root/backend
 frontend/Dockerfile            # was Dockerfile(1)
 frontend/.dockerignore         # was .dockerignore(1)
 docker-compose.yml             # main stack, same persistent volume names
-docker-compose.qdrant.yml     # isolated test instance + separate volume and ports
+docker-compose.opensearch.yml # isolated OpenSearch for tests and a host-run API (127.0.0.1:19200, own volume)
 ```
 
 Additional file: `.env.example` (required settings). `docker-compose.gpu.yml` was removed on 2026-11-07 (CM-6d): the model plane is cloud-only, so no container needs a GPU.
+
+Updated 2026-11-12 (CM-7, ADR-0016): Qdrant and Chroma are removed. The main stack runs an `opensearch` service (512 MiB heap, no host port) that the API reaches at `http://opensearch:9200`; `docker-compose.qdrant.yml` is gone. The old `qdrant-financial-analyst-agent-system`, `financial-analyst-chroma` and `qdrant-financial-analyst-standalone-test` volumes are no longer mounted and were not deleted; remove them with `docker volume rm` only after confirming you no longer need them. Create the new `financial-analyst-opensearch` volume with `make docker-up` (or `docker volume create financial-analyst-opensearch`); tickers re-ingest on their first analysis.
 
 ## Important findings
 
@@ -64,14 +66,14 @@ Additional file: `.env.example` (required settings). `docker-compose.gpu.yml` wa
 
    `/health` checks the Foundry embedding arm from configuration only; it does not call the model, so it cannot prove the deployment answers.
 
-## Separate Qdrant-only tests
+## Separate OpenSearch for tests
 
 ```bash
-docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml up -d
-VECTOR_BACKEND=qdrant QDRANT_URL=http://127.0.0.1:16333 uv run pytest tests/unit/test_qdrant_store.py -q
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml up -d --wait
+uv run pytest tests/rag -q
 ```
 
-The Qdrant-only stack uses `127.0.0.1:16333` (REST) and `127.0.0.1:16334` (gRPC), unlike the full stack's ports 6333/6334. Its new volume is called `qdrant-financial-analyst-standalone-test`, so full stack and test instance cannot accidentally write the same underlying Qdrant storage.
+The test container listens on `127.0.0.1:19200` and has its own volume, so the main stack's `opensearch` service and the test suite never share an index store.
 
 ## Expected disk reduction
 
@@ -96,4 +98,4 @@ docker buildx du
 - Compose `API_KEY` and other external provider credentials remain injected as environment variables for compatibility with your app. A true secret-file migration requires corresponding app-side `_FILE` or file-reading support. Never send secret values as build args or expose them in browser `NEXT_PUBLIC_*` variables.
 - Pin images by digest for truly immutable CI/CD builds and add an image scan + SBOM step. The updated Dockerfiles pin uv and the major language runtime/OS release, but base images still receive patched updates.
 - No model weights are stored locally any more. The old `financial-analyst-model-cache` volume is no longer mounted; it was not deleted — remove it with `docker volume rm financial-analyst-model-cache` only after confirming it holds nothing you need.
-- Qdrant service healthcheck checks TCP availability (like the existing one); it does **not** guarantee collection/index readiness. API client retries are still important during restart.
+- The `opensearch` healthcheck asks for `_cluster/health`; it does **not** guarantee that an index exists. A missing index reads as empty, and the ticker is ingested on its first analysis.

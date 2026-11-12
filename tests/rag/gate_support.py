@@ -1,26 +1,17 @@
-"""Shared builders for the CM-4 tests: a Gate-shaped corpus, its anchored fixture and a Qdrant source.
+"""Shared builders for the CM-4 tests: a Gate-shaped corpus and its anchored fixture.
 
-The corpus mirrors what the Gate A Qdrant collection holds: one chunk per gold anchor, keyed by a
-semantic chunk ID, with the metadata `QdrantVectorStore.add_documents` writes. The Qdrant source is
-an in-memory `QdrantClient` populated in that store's payload layout (sanitized metadata plus
-`_retrieval_id` and `text`, under a UUIDv5 point ID that is not the chunk ID).
+The corpus is one chunk per gold anchor, keyed by a semantic chunk ID, with the metadata the
+ingestion pipeline writes.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
-import uuid
 from pathlib import Path
-from typing import cast
-
-from qdrant_client import QdrantClient, models
 
 from app.components.retrieval.vector_store import IndexDocument
 from evaluation.validate_retrieval_fixture import AnchoredFixture, load_anchored_fixture
-from tests.rag.helpers import FakeEmbedder, raw_request
 
-SOURCE_COLLECTION = "gate_a_source"
 SECTIONS = ("business", "risk_factors", "md&a", "market_risk")
 FILINGS = {
     "AAPL": ("Apple Inc.", "0000320193-24-000123", "2024-11-01"),
@@ -115,57 +106,3 @@ def write_anchored_fixture(directory: Path) -> tuple[Path, Path]:
 def load_fixture_from(directory: Path) -> AnchoredFixture:
     fixture_path, source_dir = write_anchored_fixture(directory)
     return load_anchored_fixture(fixture_path, source_dir=source_dir)
-
-
-def source_vector(text: str) -> list[float]:
-    """A 16-d vector the configured FakeEmbedder never produces for `text` (multiples of 1/16)."""
-    digest = hashlib.sha256(f"qdrant-source|{text}".encode()).digest()
-    return [(digest[i] % 16 + 1) / 16 for i in range(FakeEmbedder.dimension)]
-
-
-def other_vector(text: str) -> list[float]:
-    digest = hashlib.sha256(f"another-model|{text}".encode()).digest()
-    return [(digest[i] % 16 + 1) / 16 for i in range(FakeEmbedder.dimension)]
-
-
-def qdrant_source(points: list[tuple[IndexDocument, list[float]]]) -> QdrantClient:
-    """An in-memory Qdrant collection holding `points` in `QdrantVectorStore`'s payload layout."""
-    client = QdrantClient(":memory:")
-    client.create_collection(
-        collection_name=SOURCE_COLLECTION,
-        vectors_config=models.VectorParams(size=FakeEmbedder.dimension, distance=models.Distance.COSINE),
-    )
-    client.upsert(
-        collection_name=SOURCE_COLLECTION,
-        points=[
-            models.PointStruct(
-                id=str(uuid.uuid5(uuid.NAMESPACE_URL, chunk.id)),
-                vector=vector,
-                payload={**chunk.metadata, "_retrieval_id": chunk.id, "text": chunk.text},
-            )
-            for chunk, vector in points
-        ],
-        wait=True,
-    )
-    return client
-
-
-def source_vectors(client: QdrantClient) -> dict[str, list[float]]:
-    """Chunk ID -> vector exactly as the source collection returns it."""
-    found: dict[str, list[float]] = {}
-    offset = None
-    while True:
-        records, offset = client.scroll(
-            SOURCE_COLLECTION, limit=100, offset=offset, with_payload=True, with_vectors=True
-        )
-        for record in records:
-            assert record.payload is not None
-            found[str(record.payload["_retrieval_id"])] = list(cast(list[float], record.vector))
-        if offset is None:
-            return found
-
-
-def documents_in_index(base_url: str, index: str) -> int:
-    """Number of documents in `index`; 0 when the index does not exist."""
-    status, body = raw_request(base_url, "GET", f"/{index}/_count")
-    return 0 if status == 404 else int(body["count"])

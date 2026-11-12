@@ -276,8 +276,8 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
 async def _ingest_on_miss(ticker: str) -> str | None:
     """Ingest the ticker's latest 10-K once. Returns an error code, or None on success."""
     # ponytail: no per-ticker lock. Two first requests may both ingest; chunk ids are
-    # deterministic and Qdrant upserts, so that only repeats work. Chroma inserts, so
-    # there the second request reports filing_ingestion_failed; add a lock if that matters.
+    # deterministic and OpenSearch bulk-indexes each chunk with _id = chunk id (an upsert),
+    # so that only repeats work; add a lock if that matters.
     logger.info(f"[retrieve_filings] Nothing indexed for {ticker}; ingesting latest 10-K")
     try:
         result = await asyncio.wait_for(
@@ -298,7 +298,7 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
     """
     Retrieve relevant SEC filing chunks from vector store.
 
-    Queries ChromaDB for chunks matching the company and key topics
+    Queries the vector store for chunks matching the company and key topics
     (risk factors, business description, etc.).
 
     Args:

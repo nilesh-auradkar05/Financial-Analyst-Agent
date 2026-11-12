@@ -19,10 +19,6 @@ class TestSettingsDefaults:
         assert settings is not None
         assert isinstance(settings, Settings)
 
-    def test_chroma_defaults(self):
-        assert settings.chroma.collection_name == "sec_filings"
-        assert "chroma" in settings.chroma.persist_dir
-
     def test_cors_defaults(self):
         assert isinstance(settings.cors_allow_origins, list)
         assert len(settings.cors_allow_origins) >= 1

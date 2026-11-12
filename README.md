@@ -7,7 +7,7 @@ A single-agent financial research system: give it a stock ticker and it gathers 
 [![FastAPI](https://img.shields.io/badge/FastAPI-service-teal.svg)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Built with:** LangGraph · FastAPI · Pydantic v2 · Qdrant (Chroma fallback) · Cohere Embed v5 fast embeddings on Microsoft Foundry · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · Claude Sonnet 5.5 sentiment and Cohere Rerank v5 on Microsoft Foundry · edgartools · Tavily · yfinance · Prometheus · LangSmith
+**Built with:** LangGraph · FastAPI · Pydantic v2 · OpenSearch · Cohere Embed v5 fast embeddings on Microsoft Foundry · Amazon Bedrock chat models (Anthropic/OpenAI fallback) · Claude Sonnet 5.5 sentiment and Cohere Rerank v5 on Microsoft Foundry · edgartools · Tavily · yfinance · Prometheus · LangSmith
 
 ### What it does
 
@@ -151,7 +151,7 @@ The accepted ADR-0017 design is drawn in [`hld.svg`](docs/svg/adr-0017/hld.svg) 
 | Python 3.12 and [`uv`](https://docs.astral.sh/uv/) | everything |
 | A Microsoft Foundry resource with a `cohere-embed-v5-fast` deployment (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`) | embeddings for ingestion and retrieval (20 requests and 20,000 tokens per minute per deployment) |
 | AWS credentials with Amazon Bedrock access | the primary chat model (`AWS_BEDROCK_MODEL`) |
-| Docker | Qdrant, and the optional API + Prometheus + Grafana stack |
+| Docker | the local OpenSearch container, and the optional API + OpenSearch + Prometheus + Grafana stack |
 | Tavily API key | news search |
 | An SEC contact string (`Name email@example.com`) | SEC EDGAR access |
 
@@ -192,8 +192,7 @@ EMBEDDING_MODEL=                    # e.g. cohere.embed-v4:0, amazon.titan-embed
 EMBEDDING_DIMENSIONS=               # 1024 for every cloud arm
 
 # Vector store
-VECTOR_BACKEND=qdrant            # or chroma
-QDRANT_URL=http://localhost:16333   # standalone Qdrant; omit for the full Docker stack
+OPENSEARCH_URL=http://localhost:19200   # local OpenSearch container; omit for the full Docker stack
 
 # Evidence sources
 TAVILY_API_KEY=tvly-...
@@ -217,12 +216,10 @@ Set `API_KEY` in the frontend server environment to the same shared key as the A
 ### 3. Start the local services
 
 ```bash
-docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml up -d   # Qdrant on :16333, own volume
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml up -d --wait   # OpenSearch on 127.0.0.1:19200, own volume
 ```
 
-The standalone Qdrant listens on `:16333`, so a host-run API needs `QDRANT_URL=http://localhost:16333`; the full Compose stack keeps `:6333` and its own volume. See [docs/docker-setup.md](docs/docker-setup.md).
-
-To skip Qdrant, set `VECTOR_BACKEND=chroma`, which stores data locally on disk.
+This container serves the test suite (`tests/rag`) and a host-run API (`OPENSEARCH_URL=http://localhost:19200`); the full Compose stack runs its own `opensearch` service with no host port. OpenSearch is the only vector store: Qdrant and Chroma were removed in CM-7 (ADR-0016). See [docs/docker-setup.md](docs/docker-setup.md).
 
 ### 4. Check the install
 

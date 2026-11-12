@@ -48,7 +48,7 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --chown=appuser:appgroup . /app/
 
 # Keep runtime caches and mutable state outside the image via Compose volumes.
-RUN mkdir -p /app/data/chroma /app/data/filings /app/.runtime /app/.cache \
+RUN mkdir -p /app/data/filings /app/.runtime /app/.cache \
     && chown -R appuser:appgroup /app/data /app/.runtime /app/.cache
 
 ENV PATH="/app/.venv/bin:$PATH" \

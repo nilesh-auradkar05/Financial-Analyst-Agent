@@ -3,21 +3,28 @@
 Uses FastAPI's TestClient — no live server needed.
 """
 
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
 import app.main as api_main
-from app.components.retrieval.vector_store import ChromaDBVectorStore
 from app.main import _get_store, app
+
+
+class StatsOnlyStore:
+    """A vector store that reports statistics for its named collection and holds no documents."""
+
+    def __init__(self, collection_name: str) -> None:
+        self.collection_name = collection_name
+
+    def get_stats(self) -> dict[str, Any]:
+        return {"collection_name": self.collection_name, "total_documents": 0}
 
 
 @pytest.fixture
 def mock_store():
-    """In-memory ChromaDB store for testing."""
-    return ChromaDBVectorStore(
-        collection_name="test_collection",
-        persist_directory=None,  # in-memory
-    )
+    return StatsOnlyStore("test_collection")
 
 
 @pytest.fixture

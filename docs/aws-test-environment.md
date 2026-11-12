@@ -20,7 +20,7 @@ Use the current AWS documentation when account, operating system, networking, or
 
 - Use a short-lived EC2 instance.
 - Restrict inbound SSH to your current public IP.
-- Do not expose the API, Qdrant, Grafana, or Prometheus publicly.
+- Do not expose the API, OpenSearch, Grafana, or Prometheus publicly.
 - Use SSH port forwarding for API smoke tests.
 - Do not place secrets in user data, shell history, committed files, screenshots, or task logs.
 - Stop or terminate the instance when testing is complete.
@@ -219,9 +219,7 @@ Create `.env` without secrets you do not need:
 cat > .env <<'EOF'
 EMBEDDING_PROVIDER=foundry_cohere
 
-VECTOR_BACKEND=qdrant
-QDRANT_URL=http://127.0.0.1:6333
-QDRANT_COLLECTION_NAME=sec_filings
+OPENSEARCH_URL=http://127.0.0.1:19200
 
 SEC_USER_AGENT="Your Name your-email@example.com"
 TAVILY_API_KEY=
@@ -233,25 +231,19 @@ EOF
 
 Replace the SEC user agent with your own contact string. Add a Tavily API key only for news-enabled live analysis.
 
-## Step 8 - Start Qdrant bound to localhost
+## Step 8 - Start OpenSearch bound to localhost
 
-Run Qdrant without exposing it on the public network interface:
+The repo's OpenSearch container binds `127.0.0.1:19200` only, so it is not exposed on the public network interface:
 
 ```bash
-docker run -d \
-  --name alpha-analyst-qdrant \
-  -p 127.0.0.1:6333:6333 \
-  -p 127.0.0.1:6334:6334 \
-  -v alpha-analyst-qdrant:/qdrant/storage \
-  qdrant/qdrant:latest
-
-docker ps --filter name=alpha-analyst-qdrant
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml up -d --wait
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml ps
 ```
 
 Check logs if startup fails:
 
 ```bash
-docker logs alpha-analyst-qdrant
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml logs opensearch
 ```
 
 ## Step 9 - Run verification on EC2
@@ -277,7 +269,7 @@ Run ingestion and retrieval checks:
 
 ```bash
 uv run pytest tests/ingestion -q
-VECTOR_BACKEND=qdrant QDRANT_URL=http://127.0.0.1:6333 uv run pytest tests/unit/test_qdrant_store.py -q
+uv run pytest tests/rag -q
 uv run python evaluation/validate_retrieval_fixture.py evaluation/fixtures/retrieval_shared_benchmark_v1.json
 ```
 
@@ -328,9 +320,7 @@ Enable news sentiment only after setting `TAVILY_API_KEY`.
 On EC2, stop local containers:
 
 ```bash
-docker stop alpha-analyst-qdrant
-docker rm alpha-analyst-qdrant
-docker volume rm alpha-analyst-qdrant
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml down -v   # throwaway instance: also drops its volume
 ```
 
 On your local machine, terminate the instance:
@@ -368,7 +358,7 @@ Remove the local `.pem` file only after confirming there are no running instance
 - SSH fails: confirm the instance is running, the public DNS is populated, the key permissions are `400`, and the security group allows port `22` from your current IP.
 - Public IP changed: update `MY_IP` and replace the security group ingress rule.
 - API is unreachable locally: confirm the SSH tunnel is open and the API is bound to `127.0.0.1:8000` on EC2.
-- Qdrant is unreachable: confirm the container is running and `QDRANT_URL=http://127.0.0.1:6333`.
+- OpenSearch is unreachable: confirm the container is healthy and `OPENSEARCH_URL=http://127.0.0.1:19200`.
 - Dependency install is slow or fails from memory pressure: use a larger test instance.
 - Live analysis is slow: use a GPU instance or run only static and API smoke checks.
 - News search fails: set `TAVILY_API_KEY` or disable news sentiment.

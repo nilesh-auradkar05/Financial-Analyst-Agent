@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import app.components.retrieval.vector_store as vector_store
+from app.components.retrieval.opensearch_store import OpenSearchVectorStore
 from app.components.retrieval.vector_store import (
-    ChromaDBVectorStore,
-    IndexDocument,
     RetrievedChunk,
     SearchFilters,
     SearchResult,
@@ -54,10 +53,10 @@ def test_search_filters_prefer_section_key_when_present():
     }
 
 def test_search_sections_prefers_canonical_section_key(monkeypatch):
-    store = object.__new__(vector_store.ChromaDBVectorStore)
+    store = object.__new__(OpenSearchVectorStore)
     calls: list[SearchFilters | None] = []
 
-    def fake_search(*, query: str, filters: SearchFilters | None = None, n_results: int = 5):
+    def fake_search(query: str, filters: SearchFilters | None = None, n_results: int = 5):
         calls.append(filters)
         return SearchResult(
             query=query,
@@ -69,7 +68,7 @@ def test_search_sections_prefers_canonical_section_key(monkeypatch):
 
     monkeypatch.setattr(store, "search", fake_search)
 
-    result = vector_store.ChromaDBVectorStore.search_sections(
+    result = OpenSearchVectorStore.search_sections(
         store,
         ticker="AAPL",
         sections=["Risk Factors"],
@@ -87,10 +86,10 @@ def test_search_sections_prefers_canonical_section_key(monkeypatch):
     assert calls[0].section_name is None
 
 def test_search_sections_fall_back_to_legacy_section_name(monkeypatch):
-    store = object.__new__(vector_store.ChromaDBVectorStore)
+    store = object.__new__(OpenSearchVectorStore)
     calls: list[SearchFilters | None] = []
 
-    def fake_search(*, query: str, filters: SearchFilters | None = None, n_results: int = 5):
+    def fake_search(query: str, filters: SearchFilters | None = None, n_results: int = 5):
         calls.append(filters)
 
         if filters and filters.section_key == "risk_factors":
@@ -121,7 +120,7 @@ def test_search_sections_fall_back_to_legacy_section_name(monkeypatch):
 
     monkeypatch.setattr(store, "search", fake_search)
 
-    result = vector_store.ChromaDBVectorStore.search_sections(
+    result = OpenSearchVectorStore.search_sections(
         store,
         ticker="AAPL",
         sections=["Risk Factors"],
@@ -136,10 +135,10 @@ def test_search_sections_fall_back_to_legacy_section_name(monkeypatch):
     assert calls[1].section_name == "Risk Factors"
 
 def test_search_by_ticker_uses_section_fallback_path(monkeypatch):
-    store = object.__new__(vector_store.ChromaDBVectorStore)
+    store = object.__new__(OpenSearchVectorStore)
     calls: list[SearchFilters | None] = []
 
-    def fake_search(*, query: str, filters: SearchFilters | None = None, n_results: int = 5):
+    def fake_search(query: str, filters: SearchFilters | None = None, n_results: int = 5):
         calls.append(filters)
         return SearchResult(
             query=query,
@@ -151,7 +150,7 @@ def test_search_by_ticker_uses_section_fallback_path(monkeypatch):
 
     monkeypatch.setattr(store, "search", fake_search)
 
-    result = vector_store.ChromaDBVectorStore.search_by_ticker(
+    result = OpenSearchVectorStore.search_by_ticker(
         store,
         query="core products",
         ticker="AAPL",
@@ -163,33 +162,3 @@ def test_search_by_ticker_uses_section_fallback_path(monkeypatch):
     assert calls[0] is not None
     assert calls[0].section_key == "business"
     assert calls[0].ticker == "AAPL"
-
-def test_add_documents_strips_none_metadata_values():
-    store = ChromaDBVectorStore(collection_name="test_sec_filings", persist_directory=None)
-
-    docs = [
-        IndexDocument(
-            id="doc1",
-            text="sample text",
-            metadata={
-                "ticker": "AAPL",
-                "section": "Risk Factors",
-                "company_name": None,
-                "source_url": None,
-                "chunk_index": 0,
-            },
-        )
-    ]
-
-    normalized = store._normalize_documents(
-        documents=docs,
-        texts=None,
-        metadatas=None,
-        ids=None,
-    )
-
-    assert normalized[0].metadata == {
-        "ticker": "AAPL",
-        "section": "Risk Factors",
-        "chunk_index": 0,
-    }

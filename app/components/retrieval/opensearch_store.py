@@ -114,7 +114,7 @@ class OpenSearchVectorStore(RetrievalStore):
         timeout_s: Optional[float] = None,
         embeddings: Optional[Embeddings] = None,
     ):
-        default_index_name = embedding_index_name(settings.chroma.collection_name or "sec_filings")
+        default_index_name = embedding_index_name("sec_filings")
         self.index_name: str = (
             index_name or os.getenv("OPENSEARCH_INDEX_NAME") or default_index_name
         )

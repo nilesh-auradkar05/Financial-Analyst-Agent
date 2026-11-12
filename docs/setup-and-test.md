@@ -18,7 +18,7 @@ Install these before running the project:
 - Git.
 - Python 3.12, or another interpreter supported by `pyproject.toml`.
 - `uv` for Python dependency management.
-- Docker, optional but recommended for Qdrant.
+- Docker, for the local OpenSearch container.
 - A Microsoft Foundry resource with a `cohere-embed-v5-fast` deployment, for live embedding flows.
 - A SEC EDGAR user-agent contact string.
 - A Tavily API key only if running news search.
@@ -68,9 +68,7 @@ CLAUDE_LLM_MODEL=claude-sonnet-4-5    # personal fallback 1 (needs ANTHROPIC_API
 OPENAI_LLM_MODEL=gpt-4.1               # personal fallback 2 (needs OPENAI_API_KEY)
 EMBEDDING_PROVIDER=foundry_cohere      # default arm; uses AZURE_OPENAI_ENDPOINT + AZURE_API_KEY
 
-VECTOR_BACKEND=qdrant
-QDRANT_URL=http://localhost:16333
-QDRANT_COLLECTION_NAME=sec_filings
+OPENSEARCH_URL=http://localhost:19200
 
 SEC_USER_AGENT="Your Name your-email@example.com"
 TAVILY_API_KEY=
@@ -79,21 +77,21 @@ LANGCHAIN_TRACING_V2=false
 LANGCHAIN_PROJECT=financial-analyst-system
 ```
 
-Use `VECTOR_BACKEND=chroma` for local fallback when Qdrant is not running.
+OpenSearch is the only vector store; Qdrant and Chroma were removed in CM-7 (ADR-0016), and `VECTOR_BACKEND` accepts only `opensearch` (the default).
 
-## Step 4 - Start Qdrant for retrieval tests
+## Step 4 - Start OpenSearch for retrieval tests
 
-Start the local Qdrant service:
+Start the local OpenSearch container (the full test suite needs it):
 
 ```bash
-docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml up -d
-docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml ps
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml up -d --wait
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml ps
 ```
 
-Follow logs if Qdrant does not appear healthy:
+Follow logs if OpenSearch does not appear healthy:
 
 ```bash
-docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml logs qdrant
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml logs opensearch
 ```
 
 ## Step 5 - Embedding deployment
@@ -138,7 +136,7 @@ Ingestion and retrieval checks:
 ```bash
 uv run pytest tests/ingestion -q
 uv run pytest tests/unit/test_vector_store_factory.py -q
-VECTOR_BACKEND=qdrant QDRANT_URL=http://localhost:16333 uv run pytest tests/unit/test_qdrant_store.py -q
+uv run pytest tests/rag -q
 uv run python evaluation/validate_retrieval_fixture.py evaluation/fixtures/retrieval_shared_benchmark_v1.json
 ```
 
@@ -207,10 +205,10 @@ curl http://127.0.0.1:8000/jobs/<job_id>
 
 ## Step 11 - Cleanup
 
-Stop Qdrant when done:
+Stop OpenSearch when done:
 
 ```bash
-docker compose -p financial-analyst-qdrant-test -f docker-compose.qdrant.yml down
+docker compose -p financial-analyst-opensearch-test -f docker-compose.opensearch.yml down
 ```
 
 Local generated data usually lives under `data/` and `.runtime/`. Remove it only when you intentionally want a clean local state and after checking that no needed fixture or task artifact is stored there.
@@ -219,7 +217,7 @@ Local generated data usually lives under `data/` and `.runtime/`. Remove it only
 
 - `uv` cannot write to its cache: rerun with `uv --cache-dir /tmp/uv-cache ...`.
 - `/health` is degraded: check the embedding settings (`AZURE_OPENAI_ENDPOINT`, `AZURE_API_KEY`), the chat model settings and the vector store.
-- Qdrant tests fail to connect: confirm `docker ps`, `QDRANT_URL`, and port `6333`.
+- `tests/rag` fails to connect: confirm `docker ps` shows the OpenSearch container healthy on `127.0.0.1:19200`. If it restarts mid-run, the Docker VM is short of memory.
 - Ingestion fails: confirm network access, SEC user agent, and embedding model availability.
 - News search fails: set `TAVILY_API_KEY` or run analysis with `include_news_sentiment=false`.
 - Behavior tests are blocked by hygiene checks: rewrite tests to assert public behavior instead of private implementation shape.
