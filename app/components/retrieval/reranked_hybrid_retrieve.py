@@ -77,7 +77,6 @@ class RerankedHybridSearchConfig(BaseModel):
     sparse_top_k: int = Field(default=DEFAULT_SPARSE_TOP_K, ge=1)
     final_top_k: int = Field(default=DEFAULT_FINAL_TOP_K, ge=1)
     candidate_pool_size: int = Field(default=512, ge=1)
-    qdrant_scroll_batch_size: int = Field(default=128, ge=1)
     max_document_chars: int = Field(default=DEFAULT_MAX_DOCUMENT_CHARS, ge=256)
     fail_open_to_dense: bool = False
     use_section_prior: bool = True
@@ -252,7 +251,6 @@ def search_reranked_hybrid(
             sparse_top_k=cfg.sparse_top_k,
             final_top_k=cfg.final_top_k,
             candidate_pool_size=cfg.candidate_pool_size,
-            qdrant_scroll_batch_size=cfg.qdrant_scroll_batch_size,
         ),
     )
     bm25_documents = _search_bm25_documents(

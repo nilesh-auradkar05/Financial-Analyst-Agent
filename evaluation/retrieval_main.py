@@ -24,7 +24,6 @@ SUPPORTED_MODES = {
     "section-aware",
     "hybrid",
     "langchain_hybrid",
-    "qdrant_hybrid",
     "reranked_hybrid",
 }
 
@@ -40,7 +39,6 @@ def _normalize_mode(mode: str | None) -> str | None:
     normalized = mode.strip().lower().replace("-", "_")
     aliases = {
         "section-aware": "section_aware",
-        "qdrant_hybrid": "hybrid",
         "langchain_hybrid": "hybrid",
         "query": "semantic",
     }

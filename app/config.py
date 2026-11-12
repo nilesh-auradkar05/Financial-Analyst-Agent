@@ -243,34 +243,6 @@ class LangSmithSettings(BaseSettings):
     )
 
 
-class ChromaDBSettings(BaseSettings):
-    """
-    Configuration for ChromaDB vector database.
-
-    Environment Variables:
-           CHROMA_PERSIST_DIR: Directory to store ChromaDB data
-           CHROMA_COLLECTION_NAME: Name of the vector collection.
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="CHROMA_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # Directory to store ChromaDB data
-    # Using project's data directory by default
-    persist_dir: str = Field(
-        default=str(DATA_DIR / "chroma"), description="ChromaDB persistence directory"
-    )
-
-    # Collection name for SEC Filings
-    collection_name: str = Field(
-        default="sec_filings", description="ChromaDB collection name"
-    )
-
-
 class SECSettings(BaseSettings):
     """
     Configuration for SEC EDGAR API access.
@@ -351,7 +323,6 @@ class Settings(BaseSettings):
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     tavily: TavilySettings = Field(default_factory=TavilySettings)
     langsmith: LangSmithSettings = Field(default_factory=LangSmithSettings)
-    chroma: ChromaDBSettings = Field(default_factory=ChromaDBSettings)
     sec: SECSettings = Field(default_factory=SECSettings)
     retry: RetrySettings = Field(default_factory=RetrySettings)
 

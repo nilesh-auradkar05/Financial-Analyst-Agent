@@ -24,7 +24,6 @@ from app.components.retrieval.opensearch_store import (
     DEFAULT_COMPRESSION_LEVEL,
     OpenSearchVectorStore,
 )
-from app.components.retrieval.qdrant_store import QdrantVectorStore
 from app.components.retrieval.section_aware_search import search_section_aware
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters
 from dataops.git_state import current_code_version
@@ -37,7 +36,7 @@ from evaluation.validate_retrieval_fixture import (
     normalize_text,
 )
 
-BackendName = Literal["chroma", "qdrant"]
+BackendName = Literal["opensearch"]
 RetrievalMode = Literal["query", "sections", "section_aware"]
 
 DEFAULT_FIXTURE = Path("evaluation/fixtures/retrieval_shared_benchmark_v1.json")
@@ -61,9 +60,8 @@ class MethodSpec(BaseModel):
 
 
 DEFAULT_METHODS: tuple[MethodSpec, ...] = (
-    MethodSpec(name="qdrant_query", backend="qdrant", mode="query"),
-    MethodSpec(name="qdrant_section_aware", backend="qdrant", mode="section_aware"),
-    MethodSpec(name="chroma_query", backend="chroma", mode="query"),
+    MethodSpec(name="opensearch_query", backend="opensearch", mode="query"),
+    MethodSpec(name="opensearch_section_aware", backend="opensearch", mode="section_aware"),
 )
 
 
@@ -301,11 +299,7 @@ def _run_anchored_cli(args: argparse.Namespace, parser: argparse.ArgumentParser)
     except FixtureValidationError as error:
         raise SystemExit(f"Invalid anchored fixture {args.fixture}:\n{error}") from error
 
-    store: QdrantVectorStore | OpenSearchVectorStore
-    if args.backend == "opensearch":
-        store = OpenSearchVectorStore(index_name=args.collection)
-    else:
-        store = QdrantVectorStore(collection_name=args.collection)
+    store = OpenSearchVectorStore(index_name=args.collection)
     if store.count == 0:
         raise SystemExit(f"Collection {args.collection!r} is empty; build the index first.")
 
@@ -317,11 +311,9 @@ def _run_anchored_cli(args: argparse.Namespace, parser: argparse.ArgumentParser)
         "evidence_release": args.evidence_release,
         "chunker": {"chunk_size": CHUNK_SIZE, "chunk_overlap": CHUNK_OVERLAP},
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "compression_level": os.getenv("OPENSEARCH_COMPRESSION_LEVEL")
+        or DEFAULT_COMPRESSION_LEVEL,
     }
-    if args.backend == "opensearch":
-        provenance["compression_level"] = (
-            os.getenv("OPENSEARCH_COMPRESSION_LEVEL") or DEFAULT_COMPRESSION_LEVEL
-        )
     result = run_anchored_benchmark(
         fixture,
         store,
@@ -347,9 +339,9 @@ def main() -> None:
             "For an anchored fixture, pass exactly one of: dense, section_aware."
         ),
     )
-    parser.add_argument("--backend", choices=["qdrant", "opensearch"], default="qdrant")
+    parser.add_argument("--backend", choices=["opensearch"], default="opensearch")
     parser.add_argument(
-        "--collection", help="Qdrant collection or OpenSearch index to search (anchored fixture)."
+        "--collection", help="OpenSearch index to search (anchored fixture)."
     )
     parser.add_argument("--output", type=Path, help="Result file (anchored fixture).")
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)

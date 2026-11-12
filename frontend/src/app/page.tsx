@@ -13,7 +13,7 @@ const NAV = [
   { label: "GitHub", href: REPO, external: true },
 ];
 
-const STACK = ["AWS Bedrock", "LangGraph", "SEC EDGAR", "FinBERT", "FastAPI", "Qdrant"];
+const STACK = ["AWS Bedrock", "LangGraph", "SEC EDGAR", "FinBERT", "FastAPI", "OpenSearch"];
 
 const STEPS = [
   {

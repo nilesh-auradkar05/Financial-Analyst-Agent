@@ -4,7 +4,7 @@ This module keeps project-specific retrieval policy in this repository while
 outsourcing generic sparse ranking and weighted Reciprocal Rank Fusion to
 LangChain:
 
-- dense retrieval: the configured project vector store, now usually Qdrant
+- dense retrieval: the configured project vector store (OpenSearch)
 - sparse retrieval: LangChain BM25Retriever over the filtered filing corpus
 - fusion: LangChain EnsembleRetriever weighted RRF
 
@@ -53,7 +53,6 @@ class LangChainHybridSearchConfig(BaseModel):
     sparse_top_k: int = Field(default=20, ge=1)
     final_top_k: int = Field(default=5, ge=1)
     candidate_pool_size: int = Field(default=512, ge=1)
-    qdrant_scroll_batch_size: int = Field(default=128, ge=1)
     dense_weight: float = Field(default=DEFAULT_DENSE_WEIGHT, ge=0.0)
     sparse_weight: float = Field(default=DEFAULT_SPARSE_WEIGHT, ge=0.0)
     rrf_c: int = Field(default=DEFAULT_RRF_C, ge=1)
@@ -111,10 +110,8 @@ def search_langchain_hybrid(
     """Run dense + BM25 hybrid retrieval with LangChain weighted RRF.
 
     The sparse corpus is loaded from the active store using the same ticker and
-    filing filters as the dense retriever. In the current sprint, Qdrant is the
-    expected default store, so the main corpus path uses Qdrant ``scroll``.
-    Chroma and test doubles are supported as fallback paths to keep evaluation
-    portable.
+    filing filters as the dense retriever, from ``iter_sparse_documents`` when the
+    store offers it, else from test doubles, else from a dense seed search.
     """
 
     start_time = time.time()
@@ -219,19 +216,10 @@ def _load_sparse_documents_from_store(
     """Load a filtered corpus for BM25.
 
     Preferred order:
-    1. Qdrant scroll against the default backend.
-    2. Chroma collection get for local fallback runs.
-    3. ``store.documents`` test-double hook.
-    4. Dense-search fallback as a last resort.
+    1. ``store.iter_sparse_documents`` when the store offers it.
+    2. ``store.documents`` test-double hook.
+    3. Dense-search fallback as a last resort.
     """
-
-    if _looks_like_qdrant_store(store):
-        return _load_qdrant_documents(store, filters=filters, config=config)
-
-    if hasattr(store, "collection"):
-        documents = _load_chroma_documents(store, filters=filters, limit=config.candidate_pool_size)
-        if documents:
-            return documents
 
     iter_documents = _load_iter_sparse_documents(store, filters=filters, limit=config.candidate_pool_size)
     if iter_documents:
@@ -251,83 +239,6 @@ def _load_sparse_documents_from_store(
         _chunk_to_document(chunk, source="dense_sparse_seed", rank=rank)
         for rank, chunk in enumerate(dense_result.chunks, start=1)
     ]
-
-
-def _looks_like_qdrant_store(store: Any) -> bool:
-    return hasattr(store, "client") and hasattr(store, "collection_name")
-
-
-def _load_qdrant_documents(
-    store: Any,
-    *,
-    filters: SearchFilters,
-    config: LangChainHybridSearchConfig,
-) -> list[Document]:
-    if hasattr(store, "_collection_exists") and not store._collection_exists():
-        return []
-
-    query_filter = _qdrant_filter(store, filters)
-    documents: list[Document] = []
-    next_page: Any = None
-
-    while len(documents) < config.candidate_pool_size:
-        points, next_page = store.client.scroll(
-            collection_name=store.collection_name,
-            scroll_filter=query_filter,
-            limit=min(
-                config.qdrant_scroll_batch_size,
-                config.candidate_pool_size - len(documents),
-            ),
-            with_payload=True,
-            with_vectors=False,
-            offset=next_page,
-        )
-        for point in points:
-            payload = dict(getattr(point, "payload", None) or {})
-            document = _document_from_payload(
-                payload,
-                fallback_id=str(getattr(point, "id", "")),
-                source="qdrant_scroll",
-            )
-            if document is not None:
-                documents.append(document)
-        if next_page is None:
-            break
-
-    return documents
-
-
-def _qdrant_filter(store: Any, filters: SearchFilters) -> Any:
-    to_qdrant_filter = getattr(store, "_to_qdrant_filter", None)
-    if callable(to_qdrant_filter):
-        return to_qdrant_filter(filters)
-    return None
-
-
-def _load_chroma_documents(store: Any, *, filters: SearchFilters, limit: int) -> list[Document]:
-    try:
-        collection = store.collection
-        backend_filter = filters.to_backend_filter()
-        kwargs: dict[str, Any] = {"include": ["documents", "metadatas"], "limit": limit}
-        if backend_filter:
-            kwargs["where"] = backend_filter
-        results = collection.get(**kwargs)
-    except Exception as exc:  # pragma: no cover - Chroma varies by version.
-        logger.debug("Could not load BM25 corpus from Chroma: {}", exc)
-        return []
-
-    ids = list(results.get("ids") or [])
-    texts = list(results.get("documents") or [])
-    metadatas = list(results.get("metadatas") or [])
-    documents: list[Document] = []
-    for index, text in enumerate(texts):
-        metadata = dict(metadatas[index] if index < len(metadatas) and metadatas[index] else {})
-        chunk_id = str(ids[index] if index < len(ids) else metadata.get("chunk_id", ""))
-        metadata["chunk_id"] = chunk_id
-        metadata["retrieval_source"] = "chroma_get"
-        if text:
-            documents.append(Document(page_content=str(text), metadata=metadata))
-    return documents
 
 
 def _load_iter_sparse_documents(store: Any, *, filters: SearchFilters, limit: int) -> list[Document]:
@@ -395,27 +306,6 @@ def _load_test_double_documents(store: Any, *, filters: SearchFilters, limit: in
         documents.append(Document(page_content=text, metadata=metadata))
 
     return documents
-
-
-def _document_from_payload(
-    payload: dict[str, Any],
-    *,
-    fallback_id: str,
-    source: str,
-) -> Optional[Document]:
-    text = str(payload.get("text", "") or "")
-    if not text.strip():
-        return None
-    chunk_id = str(
-        payload.get("_retrieval_id")
-        or payload.get("chunk_id")
-        or payload.get("id")
-        or fallback_id
-    )
-    metadata = {key: value for key, value in payload.items() if key != "text"}
-    metadata["chunk_id"] = chunk_id
-    metadata.setdefault("retrieval_source", source)
-    return Document(page_content=text, metadata=metadata)
 
 
 def _chunk_to_document(chunk: RetrievedChunk, *, source: str, rank: int) -> Document:

@@ -102,7 +102,7 @@ eval-retrieval-single:
 # =============================================================================
 
 docker-up:
-	@for v in financial-analyst-chroma financial-analyst-filings financial-analyst-runs financial-analyst-model-cache financial-analyst-prometheus financial-analyst-grafana qdrant-financial-analyst-agent-system; do docker volume create $$v >/dev/null; done
+	@for v in financial-analyst-opensearch financial-analyst-filings financial-analyst-runs financial-analyst-model-cache financial-analyst-prometheus financial-analyst-grafana; do docker volume create $$v >/dev/null; done
 	docker compose up -d
 	@echo ""
 	@echo "✅ Services started!"

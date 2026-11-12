@@ -202,7 +202,7 @@ class FoundryCohereEmbeddings(Embeddings):
         return vectors
 
 
-# Langchain Embeddings (for ChromaDB)
+# Langchain Embeddings
 
 def get_embeddings() -> Embeddings:
     """
