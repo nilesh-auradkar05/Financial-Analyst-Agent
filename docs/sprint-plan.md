@@ -696,7 +696,7 @@ Feature: OpenSearch is the only store in code, compose and docs.
 Trace: ADR-0016; CLAUDE.md/AGENTS.md §8; scripts/ci/check_doc_sync.py
 Tests:  U factory rejects qdrant/chroma · C §4 suite unchanged · R2 doc sync updated together
 Regression: R1 R2 R3 R4
-Done: no import of qdrant_client or chromadb remains. Result: Pending.
+Done: no import of qdrant_client or chromadb remains. Result: DONE 2026-11-12. Rows 04a344f (§5 backend selection, No retired stores; CM-4 gate copy retired), red 643de6b (12 red, 700 pass; tests unchanged since), feat 5e0d699, docs c4f720f. OpenSearch is the only store: QdrantVectorStore, ChromaDBVectorStore and ChromaDBSettings deleted; unset `VECTOR_BACKEND` resolves to OpenSearch and any other value is a ValueError; `uv remove chromadb qdrant-client` dropped 36 locked packages; Compose runs its own `opensearch` service (512 MiB heap, no host port) and `docker-compose.qdrant.yml` is gone; copy_gate_vectors.py and build_benchmark_index.py removed. Full suite through the commit hook passes; governance 4/4; Done grep empty. R4 (owner-approved, ~$0.21): anchored section_aware on the CM-6e index vs the CM-6e baseline: zero deltas on every metric, 75/75 cases, 750 identical ids, max score diff 1.2e-7; 236 embed calls all 200. Main stack rebuilt on OpenSearch, `/health` healthy; qdrant container stopped, not removed; qdrant and chroma volumes kept. Follow-up: hybrid and reranked eval modes build BM25 from the dense-seed fallback on OpenSearch (no store implements `iter_sparse_documents`); pre-existing since CM-2.
 ```
 
 ## S5 — Retrieval quality → Gate C
