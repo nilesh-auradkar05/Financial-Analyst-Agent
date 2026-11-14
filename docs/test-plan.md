@@ -206,6 +206,23 @@ Definitions live in `retrieval-benchmark.md`.
 | Null first relevant rank | counted as miss |
 | Output | paired deltas, win/tie/loss, bootstrap CI, separated latency |
 
+### Retrieval diagnostics: S5.1 (owner-approved 2026-11-14)
+
+Definitions: retrieval-benchmark §7a. A miss is a gold anchor not covered at K=10 in a result file.
+
+| Case | Expected behavior |
+| --- | --- |
+| Anchor in no single chunk of its section | `boundary_split` |
+| No top-10 chunk from the gold (accession, section) | `section_miss`; `intent_targeted_gold_section` records whether `infer_section_intent` named the gold section |
+| Section reached, query-term overlap with the anchor chunk < 0.5 | `vocabulary_gap` |
+| Section reached, overlap ≥ 0.5 (0.5 exactly is `ranking`) | `ranking` |
+| Precedence | an anchor that meets several conditions gets the first in the order `boundary_split` → `section_miss` → `vocabulary_gap` → `ranking` |
+| Covered anchor | not reported as a miss |
+| Dense rank | rank of the first anchor chunk in the dense top-50 pool for the case; `null` when absent or when no pool is given |
+| Candidates | each candidate's count equals the misses it addresses (§7a mapping); list sorted by count descending, then name |
+| Rebuild guard | report refuses to build when a retrieved `chunk_id` is missing from the rebuilt chunks or a recomputed `gold_hit` differs from the stored one |
+| Report over the CM-6e baseline | 45 misses over 30 cases, every miss classified, class counts sum to 45; CLI output reproduces the committed report |
+
 ---
 
 ## 7. RAG / memo & verification

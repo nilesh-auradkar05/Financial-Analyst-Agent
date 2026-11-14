@@ -703,11 +703,11 @@ Done: no import of qdrant_client or chromadb remains. Result: DONE 2026-11-12. R
 
 ```text
 S5.1 — Retrieval diagnostics and failure taxonomy
-Feature: every Gate A miss is explained by a named failure class, so S5.2 and S5.3 test a diagnosed cause.
-Trace: SPEC §12 S5; retrieval-benchmark §§7–8; test-plan §6
-Scope: per-query report (rank of each gold anchor, section hit, lexical overlap, chunk boundary); taxonomy (vocabulary gap, section miss, boundary split, ranking); section prior evaluated here as a candidate.
-Tests:  U classifier on hand-built cases · I report over the 25 baseline misses
-Regression: R1 R2 R3 R4
+Feature: every miss in the R4 baseline (CM-6e, Cohere Embed v5 fast) is explained by a named failure class, so S5.2 and S5.3 test a diagnosed cause.
+Trace: SPEC §12 S5; retrieval-benchmark §§7, 7a, 8; test-plan §6 "Retrieval diagnostics"
+Scope: per-anchor report (dense rank of each missed gold anchor, section hit, lexical overlap, chunk boundary); taxonomy (vocabulary gap, section miss, boundary split, ranking); section prior evaluated here as a candidate.
+Tests:  U classifier on hand-built cases · I report over the baseline's 45 missed anchors in 30 cases (owner 2026-11-14: was "25 baseline misses", the Qwen3 Gate A count)
+Regression: R1 R2 R3 (R4 waived by the owner 2026-11-14: no retrieval code changes)
 Done: every miss classified; candidate list ranked by misses addressed. Result: Pending.
 ```
 
