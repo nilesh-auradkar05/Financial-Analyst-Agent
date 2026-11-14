@@ -684,10 +684,10 @@ Done: no `ollama` reference in app/, dataops/, evaluation/, Compose or pyproject
 CM-6c — Model ladder live qualification
 Feature: every configured draft and judge tier is proven invocable from this account, or removed from the ladder.
 Trace: SPEC §4; ADR-0009 amendment 2026-10-17; test-plan §16 Azure and judge rows
-Blocked: the configured first draft tier (Foundry DeepSeek-V4-Flash) has no Global Standard quota (increase rejected 2026-10-17) and GPT-5.6 Luna is not available to this AWS account on Bedrock (2026-10-18). Needs an owner decision on the ladder before it opens.
+Unblocked 2026-11-12/14 (owner): `ds-v4-flash-draft` now has quota; Bedrock Luna still has quota 0 and is kept as the judge fallback by owner decision (amends Done below).
 Tests:  L one bounded call per tier, cost recorded · U ladder skips an unavailable tier
 Regression: R1 R2 R3
-Done: ladder in SPEC §4 equals the tiers proven live. Result: Blocked (owner decision).
+Done: ladder in SPEC §4 equals the tiers proven live, except Bedrock Luna, which the owner keeps as an unproven judge fallback (2026-11-14). Result: DONE 2026-11-14. Rows 1eb0c60; red 02e1739 (13/22 failed); feat fe97cf3 (tests unchanged since red). Live calls, one each, 2026-11-14: Foundry `ds-v4-flash-draft` PASS (no reasoning by default: 46 output tokens for a 27-word multi-step answer), Bedrock `deepseek.v3.2` PASS, personal `claude-sonnet-4-5` PASS, personal `gpt-4.1` PASS, Foundry `luna-judge` PASS (gpt-5.6-luna-2026-07-09; temperature 0 rejected, only 1), Bedrock `openai.gpt-5.6-luna` on bedrock-mantle 401 not available for this account; 8 calls, under $0.01. Judge ladder reversed to Foundry first, Bedrock Luna fallback; for provider luna the judge model comes from settings alone (AZURE_FOUNDRY_JUDGE_MODEL), a different --judge-model / RAG_EVAL_JUDGE_MODEL is rejected and --judge-model is optional. Draft-ladder skip of an unavailable tier was already covered (test_provider_azure incomplete Azure, test_provider_fallback unconfigured fallbacks). R1: ruff clean; mypy only the git-ignored probe file; pytest 1004 passed, 2 skipped. R2 governance 4/4. R3: `pytest tests/ingestion tests/replay` under H7's rewrite `unshare -rn` (loopback up, sandbox off) 95 passed. Follow-up commit: stale judge order fixed in the SPEC banner, README, model-access-setup and the Makefile hint; the rejection message also names DEEPEVAL_MODEL (it feeds --deepeval-model). Details: ADR-0009 amendment 2026-11-14. Not changed: the local env file sets AWS_BEDROCK_MODEL to Claude Sonnet 4.6 and leaves AZURE_FOUNDRY_MODEL / AZURE_FOUNDRY_JUDGE_MODEL unset, so a local run does not follow the SPEC ladder (owner's file).
 ```
 
 ```text
@@ -756,7 +756,7 @@ Feature: the heuristic grounding rate is quoted only with its measured agreement
 Trace: SPEC §11.2; test-plan §14, §20 "Judge adoption"
 Tests:  Q κ on ≥ 50 owner-reviewed claims · U agreement report schema
 Regression: R1 R2 R3 R5
-Result: Pending (judge tier depends on CM-6c).
+Result: Pending. Judge from CM-6c: Foundry `luna-judge` first, Bedrock Luna fallback (not invocable from this account); Luna runs only at temperature 1, so the κ check states how repeat variance is handled.
 ```
 
 ```text

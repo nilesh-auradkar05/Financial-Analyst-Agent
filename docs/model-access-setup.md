@@ -11,7 +11,7 @@ Proposed plan (user, 2026-10-16). It is recorded in ADR-0009 only after the amen
 | Role | Primary | Fallback |
 | --- | --- | --- |
 | Memo generation (draft) | **Azure:** DeepSeek-V4-Flash, Global Standard | **Bedrock:** DeepSeek V3.2 |
-| Judge / verifier | **Bedrock:** GPT-5.6 Luna, `global.openai.gpt-5.6-luna` | **Azure:** GPT-5.6-luna (short context), Global Standard |
+| Judge / verifier | **Azure:** GPT-5.6-luna (short context), Global Standard | **Bedrock:** GPT-5.6 Luna via `bedrock-mantle` (not invocable from this account, 2026-11-14) |
 | Embedding arms (EMBED-ARMS bake-off) | Bedrock: Titan Text Embeddings V2 and Cohere Embed v4, 1024 dims | Azure: `text-embedding-3-small`, 1024 dims |
 
 The embedding rows are bake-off arms, not a primary/fallback pair. The model change above does not affect them, and the embedding checks can run now.
