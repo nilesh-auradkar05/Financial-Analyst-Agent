@@ -69,4 +69,23 @@ Consequences (accepted by the owner 2026-10-17):
 - **An Azure outage or sustained 429s raise cost** about 3 to 3.6 times per token. Budget alerts are set on both clouds.
 - Open: whether V4-Flash reasons by default (billed as output); whether Luna accepts `temperature=0`; the `bedrock-mantle` Luna call itself (pending a live check).
 
+## Amendment 2026-11-14 — Judge order reversed; ladder qualified live (CM-6c, owner decision)
+
+Live calls on 2026-11-14, one bounded call per tier:
+
+- Draft: Foundry `ds-v4-flash-draft` (DeepSeek-V4-Flash), Bedrock `deepseek.v3.2`, personal Anthropic `claude-sonnet-4-5` and personal OpenAI `gpt-4.1` all answered. The 2026-10-17 V4-Flash quota rejection no longer applies.
+- Judge: Foundry `luna-judge` answered as `gpt-5.6-luna-2026-07-09`. Bedrock `openai.gpt-5.6-luna` through `bedrock-mantle` returned 401 `access_denied`, "not available for this account"; the owner confirms its quota is 0.
+- Open items of the 2026-10-17 amendment, closed: V4-Flash does not reason by default (a multi-step prompt billed 46 output tokens for a 27-word answer, with no reasoning field); Luna rejects `temperature=0` with 400 `unsupported_value` ("Only the default (1) value is supported"), so the judge sends no temperature; the `bedrock-mantle` call was made and is refused for this account.
+
+Decision:
+
+- **Judge ladder:** Foundry GPT-5.6-luna first, Bedrock Luna (`bedrock-mantle`) as the fallback. The owner keeps the Bedrock tier although it is not invocable today, so it starts working without a code change if the account gains access. Until then a Foundry failure costs one extra refused call before the judge fails.
+- **Judge model source:** for provider `luna` the judge model comes from settings alone (`AZURE_FOUNDRY_JUDGE_MODEL`; the Bedrock id when Foundry is unconfigured). The eval output's `judge_model` records it, and a different `--judge-model` or `RAG_EVAL_JUDGE_MODEL` is rejected, so the output never names a model that did not run.
+
+Consequences:
+
+- Both ladders now run Azure first. The "two ladders run in opposite order" consequence of the 2026-10-17 amendment no longer holds.
+- The judge runs at temperature 1 and is not deterministic. The S6 κ check must say how repeat variance is handled.
+- The judge fallback-quality check (test-plan "LLM fallback quality") now compares Bedrock Luna with Foundry Luna, and cannot run until Bedrock Luna answers.
+
 Alternatives: Gemma 4 26B-A4B on Bedrock (withdrawn by the owner; served only on `bedrock-mantle`, and on Foundry only as managed compute); gpt-oss-120b as the Azure drafter (cross-family with V3.2, superseded by V4-Flash); V3.2 primary on Bedrock with Foundry as fallback only (the 2026-10-08 ladder; higher draft cost).
