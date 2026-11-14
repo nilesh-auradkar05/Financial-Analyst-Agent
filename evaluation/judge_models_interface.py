@@ -123,7 +123,7 @@ def judge_config_from_env(
         if selected_model and selected_model.strip() != settings_model:
             raise ValueError(
                 "provider=luna takes its judge model from settings (AZURE_FOUNDRY_JUDGE_MODEL, "
-                "else the Bedrock Luna id); drop --judge-model / RAG_EVAL_JUDGE_MODEL or set it to that value"
+                "else the Bedrock Luna id); drop --judge-model / RAG_EVAL_JUDGE_MODEL / DEEPEVAL_MODEL or set it to that value"
             )
         selected_model = settings_model
 
