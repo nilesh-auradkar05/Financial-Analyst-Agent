@@ -68,7 +68,7 @@ class JudgeProvider(StrEnum):
 
     DEEPEVAL_DEFAULT = "deepeval_default"
     LANGCHAIN_ANTHROPIC = "langchain_anthropic"
-    LUNA = "luna"  # GPT-5.6 Luna: Bedrock, then Foundry (ADR-0009 amendment 2026-10-17)
+    LUNA = "luna"  # GPT-5.6 Luna: Foundry, then Bedrock (ADR-0009 amendment 2026-10-17, reordered 2026-11-14)
 
 
 LUNA_BEDROCK_MODEL = "openai.gpt-5.6-luna"
@@ -115,7 +115,17 @@ def judge_config_from_env(
         selected_model = selected_model or "claude-sonnet-4-6"
         max_tokens = max_tokens or 4096
     elif selected_provider == JudgeProvider.LUNA:
-        selected_model = selected_model or LUNA_BEDROCK_MODEL
+        from app.config import LLMSettings
+
+        llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
+        azure = llm.azure_deployment(llm.azure_foundry_judge_model)
+        settings_model = azure[1] if azure else LUNA_BEDROCK_MODEL
+        if selected_model and selected_model.strip() != settings_model:
+            raise ValueError(
+                "provider=luna takes its judge model from settings (AZURE_FOUNDRY_JUDGE_MODEL, "
+                "else the Bedrock Luna id); drop --judge-model / RAG_EVAL_JUDGE_MODEL or set it to that value"
+            )
+        selected_model = settings_model
 
     return JudgeModelConfig(
         provider=JudgeProvider(selected_provider),
@@ -170,11 +180,12 @@ def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
 
 
 def _luna_judge_llm(config: JudgeModelConfig) -> Any:
-    """Luna on Bedrock (`bedrock-mantle`, Bedrock API key) first, then the Foundry judge deployment.
+    """Luna on the Foundry judge deployment first, then on Bedrock (`bedrock-mantle`, Bedrock API key).
 
     Both hosts speak the OpenAI wire format, so one client class serves both. A tier without its
     settings is skipped. Bedrock goes through `bedrock-mantle` because this account's
-    `bedrock-runtime` quota for Luna is 0 (ADR-0009 amendment 2026-10-17).
+    `bedrock-runtime` quota for Luna is 0 (ADR-0009 amendment 2026-10-17); its tier always uses the
+    Bedrock id, while the Foundry tier uses its deployment (reordered 2026-11-14, CM-6c).
     """
     from langchain_openai import ChatOpenAI
 
@@ -182,24 +193,24 @@ def _luna_judge_llm(config: JudgeModelConfig) -> Any:
 
     # load_dotenv() above already put the env file into os.environ.
     llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
-    # ponytail: no temperature; GPT-5 family models usually accept only their default. Add it once a
-    # live call shows Luna accepts temperature 0.
+    # ponytail: no temperature; Luna on Foundry rejects temperature 0 (400 unsupported_value, only the
+    # default 1; CM-6c 2026-11-14).
     common: dict[str, Any] = {"timeout": llm.request_timeout_seconds, "max_retries": 0}
     if config.max_tokens is not None:
         common["max_tokens"] = config.max_tokens
 
     tiers: list[Any] = []
-    token = llm.aws_bearer_token_bedrock
-    if token and token.get_secret_value().strip() and llm.aws_region:
-        base_url = f"https://bedrock-mantle.{llm.aws_region}.api.aws/openai/v1"
-        tiers.append(ChatOpenAI(model=config.model or LUNA_BEDROCK_MODEL, base_url=base_url, api_key=token, **common))
     if azure := llm.azure_deployment(llm.azure_foundry_judge_model):
         base_url, deployment, key = azure
         tiers.append(ChatOpenAI(model=deployment, base_url=base_url, api_key=key, **common))
+    token = llm.aws_bearer_token_bedrock
+    if token and token.get_secret_value().strip() and llm.aws_region:
+        base_url = f"https://bedrock-mantle.{llm.aws_region}.api.aws/openai/v1"
+        tiers.append(ChatOpenAI(model=LUNA_BEDROCK_MODEL, base_url=base_url, api_key=token, **common))
     if not tiers:
         raise ValueError(
-            "provider=luna needs AWS_BEARER_TOKEN_BEDROCK (Bedrock) or AZURE_OPENAI_ENDPOINT, "
-            "AZURE_API_KEY and AZURE_FOUNDRY_JUDGE_MODEL (Foundry)"
+            "provider=luna needs AZURE_OPENAI_ENDPOINT, AZURE_API_KEY and AZURE_FOUNDRY_JUDGE_MODEL "
+            "(Foundry) or AWS_BEARER_TOKEN_BEDROCK (Bedrock)"
         )
     return tiers[0].with_fallbacks(tiers[1:]) if len(tiers) > 1 else tiers[0]
 
