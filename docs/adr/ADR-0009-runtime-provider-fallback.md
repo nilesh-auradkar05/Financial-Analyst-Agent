@@ -89,3 +89,24 @@ Consequences:
 - The judge fallback-quality check (test-plan "LLM fallback quality") now compares Bedrock Luna with Foundry Luna, and cannot run until Bedrock Luna answers.
 
 Alternatives: Gemma 4 26B-A4B on Bedrock (withdrawn by the owner; served only on `bedrock-mantle`, and on Foundry only as managed compute); gpt-oss-120b as the Azure drafter (cross-family with V3.2, superseded by V4-Flash); V3.2 primary on Bedrock with Foundry as fallback only (the 2026-10-08 ladder; higher draft cost).
+
+## Amendment 2026-11-15 — Judge is Claude Opus 4.6 on both clouds (JUDGE-OPUS, owner decision)
+
+Owner decision, 2026-11-14: the evaluation judge moves from GPT-5.6 Luna to Claude Opus 4.6. Luna accepts only temperature 1, and its Bedrock tier cannot be invoked from this account; Opus 4.6 is deployed on Foundry and invocable on Bedrock (`global.anthropic.claude-opus-4-6-v1`, confirmed 2026-09-30).
+
+Decision:
+
+- **Judge ladder:** Foundry Opus 4.6 first, through the Anthropic Messages route `{AZURE_OPENAI_ENDPOINT}/anthropic` (deployment `AZURE_FOUNDRY_JUDGE_MODEL`, owner value `opus-4-6-judge`, key `AZURE_API_KEY` sent as `x-api-key`), then Bedrock Opus 4.6 through the Converse runtime (`global.anthropic.claude-opus-4-6-v1`, Bedrock API key, `AWS_REGION`). An unconfigured tier is skipped.
+- **Determinism:** both tiers send the configured temperature (default 0), no `top_p` (Claude 4.x rejects both together) and no `thinking` (thinking forces temperature 1). Both send an explicit `max_tokens` so structured verdicts are not cut short.
+- **Provider value:** `--judge-provider opus` replaces `luna`; `luna` is rejected. The judge model still comes from settings alone (the Foundry deployment, else the Bedrock id), and a different `--judge-model`, `RAG_EVAL_JUDGE_MODEL` or `DEEPEVAL_MODEL` is rejected.
+- **SDK pin:** `anthropic<2`. The 2.x line sends API version `2026-10-21`, which rejects `temperature` on every model and sends keys as `Authorization: Bearer`. The pin protects the Foundry tier only; the Bedrock tier uses Converse through boto3, which is not affected.
+- **Luna removed:** its judge code, tests and settings are deleted. Foundry deployment `luna-judge` is no longer used.
+
+Consequences:
+
+- The judge is deterministic at temperature 0, so the S6.3 κ check no longer has to handle repeat variance.
+- The judge fallback-quality check (test-plan "LLM fallback quality") compares Bedrock Opus 4.6 with Foundry Opus 4.6. Both are the same model, so the check measures host drift only.
+- Cost: Foundry bills Anthropic list rates, $5 input and $25 output per million tokens, against $0.20 / $1.20 for Luna. Judge runs stay owner-approved.
+- Open until a live check: one bounded call per tier at temperature 0.
+
+Alternatives: keep Luna (rejected: temperature 1 only, Bedrock tier not invocable); Claude Sonnet 4.6 as the judge (cheaper; not chosen by the owner); Claude Opus 5.5 or later (no temperature control; Bedrock availability for this account unconfirmed).
