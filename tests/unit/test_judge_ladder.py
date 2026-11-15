@@ -219,13 +219,12 @@ def test_partially_configured_foundry_is_skipped(ladder: Ladder, blank: str) -> 
     assert ladder.foundry.requests == []
 
 
-@pytest.mark.parametrize("unset", ["AWS_BEARER_TOKEN_BEDROCK", "AWS_REGION"])
-def test_unconfigured_bedrock_tier_is_skipped(ladder: Ladder, unset: str) -> None:
-    """Row clause: an unconfigured tier is skipped (Bedrock needs the API key and AWS_REGION): a
-    Foundry failure has nowhere to fall and its own error surfaces."""
+def test_unconfigured_bedrock_tier_is_skipped(ladder: Ladder) -> None:
+    """Row clause: an unconfigured tier is skipped (Bedrock needs the API key; AWS_REGION defaults to
+    us-east-1 in settings): a Foundry failure has nowhere to fall and its own error surfaces."""
     ladder.foundry.status = 500
     ladder.configure()
-    ladder.monkeypatch.delenv(unset)
+    ladder.monkeypatch.delenv("AWS_BEARER_TOKEN_BEDROCK")
     judge = ladder.build()
 
     with pytest.raises(anthropic.APIStatusError):
@@ -258,20 +257,6 @@ def test_no_configured_tier_is_refused_without_secrets(
 
     message = str(caught.value)
     assert "AZURE_FOUNDRY_JUDGE_MODEL" in message
-    assert "AWS_BEARER_TOKEN_BEDROCK" in message
-    assert not any(secret in message for secret in SECRETS)
-
-
-def test_a_bedrock_key_without_a_region_is_no_configured_tier(ladder: Ladder) -> None:
-    """Row clause: with no tier configured the judge is refused, no secret value in the message
-    (the Bedrock key is set but AWS_REGION is not)."""
-    ladder.configure(azure=False)
-    ladder.monkeypatch.delenv("AWS_REGION")
-
-    with pytest.raises(ValueError) as caught:
-        create_langchain_judge_llm(ladder.config())
-
-    message = str(caught.value)
     assert "AWS_BEARER_TOKEN_BEDROCK" in message
     assert not any(secret in message for secret in SECRETS)
 
