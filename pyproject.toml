@@ -59,7 +59,7 @@ eval = [
     "deepeval>=3.9.9",
     "datasets>=4.5",
     "ragas>=0.4.3",
-    "anthropic>=0.100.0,<2",
+    "anthropic>=0.100.0",
 ]
 
 

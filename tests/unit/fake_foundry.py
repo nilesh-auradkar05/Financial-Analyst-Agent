@@ -7,12 +7,6 @@ server parses them and computes the reply from the request. For Messages it read
 fixed lexicon. For rerank it scores each document by the fraction of query words it contains and
 lists the results best first, not in input order (as the real endpoint does). It never replays an
 answer supplied by a test. No network beyond loopback.
-
-With `judge_replies` set, Messages requests are answered as a chat judge instead: a request that
-carries `tools` gets a `tool_use` block for the first tool, its input filled from that tool's
-input schema (every string field holds the requested model, every other field its type's zero);
-a plain request gets a text reply `"<requested model>: <prompt>"`. The reply's `model` is the served Opus id (`JUDGE_SERVED_MODEL`), as the real endpoint
-reports it, whatever deployment was requested; text replies and tool inputs name the requested model.
 """
 
 from __future__ import annotations
@@ -30,7 +24,6 @@ from typing import Any
 POSITIVE_WORDS = ("beat", "record", "surged", "growth", "rose")
 NEGATIVE_WORDS = ("fell", "warned", "lawsuit", "decline", "missed")
 SERVED_MODEL = "claude-sonnet-5-5"
-JUDGE_SERVED_MODEL = "claude-opus-4-6"
 DEPLOYMENT = "sonnet-5-5-sentiment"
 MODEL_IDENTITY = "foundry:sonnet-5-5-sentiment:claude-sonnet-5-5"
 MESSAGES_PATH = "/anthropic/v1/messages"
@@ -51,7 +44,6 @@ class ReceivedRequest:
     credential: str
     body: dict[str, Any]
     bearer: bool = False
-    credential_header: str = ""
 
     @property
     def system(self) -> str:
@@ -95,18 +87,6 @@ def relevance(query: str, document: str) -> float:
     return len(wanted & set(_WORD.findall(document.lower()))) / len(wanted)
 
 
-def _zero_for(json_type: object, text: str) -> object:
-    """A value of the JSON schema type: `text` for strings, the type's zero for the rest."""
-    return {
-        "string": text,
-        "integer": 0,
-        "number": 0.0,
-        "boolean": False,
-        "array": [],
-        "object": {},
-    }.get(str(json_type), text)
-
-
 def _scores(label: str) -> dict[str, float]:
     return {name: (0.8 if name == label else 0.1) for name in ("positive", "negative", "neutral")}
 
@@ -128,18 +108,14 @@ class FakeFoundry:
         self.corrupt: Callable[[dict[str, Any]], None] | None = None
         self.delay = 0.0
         self.raw_reply: bytes | None = None
-        self.judge_replies = False
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
-        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
     @property
     def url(self) -> str:
         return f"http://127.0.0.1:{self._server.server_address[1]}"
-
-    def _serve(self) -> None:
-        self._server.serve_forever(poll_interval=0.02)
 
     def start(self) -> FakeFoundry:
         self._thread.start()
@@ -207,41 +183,7 @@ class FakeFoundry:
             },
         }
 
-    def _judge_messages(self, request: ReceivedRequest, attempt: int) -> dict[str, Any]:
-        model = str(request.body.get("model", ""))
-        tools = request.body.get("tools")
-        if tools:
-            tool = tools[0]
-            properties = tool.get("input_schema", {}).get("properties", {})
-            content: list[dict[str, Any]] = [
-                {
-                    "type": "tool_use",
-                    "id": f"toolu_{attempt}",
-                    "name": tool["name"],
-                    "input": {
-                        name: _zero_for(spec.get("type"), model)
-                        for name, spec in properties.items()
-                    },
-                }
-            ]
-            stop_reason = "tool_use"
-        else:
-            content = [{"type": "text", "text": f"{model}: {request.user_content}"}]
-            stop_reason = "end_turn"
-        return {
-            "id": f"msg_{attempt}",
-            "type": "message",
-            "role": "assistant",
-            "model": JUDGE_SERVED_MODEL,
-            "content": content,
-            "stop_reason": stop_reason,
-            "stop_sequence": None,
-            "usage": {"input_tokens": len(request.user_content.split()), "output_tokens": 1},
-        }
-
     def _messages(self, request: ReceivedRequest, attempt: int) -> dict[str, Any]:
-        if self.judge_replies:
-            return self._judge_messages(request, attempt)
         results = [
             {"index": index, "label": label, "scores": _scores(label)}
             for index, text in request.articles
@@ -269,13 +211,19 @@ class FakeFoundry:
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
                 headers = {key.lower(): value for key, value in self.headers.items()}
-                credential_header = next((name for name in _AUTH_HEADERS if name in headers), "")
-                credential = headers.get(credential_header, "").removeprefix("Bearer ")
+                credential = next(
+                    (
+                        headers[name].removeprefix("Bearer ")
+                        for name in _AUTH_HEADERS
+                        if name in headers
+                    ),
+                    "",
+                )
                 bearer = headers.get("authorization", "").startswith("Bearer ")
                 for name in _AUTH_HEADERS:
                     headers.pop(name, None)
                 status, payload = fake._reply(
-                    ReceivedRequest(self.path, headers, credential, body, bearer, credential_header)
+                    ReceivedRequest(self.path, headers, credential, body, bearer)
                 )
                 data = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
                 self.send_response(status)
