@@ -691,6 +691,16 @@ Done: ladder in SPEC §4 equals the tiers proven live, except Bedrock Luna, whic
 ```
 
 ```text
+CM-6f — Judge on Claude Opus 4.6
+Feature: the evaluation judge runs Claude Opus 4.6 at temperature 0 on Foundry, then Bedrock; GPT-5.6 Luna is removed.
+Trace: owner decision 2026-11-14; ADR-0009 amendment 2026-11-15; SPEC §4 judge ladder; test-plan §16 "Judge ladder", §20 "LLM fallback quality" and "Judge adoption"
+Scope: provider `opus` replaces `luna`; Foundry tier on the Anthropic Messages route (deployment `opus-4-6-judge` from AZURE_FOUNDRY_JUDGE_MODEL), Bedrock tier `global.anthropic.claude-opus-4-6-v1` on Converse; temperature from config, no top_p, no thinking; `anthropic<2` pinned; Luna code, tests and docs removed.
+Tests:  U ladder order, skip and refusal, request shape per tier, structured verdicts across the fallback, settings-only judge model, `luna` rejected · L one bounded call per tier at temperature 0 (owner)
+Regression: R1 R2 R3
+Done: both tiers proven live at temperature 0, or the failing tier recorded. Result: DONE 2026-11-15. Live (owner, one call per tier, temperature 0, max_tokens 64): Foundry `opus-4-6-judge` answered as `claude-opus-4-6` ('ok'); Bedrock `global.anthropic.claude-opus-4-6-v1` answered ('ok'); 2 calls, under $0.01. Rows 441928b; red 030dab7 (40/40 failed); test correction 3081d83 (two AWS_REGION-unset cases removed: the setting defaults to us-east-1; the brief, not the row, had required region-based skipping); feat cb849a1. Offline: judge tests 40 passed; pytest 1020 passed, 2 skipped; ruff clean; mypy only the git-ignored probe file; governance 4/4; ingestion + replay 95 passed under `unshare -rn`; pip-audit clean; lock unchanged (anthropic 1.9.0).
+```
+
+```text
 CM-7 — Remove Qdrant and Chroma
 Feature: OpenSearch is the only store in code, compose and docs.
 Trace: ADR-0016; CLAUDE.md/AGENTS.md §8; scripts/ci/check_doc_sync.py
@@ -756,7 +766,7 @@ Feature: the heuristic grounding rate is quoted only with its measured agreement
 Trace: SPEC §11.2; test-plan §14, §20 "Judge adoption"
 Tests:  Q κ on ≥ 50 owner-reviewed claims · U agreement report schema
 Regression: R1 R2 R3 R5
-Result: Pending. Judge from CM-6c: Foundry `luna-judge` first, Bedrock Luna fallback (not invocable from this account); Luna runs only at temperature 1, so the κ check states how repeat variance is handled.
+Result: Pending. Judge from CM-6f: Claude Opus 4.6 on Foundry (`opus-4-6-judge`) first, Bedrock Opus 4.6 fallback, both at temperature 0, so the κ check needs no repeat-variance handling (supersedes the CM-6c Luna note).
 ```
 
 ```text
