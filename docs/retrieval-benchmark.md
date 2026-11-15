@@ -183,23 +183,6 @@ Rules:
 
 ---
 
-## 7a. Miss diagnostics (S5.1, 2026-11-14)
-
-A diagnostic report over one result file. It explains misses; it is not a metric and makes no comparison claim, so §8 does not apply to it.
-
-- **Miss:** a gold anchor not covered at K=10 (§4). Partial cases contribute their uncovered anchors.
-- **Chunks:** rebuilt offline from the result's `evidence_release` with the ingestion chunker recorded in its provenance. The report refuses to build unless every retrieved `chunk_id` exists in the rebuild and the §3 matcher on the rebuilt text reproduces every stored `gold_hit`.
-- **Classes**, first match wins:
-  1. `boundary_split`: no rebuilt chunk of the gold section wholly contains the anchor (§3 straddle rule).
-  2. `section_miss`: no top-10 chunk comes from the gold (accession, section).
-  3. `vocabulary_gap`: section reached; the share of the query's content tokens found in the anchor chunk's text is below 0.5 (the verifier's token-overlap score; the highest over anchor chunks).
-  4. `ranking`: section reached; overlap ≥ 0.5.
-- **Dense rank:** the anchor chunk's rank in a dense top-50 search under the case's ticker and filing-type filters, from a pool file collected once and committed with the report. It shows whether the chunk is reachable by a larger candidate pool; it is not the section-aware rank.
-- **Candidates**, counted by misses addressed: section prior / intent routing ← `section_miss`; hybrid dense + BM25 (S5.2) ← `ranking`; rerank (S5.3) ← any non-`boundary_split` miss with a dense rank ≤ 50; chunking ← `boundary_split`; query rewriting ← `vocabulary_gap` (outside S5, listed for completeness). A miss can count for several candidates.
-- The overlap threshold 0.5 and the pool depth 50 were declared before the first report was generated.
-
----
-
 ## 8. Paired comparison policy
 
 File: `evaluation/compare_retrieval_results.py`. This is where the prior invalid-comparison lesson is enforced.
