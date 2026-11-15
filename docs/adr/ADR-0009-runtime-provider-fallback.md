@@ -107,6 +107,6 @@ Consequences:
 - The judge is deterministic at temperature 0, so the S6.3 κ check no longer has to handle repeat variance.
 - The judge fallback-quality check (test-plan "LLM fallback quality") compares Bedrock Opus 4.6 with Foundry Opus 4.6. Both are the same model, so the check measures host drift only.
 - Cost: Foundry bills Anthropic list rates, $5 input and $25 output per million tokens, against $0.20 / $1.20 for Luna. Judge runs stay owner-approved.
-- Open until a live check: one bounded call per tier at temperature 0.
+- Live check 2026-11-15 (owner): one bounded call per tier at temperature 0; Foundry `opus-4-6-judge` answered as `claude-opus-4-6`, Bedrock `global.anthropic.claude-opus-4-6-v1` answered. No 400 on temperature from either tier.
 
 Alternatives: keep Luna (rejected: temperature 1 only, Bedrock tier not invocable); Claude Sonnet 4.6 as the judge (cheaper; not chosen by the owner); Claude Opus 5.5 or later (no temperature control; Bedrock availability for this account unconfirmed).
