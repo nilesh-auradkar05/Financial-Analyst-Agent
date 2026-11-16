@@ -24,6 +24,7 @@ from app.components.retrieval.opensearch_store import (
     DEFAULT_COMPRESSION_LEVEL,
     OpenSearchVectorStore,
 )
+from app.components.retrieval.reranked_hybrid_retrieve import FoundryCohereReranker, search_reranked
 from app.components.retrieval.section_aware_search import search_section_aware
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters
 from dataops.git_state import current_code_version
@@ -43,7 +44,17 @@ DEFAULT_FIXTURE = Path("evaluation/fixtures/retrieval_shared_benchmark_v1.json")
 DEFAULT_OUTPUT_DIR = Path("evaluation/results/shared_benchmark")
 DEFAULT_SOURCE_DIR = Path("evaluation/fixtures/source_sections")
 
-RETRIEVAL_METHODS: tuple[str, ...] = ("dense", "section_aware", "hybrid")
+RETRIEVAL_METHODS: tuple[str, ...] = (
+    "dense",
+    "section_aware",
+    "hybrid",
+    "dense_rerank",
+    "hybrid_rerank",
+)
+_RERANK_CANDIDATES: dict[str, Literal["dense", "hybrid"]] = {
+    "dense_rerank": "dense",
+    "hybrid_rerank": "hybrid",
+}
 BENCHMARK_KS: tuple[int, ...] = (5, 10)
 _RANKED_METRICS = ("pass", "recall", "precision", "mrr", "ndcg", "section_recall", "keyword_hit_rate")
 
@@ -202,6 +213,15 @@ def _search(store: Any, case: AnchoredCase, method: str) -> list[RetrievedChunk]
             n_results=top_k,
         )
         return list(hybrid.chunks)
+    if method in _RERANK_CANDIDATES:
+        return search_reranked(
+            store,
+            query=case.query,
+            ticker=case.ticker,
+            filing_type=filing_type,
+            top_k=top_k,
+            candidates=_RERANK_CANDIDATES[method],
+        ).chunks
     return search_section_aware(
         store, query=case.query, ticker=case.ticker, filing_type=filing_type, top_k=top_k
     ).chunks
@@ -232,6 +252,10 @@ def run_anchored_benchmark(
         raise ValueError(f"retrieval_method must be one of {RETRIEVAL_METHODS}: {retrieval_method!r}")
     if not backend:
         raise ValueError("backend must not be empty")
+
+    provenance = dict(provenance or {})
+    if retrieval_method in _RERANK_CANDIDATES:
+        provenance["reranker"] = FoundryCohereReranker().identity
 
     cases: list[dict[str, Any]] = []
     for case in fixture.cases:
@@ -280,7 +304,7 @@ def run_anchored_benchmark(
         "mode": retrieval_method,
         "ks": list(BENCHMARK_KS),
         "top_k": max(BENCHMARK_KS),
-        "provenance": dict(provenance or {}),
+        "provenance": provenance,
         "cases": cases,
         "summary": {
             "n_cases": len(cases),
@@ -343,7 +367,8 @@ def main() -> None:
         dest="methods",
         help=(
             "Method name to run. May be passed multiple times. Defaults to all configured methods. "
-            "For an anchored fixture, pass exactly one of: dense, section_aware."
+            "For an anchored fixture, pass exactly one of: dense, section_aware, hybrid, "
+            "dense_rerank, hybrid_rerank."
         ),
     )
     parser.add_argument("--backend", choices=["opensearch"], default="opensearch")

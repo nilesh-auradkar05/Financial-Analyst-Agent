@@ -181,8 +181,11 @@ def foundry(monkeypatch):
 
 
 @pytest.fixture
-def foundry_rerank(monkeypatch):
-    """A loopback Foundry rerank endpoint, with reranked retrieval configured to use it."""
+def foundry_rerank(monkeypatch, fake_clock):
+    """A loopback Foundry rerank endpoint, with reranked retrieval configured to use it.
+
+    On the fake clock: the reranker paces its calls (test-plan §25), so sleeping must be free.
+    """
     from pydantic import SecretStr
 
     from app.config import settings

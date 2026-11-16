@@ -31,7 +31,6 @@ IMPORTED_MODULES = (
     "app.main",
     "app.components.retrieval.vector_store",
     "app.components.retrieval.opensearch_store",
-    "app.components.retrieval.hybrid_retrieve",
     "app.components.retrieval.reranked_hybrid_retrieve",
     "evaluation.run_shared_retrieval_benchmark",
     "evaluation.build_embedding_arm",
