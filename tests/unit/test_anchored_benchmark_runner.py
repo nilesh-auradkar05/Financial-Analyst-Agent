@@ -10,6 +10,8 @@ import json
 import math
 import re
 import statistics
+import sys
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,10 +24,12 @@ from app.components.retrieval.vector_store import (
 from evaluation.run_shared_retrieval_benchmark import (
     BENCHMARK_KS,
     RETRIEVAL_METHODS,
+    main,
     run_anchored_benchmark,
     score_retrieval,
 )
 from evaluation.validate_retrieval_fixture import AnchoredCase, AnchoredFixture
+from tests.rag.gate_support import write_anchored_fixture
 
 AAPL_ACC = "0000320193-23-000106"
 AAPL_10Q_ACC = "0000320193-23-000077"
@@ -54,6 +58,11 @@ def _tokens(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9&]+", text.lower()))
 
 
+def _trigrams(text: str) -> set[str]:
+    padded = f"  {' '.join(sorted(_tokens(text)))}  "
+    return {padded[i : i + 3] for i in range(len(padded) - 2)}
+
+
 class InMemoryStore:
     """Scores chunks by query-token overlap; filters by metadata; returns top n."""
 
@@ -73,13 +82,8 @@ class InMemoryStore:
         scored.sort(key=lambda c: (c.distance, c.id))
         return scored[:n]
 
-    def search(
-        self,
-        query: str,
-        filters: SearchFilters | None = None,
-        n_results: int = 5,
-    ) -> SearchResult:
-        rows = [
+    def _filtered(self, filters: SearchFilters | None) -> list[tuple[str, str, dict[str, Any]]]:
+        return [
             r
             for r in self._rows
             if filters is None
@@ -89,7 +93,48 @@ class InMemoryStore:
                 and (filters.section_key is None or r[2]["section_key"] == filters.section_key)
             )
         ]
-        chunks = self._rank(query, rows, n_results)
+
+    def search(
+        self,
+        query: str,
+        filters: SearchFilters | None = None,
+        n_results: int = 5,
+    ) -> SearchResult:
+        chunks = self._rank(query, self._filtered(filters), n_results)
+        return SearchResult(query=query, chunks=chunks, total_results=len(chunks))
+
+    def search_hybrid(
+        self,
+        query: str,
+        filters: SearchFilters | None = None,
+        n_results: int = 5,
+    ) -> SearchResult:
+        """Fuses an idf-weighted keyword score with a character-trigram similarity (a stand-in for
+        the vector score), each min-max normalised over the filtered rows, at weights 0.5 / 0.5;
+        distance is 1 - fused."""
+        rows = self._filtered(filters)
+        q = _tokens(query)
+        document_frequency = {t: sum(t in _tokens(r[1]) for r in self._rows) for t in q}
+        keyword = [
+            sum(math.log(1 + len(self._rows) / document_frequency[t]) for t in q & _tokens(r[1]))
+            for r in rows
+        ]
+        grams = _trigrams(query)
+        overlap = [len(grams & _trigrams(r[1])) / len(grams | _trigrams(r[1])) for r in rows]
+
+        def normalised(scores: list[float]) -> list[float]:
+            low, high = min(scores, default=0.0), max(scores, default=0.0)
+            return [(s - low) / (high - low) if high > low else 0.0 for s in scores]
+
+        fused = [
+            0.5 * k + 0.5 * o for k, o in zip(normalised(keyword), normalised(overlap), strict=True)
+        ]
+        chunks = [
+            RetrievedChunk(id=r[0], text=r[1], metadata=dict(r[2]), distance=1.0 - score)
+            for r, score in zip(rows, fused, strict=True)
+        ]
+        chunks.sort(key=lambda c: (c.distance, c.id))
+        chunks = chunks[:n_results]
         return SearchResult(query=query, chunks=chunks, total_results=len(chunks))
 
     def search_sections(
@@ -265,7 +310,7 @@ def _by_id(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("method", ["dense", "section_aware"])
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
 def test_result_contains_every_case_id(method: str) -> None:
     """test-plan §6 Benchmark runner: Run on fixture."""
     fixture = _fixture()
@@ -296,11 +341,12 @@ def test_dense_search_is_scoped_to_ticker_and_filing_type_only() -> None:
 
 def test_method_constants() -> None:
     """test-plan §6 Benchmark runner: Method/mode labels."""
-    assert tuple(RETRIEVAL_METHODS) == ("dense", "section_aware")
+    assert set(RETRIEVAL_METHODS) == {"dense", "section_aware", "hybrid"}
+    assert len(RETRIEVAL_METHODS) == 3
     assert tuple(BENCHMARK_KS) == (5, 10)
 
 
-@pytest.mark.parametrize("method", ["dense", "section_aware"])
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
 def test_result_carries_method_and_mode_labels(method: str) -> None:
     """test-plan §6 Benchmark runner: Method/mode labels (present)."""
     result = _run(method)
@@ -308,11 +354,45 @@ def test_result_carries_method_and_mode_labels(method: str) -> None:
     assert result["mode"] == method
 
 
-@pytest.mark.parametrize("method", ["bm25", "", "Dense", "hybrid"])
+@pytest.mark.parametrize("method", ["bm25", "", "Dense", "Hybrid", "hybrid "])
 def test_unknown_retrieval_method_is_rejected(method: str) -> None:
     """test-plan §6 Benchmark runner: Method/mode labels (validated)."""
     with pytest.raises(ValueError):
         _run(method)
+
+
+@pytest.mark.parametrize("method", ["bm25", "Hybrid", "hybrid,dense"])
+def test_cli_rejects_an_unknown_method_as_a_usage_error_before_any_store_is_read(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    method: str,
+) -> None:
+    """test-plan §6 Benchmark runner: `hybrid` method (S5.2) - any other unknown method is a usage
+    error before any store is read (the store URL here refuses connections, so a store read would
+    surface as a different failure) and the message names the accepted methods."""
+    fixture_path, source_dir = write_anchored_fixture(tmp_path)
+    monkeypatch.setenv("OPENSEARCH_URL", "http://127.0.0.1:1")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_shared_retrieval_benchmark",
+            "--fixture", str(fixture_path),
+            "--source-dir", str(source_dir),
+            "--backend", "opensearch",
+            "--collection", "no-such-index",
+            "--method", method,
+            "--output", str(tmp_path / "result.json"),
+        ],
+    )  # fmt: skip
+
+    with pytest.raises(SystemExit) as raised:
+        main()
+
+    assert raised.value.code == 2
+    assert "hybrid" in capsys.readouterr().err.lower()
+    assert not (tmp_path / "result.json").exists()
 
 
 def test_empty_backend_is_rejected() -> None:
@@ -331,7 +411,7 @@ def test_empty_backend_is_rejected() -> None:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("method", ["dense", "section_aware"])
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
 def test_miss_emits_null_first_relevant_rank_in_json(method: str) -> None:
     """test-plan §6 Benchmark runner: Null first relevant rank."""
     result = _run(method)
@@ -375,7 +455,93 @@ def test_dense_provenance_preserves_chunk_ids_sections_and_scores() -> None:
         assert [r["score"] for r in got] == pytest.approx([c.relevance_score for c in expected])
 
 
-@pytest.mark.parametrize("method", ["dense", "section_aware"])
+# --------------------------------------------------------------------------
+# test-plan §6 Benchmark runner: `hybrid` method (S5.2)
+# --------------------------------------------------------------------------
+
+
+def _hybrid_corpus() -> list[tuple[str, str, dict[str, Any]]]:
+    """Fourteen AAPL 10-K chunks (more than max(BENCHMARK_KS)), an AAPL 10-Q and an MSFT 10-K that
+    both repeat the first query word for word."""
+    topics = ["supply", "currency", "litigation", "regulation", "inflation", "tariffs", "demand"]
+    rows = [
+        _row(
+            f"{AAPL_ACC}_{section}_{index:03d}",
+            f"{topics[index % 7]} exposure in {section} could affect results fiscal {index}",
+            "AAPL",
+            AAPL_ACC,
+            section,
+        )
+        for index, section in enumerate(["risk_factors", "md&a"] * 7)
+    ]
+    rows.append(_row(f"{AAPL_ACC}_risk_factors_100", RISK_ANCHOR, "AAPL", AAPL_ACC, "risk_factors"))
+    rows.append(
+        _row(
+            f"{AAPL_10Q_ACC}_risk_factors_000",
+            RISK_ANCHOR,
+            "AAPL",
+            AAPL_10Q_ACC,
+            "risk_factors",
+            "10-Q",
+        )
+    )
+    rows.append(_row(f"{MSFT_ACC}_risk_factors_000", RISK_ANCHOR, "MSFT", MSFT_ACC, "risk_factors"))
+    return rows
+
+
+def test_hybrid_retrieves_each_case_through_the_store_hybrid_search_under_its_filters() -> None:
+    """test-plan §6 Benchmark runner: `hybrid` method (S5.2) - each case is retrieved through the
+    store's hybrid search under the case's ticker and filing-type filters (the case's section_key
+    is not applied), for max(BENCHMARK_KS) results, in the store's fused order."""
+    rows = _hybrid_corpus()
+    store = InMemoryStore(rows)
+    fixture = _fixture()
+    result = _by_id(
+        run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method="hybrid")
+    )
+
+    for case in fixture.cases:
+        expected = store.search_hybrid(
+            case.query,
+            filters=SearchFilters(ticker=case.ticker, filing_type="10-K"),
+            n_results=max(BENCHMARK_KS),
+        ).chunks
+        got = result[case.case_id]["retrieved"]
+        assert [r["rank"] for r in got] == list(range(1, len(expected) + 1))
+        assert [r["chunk_id"] for r in got] == [c.id for c in expected]
+        assert [r["accession_number"] for r in got] == [
+            c.metadata["accession_number"] for c in expected
+        ]
+        assert [r["section_key"] for r in got] == [c.metadata["section_key"] for c in expected]
+        assert [r["score"] for r in got] == pytest.approx([c.relevance_score for c in expected])
+
+    risk = result["aapl-risk-001"]["retrieved"]
+    assert len(risk) == max(BENCHMARK_KS)
+    assert {r["accession_number"] for r in risk} == {AAPL_ACC}
+    assert {r["section_key"] for r in risk} == {"risk_factors", "md&a"}
+
+
+def test_hybrid_ranks_differently_from_dense_where_the_store_fuses_keyword_scores() -> None:
+    """test-plan §6 Benchmark runner: `hybrid` method (S5.2) - the hybrid arm is the store's fused
+    ranking, not the dense one under another label."""
+    rows = _hybrid_corpus()
+    store = InMemoryStore(rows)
+    fixture = _fixture()
+    dense = _by_id(run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method="dense"))
+    hybrid = _by_id(
+        run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method="hybrid")
+    )
+
+    differing = [
+        case_id
+        for case_id in dense
+        if [r["chunk_id"] for r in dense[case_id]["retrieved"]]
+        != [r["chunk_id"] for r in hybrid[case_id]["retrieved"]]
+    ]
+    assert differing, "precondition: the fake store's hybrid order differs from its dense order"
+
+
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
 def test_retrieved_entries_trace_back_to_the_store(method: str) -> None:
     """test-plan §6 Benchmark runner: Provenance."""
     by_id = {cid: meta for cid, _text, meta in CORPUS}
@@ -416,7 +582,7 @@ def test_run_provenance_is_recorded(
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("method", ["dense", "section_aware"])
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
 def test_cold_and_warm_latency_are_captured_separately(method: str) -> None:
     """test-plan §6 Benchmark runner: Cold/warm latency."""
     result = _run(method)
@@ -435,7 +601,7 @@ def test_cold_and_warm_latency_are_captured_separately(method: str) -> None:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("method", ["dense", "section_aware"])
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
 def test_same_fixture_backend_method_gives_identical_metrics(method: str) -> None:
     """test-plan §6 Benchmark runner: Determinism."""
     first, second = _run(method), _run(method)
