@@ -18,6 +18,15 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
+
+from app.components.retrieval.section_intent import infer_section_intent
+from app.components.retrieval.vector_store import (
+    IndexDocument,
+    RetrievedChunk,
+    SearchFilters,
+    SearchResult,
+)
 from evaluation.retrieval_diagnostics import (
     DENSE_POOL_DEPTH,
     OVERLAP_THRESHOLD,
@@ -27,15 +36,6 @@ from evaluation.retrieval_diagnostics import (
     build_diagnostics_report,
     classify_miss,
     collect_dense_pool,
-)
-from pydantic import ValidationError
-
-from app.components.retrieval.section_intent import infer_section_intent
-from app.components.retrieval.vector_store import (
-    IndexDocument,
-    RetrievedChunk,
-    SearchFilters,
-    SearchResult,
 )
 from evaluation.validate_retrieval_fixture import AnchoredFixture, normalize_text
 

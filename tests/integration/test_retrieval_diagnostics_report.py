@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
 from evaluation.retrieval_diagnostics import (
     DENSE_POOL_DEPTH,
     OVERLAP_THRESHOLD,
@@ -25,7 +26,6 @@ from evaluation.retrieval_diagnostics import (
     main,
     rebuild_chunks,
 )
-
 from evaluation.validate_retrieval_fixture import load_anchored_fixture
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
