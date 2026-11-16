@@ -1,6 +1,6 @@
 """Trace: docs/test-plan.md §25, hosted rerank and no local models (CM-6d, ADR-0011 amendment).
 
-Reranked hybrid retrieval talks to a loopback fake of the Foundry Cohere rerank endpoint that
+Reranked retrieval talks to a loopback fake of the Foundry Cohere rerank endpoint that
 computes relevance from the request and lists results best first (tests/unit/fake_foundry.py).
 No network beyond 127.0.0.1, no credentials.
 """
@@ -16,30 +16,22 @@ from typing import Any, Callable
 import pytest
 
 from app.components.retrieval.reranked_hybrid_retrieve import (
-    RerankedHybridSearchConfig,
+    FoundryCohereReranker,
     RerankedHybridSearchUnavailableError,
-    search_reranked_hybrid,
 )
 from app.config import settings
+from tests.rerank_api import rerank_api
 from tests.unit.fake_foundry import RERANK_DEPLOYMENT, RERANK_PATH, FakeFoundry
 from tests.unit.fake_retrieval_store import RISK_TEXT, FakeRetrievalStore, make_point
 
 ROOT = Path(__file__).resolve().parents[2]
 QUERY = "supply chain supplier risks"
 IDENTITY = f"foundry:{RERANK_DEPLOYMENT}"
-DENSE_ORDER = ["business-1", "risk-1"]
+DOCUMENTS = ["The company sells devices.", RISK_TEXT]
 
 
-def _search(store: FakeRetrievalStore | None = None, **config: Any):
-    cfg = RerankedHybridSearchConfig(dense_top_k=2, sparse_top_k=2, final_top_k=2, **config)
-    return search_reranked_hybrid(
-        store or FakeRetrievalStore(),
-        query=QUERY,
-        ticker="AAPL",
-        filing_type="10-K",
-        top_k=2,
-        config=cfg,
-    )
+def _score() -> list[float]:
+    return FoundryCohereReranker().score(QUERY, DOCUMENTS)
 
 
 def _edit_results(edit: Callable[[list[dict[str, Any]]], None]) -> Callable[[FakeFoundry], None]:
@@ -89,8 +81,6 @@ MISSING = ["azure_openai_endpoint", "azure_api_key", "azure_foundry_rerank_model
 
 def test_scores_come_back_in_input_order(foundry_rerank):
     """test-plan §25: Scores in input order."""
-    from app.components.retrieval.reranked_hybrid_retrieve import FoundryCohereReranker
-
     documents = [
         "alpha",
         "alpha beta gamma delta",
@@ -104,17 +94,14 @@ def test_scores_come_back_in_input_order(foundry_rerank):
     assert scores == pytest.approx([0.25, 1.0, 0.0, 0.5])
 
 
+def test_the_reranker_names_its_deployment(foundry_rerank):
+    """test-plan §25: Rerank reorders candidates (the identity is `foundry:<deployment>`)."""
+    assert FoundryCohereReranker().identity == IDENTITY
+
+
 def test_request_follows_the_rerank_contract(foundry_rerank):
     """test-plan §25: Request contract."""
-    long_text = RISK_TEXT + " " + "x" * 600
-    store = FakeRetrievalStore(
-        [
-            make_point("business-1", "The company sells devices.", "business"),
-            make_point("risk-1", long_text, "risk_factors"),
-        ]
-    )
-
-    _search(store, max_document_chars=256)
+    FoundryCohereReranker().score(QUERY, DOCUMENTS)
 
     (request,) = foundry_rerank.requests
     assert request.path == RERANK_PATH
@@ -122,29 +109,32 @@ def test_request_follows_the_rerank_contract(foundry_rerank):
     assert request.credential == "test-key"
     assert request.body["model"] == RERANK_DEPLOYMENT
     assert request.body["query"] == QUERY
-    assert sorted(request.body["documents"]) == sorted(
-        ["The company sells devices.", long_text[:256]]
-    )
+    assert request.body["documents"] == DOCUMENTS
     assert request.body["top_n"] == len(request.body["documents"]) == 2
 
 
-def test_rerank_reorders_candidates_and_records_provenance(foundry_rerank):
-    """test-plan §25: Rerank reorders candidates."""
-    result = _search()
+def test_an_oversized_candidate_text_is_clipped_in_the_request_not_in_the_result(foundry_rerank):
+    """test-plan §25: Request contract (the document texts are clipped) with Rerank reorders
+    candidates (the returned chunk keeps the store's full text)."""
+    long_text = RISK_TEXT + " " + "x" * 200_000
+    store = FakeRetrievalStore(
+        [
+            make_point("business-1", "The company sells devices.", "business"),
+            make_point("risk-1", long_text, "risk_factors"),
+        ]
+    )
 
-    assert [chunk.id for chunk in result.chunks] == ["risk-1", "business-1"]
-    assert DENSE_ORDER != [chunk.id for chunk in result.chunks]
-    top, runner_up = (chunk.metadata for chunk in result.chunks)
-    assert top["reranker_score"] == pytest.approx(1.0)
-    assert runner_up["reranker_score"] == pytest.approx(0.0)
-    for metadata in (top, runner_up):
-        assert metadata["retrieval_method"] == "dense_bm25_cross_encoder_rerank"
-        assert metadata["reranker_model"] == IDENTITY
-        assert metadata["final_rerank_score"] == pytest.approx(
-            metadata["reranker_score"]
-            + metadata["section_prior_score"]
-            + metadata["keyword_prior_score"]
-        )
+    result = rerank_api.search_reranked(
+        store, query=QUERY, ticker="AAPL", filing_type="10-K", top_k=2, candidates="dense"
+    )
+
+    (request,) = foundry_rerank.requests
+    sent = sorted(request.body["documents"], key=len)
+    assert sent[0] == "The company sells devices."
+    assert len(sent[1]) < len(long_text)
+    assert long_text.startswith(sent[1])
+    assert request.body["top_n"] == len(request.body["documents"]) == 2
+    assert {chunk.id: chunk.text for chunk in result.chunks}["risk-1"] == long_text
 
 
 @pytest.mark.parametrize("variant", MALFORMED.values(), ids=MALFORMED.keys())
@@ -153,7 +143,7 @@ def test_malformed_provider_reply_raises_and_returns_no_ranking(foundry_rerank, 
     variant(foundry_rerank)
 
     with pytest.raises(RerankedHybridSearchUnavailableError) as raised:
-        _search()
+        _score()
 
     assert "test-key" not in str(raised.value)
 
@@ -164,7 +154,7 @@ def test_provider_failure_is_retried_a_bounded_number_of_times(foundry_rerank, s
     foundry_rerank.status = status
 
     with pytest.raises(RerankedHybridSearchUnavailableError) as raised:
-        _search()
+        _score()
 
     assert "test-key" not in str(raised.value)
     assert len(foundry_rerank.requests) == 3  # the first attempt plus the two retries
@@ -176,9 +166,9 @@ def test_provider_recovering_within_the_retry_budget_reranks(foundry_rerank, sta
     foundry_rerank.fail_first = 2
     foundry_rerank.fail_status = status
 
-    result = _search()
+    scores = _score()
 
-    assert result.chunks[0].id == "risk-1"
+    assert scores[1] == pytest.approx(1.0)
     assert len(foundry_rerank.requests) == 3
 
 
@@ -190,7 +180,7 @@ def test_unreachable_provider_raises_the_unavailable_error(foundry_rerank, monke
     monkeypatch.setattr(settings.llm, "azure_openai_endpoint", f"http://127.0.0.1:{closed_port}")
 
     with pytest.raises(RerankedHybridSearchUnavailableError):
-        _search()
+        _score()
 
 
 @pytest.mark.parametrize("missing", MISSING)
@@ -199,37 +189,9 @@ def test_unconfigured_rerank_fails_closed_before_any_request(foundry_rerank, mon
     monkeypatch.setattr(settings.llm, missing, None)
 
     with pytest.raises(RerankedHybridSearchUnavailableError):
-        _search()
+        _score()
 
     assert foundry_rerank.requests == []
-
-
-@pytest.mark.parametrize("missing", MISSING)
-def test_unconfigured_rerank_can_fail_open_to_marked_dense_results(
-    foundry_rerank, monkeypatch, missing
-):
-    """test-plan §25: Fails closed when unconfigured (the `fail_open_to_dense` variant)."""
-    monkeypatch.setattr(settings.llm, missing, None)
-
-    result = _search(fail_open_to_dense=True)
-
-    assert [chunk.id for chunk in result.chunks] == DENSE_ORDER
-    for chunk in result.chunks:
-        assert chunk.metadata["retrieval_method"] == "dense_fallback_no_cross_encoder"
-        assert chunk.metadata["reranker_score"] is None
-    assert foundry_rerank.requests == []
-
-
-def test_provider_failure_can_fail_open_to_marked_dense_results(foundry_rerank):
-    """test-plan §25: Fails closed when unconfigured (`fail_open_to_dense` also covers failures)."""
-    foundry_rerank.status = 503
-
-    result = _search(fail_open_to_dense=True)
-
-    assert [chunk.id for chunk in result.chunks] == DENSE_ORDER
-    for chunk in result.chunks:
-        assert chunk.metadata["retrieval_method"] == "dense_fallback_no_cross_encoder"
-        assert chunk.metadata["reranker_score"] is None
 
 
 def test_lockfile_holds_no_local_model_package():

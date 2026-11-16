@@ -6,6 +6,7 @@ Traces to docs/test-plan.md §6 "Benchmark runner" and docs/retrieval-benchmark.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -30,6 +31,7 @@ from evaluation.run_shared_retrieval_benchmark import (
 )
 from evaluation.validate_retrieval_fixture import AnchoredCase, AnchoredFixture
 from tests.rag.gate_support import write_anchored_fixture
+from tests.unit.fake_foundry import RERANK_DEPLOYMENT, relevance
 
 AAPL_ACC = "0000320193-23-000106"
 AAPL_10Q_ACC = "0000320193-23-000077"
@@ -341,8 +343,14 @@ def test_dense_search_is_scoped_to_ticker_and_filing_type_only() -> None:
 
 def test_method_constants() -> None:
     """test-plan §6 Benchmark runner: Method/mode labels."""
-    assert set(RETRIEVAL_METHODS) == {"dense", "section_aware", "hybrid"}
-    assert len(RETRIEVAL_METHODS) == 3
+    assert set(RETRIEVAL_METHODS) == {
+        "dense",
+        "section_aware",
+        "hybrid",
+        "dense_rerank",
+        "hybrid_rerank",
+    }
+    assert len(RETRIEVAL_METHODS) == 5
     assert tuple(BENCHMARK_KS) == (5, 10)
 
 
@@ -354,7 +362,10 @@ def test_result_carries_method_and_mode_labels(method: str) -> None:
     assert result["mode"] == method
 
 
-@pytest.mark.parametrize("method", ["bm25", "", "Dense", "Hybrid", "hybrid "])
+@pytest.mark.parametrize(
+    "method",
+    ["bm25", "", "Dense", "Hybrid", "hybrid ", "rerank", "Dense_Rerank", "hybrid_rerank "],
+)
 def test_unknown_retrieval_method_is_rejected(method: str) -> None:
     """test-plan §6 Benchmark runner: Method/mode labels (validated)."""
     with pytest.raises(ValueError):
@@ -392,6 +403,41 @@ def test_cli_rejects_an_unknown_method_as_a_usage_error_before_any_store_is_read
 
     assert raised.value.code == 2
     assert "hybrid" in capsys.readouterr().err.lower()
+    assert not (tmp_path / "result.json").exists()
+
+
+@pytest.mark.parametrize("method", ["rerank", "dense_rerank,hybrid_rerank"])
+def test_cli_usage_error_names_the_rerank_methods(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    method: str,
+) -> None:
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - the usage
+    error for an unknown method lists the accepted ones, which now include both rerank methods."""
+    fixture_path, source_dir = write_anchored_fixture(tmp_path)
+    monkeypatch.setenv("OPENSEARCH_URL", "http://127.0.0.1:1")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_shared_retrieval_benchmark",
+            "--fixture", str(fixture_path),
+            "--source-dir", str(source_dir),
+            "--backend", "opensearch",
+            "--collection", "no-such-index",
+            "--method", method,
+            "--output", str(tmp_path / "result.json"),
+        ],
+    )  # fmt: skip
+
+    with pytest.raises(SystemExit) as raised:
+        main()
+
+    assert raised.value.code == 2
+    message = capsys.readouterr().err
+    assert "dense_rerank" in message
+    assert "hybrid_rerank" in message
     assert not (tmp_path / "result.json").exists()
 
 
@@ -575,6 +621,149 @@ def test_run_provenance_is_recorded(
     """test-plan §6 Benchmark runner: Provenance."""
     result = _run("dense", provenance=provenance)
     assert result["provenance"] == (provenance if expected is None else expected)
+
+
+# --------------------------------------------------------------------------
+# test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3)
+# --------------------------------------------------------------------------
+
+RERANK_METHODS = {"dense_rerank": "dense", "hybrid_rerank": "hybrid"}
+RERANK_POOL = 50
+
+
+class PseudoEmbeddingStore(InMemoryStore):
+    """Dense and hybrid search ranked by text-derived pseudo-scores (a hash of the method, query
+    and text; the two methods use different salts), so neither order is the word-overlap
+    relevance the rerank endpoint computes, and the two differ from each other."""
+
+    def _ranked(
+        self, method: str, query: str, filters: SearchFilters | None, n_results: int
+    ) -> SearchResult:
+        def distance(text: str) -> float:
+            digest = hashlib.sha256(f"{method}|{query}|{text}".encode()).digest()
+            return int.from_bytes(digest[:4], "big") / 2**32
+
+        chunks = [
+            RetrievedChunk(id=cid, text=text, metadata=dict(meta), distance=distance(text))
+            for cid, text, meta in self._filtered(filters)
+        ]
+        chunks.sort(key=lambda c: (c.distance, c.id))
+        chunks = chunks[:n_results]
+        return SearchResult(query=query, chunks=chunks, total_results=len(chunks))
+
+    def search(
+        self, query: str, filters: SearchFilters | None = None, n_results: int = 5
+    ) -> SearchResult:
+        return self._ranked("dense", query, filters, n_results)
+
+    def search_hybrid(
+        self, query: str, filters: SearchFilters | None = None, n_results: int = 5
+    ) -> SearchResult:
+        return self._ranked("hybrid", query, filters, n_results)
+
+
+def _expected_reranked_ids(store: InMemoryStore, case: AnchoredCase, source: str) -> list[str]:
+    """The store's top 50 under the case's ticker and 10-K filters, ordered by the endpoint's
+    relevance (stable: equal scores keep candidate order), cut to K = 10."""
+    search = store.search if source == "dense" else store.search_hybrid
+    candidates = search(
+        case.query,
+        filters=SearchFilters(ticker=case.ticker, filing_type="10-K"),
+        n_results=RERANK_POOL,
+    ).chunks
+    ranked = sorted(candidates, key=lambda chunk: -relevance(case.query, chunk.text))
+    return [chunk.id for chunk in ranked[: max(BENCHMARK_KS)]]
+
+
+@pytest.mark.parametrize(("method", "source"), list(RERANK_METHODS.items()))
+def test_rerank_methods_retrieve_each_case_through_search_reranked_in_the_reranked_order(
+    foundry_rerank, method: str, source: str
+) -> None:
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - each case
+    is retrieved through the store's dense or hybrid candidates under the case's ticker and
+    filing-type filters, K = 10, in the reranked order."""
+    store = PseudoEmbeddingStore(_hybrid_corpus())
+    fixture = _fixture()
+
+    result = _by_id(
+        run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method=method)
+    )
+
+    for case in fixture.cases:
+        got = result[case.case_id]["retrieved"]
+        assert [r["chunk_id"] for r in got] == _expected_reranked_ids(store, case, source)
+        assert [r["rank"] for r in got] == list(range(1, len(got) + 1))
+    risk = result["aapl-risk-001"]["retrieved"]
+    assert len(risk) == max(BENCHMARK_KS)
+    assert {r["accession_number"] for r in risk} == {AAPL_ACC}
+
+
+def test_the_rerank_arms_reorder_what_the_store_returned() -> None:
+    """Guards the test above against passing vacuously: on this store and fixture the reranked
+    order differs from the candidate order for both candidate sources."""
+    store = PseudoEmbeddingStore(_hybrid_corpus())
+    fixture = _fixture()
+
+    for source, search in (("dense", store.search), ("hybrid", store.search_hybrid)):
+        differing = [
+            case.case_id
+            for case in fixture.cases
+            if _expected_reranked_ids(store, case, source)
+            != [
+                chunk.id
+                for chunk in search(
+                    case.query,
+                    filters=SearchFilters(ticker=case.ticker, filing_type="10-K"),
+                    n_results=max(BENCHMARK_KS),
+                ).chunks
+            ]
+        ]
+        assert differing, source
+
+
+@pytest.mark.parametrize("method", list(RERANK_METHODS))
+def test_rerank_methods_carry_their_label_and_record_the_reranker_identity(
+    foundry_rerank, method: str
+) -> None:
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - the
+    result's `retrieval_method` and `mode` are the method name and its provenance records the
+    reranker identity, next to the provenance the caller supplied."""
+    result = run_anchored_benchmark(
+        _fixture(),
+        PseudoEmbeddingStore(_hybrid_corpus()),
+        backend="qdrant",
+        retrieval_method=method,
+        provenance={"collection": "bench_x"},
+    )
+
+    assert result["retrieval_method"] == method
+    assert result["mode"] == method
+    assert result["provenance"]["reranker"] == f"foundry:{RERANK_DEPLOYMENT}"
+    assert result["provenance"]["collection"] == "bench_x"
+    assert result["summary"]["n_cases"] == len(_fixture().cases)
+
+
+@pytest.mark.parametrize("method", ["dense", "section_aware", "hybrid"])
+def test_methods_without_a_reranker_record_none(method: str) -> None:
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - the
+    reranker identity is recorded only for the rerank methods."""
+    assert "reranker" not in _run(method)["provenance"]
+
+
+@pytest.mark.parametrize("method", list(RERANK_METHODS))
+def test_rerank_methods_make_one_rerank_request_per_case_with_candidates(
+    foundry_rerank, method: str
+) -> None:
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - each case
+    is reranked in one request over its candidates, in the case's own query."""
+    store = PseudoEmbeddingStore(_hybrid_corpus())
+    fixture = _fixture()
+
+    run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method=method)
+
+    assert sorted(request.body["query"] for request in foundry_rerank.requests) == sorted(
+        case.query for case in fixture.cases
+    )
 
 
 # --------------------------------------------------------------------------

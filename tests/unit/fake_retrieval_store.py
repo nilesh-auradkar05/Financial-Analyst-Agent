@@ -1,13 +1,16 @@
-"""An in-memory retrieval store for the hybrid and reranked-hybrid tests.
+"""An in-memory retrieval store for the reranked-retrieval tests (test-plan §25).
 
-It serves one set of chunks through the dense `search` call and through the sparse
-`iter_sparse_documents` hook that BM25 reads, so dense and lexical candidates agree. Both honour
-the metadata filters they are given. Dense order is the order of `points`.
+It serves one set of chunks through two ranked calls, each of which honours the metadata filters it
+is given and returns at most `n_results`:
+
+- `search` is the dense stand-in: the order of `points`.
+- `search_hybrid` is the fused stand-in: character-trigram similarity between the query and the
+  chunk text, best first, ties in the order of `points`. It ranks differently from `search`, so a
+  test can tell which of the two a caller used.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Optional
 
 from app.components.retrieval.vector_store import (
@@ -18,19 +21,23 @@ from app.components.retrieval.vector_store import (
 )
 
 BUSINESS_TEXT = "The company sells devices, services, and accessories worldwide."
-RISK_TEXT = (
-    "Supply chain disruption, supplier concentration, and manufacturing risks may affect production."
-)
+RISK_TEXT = "Supply chain disruption, supplier concentration, and manufacturing risks may affect production."
 _FILTERED_FIELDS = ("ticker", "filing_type", "section_key", "filing_date")
 
 
-def make_point(chunk_id: str, text: str, section_key: str) -> IndexDocument:
+def make_point(
+    chunk_id: str,
+    text: str,
+    section_key: str,
+    ticker: str = "AAPL",
+    filing_type: str = "10-K",
+) -> IndexDocument:
     return IndexDocument(
         id=chunk_id,
         text=text,
         metadata={
-            "ticker": "AAPL",
-            "filing_type": "10-K",
+            "ticker": ticker,
+            "filing_type": filing_type,
             "section_key": section_key,
         },
     )
@@ -52,17 +59,40 @@ def _matches(point: IndexDocument, filters: Optional[SearchFilters]) -> bool:
     return True
 
 
+def _trigrams(text: str) -> set[str]:
+    padded = (
+        f"  {' '.join(sorted(set(text.lower().replace(',', ' ').replace('.', ' ').split())))}  "
+    )
+    return {padded[i : i + 3] for i in range(len(padded) - 2)}
+
+
+def _similarity(query: str, text: str) -> float:
+    wanted, found = _trigrams(query), _trigrams(text)
+    return len(wanted & found) / len(wanted | found)
+
+
 class FakeRetrievalStore:
     def __init__(self, points: Optional[list[IndexDocument]] = None) -> None:
         self.points = list(points if points is not None else DEFAULT_POINTS)
 
-    def iter_sparse_documents(
-        self,
-        filters: Optional[SearchFilters] = None,
-        limit: Optional[int] = None,
-    ) -> Iterable[IndexDocument]:
-        matching = [point for point in self.points if _matches(point, filters)]
-        return matching if limit is None else matching[:limit]
+    def _result(
+        self, query: str, points: list[IndexDocument], distances: list[float], n_results: int
+    ) -> SearchResult:
+        chunks = [
+            RetrievedChunk(
+                id=point.id,
+                text=point.text,
+                metadata=dict(point.metadata),
+                distance=distance,
+            )
+            for point, distance in zip(points, distances)
+        ][:n_results]
+        return SearchResult(
+            query=query,
+            chunks=chunks,
+            total_results=len(chunks),
+            search_time_ms=1.0,
+        )
 
     def search(
         self,
@@ -70,21 +100,17 @@ class FakeRetrievalStore:
         filters: Optional[SearchFilters] = None,
         n_results: int = 5,
     ) -> SearchResult:
-        del query
-        chunks = [
-            RetrievedChunk(
-                id=point.id,
-                text=point.text,
-                metadata=dict(point.metadata),
-                distance=0.05 * rank,
-            )
-            for rank, point in enumerate(
-                (point for point in self.points if _matches(point, filters)), start=1
-            )
-        ]
-        return SearchResult(
-            query="dense",
-            chunks=chunks[:n_results],
-            total_results=min(len(chunks), n_results),
-            search_time_ms=1.0,
-        )
+        matching = [point for point in self.points if _matches(point, filters)]
+        distances = [0.05 * rank for rank in range(1, len(matching) + 1)]
+        return self._result(query, matching, distances, n_results)
+
+    def search_hybrid(
+        self,
+        query: str,
+        filters: Optional[SearchFilters] = None,
+        n_results: int = 5,
+    ) -> SearchResult:
+        matching = [point for point in self.points if _matches(point, filters)]
+        ranked = sorted(matching, key=lambda point: -_similarity(query, point.text))
+        distances = [1.0 - _similarity(query, point.text) for point in ranked]
+        return self._result(query, ranked, distances, n_results)

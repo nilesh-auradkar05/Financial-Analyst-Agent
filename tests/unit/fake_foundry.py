@@ -52,6 +52,7 @@ class ReceivedRequest:
     body: dict[str, Any]
     bearer: bool = False
     credential_header: str = ""
+    arrived_at: float = 0.0  # `time.monotonic()` when the request reached the server
 
     @property
     def system(self) -> str:
@@ -275,7 +276,15 @@ class FakeFoundry:
                 for name in _AUTH_HEADERS:
                     headers.pop(name, None)
                 status, payload = fake._reply(
-                    ReceivedRequest(self.path, headers, credential, body, bearer, credential_header)
+                    ReceivedRequest(
+                        self.path,
+                        headers,
+                        credential,
+                        body,
+                        bearer,
+                        credential_header,
+                        time.monotonic(),
+                    )
                 )
                 data = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
                 self.send_response(status)
