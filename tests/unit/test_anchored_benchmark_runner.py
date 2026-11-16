@@ -573,7 +573,9 @@ def test_hybrid_ranks_differently_from_dense_where_the_store_fuses_keyword_score
     rows = _hybrid_corpus()
     store = InMemoryStore(rows)
     fixture = _fixture()
-    dense = _by_id(run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method="dense"))
+    dense = _by_id(
+        run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method="dense")
+    )
     hybrid = _by_id(
         run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method="hybrid")
     )
@@ -751,18 +753,19 @@ def test_methods_without_a_reranker_record_none(method: str) -> None:
 
 
 @pytest.mark.parametrize("method", list(RERANK_METHODS))
-def test_rerank_methods_make_one_rerank_request_per_case_with_candidates(
+def test_rerank_methods_make_one_rerank_request_per_timed_search_with_candidates(
     foundry_rerank, method: str
 ) -> None:
-    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - each case
-    is reranked in one request over its candidates, in the case's own query."""
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - each timed
+    search of a case (cold, then warm: the Cold/warm latency row) is reranked in one request over
+    its candidates, in the case's own query. (Dispute accepted 2026-11-16: was one per case.)"""
     store = PseudoEmbeddingStore(_hybrid_corpus())
     fixture = _fixture()
 
     run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method=method)
 
     assert sorted(request.body["query"] for request in foundry_rerank.requests) == sorted(
-        case.query for case in fixture.cases
+        2 * [case.query for case in fixture.cases]
     )
 
 
