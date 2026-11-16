@@ -691,6 +691,16 @@ Done: ladder in SPEC §4 equals the tiers proven live, except Bedrock Luna, whic
 ```
 
 ```text
+CM-6f — Judge on Claude Opus 4.6
+Feature: the evaluation judge runs Claude Opus 4.6 at temperature 0 on Foundry, then Bedrock; GPT-5.6 Luna is removed.
+Trace: owner decision 2026-11-14; ADR-0009 amendment 2026-11-15; SPEC §4 judge ladder; test-plan §16 "Judge ladder", §20 "LLM fallback quality" and "Judge adoption"
+Scope: provider `opus` replaces `luna`; Foundry tier on the Anthropic Messages route (deployment `opus-4-6-judge` from AZURE_FOUNDRY_JUDGE_MODEL), Bedrock tier `global.anthropic.claude-opus-4-6-v1` on Converse; temperature from config, no top_p, no thinking; `anthropic<2` pinned; Luna code, tests and docs removed.
+Tests:  U ladder order, skip and refusal, request shape per tier, structured verdicts across the fallback, settings-only judge model, `luna` rejected · L one bounded call per tier at temperature 0 (owner)
+Regression: R1 R2 R3
+Done: both tiers proven live at temperature 0, or the failing tier recorded. Result: DONE 2026-11-15. Live (owner, one call per tier, temperature 0, max_tokens 64): Foundry `opus-4-6-judge` answered as `claude-opus-4-6` ('ok'); Bedrock `global.anthropic.claude-opus-4-6-v1` answered ('ok'); 2 calls, under $0.01. Rows 441928b; red 030dab7 (40/40 failed); test correction 3081d83 (two AWS_REGION-unset cases removed: the setting defaults to us-east-1; the brief, not the row, had required region-based skipping); feat cb849a1. Offline: judge tests 40 passed; pytest 1020 passed, 2 skipped; ruff clean; mypy only the git-ignored probe file; governance 4/4; ingestion + replay 95 passed under `unshare -rn`; pip-audit clean; lock unchanged (anthropic 1.9.0).
+```
+
+```text
 CM-7 — Remove Qdrant and Chroma
 Feature: OpenSearch is the only store in code, compose and docs.
 Trace: ADR-0016; CLAUDE.md/AGENTS.md §8; scripts/ci/check_doc_sync.py
@@ -703,12 +713,12 @@ Done: no import of qdrant_client or chromadb remains. Result: DONE 2026-11-12. R
 
 ```text
 S5.1 — Retrieval diagnostics and failure taxonomy
-Feature: every Gate A miss is explained by a named failure class, so S5.2 and S5.3 test a diagnosed cause.
-Trace: SPEC §12 S5; retrieval-benchmark §§7–8; test-plan §6
-Scope: per-query report (rank of each gold anchor, section hit, lexical overlap, chunk boundary); taxonomy (vocabulary gap, section miss, boundary split, ranking); section prior evaluated here as a candidate.
-Tests:  U classifier on hand-built cases · I report over the 25 baseline misses
-Regression: R1 R2 R3 R4
-Done: every miss classified; candidate list ranked by misses addressed. Result: Pending.
+Feature: every miss in the R4 baseline (CM-6e, Cohere Embed v5 fast) is explained by a named failure class, so S5.2 and S5.3 test a diagnosed cause.
+Trace: SPEC §12 S5; retrieval-benchmark §§7, 7a, 8; test-plan §6 "Retrieval diagnostics"
+Scope: per-anchor report (dense rank of each missed gold anchor, section hit, lexical overlap, chunk boundary); taxonomy (vocabulary gap, section miss, boundary split, ranking); section prior evaluated here as a candidate.
+Tests:  U classifier on hand-built cases · I report over the baseline's 45 missed anchors in 30 cases (owner 2026-11-14: was "25 baseline misses", the Qwen3 Gate A count)
+Regression: R1 R2 R3 (R4 waived by the owner 2026-11-14: no retrieval code changes)
+Done: every miss classified; candidate list ranked by misses addressed. Result: DONE 2026-11-15. Rows b4e130d; red e9f6354; feat 783423d (tests unchanged since red). Report `evaluation/results/s5_1_diagnostics_foundry-cohere-embed-v5-fast.json` over the CM-6e baseline: 45 missed anchors in 30 cases, 45 classified, 0 unclassified; rebuild guard holds (750/750 chunk ids, gold_hit equal). Classes: section_miss 29, vocabulary_gap 16, boundary_split 0, ranking 0. Candidates by misses addressed: rerank 42 (gold in the dense top-50 pool), section_prior 29, query_rewrite 16, chunking 0, hybrid_bm25 0. Finding: on all 29 section_miss anchors `infer_section_intent` targets a section other than the gold one, and plain dense ranks the gold anchor 1–7 on 26 of them (12, 15, 24 on the rest): the section-aware boost of mis-targeted sections displaces dense hits. Vocabulary-gap anchors sit at dense ranks 15–32 (3 beyond 50). Counts only, no metric deltas; a dense-vs-section_aware comparison is a separate single-axis run. Dense pool `s5_1_dense_pool_top50.json` collected live (owner, OpenSearch Serverless 1x, Foundry embed); offline CLI replay from the pool reproduces the report byte-for-byte. R1: ruff clean; mypy only the git-ignored probe file; pytest 1052 passed, 7 skipped; integration report tests 5 passed with `--run-integration`. R2 4/4. R3 `-m replay` 87 passed under `unshare -rn`. R4 waived (owner 2026-11-14).
 ```
 
 ```text
@@ -756,7 +766,7 @@ Feature: the heuristic grounding rate is quoted only with its measured agreement
 Trace: SPEC §11.2; test-plan §14, §20 "Judge adoption"
 Tests:  Q κ on ≥ 50 owner-reviewed claims · U agreement report schema
 Regression: R1 R2 R3 R5
-Result: Pending. Judge from CM-6c: Foundry `luna-judge` first, Bedrock Luna fallback (not invocable from this account); Luna runs only at temperature 1, so the κ check states how repeat variance is handled.
+Result: Pending. Judge from CM-6f: Claude Opus 4.6 on Foundry (`opus-4-6-judge`) first, Bedrock Opus 4.6 fallback, both at temperature 0, so the κ check needs no repeat-variance handling (supersedes the CM-6c Luna note).
 ```
 
 ```text
