@@ -239,7 +239,7 @@ dev = [
     { name = "tenacity", specifier = ">=9.1.4" },
 ]
 eval = [
-    { name = "anthropic", specifier = ">=0.100.0" },
+    { name = "anthropic", specifier = ">=0.100.0,<2" },
     { name = "datasets", specifier = ">=4.5" },
     { name = "deepeval", specifier = ">=3.9.9" },
     { name = "ragas", specifier = ">=0.4.3" },

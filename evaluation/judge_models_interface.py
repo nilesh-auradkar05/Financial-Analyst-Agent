@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 from enum import StrEnum
 from typing import Any
@@ -68,10 +69,10 @@ class JudgeProvider(StrEnum):
 
     DEEPEVAL_DEFAULT = "deepeval_default"
     LANGCHAIN_ANTHROPIC = "langchain_anthropic"
-    LUNA = "luna"  # GPT-5.6 Luna: Foundry, then Bedrock (ADR-0009 amendment 2026-10-17, reordered 2026-11-14)
+    OPUS = "opus"  # Claude Opus 4.6: Foundry Messages route, then Bedrock Converse (ADR-0009 amendment 2026-11-15)
 
 
-LUNA_BEDROCK_MODEL = "openai.gpt-5.6-luna"
+OPUS_BEDROCK_MODEL = "global.anthropic.claude-opus-4-6-v1"
 
 class JudgeModelConfig(BaseModel):
     """Runtime config for LLM-as-Judge providers"""
@@ -114,16 +115,16 @@ def judge_config_from_env(
         api_key = SecretStr(raw_key) if raw_key else None
         selected_model = selected_model or "claude-sonnet-4-6"
         max_tokens = max_tokens or 4096
-    elif selected_provider == JudgeProvider.LUNA:
+    elif selected_provider == JudgeProvider.OPUS:
         from app.config import LLMSettings
 
         llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
         azure = llm.azure_deployment(llm.azure_foundry_judge_model)
-        settings_model = azure[1] if azure else LUNA_BEDROCK_MODEL
+        settings_model = azure[1] if azure else OPUS_BEDROCK_MODEL
         if selected_model and selected_model.strip() != settings_model:
             raise ValueError(
-                "provider=luna takes its judge model from settings (AZURE_FOUNDRY_JUDGE_MODEL, "
-                "else the Bedrock Luna id); drop --judge-model / RAG_EVAL_JUDGE_MODEL / DEEPEVAL_MODEL or set it to that value"
+                "provider=opus takes its judge model from settings (AZURE_FOUNDRY_JUDGE_MODEL, "
+                "else the Bedrock Opus id); drop --judge-model / RAG_EVAL_JUDGE_MODEL / DEEPEVAL_MODEL or set it to that value"
             )
         selected_model = settings_model
 
@@ -173,43 +174,56 @@ def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
 
         return ChatAnthropic(**kwargs)
 
-    if config.provider == JudgeProvider.LUNA:
-        return _luna_judge_llm(config)
+    if config.provider == JudgeProvider.OPUS:
+        return _opus_judge_llm(config)
 
     raise ValueError(f"Unsupported judge provider: {config.provider}")
 
 
-def _luna_judge_llm(config: JudgeModelConfig) -> Any:
-    """Luna on the Foundry judge deployment first, then on Bedrock (`bedrock-mantle`, Bedrock API key).
+def _opus_judge_llm(config: JudgeModelConfig) -> Any:
+    """Opus 4.6 on the Foundry judge deployment first (Anthropic Messages route), then on Bedrock (Converse).
 
-    Both hosts speak the OpenAI wire format, so one client class serves both. A tier without its
-    settings is skipped. Bedrock goes through `bedrock-mantle` because this account's
-    `bedrock-runtime` quota for Luna is 0 (ADR-0009 amendment 2026-10-17); its tier always uses the
-    Bedrock id, while the Foundry tier uses its deployment (reordered 2026-11-14, CM-6c).
+    A tier without its settings is skipped. The Foundry tier uses its deployment, the Bedrock tier
+    always the Bedrock id (ADR-0009 amendment 2026-11-15, CM-6f).
     """
-    from langchain_openai import ChatOpenAI
+    from langchain_anthropic import ChatAnthropic
+    from langchain_aws import ChatBedrockConverse
 
     from app.config import LLMSettings
 
     # load_dotenv() above already put the env file into os.environ.
     llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
-    # ponytail: no temperature; Luna on Foundry rejects temperature 0 (400 unsupported_value, only the
-    # default 1; CM-6c 2026-11-14).
-    common: dict[str, Any] = {"timeout": llm.request_timeout_seconds, "max_retries": 0}
-    if config.max_tokens is not None:
-        common["max_tokens"] = config.max_tokens
+    # ponytail: never top_p or thinking on either tier; Opus 4.6 rejects temperature with top_p.
+    max_tokens = config.max_tokens or 4096
 
     tiers: list[Any] = []
     if azure := llm.azure_deployment(llm.azure_foundry_judge_model):
-        base_url, deployment, key = azure
-        tiers.append(ChatOpenAI(model=deployment, base_url=base_url, api_key=key, **common))
+        _, deployment, key = azure
+        anthropic_kwargs: dict[str, Any] = {
+            "model": deployment,
+            "base_url": f"{llm.azure_openai_endpoint}/anthropic",
+            "api_key": key,
+            "temperature": config.temperature,
+            "max_tokens": max_tokens,
+            "timeout": llm.request_timeout_seconds,
+            "max_retries": 0,
+        }
+        tiers.append(ChatAnthropic(**anthropic_kwargs))
     token = llm.aws_bearer_token_bedrock
     if token and token.get_secret_value().strip() and llm.aws_region:
-        base_url = f"https://bedrock-mantle.{llm.aws_region}.api.aws/openai/v1"
-        tiers.append(ChatOpenAI(model=LUNA_BEDROCK_MODEL, base_url=base_url, api_key=token, **common))
+        bedrock_kwargs: dict[str, Any] = {
+            "model": OPUS_BEDROCK_MODEL,
+            "region_name": llm.aws_region,
+            "bedrock_api_key": token,
+            "temperature": config.temperature,
+            "max_tokens": max_tokens,
+            "timeout": math.ceil(llm.request_timeout_seconds),
+            "max_retries": 0,
+        }
+        tiers.append(ChatBedrockConverse(**bedrock_kwargs))
     if not tiers:
         raise ValueError(
-            "provider=luna needs AZURE_OPENAI_ENDPOINT, AZURE_API_KEY and AZURE_FOUNDRY_JUDGE_MODEL "
+            "provider=opus needs AZURE_OPENAI_ENDPOINT, AZURE_API_KEY and AZURE_FOUNDRY_JUDGE_MODEL "
             "(Foundry) or AWS_BEARER_TOKEN_BEDROCK (Bedrock)"
         )
     return tiers[0].with_fallbacks(tiers[1:]) if len(tiers) > 1 else tiers[0]
@@ -446,5 +460,5 @@ def create_ragas_judge_llm(config: JudgeModelConfig) -> Any | None:
         return _create_ragas_default_llm(config)
     if config.provider == JudgeProvider.LANGCHAIN_ANTHROPIC:
         return _create_ragas_anthropic_llm(config)
-    # ponytail: Luna judges through DeepEval only; add a RAGAS client when RAGAS imports again in this env.
+    # ponytail: Opus judges through DeepEval only; add a RAGAS client when RAGAS imports again in this env.
     raise ValueError(f"Unsupported RAGAS judge provider: {config.provider}; use --judges deepeval")

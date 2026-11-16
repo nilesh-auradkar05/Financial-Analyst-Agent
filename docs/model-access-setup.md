@@ -11,7 +11,7 @@ Proposed plan (user, 2026-10-16). It is recorded in ADR-0009 only after the amen
 | Role | Primary | Fallback |
 | --- | --- | --- |
 | Memo generation (draft) | **Azure:** DeepSeek-V4-Flash, Global Standard | **Bedrock:** DeepSeek V3.2 |
-| Judge / verifier | **Azure:** GPT-5.6-luna (short context), Global Standard | **Bedrock:** GPT-5.6 Luna via `bedrock-mantle` (not invocable from this account, 2026-11-14) |
+| Judge / verifier | **Azure:** Claude Opus 4.6 (deployment `opus-4-6-judge`, Anthropic Messages route) | **Bedrock:** Claude Opus 4.6, `global.anthropic.claude-opus-4-6-v1` (Converse) |
 | Embedding arms (EMBED-ARMS bake-off) | Bedrock: Titan Text Embeddings V2 and Cohere Embed v4, 1024 dims | Azure: `text-embedding-3-small`, 1024 dims |
 
 The embedding rows are bake-off arms, not a primary/fallback pair. The model change above does not affect them, and the embedding checks can run now.
@@ -22,8 +22,8 @@ Prices per million tokens (input / output):
 | --- | --- | --- | --- |
 | DeepSeek-V4-Flash | Foundry, Global Standard | $0.19 / $0.51 (cached input $0.028) | Microsoft Foundry launch post (about 100 days old; one guide says $0.20 / $0.80) |
 | DeepSeek V3.2 | Bedrock | $0.62 / $1.85 | ADR-0009, 2026-10-08; re-check |
-| GPT-5.6 Luna, short context (≤272K input) | Bedrock, Global CRIS | $0.20 / $1.20 (Geo or in-Region $0.22 / $1.32) | AWS model card |
-| GPT-5.6-luna (short context) | Foundry, Global Standard | $0.20 / $1.20 | Microsoft Foundry GPT-5.6 post |
+| Claude Opus 4.6 | Foundry | $5 / $25 (Anthropic list rates) | Claude API pricing |
+| Claude Opus 4.6 | Bedrock, global profile | see the Bedrock pricing page | AWS Bedrock pricing |
 
 
 ### What the plan costs
@@ -43,6 +43,8 @@ Region: `us-east-1`, matching the app's `AWS_REGION` default.
 2. Open **Amazon Bedrock → API keys** and choose **Generate long-term API key**. Set an expiry; 30 days is fine for testing.
 3. The console creates an IAM user for the key with `AmazonBedrockLimitedAccess` attached. Copy the key once; it is not shown again.
 4. This is the value of `AWS_BEARER_TOKEN_BEDROCK`. The app already reads it, and so do boto3 and the AWS CLI.
+
+> **Superseded 2026-11-15 (CM-6f, ADR-0009 amendment 2026-11-15):** the judge is Claude Opus 4.6 (Foundry `opus-4-6-judge`, then Bedrock `global.anthropic.claude-opus-4-6-v1`) at temperature 0. The GPT-5.6 Luna steps below are kept as a record and are no longer needed.
 
 ### 2.2 Extra permission for GPT-5.6 Luna
 
@@ -150,6 +152,8 @@ for MODEL in ("deepseek.v3.2", "us.deepseek.v3.2"):
 PY
 ```
 
+> **Superseded 2026-11-15 (CM-6f, ADR-0009 amendment 2026-11-15):** the judge is Claude Opus 4.6 (Foundry `opus-4-6-judge`, then Bedrock `global.anthropic.claude-opus-4-6-v1`) at temperature 0. The GPT-5.6 Luna steps below are kept as a record and are no longer needed.
+
 **e. GPT-5.6 Luna through Converse (primary judge)**
 
 The second call checks whether Luna accepts `temperature=0`, which a judge wants. GPT-5 family models often reject non-default temperature. If it errors, the judge code must omit the parameter.
@@ -233,7 +237,7 @@ In Foundry, open **Models + endpoints → Deploy model → Deploy base model**, 
 | Catalog model | Deployment type | Deployment name (you choose; suggested) | Rate limit to start |
 | --- | --- | --- | --- |
 | DeepSeek-V4-Flash (Direct from Azure) | Global Standard | `ds-v4-flash-draft` | 50K tokens/min |
-| GPT-5.6-luna (short context) | Global Standard | `luna-judge` | 50K tokens/min |
+| Claude Opus 4.6 | (as offered) | `opus-4-6-judge` | start low; judge runs are owner-approved |
 | text-embedding-3-small | Global Standard | `embed-3-small` | 100K tokens/min |
 
 Write down the three names exactly as typed; they are case-sensitive. These are the "deployment names" the app needs.
