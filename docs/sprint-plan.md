@@ -734,10 +734,11 @@ Done: adopt only if the §7b tolerance holds for recall@10 and section_recall@10
 ```text
 S5.3 — Rerank
 Feature: an optional reranker reorders the top candidates.
-Trace: ADR-0011 (Bedrock Cohere Rerank 3.5); Gate C
-Tests:  U rerank adapter with a faithful fake · Q paired vs the S5.2 winner · P added latency and cost per query
+Trace: ADR-0011 (amendment 2026-11-07: Foundry Cohere Rerank v5 fast); Gate C; retrieval-benchmark §7c; test-plan §25 S5.3 rows, §6 runner rerank methods
+Scope (owner 2026-11-15): methods `dense_rerank` and `hybrid_rerank`, each reranking the store's top 50 (dense `search()` / `search_hybrid()`) by reranker score only; the section and keyword priors, the LangChain in-process BM25 path (hybrid_retrieve.py, rank-bm25) and the legacy evaluator's hybrid/reranked modes are deleted; client pacing for the rerank deployment (20 requests / 20,000 tokens per minute).
+Tests:  U rerank adapter and pacing with a faithful fake · U runner methods · Q dense_rerank vs dense (the S5.2 winner for the app) and hybrid_rerank vs dense_rerank, method the only axis · P added latency and cost per query
 Regression: R1 R2 R3 R4
-Done: Gate C recorded; rerank off unless it shows lift within the cost budget. Result: Pending.
+Done: Gate C recorded under §7c G1/G2; rerank off unless G1 holds. Result: Pending.
 ```
 
 ## S6 — Answer quality → Gate D

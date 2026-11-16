@@ -209,6 +209,14 @@ A diagnostic report over one result file. It explains misses; it is not a metric
 
 ---
 
+## 7c. Rerank (S5.3, declared 2026-11-15 before any run)
+
+- **Methods:** `dense_rerank` and `hybrid_rerank`. Each takes the store's top 50 for the case (dense `search()` or `search_hybrid()`, under the case's ticker and filing-type filters), sends them to Cohere Rerank v5 fast on Foundry (`cohere-rerank-v5-fast`) in one call, and keeps the 10 the reranker scores highest. No section or keyword prior. Same fixture, index, embedding and K as §7b.
+- **G1, rerank on in the app:** `dense_rerank` vs `dense` (the app's method; §7b app switch failed). Adopt iff the 95% bootstrap CI lower bound of the paired delta is > 0 for `recall@10` and ≥ −0.03 for `section_recall@10`, and rerank costs ≤ $0.002 per query.
+- **G2, candidate source:** `hybrid_rerank` vs `dense_rerank`. `hybrid_rerank` wins only if its `recall@10` CI lower bound is > 0; otherwise `dense_rerank`, which keeps the app on the search it runs.
+- **Cost:** Foundry bills rerank by input tokens (probe 2026-11-15: `billed_units.input_tokens`). Declared price ≤ $0.02 per 1M tokens (Microsoft's v5 announcement), with $2 per 1,000 searches (the v4 Fast price list) as the upper bound behind the $0.002 budget. Cost per query is estimated from the request size (ceil(chars/4) tokens; 50 chunks of 1,000 characters ≈ 12,500 tokens).
+- **Throughput:** the deployment allows 20 requests and 20,000 tokens per minute (probe 2026-11-15), so the client paces rerank calls to ≤ 18 per minute and ≤ 18,000 estimated tokens per minute; a 75-case run takes about 100 minutes. Latency is reported but measures the embedding and rerank pacers, so no search-latency claim is made.
+
 ## 8. Paired comparison policy
 
 File: `evaluation/compare_retrieval_results.py`. This is where the prior invalid-comparison lesson is enforced.
