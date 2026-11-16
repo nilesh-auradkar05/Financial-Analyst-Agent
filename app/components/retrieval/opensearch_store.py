@@ -69,6 +69,20 @@ DELETE_PAGE_SIZE = 500
 ITER_PAGE_SIZE = 500
 DEFAULT_AWS_REGION = "us-east-1"
 SIGV4_SERVICE = "aoss"
+HYBRID_SEARCH_PIPELINE = "hybrid-minmax-mean-v1"
+_HYBRID_PIPELINE_BODY: dict[str, Any] = {
+    "phase_results_processors": [
+        {
+            "normalization-processor": {
+                "normalization": {"technique": "min_max"},
+                "combination": {
+                    "technique": "arithmetic_mean",
+                    "parameters": {"weights": [0.5, 0.5]},
+                },
+            }
+        }
+    ]
+}
 
 
 class IndexCompressionMismatchError(ValueError):
@@ -127,6 +141,7 @@ class OpenSearchVectorStore(RetrievalStore):
         self._write_options: dict[str, Any] = {} if signer else {"refresh": "wait_for"}
         self._embeddings = embeddings or get_embeddings()
         self._index_verified = False
+        self._hybrid_pipeline_ready = False
         self._client = OpenSearch(
             hosts=[self.url],
             http_auth=signer,
@@ -228,17 +243,74 @@ class OpenSearchVectorStore(RetrievalStore):
             raise RuntimeError(f"OpenSearch search failed: {type(exc).__name__}: {exc}") from exc
 
         for hit in response["hits"]["hits"]:
-            source = dict(hit["_source"])
-            text = str(source.pop("text", ""))
-            chunks.append(
-                RetrievedChunk(
-                    id=hit["_id"],
-                    text=text,
-                    metadata=source,
-                    # Cosine space score is (2 - d) / 2 with d = 1 - cos, so d = 2 * (1 - score).
-                    distance=max(0.0, 2.0 * (1.0 - float(hit["_score"]))),
+            # Cosine space score is (2 - d) / 2 with d = 1 - cos, so d = 2 * (1 - score).
+            chunks.append(self._to_chunk(hit, max(0.0, 2.0 * (1.0 - float(hit["_score"])))))
+
+        return SearchResult(
+            query=query,
+            chunks=chunks,
+            total_results=len(chunks),
+            search_time_ms=(time.time() - start_time) * 1000,
+            filter_used=filters.to_backend_filter() if filters else None,
+        )
+
+    def search_hybrid(
+        self,
+        query: str,
+        filters: Optional[SearchFilters] = None,
+        n_results: int = 5,
+    ) -> SearchResult:
+        """Fuse BM25 and k-NN with a native hybrid query; distance is 1 - the fused score."""
+        start_time = time.time()
+        filter_query = self._to_filter_query(filters)
+        chunks: list[RetrievedChunk] = []
+
+        try:
+            if run := get_current_run_tree():
+                run.metadata.update(
+                    embedding_model=settings.embedding.model,
+                    embedding_provider=settings.embedding.provider,
                 )
+            self._require_compatible_index()
+            self._ensure_hybrid_pipeline()
+            knn: dict[str, Any] = {
+                "vector": self._embeddings.embed_query(query),
+                "k": n_results,
+                "rescore": True,
+            }
+            if filter_query:
+                knn["filter"] = filter_query
+            response = self._client.search(
+                index=self.index_name,
+                params={"search_pipeline": HYBRID_SEARCH_PIPELINE},
+                body={
+                    "size": n_results,
+                    "_source": {"excludes": [VECTOR_FIELD]},
+                    "query": {
+                        "hybrid": {
+                            "queries": [
+                                {
+                                    "bool": {
+                                        "must": [{"match": {"text": query}}],
+                                        **(filter_query["bool"] if filter_query else {}),
+                                    }
+                                },
+                                {"knn": {VECTOR_FIELD: knn}},
+                            ]
+                        }
+                    },
+                },
             )
+        except NotFoundError:
+            response = {"hits": {"hits": []}}
+        except OpenSearchException as exc:
+            logger.exception(f"OpenSearch hybrid search failed | index={self.index_name}")
+            raise RuntimeError(
+                f"OpenSearch hybrid search failed: {type(exc).__name__}: {exc}"
+            ) from exc
+
+        for hit in response["hits"]["hits"]:
+            chunks.append(self._to_chunk(hit, 1.0 - float(hit["_score"])))
 
         return SearchResult(
             query=query,
@@ -467,6 +539,12 @@ class OpenSearchVectorStore(RetrievalStore):
             )
         self._index_verified = True
 
+    def _ensure_hybrid_pipeline(self) -> None:
+        if self._hybrid_pipeline_ready:
+            return
+        self._client.search_pipeline.put(id=HYBRID_SEARCH_PIPELINE, body=_HYBRID_PIPELINE_BODY)
+        self._hybrid_pipeline_ready = True
+
     def _ensure_index(self) -> None:
         if self._client.indices.exists(index=self.index_name):
             self._require_compatible_index()
@@ -520,6 +598,12 @@ class OpenSearchVectorStore(RetrievalStore):
             raise RuntimeError(
                 f"OpenSearch bulk write failed for {len(failures)} items; first: {failures[0]}"
             )
+
+    @staticmethod
+    def _to_chunk(hit: dict[str, Any], distance: float) -> RetrievedChunk:
+        source = dict(hit["_source"])
+        text = str(source.pop("text", ""))
+        return RetrievedChunk(id=hit["_id"], text=text, metadata=source, distance=distance)
 
     @staticmethod
     def _to_filter_query(filters: Optional[SearchFilters]) -> Optional[dict[str, Any]]:

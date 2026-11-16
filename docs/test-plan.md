@@ -158,6 +158,12 @@ Against a local OpenSearch container; no network beyond it and no cloud credenti
 | Health check (CM-3) | `healthcheck()` probes the configured index (`HEAD /<index>`), because Serverless answers `/` with 404: 200 or 404 → available; 401, 403, any other error status, a connection error or a timeout → unavailable |
 | Serverless timeout and retry (CM-3) | With `OPENSEARCH_AUTH=sigv4` and no `OPENSEARCH_TIMEOUT_S`, the request timeout is 30 s (cold starts measured 12.9–19.9 s), and a request whose connection drops is retried once (the server closes pooled connections idle for minutes); a second drop is an error. Unset or `none`: 5 s and no retry, as before. An explicit `OPENSEARCH_TIMEOUT_S` applies in both modes |
 
+| Hybrid search: keyword reach (S5.2) | On the same corpus, a chunk that contains the query's exact rare term but that dense `search()` ranks below `n_results` is returned within `n_results` by `search_hybrid()`. Embeddings are a fake that computes similarity from the text, BM25 is the container's own |
+| Hybrid search: filters on both subqueries (S5.2) | With a ticker (and filing-type or section) filter, `search_hybrid()` never returns a chunk outside the filter, even one that matches the query word for word and is nearest in vector space |
+| Hybrid search: scores (S5.2) | Results come in non-increasing fused score order; each chunk's `distance` is 1 − fused score with the fused score in [0, 1]; chunks carry the same text and metadata as `search()` returns for them |
+| Hybrid search: missing index (S5.2) | `search_hybrid()` on an index that does not exist returns an empty result, as `search()` does |
+| Hybrid search: pipeline (S5.2) | The first hybrid search creates the search pipeline if absent; creating it again (a second store, a second call) is not an error. The pipeline read back from the cluster is `normalization-processor`, `min_max`, `arithmetic_mean`, weights [0.5, 0.5] (retrieval-benchmark §7b) |
+
 The CM-3 Serverless rows run against a local HTTP stand-in that answers with the status codes and errors captured from the NEXTGEN collection on 2026-11-08; the precision rows run against the local container.
 
 Superseded Qdrant cases (S3, kept for history; Qdrant and Chroma removed in CM-7): `VECTOR_BACKEND=qdrant` resolves to `QdrantVectorStore`; Qdrant unavailable is reported without a hang; payload indexes are created idempotently; coverage passes under Qdrant.
@@ -192,6 +198,7 @@ Definitions live in `retrieval-benchmark.md`.
 | Null first relevant rank | emitted as `null` |
 | Provenance | retrieved chunk ids/section/score preserved |
 | Cold/warm latency | captured separately |
+| `hybrid` method (S5.2) | the anchored runner accepts `--method hybrid`, retrieves each case through the store's hybrid search under the case's ticker and filing-type filters, and writes `retrieval_method` and `mode` = `hybrid`; any other unknown method is a usage error before any store is read |
 | Determinism | same fixture + backend + method gives identical metrics |
 | Metrics match retrieval-benchmark §3–§4 (added 2026-10-22, owner-approved) | On a hand-computed case: graded NDCG@K credits each anchor once; an anchor split across two chunks is a miss; a section hit without the anchor counts for section_recall only; precision@K divides by K; mrr@K = 0 and first_relevant_rank = null on a miss; keyword_hit_rate is null with no expected keywords |
 
