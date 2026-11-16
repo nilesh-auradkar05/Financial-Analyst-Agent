@@ -724,11 +724,11 @@ Done: every miss classified; candidate list ranked by misses addressed. Result: 
 ```text
 S5.2 — Hybrid dense + BM25 retrieval
 Feature: retrieval combines dense and keyword scores on OpenSearch.
-Trace: SPEC §11.1 Gate C; retrieval-benchmark §8; test-plan §6 comparator
-Scope: OpenSearch hybrid search pipeline; method label `hybrid`; same fixture, K and embedding.
-Tests:  U fusion normalisation · C §4 suite with method=hybrid · Q paired vs Gate A baseline, method the only axis · P cold/warm latency
+Trace: SPEC §11.1 Gate C; retrieval-benchmark §§7b, 8; test-plan §5 "Hybrid search", §6 runner and comparator
+Scope: OpenSearch hybrid search pipeline; method label `hybrid`; same fixture, K and embedding. Product wiring only after the §7b adoption rule passes, with an owner check-in. The LangChain in-process BM25 path stays until S5.3.
+Tests:  C §5 hybrid rows against the local container (fusion, filters on both subqueries, pipeline) · U runner `hybrid` method · Q paired vs the CM-6e baseline (section_aware), method the only axis (owner 2026-11-15: was "Gate A baseline", which differs on backend and embedding too) · P cold/warm latency from the same run
 Regression: R1 R2 R3 R4
-Done: adopt only if recall@10 does not drop beyond tolerance; decision recorded. Result: Pending.
+Done: adopt only if the §7b tolerance holds for recall@10 and section_recall@10; decision recorded. Result: Pending.
 ```
 
 ```text
