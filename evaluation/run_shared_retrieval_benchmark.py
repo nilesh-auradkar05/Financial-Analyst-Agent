@@ -43,7 +43,7 @@ DEFAULT_FIXTURE = Path("evaluation/fixtures/retrieval_shared_benchmark_v1.json")
 DEFAULT_OUTPUT_DIR = Path("evaluation/results/shared_benchmark")
 DEFAULT_SOURCE_DIR = Path("evaluation/fixtures/source_sections")
 
-RETRIEVAL_METHODS: tuple[str, ...] = ("dense", "section_aware")
+RETRIEVAL_METHODS: tuple[str, ...] = ("dense", "section_aware", "hybrid")
 BENCHMARK_KS: tuple[int, ...] = (5, 10)
 _RANKED_METRICS = ("pass", "recall", "precision", "mrr", "ndcg", "section_recall", "keyword_hit_rate")
 
@@ -195,6 +195,13 @@ def _search(store: Any, case: AnchoredCase, method: str) -> list[RetrievedChunk]
             n_results=top_k,
         )
         return sorted(result.chunks, key=lambda c: (-c.relevance_score, c.id))
+    if method == "hybrid":
+        hybrid = store.search_hybrid(
+            case.query,
+            filters=SearchFilters(ticker=case.ticker, filing_type=filing_type),
+            n_results=top_k,
+        )
+        return list(hybrid.chunks)
     return search_section_aware(
         store, query=case.query, ticker=case.ticker, filing_type=filing_type, top_k=top_k
     ).chunks
