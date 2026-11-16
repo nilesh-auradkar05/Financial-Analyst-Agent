@@ -1,7 +1,7 @@
 """Run one retrieval fixture across multiple retrieval modes and compare them.
 
-This is the safe way to answer questions like "does reranked hybrid beat
-section-aware retrieval?" because every method is run on the exact same fixture
+This is the safe way to answer questions like "does section-aware beat
+dense retrieval?" because every method is run on the exact same fixture
 rows and therefore the result files share case IDs.
 """
 
@@ -26,17 +26,12 @@ DEFAULT_MODES = [
     "naive",
     "semantic",
     "section_aware",
-    "hybrid",
-    "reranked_hybrid",
 ]
 
 MODE_ALIASES = {
     "dense": "semantic",
     "query": "semantic",
     "section-aware": "section_aware",
-    "langchain_hybrid": "hybrid",
-    "hybrid_rerank": "reranked_hybrid",
-    "dense_bm25_rerank": "reranked_hybrid",
 }
 
 

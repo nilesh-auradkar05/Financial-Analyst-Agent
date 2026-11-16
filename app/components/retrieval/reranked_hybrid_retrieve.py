@@ -1,130 +1,45 @@
-"""Dense + BM25 candidate generation followed by hosted reranking.
+"""Rerank a dense or hybrid candidate pool with hosted Cohere Rerank on Microsoft Foundry.
 
-This module implements the standard two-stage retrieval stack:
-
-1. Generate a broad candidate set with dense vector search and BM25 lexical
-   search.
-2. Deduplicate candidates while preserving dense/BM25 provenance.
-3. Score query/document pairs with Cohere Rerank v5 fast on Microsoft Foundry.
-4. Return top-k evidence chunks with explicit reranker metadata.
-
-The module is intentionally strict for evaluation: if the reranker cannot
-run, it raises instead of silently falling back to non-reranked hybrid output.
-Silent fallback is how mislabeled result files happen. Humanity has suffered
-enough JSON fraud.
+Two-stage retrieval: the store's top 50 under the ticker and filing-type filters (dense `search`
+or fused `search_hybrid`), scored in one rerank call, best K kept. Fails closed: if the reranker
+cannot run, it raises instead of returning unreranked chunks, because a silent fallback is how
+mislabeled result files happen.
 """
 
 from __future__ import annotations
 
 import math
 import time
-from typing import Any, Optional, Protocol
+from typing import Any, Literal, Optional, Protocol
 
 import httpx
-from langchain_community.retrievers import BM25Retriever
-from langchain_core.documents import Document
-from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.components.retrieval.hybrid_retrieve import (
-    LangChainHybridSearchConfig,
-    _call_store_search,
-    _chunk_to_document,
-    _load_sparse_documents_from_store,
-    _stable_chunk_id,
-)
+from app.components.retrieval.embeddings import RequestPacer, estimate_tokens
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 from app.config import settings
 
-try:
-    from app.components.retrieval.section_intent import (
-        SectionIntent,
-        infer_section_intent,
-        normalize_query_text,
-    )
-except ImportError:
-    SectionIntent = Any  # type: ignore[misc, assignment]
-
-    def infer_section_intent(query: str, *, max_sections: int = 3) -> Any:  # type: ignore[misc, no-redef]
-        del query, max_sections
-        return None
-
-    def normalize_query_text(value: str) -> str:  # type: ignore[no-redef]
-        return value.strip().lower()
-
-
-DEFAULT_DENSE_TOP_K = 30
-DEFAULT_SPARSE_TOP_K = 30
-DEFAULT_FINAL_TOP_K = 5
-DEFAULT_MAX_DOCUMENT_CHARS = 4_000
-DEFAULT_RETRIEVAL_METHOD = "dense_bm25_cross_encoder_rerank"
+RERANK_CANDIDATE_POOL = 50
+_MAX_DOCUMENT_CHARS = 4_000
 _RERANK_TIMEOUT_SECONDS = 30.0
 _RERANK_ATTEMPTS = 3
 _RERANK_BACKOFF_SECONDS = 0.1
 
+# The deployment allows 20 requests and 20,000 tokens per minute, the same quota as embeddings, in
+# a window of its own.
+_rerank_pacer = RequestPacer()
+
 
 class RerankerLike(Protocol):
+    @property
+    def identity(self) -> str:
+        """Names the scoring model in result provenance."""
+
     def score(self, query: str, documents: list[str]) -> list[float]:
         """One relevance score per document, in input order; higher is better."""
 
 
-class RerankedHybridSearchConfig(BaseModel):
-    """Configuration for dense + BM25 candidate generation and reranking."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    dense_top_k: int = Field(default=DEFAULT_DENSE_TOP_K, ge=1)
-    sparse_top_k: int = Field(default=DEFAULT_SPARSE_TOP_K, ge=1)
-    final_top_k: int = Field(default=DEFAULT_FINAL_TOP_K, ge=1)
-    candidate_pool_size: int = Field(default=512, ge=1)
-    max_document_chars: int = Field(default=DEFAULT_MAX_DOCUMENT_CHARS, ge=256)
-    fail_open_to_dense: bool = False
-    use_section_prior: bool = True
-    section_prior_boost: float = Field(default=0.20, ge=0.0)
-    keyword_prior_boost: float = Field(default=0.03, ge=0.0)
-    max_keyword_prior_boost: float = Field(default=0.15, ge=0.0)
-
-    @field_validator("final_top_k")
-    @classmethod
-    def _validate_final_top_k(cls, final_top_k: int, info: Any) -> int:
-        dense_top_k = int(info.data.get("dense_top_k", DEFAULT_DENSE_TOP_K))
-        sparse_top_k = int(info.data.get("sparse_top_k", DEFAULT_SPARSE_TOP_K))
-        if final_top_k > dense_top_k + sparse_top_k:
-            raise ValueError("final_top_k cannot exceed dense_top_k + sparse_top_k")
-        return final_top_k
-
-
-class RerankedCandidate(BaseModel):
-    """Candidate document with retrieval provenance and reranker score."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
-
-    document: Document
-    chunk_id: str
-    dense_rank: Optional[int] = None
-    bm25_rank: Optional[int] = None
-    reranker_score: float = 0.0
-    section_prior_score: float = 0.0
-    keyword_prior_score: float = 0.0
-    final_rerank_score: float = 0.0
-
-    @property
-    def best_candidate_rank(self) -> int:
-        ranks = [rank for rank in [self.dense_rank, self.bm25_rank] if rank is not None]
-        return min(ranks) if ranks else 10_000
-
-    @property
-    def sources(self) -> list[str]:
-        sources: list[str] = []
-        if self.dense_rank is not None:
-            sources.append("dense")
-        if self.bm25_rank is not None:
-            sources.append("bm25")
-        return sources
-
-
 class RerankedHybridSearchUnavailableError(RuntimeError):
-    """Raised when reranked hybrid search cannot be executed."""
+    """Raised when reranked search cannot be executed."""
 
 
 def _is_number(value: Any) -> bool:
@@ -159,7 +74,11 @@ class FoundryCohereReranker:
 
     @staticmethod
     def _post(url: str, key: str, payload: dict[str, Any]) -> httpx.Response:
+        tokens = estimate_tokens(payload["query"]) + sum(
+            estimate_tokens(text) for text in payload["documents"]
+        )
         for attempt in range(1, _RERANK_ATTEMPTS + 1):
+            _rerank_pacer.wait_for_slot(tokens)
             try:
                 reply = httpx.post(
                     url,
@@ -208,321 +127,63 @@ class FoundryCohereReranker:
         return [scores[index] for index in range(count)]
 
 
-def search_reranked_hybrid(
+def search_reranked(
     store: Any,
     *,
     query: str,
     ticker: str,
     filing_type: Optional[str] = None,
-    top_k: int = DEFAULT_FINAL_TOP_K,
-    config: Optional[RerankedHybridSearchConfig] = None,
+    top_k: int = 10,
+    candidates: Literal["dense", "hybrid"] = "dense",
     reranker: Optional[RerankerLike] = None,
 ) -> SearchResult:
-    """Run dense + BM25 retrieval, then hosted rerank to top-k.
+    """Rerank the store's top 50 dense or hybrid candidates and return the best `top_k`.
 
-    Evaluation mode fails closed by default. If the reranker is unconfigured
-    or fails, this function raises unless ``fail_open_to_dense`` is
-    explicitly set. That keeps result files honest: reranked output must contain
-    reranker scores.
+    Equal scores keep candidate order. Raises `RerankedHybridSearchUnavailableError` when the
+    reranker is unconfigured or fails; no unreranked result is ever returned.
     """
 
-    start_time = time.time()
-    cfg = config or RerankedHybridSearchConfig(final_top_k=top_k)
-    if top_k != cfg.final_top_k:
-        cfg = cfg.model_copy(update={"final_top_k": top_k})
+    started = time.perf_counter()
+    search = store.search if candidates == "dense" else store.search_hybrid
+    pool: list[RetrievedChunk] = search(
+        query,
+        filters=SearchFilters(ticker=ticker, filing_type=filing_type),
+        n_results=RERANK_CANDIDATE_POOL,
+    ).chunks
 
-    filters = SearchFilters(ticker=ticker, filing_type=filing_type)
-    dense_result = _call_store_search(
-        store,
-        query=query,
-        filters=filters,
-        n_results=cfg.dense_top_k,
-    )
-    dense_documents = [
-        _chunk_to_document(chunk, source="dense", rank=rank)
-        for rank, chunk in enumerate(dense_result.chunks, start=1)
-    ]
-
-    sparse_documents = _load_sparse_documents_from_store(
-        store,
-        filters=filters,
-        config=LangChainHybridSearchConfig(
-            dense_top_k=cfg.dense_top_k,
-            sparse_top_k=cfg.sparse_top_k,
-            final_top_k=cfg.final_top_k,
-            candidate_pool_size=cfg.candidate_pool_size,
-        ),
-    )
-    bm25_documents = _search_bm25_documents(
-        query=query,
-        documents=sparse_documents,
-        top_k=cfg.sparse_top_k,
-    )
-
-    candidates = _merge_candidates(
-        dense_documents=dense_documents,
-        bm25_documents=bm25_documents,
-    )
-    if not candidates:
-        raise RerankedHybridSearchUnavailableError(
-            "Reranked hybrid produced no dense or BM25 candidates."
-        )
-
-    intent = infer_section_intent(query) if cfg.use_section_prior else None
-    reranker = reranker or FoundryCohereReranker()
-
-    try:
-        scored_candidates = _rerank_candidates(
-            query=query,
-            candidates=candidates,
-            config=cfg,
-            reranker=reranker,
-            intent=intent,
-        )
-    except Exception as exc:
-        if not cfg.fail_open_to_dense:
+    chunks: list[RetrievedChunk] = []
+    if pool:
+        reranker = reranker or FoundryCohereReranker()
+        scores = [float(score) for score in reranker.score(query, [c.text[:_MAX_DOCUMENT_CHARS] for c in pool])]
+        if len(scores) != len(pool):
             raise RerankedHybridSearchUnavailableError(
-                "Hosted reranking failed. Check the Foundry rerank configuration "
-                "or choose a non-reranked retrieval mode."
-            ) from exc
-        logger.warning("Reranked hybrid failed; falling back to dense results: {}", exc)
-        return SearchResult(
-            query=query,
-            chunks=_dense_fallback_chunks(dense_result.chunks[: cfg.final_top_k]),
-            total_results=min(len(dense_result.chunks), cfg.final_top_k),
-            search_time_ms=(time.time() - start_time) * 1000,
-            filter_used={
-                "mode": "reranked_hybrid_dense_fallback",
-                "retrieval_method": "dense_fallback_no_cross_encoder",
-                "ticker": ticker.upper(),
-                "filing_type": filing_type,
-                "error": str(exc),
-            },
-        )
-
-    reranker_model = getattr(reranker, "identity", None)
-    top_candidates = scored_candidates[: cfg.final_top_k]
-    chunks = [
-        _candidate_to_chunk(candidate, rank=rank, reranker_model=reranker_model)
-        for rank, candidate in enumerate(top_candidates, start=1)
-    ]
+                "Reranker returned a different number of scores than candidates."
+            )
+        ranked = sorted(enumerate(zip(pool, scores), start=1), key=lambda item: -item[1][1])
+        chunks = [
+            RetrievedChunk(
+                id=chunk.id,
+                text=chunk.text,
+                metadata={
+                    **chunk.metadata,
+                    "reranker_score": score,
+                    "candidate_rank": rank,
+                    "candidate_source": candidates,
+                    "reranker_model": reranker.identity,
+                },
+                distance=chunk.distance,
+            )
+            for rank, (chunk, score) in ranked[:top_k]
+        ]
 
     return SearchResult(
         query=query,
         chunks=chunks,
         total_results=len(chunks),
-        search_time_ms=(time.time() - start_time) * 1000,
+        search_time_ms=(time.perf_counter() - started) * 1000,
         filter_used={
-            "mode": "reranked_hybrid",
-            "retrieval_method": DEFAULT_RETRIEVAL_METHOD,
+            "mode": f"{candidates}_rerank",
             "ticker": ticker.upper(),
             "filing_type": filing_type,
-            "dense_top_k": cfg.dense_top_k,
-            "sparse_top_k": cfg.sparse_top_k,
-            "final_top_k": cfg.final_top_k,
-            "candidate_count": len(candidates),
-            "sparse_corpus_size": len(sparse_documents),
-            "reranker_model": reranker_model,
-            "use_section_prior": cfg.use_section_prior,
-            "section_prior_target_sections": _intent_sections(intent),
         },
     )
-
-
-def _search_bm25_documents(
-    *,
-    query: str,
-    documents: list[Document],
-    top_k: int,
-) -> list[Document]:
-    if not documents:
-        return []
-    retriever = BM25Retriever.from_documents(documents)
-    retriever.k = top_k
-    return list(retriever.invoke(query))
-
-
-def _merge_candidates(
-    *,
-    dense_documents: list[Document],
-    bm25_documents: list[Document],
-) -> list[RerankedCandidate]:
-    by_chunk_id: dict[str, RerankedCandidate] = {}
-
-    for rank, document in enumerate(dense_documents, start=1):
-        chunk_id = _document_chunk_id(document)
-        by_chunk_id[chunk_id] = RerankedCandidate(
-            document=document,
-            chunk_id=chunk_id,
-            dense_rank=rank,
-        )
-
-    for rank, document in enumerate(bm25_documents, start=1):
-        chunk_id = _document_chunk_id(document)
-        existing = by_chunk_id.get(chunk_id)
-        if existing is None:
-            metadata = dict(document.metadata)
-            metadata["bm25_rank"] = rank
-            metadata["retrieval_source"] = "bm25"
-            by_chunk_id[chunk_id] = RerankedCandidate(
-                document=Document(page_content=document.page_content, metadata=metadata),
-                chunk_id=chunk_id,
-                bm25_rank=rank,
-            )
-            continue
-
-        metadata = dict(existing.document.metadata)
-        metadata["bm25_rank"] = rank
-        metadata["retrieval_source"] = "dense+bm25"
-        by_chunk_id[chunk_id] = existing.model_copy(
-            update={
-                "document": Document(
-                    page_content=existing.document.page_content,
-                    metadata=metadata,
-                ),
-                "bm25_rank": rank,
-            }
-        )
-
-    return sorted(by_chunk_id.values(), key=lambda candidate: candidate.best_candidate_rank)
-
-
-def _rerank_candidates(
-    *,
-    query: str,
-    candidates: list[RerankedCandidate],
-    config: RerankedHybridSearchConfig,
-    reranker: RerankerLike,
-    intent: Any = None,
-) -> list[RerankedCandidate]:
-    documents = [
-        _clip_document_text(candidate.document.page_content, config.max_document_chars)
-        for candidate in candidates
-    ]
-    score_values = [float(score) for score in reranker.score(query, documents)]
-    if len(score_values) != len(candidates):
-        raise ValueError(
-            "Reranker returned a different number of scores than candidates: "
-            f"{len(score_values)} != {len(candidates)}"
-        )
-
-    scored_candidates = []
-    for candidate, score in zip(candidates, score_values):
-        section_prior = _section_prior_score(candidate, intent, config)
-        keyword_prior = _keyword_prior_score(candidate, intent, config)
-        final_score = score + section_prior + keyword_prior
-        scored_candidates.append(
-            candidate.model_copy(
-                update={
-                    "reranker_score": score,
-                    "section_prior_score": section_prior,
-                    "keyword_prior_score": keyword_prior,
-                    "final_rerank_score": final_score,
-                }
-            )
-        )
-
-    return sorted(
-        scored_candidates,
-        key=lambda candidate: (-candidate.final_rerank_score, candidate.best_candidate_rank),
-    )
-
-
-def _candidate_to_chunk(
-    candidate: RerankedCandidate, *, rank: int, reranker_model: Optional[str]
-) -> RetrievedChunk:
-    metadata = dict(candidate.document.metadata)
-    metadata["chunk_id"] = candidate.chunk_id
-    metadata["hybrid_rank"] = rank
-    metadata["reranker_rank"] = rank
-    metadata["reranker_score"] = candidate.reranker_score
-    metadata["reranker_model"] = reranker_model
-    metadata["section_prior_score"] = candidate.section_prior_score
-    metadata["keyword_prior_score"] = candidate.keyword_prior_score
-    metadata["final_rerank_score"] = candidate.final_rerank_score
-    metadata["dense_rank"] = candidate.dense_rank
-    metadata["bm25_rank"] = candidate.bm25_rank
-    metadata["retrieval_sources"] = candidate.sources
-    metadata["retrieval_method"] = DEFAULT_RETRIEVAL_METHOD
-
-    return RetrievedChunk(
-        id=candidate.chunk_id,
-        text=candidate.document.page_content,
-        metadata=metadata,
-        distance=_rank_to_distance(rank),
-    )
-
-
-def _dense_fallback_chunks(chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
-    fallback_chunks: list[RetrievedChunk] = []
-    for rank, chunk in enumerate(chunks, start=1):
-        metadata = dict(getattr(chunk, "metadata", {}) or {})
-        metadata["retrieval_method"] = "dense_fallback_no_cross_encoder"
-        metadata["reranker_rank"] = None
-        metadata["reranker_score"] = None
-        fallback_chunks.append(
-            RetrievedChunk(
-                id=str(getattr(chunk, "id", "")),
-                text=str(getattr(chunk, "text", "")),
-                metadata=metadata,
-                distance=_rank_to_distance(rank),
-            )
-        )
-    return fallback_chunks
-
-
-def _document_chunk_id(document: Document) -> str:
-    chunk_id = str(document.metadata.get("chunk_id") or document.metadata.get("_retrieval_id") or "")
-    if chunk_id:
-        return chunk_id
-    chunk_id = _stable_chunk_id(document.page_content, document.metadata)
-    document.metadata["chunk_id"] = chunk_id
-    return chunk_id
-
-
-def _clip_document_text(text: str, max_chars: int) -> str:
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars]
-
-
-def _rank_to_distance(rank: int) -> float:
-    return max(0.0, float(rank - 1) / max(rank, 1))
-
-
-def _section_prior_score(
-    candidate: RerankedCandidate,
-    intent: Any,
-    config: RerankedHybridSearchConfig,
-) -> float:
-    if intent is None or not config.use_section_prior:
-        return 0.0
-    target_sections = set(getattr(intent, "target_sections", []) or [])
-    if not target_sections:
-        return 0.0
-    metadata = dict(candidate.document.metadata)
-    section_key = str(metadata.get("section_key") or metadata.get("section_name") or "")
-    if section_key in target_sections:
-        return config.section_prior_boost
-    return 0.0
-
-
-def _keyword_prior_score(
-    candidate: RerankedCandidate,
-    intent: Any,
-    config: RerankedHybridSearchConfig,
-) -> float:
-    if intent is None or not config.use_section_prior:
-        return 0.0
-    matched_terms = list(getattr(intent, "matched_terms", []) or [])
-    if not matched_terms:
-        return 0.0
-    document_text = normalize_query_text(candidate.document.page_content)
-    matches = sum(1 for term in matched_terms if normalize_query_text(str(term)) in document_text)
-    return min(config.max_keyword_prior_boost, matches * config.keyword_prior_boost)
-
-
-def _intent_sections(intent: Any) -> list[str]:
-    if intent is None:
-        return []
-    return list(getattr(intent, "target_sections", []) or [])

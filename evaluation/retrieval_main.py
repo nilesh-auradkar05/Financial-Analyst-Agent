@@ -22,9 +22,6 @@ SUPPORTED_MODES = {
     "semantic",
     "section_aware",
     "section-aware",
-    "hybrid",
-    "langchain_hybrid",
-    "reranked_hybrid",
 }
 
 
@@ -39,7 +36,6 @@ def _normalize_mode(mode: str | None) -> str | None:
     normalized = mode.strip().lower().replace("-", "_")
     aliases = {
         "section-aware": "section_aware",
-        "langchain_hybrid": "hybrid",
         "query": "semantic",
     }
     return aliases.get(normalized, normalized)
@@ -116,7 +112,7 @@ def main() -> None:
         choices=sorted({_normalize_mode(item) or item for item in SUPPORTED_MODES}),
         help=(
             "Override fixture retrieval mode for every case. Use this for fair same-fixture "
-            "method comparisons, e.g. semantic, section_aware, hybrid, reranked_hybrid."
+            "method comparisons, e.g. semantic, section_aware."
         ),
     )
     parser.add_argument(
