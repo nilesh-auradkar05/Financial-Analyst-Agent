@@ -203,7 +203,8 @@ A diagnostic report over one result file. It explains misses; it is not a metric
 - **Method `hybrid`:** one OpenSearch `hybrid` query with two subqueries, BM25 `match` on the chunk text and k-NN on the vector field, both under the same ticker and filing-type filters, fused by a search pipeline. Same fixture, K, index and embedding as the baseline.
 - **Fusion (fixed, never tuned on the fixture):** `normalization-processor`, `min_max` normalisation, `arithmetic_mean` combination, weights 0.5 BM25 / 0.5 k-NN.
 - **Baseline:** the CM-6e R4 result (`gate_c_foundry-cohere-embed-v5-fast_opensearch_section_aware_retrieval_anchored_benchmark_v1.json`), method `section_aware`. Method is the only axis (§8).
-- **Attribution:** `section_aware` boosts the inferred section and `hybrid` does not. Per S5.1 the boost itself displaces dense hits on 29 misses, so a delta answers "does hybrid beat the shipped method", not "does BM25 help".
+- **Attribution:** `section_aware` boosts the inferred section and `hybrid` does not. Per S5.1 the boost itself displaces dense hits on 29 misses, so a delta answers "does hybrid beat section_aware", not "does BM25 help".
+- **App switch (owner 2026-11-15):** the app's retrieval step is plain dense (`search_by_ticker` → `search()` under a ticker filter), not `section_aware`. Before the app moves to `hybrid`, a second paired comparison, `hybrid` vs `dense` on the same index (both under the case's ticker and filing-type filters, method the only axis), must pass the same adoption rule.
 - **Adoption rule:** adopt iff the lower bound of the 95% bootstrap CI of the paired delta (hybrid − baseline) is ≥ −0.03 for both `recall@10` and `section_recall@10` (the §9 rule reused). Otherwise `section_aware` stays. Latency is reported beside the result, not folded into it.
 
 ---
