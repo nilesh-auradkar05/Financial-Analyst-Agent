@@ -17,6 +17,7 @@ from app import main as api
 from app.agents import graph
 from app.agents.graph import run_agent
 from app.agents.state import create_initial_state
+from tests.unit.fake_retrieval_store import as_search_result
 
 BRANCH_SECONDS = 1.0
 EVIDENCE_STEPS = {"research_news", "fetch_stock", "retrieve_filings"}
@@ -84,8 +85,16 @@ def install_fakes(
         )
 
     class Store:
+        def search(self, query, filters=None, n_results=5):
+            # The candidate search a reranker would start from; the by-ticker search below is the
+            # one that holds its thread for the branch's delay.
+            return as_search_result(query, self._result(query, filters.ticker, n_results), filters.ticker)
+
         def search_by_ticker(self, query, ticker, n_results=3, section=None):
             time.sleep(delay / FILING_SEARCHES)  # blocking, like a real vector-store client
+            return self._result(query, ticker, n_results)
+
+        def _result(self, query, ticker, n_results):
             metadata = {"filing_type": "10-K"}
             if indexed_name:
                 metadata["company_name"] = f"{ticker} Inc."

@@ -10,19 +10,32 @@ from app.agents import graph
 from app.agents.state import apply_update, create_initial_state
 from app.components.retrieval import ingestion
 from app.components.retrieval.ingestion import IngestionResult
+from app.components.retrieval.vector_store import SearchFilters, SearchResult
+from tests.unit.fake_retrieval_store import as_search_result
 
 
 class FakeStore:
     """In-memory store: search returns what was written for the ticker, best first."""
 
-    def __init__(self, docs: dict[str, list[str]] | None = None, searchable: bool = True):
+    def __init__(
+        self, docs: dict[str, list[str]] | None = None, searchable: bool = True, fails: bool = False
+    ):
         self.docs = docs or {}
         self.searchable = searchable
+        self.fails = fails
 
     def count_documents(self, filters=None):
         return len(self.docs.get(filters.ticker, []))
 
+    def search(
+        self, query: str, filters: SearchFilters | None = None, n_results: int = 5
+    ) -> SearchResult:
+        ticker = (filters.ticker if filters else None) or ""
+        return as_search_result(query, self.search_by_ticker(query, ticker, n_results), ticker)
+
     def search_by_ticker(self, query, ticker, n_results=3, section=None):
+        if self.fails:
+            raise RuntimeError("secret retrieval details")
         texts = self.docs.get(ticker, []) if self.searchable else []
         return SimpleNamespace(chunks=[
             SimpleNamespace(id=f"{ticker}-{n}", text=text, section="Business",
@@ -56,12 +69,8 @@ async def test_missing_filing_keeps_available_evidence_and_verifies(monkeypatch,
     state["news_articles"] = [{"title": "Market update", "snippet": "Shares rose.", "source": "Wire"}]
     state["sentiment_result"] = {"overall_sentiment": "positive", "positive_count": 1}
 
-    use_store(monkeypatch, FakeStore())
+    use_store(monkeypatch, FakeStore(fails=retrieval_fails))
     monkeypatch.setattr(graph, "ingest_10k_for_ticker", no_10k)
-    if retrieval_fails:
-        def search(*_args):
-            raise RuntimeError("secret retrieval details")
-        monkeypatch.setattr(graph, "_search_filing_chunks", search)
 
     state = apply_update(state, await graph.retrieve_sec_filings_node(state))
 

@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.main as api_main
-from app.components.retrieval.vector_store import SearchFilters
+from app.components.retrieval.vector_store import SearchFilters, SearchResult
 from app.services.run_store import FileBackedRunStore
 
 
@@ -542,10 +542,21 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(
     from app.agents.state import apply_update, create_initial_state
     from app.components.retrieval.ingestion import IngestionResult
 
-    def search(*_args):
-        if retrieval_fails:
-            raise RuntimeError("private retrieval details")
-        return SimpleNamespace(chunks=[])
+    class FilingStore:
+        """A store with no filings whose searches break when `retrieval_fails`."""
+
+        def count_documents(self, _filters=None):
+            return 0
+
+        def search(self, query, filters=None, n_results=5):
+            if retrieval_fails:
+                raise RuntimeError("private retrieval details")
+            return SearchResult(query=query, chunks=[])
+
+        def search_by_ticker(self, query, ticker, n_results=3, section=None):
+            if retrieval_fails:
+                raise RuntimeError("private retrieval details")
+            return SimpleNamespace(chunks=[])
 
     async def no_10k(ticker, **_kwargs):
         return IngestionResult(
@@ -556,10 +567,7 @@ def test_analysis_preserves_evidence_when_filings_are_unavailable(
         async def ainvoke(self, _messages):
             return SimpleNamespace(content=memo_text)
 
-    monkeypatch.setattr(
-        graph, "get_vector_store", lambda: SimpleNamespace(count_documents=lambda _filters: 0)
-    )
-    monkeypatch.setattr(graph, "_search_filing_chunks", search)
+    monkeypatch.setattr(graph, "get_vector_store", FilingStore)
     monkeypatch.setattr(graph, "ingest_10k_for_ticker", no_10k)
     monkeypatch.setattr(graph, "get_llm", lambda _settings: MemoLLM())
 
@@ -622,6 +630,10 @@ def test_throttled_embedding_arm_leaves_the_run_with_a_filings_gap_not_a_crash(
     class EmbeddingStore:
         def count_documents(self, _filters=None):
             return 3
+
+        def search(self, query, filters=None, n_results=5):
+            embeddings.embed_query(query)
+            return SearchResult(query=query, chunks=[])
 
         def search_by_ticker(self, query, ticker, n_results=3, section=None):
             embeddings.embed_query(query)

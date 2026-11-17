@@ -116,7 +116,8 @@ class FakeFoundry:
     """Serves Messages and rerank replies computed from each request.
 
     `status` makes every request fail with that HTTP status; `fail_first` fails only the first N
-    requests. `corrupt` edits the computed reply body before it is sent (a malformed provider);
+    requests; `fail_after` lets the first N succeed and fails every later one with `fail_status`.
+    `corrupt` edits the computed reply body before it is sent (a malformed provider);
     `raw_reply` replaces a successful reply with those bytes (a provider that is not speaking JSON).
     `delay` is seconds of latency per request.
     """
@@ -126,6 +127,7 @@ class FakeFoundry:
         self.status: int | None = None
         self.fail_first = 0
         self.fail_status = 500
+        self.fail_after: int | None = None
         self.corrupt: Callable[[dict[str, Any]], None] | None = None
         self.delay = 0.0
         self.raw_reply: bytes | None = None
@@ -158,6 +160,8 @@ class FakeFoundry:
         if self.delay:
             time.sleep(self.delay)
         failing = self.status or (self.fail_status if attempt <= self.fail_first else None)
+        if self.fail_after is not None and attempt > self.fail_after:
+            failing = self.fail_status
         if failing:
             return failing, {
                 "type": "error",

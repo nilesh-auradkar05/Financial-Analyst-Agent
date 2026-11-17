@@ -21,6 +21,7 @@ import pytest
 
 from app.agents import graph
 from app.agents.state import create_initial_state
+from app.components.retrieval.vector_store import SearchResult
 from tests.embedding_arms import (
     AZURE_API_KEY,
     FOUNDRY_COHERE,
@@ -605,6 +606,10 @@ class _EmbeddingStore:
 
     def count_documents(self, filters: Any = None) -> int:
         return 3
+
+    def search(self, query: str, filters: Any = None, n_results: int = 5) -> Any:
+        embeddings_api.embed_query(query)
+        return SearchResult(query=query, chunks=[])
 
     def search_by_ticker(
         self, query: str, ticker: str, n_results: int = 3, section: str | None = None
