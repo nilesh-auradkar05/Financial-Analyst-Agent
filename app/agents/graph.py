@@ -42,6 +42,10 @@ from app.agents.state import (
     get_data_availability,
 )
 from app.components.retrieval.ingestion import ingest_10k_for_ticker
+from app.components.retrieval.reranked_hybrid_retrieve import (
+    RerankedHybridSearchUnavailableError,
+    search_reranked,
+)
 from app.components.retrieval.vector_store import (
     RetrievalStore,
     SearchFilters,
@@ -200,10 +204,18 @@ def _filing_search_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return {key: inputs[key] for key in ("query", "ticker", "n_results")}
 
 
+def _rerank_marker(result: SearchResult) -> dict[str, Any]:
+    """The `reranked` / `rerank_fallback_reason` marker the search put on its chunks."""
+    metadata = result.chunks[0].metadata if result.chunks else {}
+    return {key: metadata[key] for key in ("reranked", "rerank_fallback_reason") if key in metadata}
+
+
 def _filing_search_outputs(result: SearchResult) -> dict[str, Any]:
     return {
         "count": len(result.chunks),
         "evidence_ids": [chunk.id for chunk in result.chunks],
+        "reranked": False,
+        **_rerank_marker(result),
     }
 
 
@@ -219,8 +231,31 @@ def _search_filing_chunks(
     query: str,
     ticker: str,
     n_results: int = 3,
+    rerank: bool = False,
+    fallback_reason: str | None = None,
 ) -> SearchResult:
-    return store.search_by_ticker(query, ticker=ticker, n_results=n_results)
+    """Rerank the ticker's dense candidates, or search densely and mark why they are not reranked.
+
+    A reranker that is unavailable falls back to the dense search; `fallback_reason` marks a dense
+    search made because another query's rerank already failed.
+    """
+    if rerank:
+        try:
+            result = search_reranked(
+                store, query=query, ticker=ticker, top_k=n_results, candidates="dense"
+            )
+        except RerankedHybridSearchUnavailableError as error:
+            fallback_reason = str(error)
+            logger.warning(f"[retrieve_filings] Rerank unavailable, using dense search: {error}")
+        else:
+            for chunk in result.chunks:
+                chunk.metadata["reranked"] = True
+            return result
+    result = store.search_by_ticker(query, ticker=ticker, n_results=n_results)
+    if fallback_reason is not None:
+        for chunk in result.chunks:
+            chunk.metadata.update(reranked=False, rerank_fallback_reason=fallback_reason)
+    return result
 
 
 # ponytail: a fixed bound on one ingest-on-miss (the former local embedding timeout). Give it
@@ -239,7 +274,7 @@ def _filing_error(code: str, message: str) -> dict:
 
 
 async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_name: str) -> list:
-    """Top filing chunks for the ticker across the four topic queries."""
+    """Top reranked filing chunks for the ticker across the four topic queries (dense on fallback)."""
     # This node runs beside fetch_stock, so a missing name comes from the indexed
     # filing metadata instead of the quote provider; the ticker is the last resort.
     if not company_name:
@@ -255,12 +290,35 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
         f"{company_name} competition market position",
     ]
 
+    results: list[SearchResult] = []
+    fallback_reason: str | None = None
+    for query in queries:
+        result = await asyncio.to_thread(
+            _search_filing_chunks,
+            store,
+            query,
+            ticker,
+            3,
+            rerank=fallback_reason is None,
+            fallback_reason=fallback_reason,
+        )
+        fallback_reason = fallback_reason or _rerank_marker(result).get("rerank_fallback_reason")
+        results.append(result)
+    if fallback_reason:
+        # One failed rerank puts all four queries on the dense path, so the chunks are not mixed.
+        results = [
+            result
+            if "rerank_fallback_reason" in _rerank_marker(result)
+            else await asyncio.to_thread(
+                _search_filing_chunks, store, query, ticker, 3, fallback_reason=fallback_reason
+            )
+            for query, result in zip(queries, results)
+        ]
+
     all_chunks = []
     seen_texts: set[str] = set()
 
-    for query in queries:
-        result = await asyncio.to_thread(_search_filing_chunks, store, query, ticker, 3)
-
+    for result in results:
         for chunk in result.chunks:
             # Deduplicate by text
             text_hash = hashlib.md5(chunk.text[:100].encode("utf-8")).hexdigest()
@@ -268,8 +326,11 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
                 seen_texts.add(text_hash)
                 all_chunks.append(chunk)
 
-    # Sort by relevance and take top chunks
-    all_chunks.sort(key=lambda x: x.relevance_score, reverse=True)
+    # Sort by rerank score (relevance on the dense fallback) and take top chunks
+    all_chunks.sort(
+        key=lambda x: x.relevance_score if fallback_reason else x.metadata["reranker_score"],
+        reverse=True,
+    )
     return all_chunks[:MAX_FILING_CHUNKS]
 
 
