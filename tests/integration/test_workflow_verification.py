@@ -5,9 +5,13 @@ from types import SimpleNamespace
 import pytest
 
 from app.agents import graph as graph_mod
+from tests.unit.fake_retrieval_store import as_search_result
 
 
 class StubVectorStore:
+    def search(self, query: str, filters=None, n_results: int = 5):
+        return as_search_result(query, self.search_by_ticker(query, filters.ticker), filters.ticker)
+
     def search_by_ticker(self, query: str, ticker: str, n_results: int = 3):
         chunk = SimpleNamespace(
             text=(

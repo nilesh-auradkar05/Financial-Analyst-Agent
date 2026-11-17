@@ -227,6 +227,7 @@ def live_world(monkeypatch: pytest.MonkeyPatch, chat: FakeChat) -> Callable[...,
       query (chunk n of every result gets pair n); an empty sequence = nothing indexed.
     """
     from app.agents import graph
+    from tests.unit.fake_retrieval_store import as_search_result
 
     def install(
         *,
@@ -267,6 +268,13 @@ def live_world(monkeypatch: pytest.MonkeyPatch, chat: FakeChat) -> Callable[...,
             )
 
         class Store:
+            def search(
+                self, query: str, filters: Any = None, n_results: int = 5
+            ) -> Any:
+                return as_search_result(
+                    query, self.search_by_ticker(query, filters.ticker, n_results), filters.ticker
+                )
+
             def search_by_ticker(
                 self, query: str, ticker: str, n_results: int = 3, section: str | None = None
             ) -> SimpleNamespace:

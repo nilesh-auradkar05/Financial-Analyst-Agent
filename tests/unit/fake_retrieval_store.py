@@ -11,7 +11,7 @@ is given and returns at most `n_results`:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from app.components.retrieval.vector_store import (
     IndexDocument,
@@ -114,3 +114,41 @@ class FakeRetrievalStore:
         ranked = sorted(matching, key=lambda point: -_similarity(query, point.text))
         distances = [1.0 - _similarity(query, point.text) for point in ranked]
         return self._result(query, ranked, distances, n_results)
+
+    def search_by_ticker(
+        self,
+        query: str,
+        ticker: str,
+        n_results: int = 5,
+        section: Optional[str] = None,
+    ) -> SearchResult:
+        return self.search(
+            query, SearchFilters(ticker=ticker, section_key=section), n_results=n_results
+        )
+
+    def count_documents(self, filters: Optional[SearchFilters] = None) -> int:
+        return sum(_matches(point, filters) for point in self.points)
+
+
+def as_search_result(query: str, result: Any, ticker: str) -> SearchResult:
+    """A `SearchResult` of real `RetrievedChunk`s from the loose chunk objects a test double's
+    `search_by_ticker` returns, so its `search` serves the same chunks under the ticker filter.
+
+    A chunk's section and filing date move into the metadata keys `RetrievedChunk` reads them from;
+    its relevance score becomes the distance that yields it.
+    """
+    chunks = [
+        RetrievedChunk(
+            id=getattr(chunk, "id", f"{ticker}-{rank}"),
+            text=chunk.text,
+            metadata={
+                **dict(chunk.metadata),
+                "ticker": ticker,
+                "section_name": chunk.section,
+                "filing_date": chunk.filing_date,
+            },
+            distance=1 / max(chunk.relevance_score, 1e-9) - 1,
+        )
+        for rank, chunk in enumerate(result.chunks)
+    ]
+    return SearchResult(query=query, chunks=chunks, total_results=len(chunks))

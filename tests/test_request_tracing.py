@@ -107,6 +107,7 @@ def evidence(monkeypatch):
     from langsmith import traceable
 
     from app.agents import graph
+    from tests.unit.fake_retrieval_store import as_search_result
 
     class EvidenceChat(BaseChatModel):
         model: str = "offline-evidence-model"
@@ -145,6 +146,9 @@ def evidence(monkeypatch):
                                 snippet=query + " reports software revenue growth.", published_date="2026-09-01")][:max_results]
 
     class Store:
+        def search(self, query, filters=None, n_results=5):
+            return as_search_result(query, self.search_by_ticker(query, filters.ticker), filters.ticker)
+
         def search_by_ticker(self, query, ticker, n_results=3):
             return SimpleNamespace(chunks=[SimpleNamespace(id=f"{ticker}-business", text=f"{ticker} sells software and faces competition.",
                 section="Business", metadata={"filing_type": "10-K"}, filing_date="2026-01-01", relevance_score=1.0)])
@@ -188,7 +192,11 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     searches = [run for run in children if run["name"] == "search_filing_chunks"]
     assert len(searches) == 5  # four topic queries plus the company-name lookup (S2-T00c D2)
     assert all(set(run["inputs"]) == {"query", "ticker", "n_results"} for run in searches)
-    assert all(run["outputs"] == {"count": 1, "evidence_ids": ["AAPL-business"]} for run in searches)
+    assert all(
+        {key: run["outputs"].get(key) for key in ("count", "evidence_ids")}
+        == {"count": 1, "evidence_ids": ["AAPL-business"]}
+        for run in searches
+    )
     assert all(run["run_type"] == "chain" for run in children if run["name"] == "draft_memo")
     llms = [run for run in children if run["run_type"] == "llm"]
     assert len(llms) == 1
@@ -204,6 +212,50 @@ def test_real_graph_has_native_model_tools_verifier_and_text_only_memo(traced, e
     assert llms[0]["extra"]["metadata"]["ls_temperature"] == 0.0
     exported = str(runs)
     assert all(secret not in exported for secret in ("private-auth-value", "private-cookie-value", "private-export-key"))
+
+
+def _topic_searches(traced):
+    """The `search_filing_chunks` runs of the four topic queries (the company-name lookup searches
+    for the bare ticker)."""
+    return [
+        run
+        for run in traced.runs.values()
+        if run["name"] == "search_filing_chunks" and run["inputs"]["query"] != run["inputs"]["ticker"]
+    ]
+
+
+def test_filing_search_traces_record_the_dense_fallback(traced, evidence, monkeypatch):
+    """test-plan §25: App rerank fallback (the `search_filing_chunks` trace outputs record
+    `reranked` = false and the reason)."""
+    monkeypatch.setattr(api.settings.llm, "azure_foundry_rerank_model", None)
+    with TestClient(api.app) as client:
+        response = client.post("/analyze", json={"ticker": "AAPL"},
+                               headers={"X-API-Key": "private-auth-value"})
+    assert response.status_code == 200
+    topic = _topic_searches(traced)
+    assert len(topic) >= 4
+    for run in topic:
+        assert run["outputs"].get("reranked") is False
+        reason = run["outputs"].get("rerank_fallback_reason")
+        assert isinstance(reason, str) and reason.strip()
+        assert run["outputs"]["evidence_ids"] == ["AAPL-business"]
+    assert "private-export-key" not in str(traced.runs)
+
+
+def test_filing_search_traces_record_a_reranked_search(traced, evidence, foundry_rerank):
+    """test-plan §25: App filing retrieval reranks (the `search_filing_chunks` trace outputs
+    record `reranked` = true when the reranker scored the candidates)."""
+    with TestClient(api.app) as client:
+        response = client.post("/analyze", json={"ticker": "AAPL"},
+                               headers={"X-API-Key": "private-auth-value"})
+    assert response.status_code == 200
+    topic = _topic_searches(traced)
+    assert len(topic) >= 4
+    for run in topic:
+        assert run["outputs"].get("reranked") is True
+        assert "rerank_fallback_reason" not in run["outputs"]
+        assert run["outputs"]["evidence_ids"] == ["AAPL-business"]
+    assert "test-key" not in str(traced.runs)
 
 
 def test_nested_app_failure_exports_only_safe_error(traced, evidence, monkeypatch):
