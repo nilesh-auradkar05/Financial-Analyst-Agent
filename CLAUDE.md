@@ -148,6 +148,7 @@ python scripts/ci/check_no_scope_residue.py
 python scripts/ci/check_sprint_map.py
 python scripts/ci/check_doc_sync.py
 python scripts/ci/check_test_hygiene.py
+python scripts/ci/check_eval_lineage.py
 
 # ingestion / replay (replay runs without network, hook H7)
 uv run pytest tests/ingestion tests/replay

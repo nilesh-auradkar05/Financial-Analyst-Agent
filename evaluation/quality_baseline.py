@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import re
 import statistics
@@ -31,9 +32,10 @@ from app.verification.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_gro
 from dataops.evidence_release import SnapshotRecord
 from dataops.git_state import git_state as _git_state
 from dataops.replay import EvidenceReplayBundle, load_evidence_release_records
+from evaluation.registry import new_run_id, prompt_version, run_snapshot_hash, write_run
 from evaluation.semantic_grounding import evaluate_memo_grounding_semantic
 
-RESULTS_DIR = Path("evaluation/results")
+RESULTS_DIR = Path("evaluation/quality_res")
 MIN_CITATION_COVERAGE = 0.80
 MIN_GROUNDED_CLAIM_RATE = 0.75
 _CIT_RE = re.compile(r"\[(\d+)\]")
@@ -190,6 +192,7 @@ def _score_final_state(
             {"step": e.get("step"), "message": (e.get("message") or "")[:200]} for e in errors
         ],
         "fatal_error": has_fatal_error(final),
+        "snapshot_hash": final.get("snapshot_hash"),
         "run_ms": run_ms,
     }
 
@@ -325,10 +328,32 @@ async def main() -> None:
     overall = _aggregate(runs)
     error_steps = Counter(e["step"] for r in runs for e in r["errors"])
     model_id = MODEL_PRESETS.get(settings.llm.model, settings.llm.model)
+    git = _git_state()
+    run_config = {
+        "tickers": args.tickers,
+        "repeats": args.repeats,
+        "include_filing_analysis": include_filing_analysis,
+        "include_news_sentiment": include_news_sentiment,
+        "max_news_articles": args.max_news,
+    }
+    release_id = evidence_bundle.manifest.release_id if evidence_bundle else "live"
+    snapshot_hashes = (
+        evidence_bundle.manifest.snapshot_ids
+        if evidence_bundle
+        else [r["snapshot_hash"] for r in runs]
+    )
 
     artifact = {
+        "run_id": new_run_id(git["commit"]),
+        "git_sha": git["commit"],
+        "branch": git["branch"],
+        "prompt_version": prompt_version(),
+        "snapshot_hash": run_snapshot_hash(release_id, snapshot_hashes),
+        "fixture_version": hashlib.sha256(
+            json.dumps(run_config, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:16],
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "git": _git_state(),
+        "git": git,
         "provider": "bedrock",
         "model": model_id,
         "model_family": _model_family(model_id),
@@ -337,7 +362,8 @@ async def main() -> None:
         "grounding_checker": args.checker,
         "grounding_eval_version": GROUNDING_EVAL_VERSION,
         "min_similarity": args.min_similarity if args.checker == "semantic" else None,
-        "evidence_release": (
+        "evidence_release": release_id,
+        "evidence_release_detail": (
             {
                 "release_id": evidence_bundle.manifest.release_id,
                 "dataset_name": evidence_bundle.manifest.dataset_name,
@@ -370,6 +396,25 @@ async def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = RESULTS_DIR / next_baseline_filename(RESULTS_DIR, model_id, settings.llm.temperature)
     out_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
+    write_run(
+        {
+            "run_id": artifact["run_id"],
+            "git_sha": artifact["git_sha"],
+            "branch": artifact["branch"],
+            "model": model_id,
+            "temperature": settings.llm.temperature,
+            "prompt_version": artifact["prompt_version"],
+            "evidence_release": release_id,
+            "snapshot_hash": artifact["snapshot_hash"],
+            "fixture_version": artifact["fixture_version"],
+            "metrics": {
+                "grounded_claim_rate": overall["grounded_claim_rate"]["mean"],
+                "citation_coverage": overall["citation_coverage_rate"]["mean"],
+            },
+            "classification": "candidate",
+            "result_path": str(out_path),
+        }
+    )
 
     g, c = overall["grounded_claim_rate"], overall["citation_coverage_rate"]
     dirty = " (WORKING TREE DIRTY)" if artifact["git"]["dirty"] else ""

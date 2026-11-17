@@ -89,6 +89,7 @@ async def _run_case(case: RAGQualityEvalCase) -> RAGQualitySample:
             "execution_time_ms": state_dict.get("execution_time_ms"),
             "verification_result": state_dict.get("verification_result"),
             "errors": state_dict.get("errors", []),
+            "snapshot_hash": state_dict.get("snapshot_hash"),
         },
     )
 
