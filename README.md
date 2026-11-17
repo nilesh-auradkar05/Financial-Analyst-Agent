@@ -28,7 +28,7 @@ These numbers come from committed artifacts. Each one holds only for the model a
 |---|---|---|---|
 | Grounded-claim rate | **0.935 ± 0.045** | 30 memos (two replay runs of AAPL, MSFT, NVDA × 5), frozen evidence release `alpha-evidence:0.1.0`, `deepseek.v3.2` at temperature 0.3, commit `89265b8` | [`quality_baselines/alpha-quality-baseline__0.1.0.json`](artifacts/dataops/quality_baselines/alpha-quality-baseline__0.1.0.json) |
 | Citation coverage | **0.923 ± 0.047** | same run | same file |
-| End-to-end latency (warm, sequential) | p50 **32.6 s**, p95 **37.7 s** | 12 warm runs, Ollama `minimax-m3:cloud`, commit `2a47dd1` | [`evaluation/latency_res/`](evaluation/latency_res/) |
+| End-to-end latency (warm, sequential) | p50 **32.6 s**, p95 **37.7 s** | 12 warm runs, Ollama `minimax-m3:cloud`, commit `2a47dd1` | [`evaluation/archive/latency_res/`](evaluation/archive/latency_res/) |
 
 ### Reproduce the evaluations
 

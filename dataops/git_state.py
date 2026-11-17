@@ -28,6 +28,7 @@ def git_state() -> dict[str, Any]:
 
     return {
         "commit": run(["rev-parse", "--short", "HEAD"]) or "unknown",
+        "branch": run(["rev-parse", "--abbrev-ref", "HEAD"]) or "unknown",
         "dirty": bool(run(["status", "--porcelain"])),
     }
 

@@ -611,6 +611,33 @@ def _extract_used_citations(memo: str) -> set[int]:
     return {int(m) for m in re.findall(r"\[(\d+)\]", memo)}
 
 
+DRAFT_PROMPT_TEMPLATE = (
+    "Write a comprehensive investment memo for {company_name} ({ticker}).\n\n"
+    "{context}"
+    "{registry_block}\n\n"
+    "Structure:\n"
+    "1. Executive Summary (2-3 sentences; every factual sentence cited)\n"
+    "2. Company Overview\n"
+    "3. Recent News & Market Sentiment\n"
+    "4. Key Risk Factors (from SEC filings)\n"
+    "5. Financial Highlights\n"
+    "6. Investment Thesis (bullish and bearish cases)\n"
+    "7. Conclusion with recommendation\n\n"
+    "CITATION REQUIREMENTS (mandatory):\n"
+    "- Every sentence stating a fact, number, metric, or event MUST end with a citation "
+    "to a listed source, e.g. [1] or [2][3] — in EVERY section, including the Executive "
+    "Summary and Investment Thesis.\n"
+    "- Use ONLY the numbered sources above. Never invent citation numbers or cite unlisted sources.\n"
+    "- If a claim is not supported by a listed source, do not assert it as fact: omit it "
+    "or state explicitly that it is unsupported/uncertain.\n"
+    "- The only uncited sentences allowed are section headers and your clearly-labeled "
+    "recommendation, which must rest on cited premises stated earlier.\n"
+    "- Before finishing, re-read each sentence: if it states a fact or number without a [N], "
+    "add the citation or delete the sentence.\n"
+    "{disclaimer}"
+)
+
+
 @app_traceable(name="draft_memo", run_type="chain", tags=["agent"])
 async def draft_memo_node(state: AgentState) -> dict:
     """
@@ -676,30 +703,12 @@ async def draft_memo_node(state: AgentState) -> dict:
         if "filings" in missing:
             disclaimer += f" Include the exact line 'SEC Filings: Not Available. {filing_reason}'"
 
-        user_prompt = (
-            f"Write a comprehensive investment memo for {company_name} ({ticker}).\n\n"
-            f"{context}"
-            f"{registry_block}\n\n"
-            "Structure:\n"
-            "1. Executive Summary (2-3 sentences; every factual sentence cited)\n"
-            "2. Company Overview\n"
-            "3. Recent News & Market Sentiment\n"
-            "4. Key Risk Factors (from SEC filings)\n"
-            "5. Financial Highlights\n"
-            "6. Investment Thesis (bullish and bearish cases)\n"
-            "7. Conclusion with recommendation\n\n"
-            "CITATION REQUIREMENTS (mandatory):\n"
-            "- Every sentence stating a fact, number, metric, or event MUST end with a citation "
-            "to a listed source, e.g. [1] or [2][3] — in EVERY section, including the Executive "
-            "Summary and Investment Thesis.\n"
-            "- Use ONLY the numbered sources above. Never invent citation numbers or cite unlisted sources.\n"
-            "- If a claim is not supported by a listed source, do not assert it as fact: omit it "
-            "or state explicitly that it is unsupported/uncertain.\n"
-            "- The only uncited sentences allowed are section headers and your clearly-labeled "
-            "recommendation, which must rest on cited premises stated earlier.\n"
-            "- Before finishing, re-read each sentence: if it states a fact or number without a [N], "
-            "add the citation or delete the sentence.\n"
-            f"{disclaimer}"
+        user_prompt = DRAFT_PROMPT_TEMPLATE.format(
+            company_name=company_name,
+            ticker=ticker,
+            context=context,
+            registry_block=registry_block,
+            disclaimer=disclaimer,
         )
 
         llm = get_llm(settings)

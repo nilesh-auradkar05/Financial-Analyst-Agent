@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import inspect
 import json
 import os
@@ -23,6 +24,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from dataops.git_state import git_state
 from evaluation.build_rag_quality_samples import RAGQualitySample
 from evaluation.judge_models_interface import (
     JudgeModelConfig,
@@ -32,6 +34,7 @@ from evaluation.judge_models_interface import (
     create_ragas_judge_llm,
     judge_config_from_env,
 )
+from evaluation.registry import new_run_id, prompt_version, run_snapshot_hash, write_run
 
 JudgeName = Literal["ragas", "deepeval"]
 T = TypeVar("T")
@@ -55,6 +58,15 @@ class MetricScore(BaseModel):
 class RagQualityReport(BaseModel):
     """Persisted RAG quality report."""
 
+    run_id: str
+    git_sha: str
+    branch: str
+    model: str
+    temperature: float
+    prompt_version: str
+    evidence_release: str
+    snapshot_hash: str
+    fixture_version: str
     generated_at: str
     sample_count: int
     judges: list[str]
@@ -607,7 +619,7 @@ def log_summary_to_langsmith(report: RagQualityReport, *, experiment_name: str) 
 
 def _default_output_path() -> Path:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return Path("evaluation/reports") / f"rag_quality_eval_{timestamp}.json"
+    return Path("evaluation/rag_quality_res") / f"rag_quality_eval_{timestamp}.json"
 
 
 def _parse_judges(value: str) -> list[JudgeName]:
@@ -701,6 +713,9 @@ def main() -> None:
     samples = load_samples(args.samples)
     judges = _parse_judges(args.judges)
     judge_config = _build_judge_config(args)
+    unhashed = [s.case_id for s in samples if not s.metadata.get("snapshot_hash")]
+    if unhashed:
+        raise ValueError(f"samples lack metadata.snapshot_hash (run lineage): {unhashed}")
 
     scores: list[MetricScore] = []
     if "ragas" in judges:
@@ -732,14 +747,45 @@ def main() -> None:
             )
         )
 
+    git = git_state()
+    summary = summarize_scores(scores, judge_config=judge_config)
     report = RagQualityReport(
+        run_id=new_run_id(git["commit"]),
+        git_sha=git["commit"],
+        branch=git["branch"],
+        model=judge_config.model or str(judge_config.provider),
+        temperature=judge_config.temperature,
+        prompt_version=prompt_version(),
+        evidence_release="live",
+        snapshot_hash=run_snapshot_hash("live", (s.metadata["snapshot_hash"] for s in samples)),
+        fixture_version=hashlib.sha256(Path(args.samples).read_bytes()).hexdigest()[:16],
         generated_at=datetime.now(timezone.utc).isoformat(),
         sample_count=len(samples),
         judges=list(judges),
-        summary=summarize_scores(scores, judge_config=judge_config),
+        summary=summary,
         scores=scores,
     )
     output_path = save_report(report, args.output)
+    write_run(
+        {
+            **report.model_dump(
+                include={
+                    "run_id",
+                    "git_sha",
+                    "branch",
+                    "model",
+                    "temperature",
+                    "prompt_version",
+                    "evidence_release",
+                    "snapshot_hash",
+                    "fixture_version",
+                }
+            ),
+            "metrics": summary["metric_averages"],
+            "classification": "candidate",
+            "result_path": str(output_path),
+        }
+    )
     log_summary_to_langsmith(report, experiment_name=args.langsmith_experiment)
 
     print(json.dumps(report.summary, indent=2))
