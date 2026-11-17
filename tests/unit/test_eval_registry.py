@@ -113,6 +113,24 @@ def test_lineage_empty_string_field_is_refused_and_writes_no_file(
     assert_nothing_written(root)
 
 
+@pytest.mark.parametrize(
+    "run_id",
+    ["../x", "a/b", "/abs", ".hidden", "..", "a\\b", "x y", "x\0y", "run:1"],
+    ids=["parent-dir", "separator", "absolute", "leading-dot", "dotdot", "backslash", "space", "nul", "colon"],
+)
+def test_lineage_run_id_that_is_not_a_plain_file_name_is_refused_and_writes_nothing(
+    tmp_path: Path, run_id: str
+) -> None:
+    """§14 Lineage required: run_id may use only letters, digits, '.', '_' and '-', with no path
+    separator and no leading '.'; a refused record writes no file inside or outside the root."""
+    root = tmp_path / "registry" / "runs"
+
+    with pytest.raises(RegistryError):
+        write_run(record(run_id=run_id), root=root)
+
+    assert not list(tmp_path.rglob("*")), "a refused run_id left files behind"
+
+
 def test_lineage_extra_field_is_refused_and_writes_no_file(tmp_path: Path) -> None:
     """§14 Lineage required: an extra field is refused; no file is written."""
     root = tmp_path / "runs"
