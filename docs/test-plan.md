@@ -344,8 +344,13 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 
 | Case | Expected behavior |
 | --- | --- |
-| Lineage required | Result JSON lacking any of `git_sha, model, temperature, prompt_version, evidence_release, snapshot_hash, fixture_version` is rejected by the registry writer |
-| Classification ceiling | Run on live evidence cannot be `approved` (SPEC §11.1) |
+| Lineage required (amended S6.1, 2026-11-17) | The registry writer (`evaluation/registry.py`) accepts only a record with every SPEC §11.2 field (`run_id, git_sha, branch, model, temperature, prompt_version, evidence_release, snapshot_hash, fixture_version, metrics, classification`) and refuses one with any field missing, any string field empty, an extra field, or a `run_id` that is not a plain file name (only letters, digits, `.`, `_` and `-`; no path separator, no leading `.`); a refused record writes no file inside or outside the registry root |
+| Append-only (S6.1) | Writing a record whose `run_id` already exists under the registry root is refused and the existing file is unchanged |
+| Classification ceiling | Run on live evidence cannot be `approved` (SPEC §11.1): a record with `evidence_release` = `live` and `classification` = `approved` is refused |
+| prompt_version (S6.1) | `prompt_version()` is a short sha256 hex of the analyst system prompt plus the draft-memo prompt template; the same prompt text gives the same value, and an edit to either gives a different value |
+| Run snapshot hash (S6.1) | `run_snapshot_hash(evidence_release, snapshot_hashes)` is a sha256 hex that depends on the release id and the set of snapshot hashes, not their order: replay runs pass the release id and its manifest's snapshot ids; live runs pass `live` and the per-case snapshot hashes |
+| Hook and CI agree (S6.1) | For each sample (path, JSON body), hook H5 and `scripts/ci/check_eval_lineage.py` give the same allow/deny on `evaluation/<name>_res/` and `evaluation/registry/runs/` paths; the CI check passes on the repository (legacy results live under `evaluation/archive/`, outside both patterns) and fails, naming the file, on a planted `*_res` result lacking a lineage key |
+| Producers write lineage (S6.1) | A `quality_baseline` replay run and a `run_rag_quality_eval` run (fake judges, no network) each write a result under `evaluation/<name>_res/` carrying the lineage keys and exactly one registry record whose `result_path` names that result and whose `classification` is `candidate`. RAG samples carry their run's `snapshot_hash` in `metadata`; `run_rag_quality_eval` refuses samples without one before any judge runs and writes nothing |
 | Regression gate | Synthetic run with `grounded_claim_rate` 2.5σ below approved baseline fails `eval-replay` job |
 | Verifier↔judge agreement | Agreement report exists with n ≥ 50 and κ; README quotes heuristic rate only alongside κ |
 | Single-axis record | Registry record stores the `git diff --stat` axis set; multi-axis runs are flagged `invalid` |

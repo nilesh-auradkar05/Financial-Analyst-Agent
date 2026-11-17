@@ -749,7 +749,7 @@ Feature: every eval run is an append-only record with full lineage, and unlineag
 Trace: SPEC §11.2; test-plan §14; hook H5
 Tests:  U registry writer rejects each missing key; live runs cannot be approved · C hook H5 and the CI check agree
 Regression: R1 R2 R3
-Result: Pending.
+Result: DONE 2026-11-17. Owner decisions D1–D4 (2026-11-16) applied; test-plan §14 rows amended/added (Lineage required incl. plain-file-name run_id, Append-only, Classification ceiling, prompt_version, Run snapshot hash, Hook and CI agree, Producers write lineage). Red 6a8971b, 6202612; feat 53a8f3b (tests unchanged since 6202612). `evaluation/registry.py`: `EvalRunRecord` (SPEC §11.2 fields, extra forbidden, live evidence never approved), append-only `write_run` to `evaluation/registry/runs/<run_id>.json`, `prompt_version()` = sha256 prefix of the analyst system prompt + `DRAFT_PROMPT_TEMPLATE` (extracted from `draft_memo_node`, prompt text byte-identical), `run_snapshot_hash`. `scripts/ci/check_eval_lineage.py` uses H5's pattern and key rule and runs in the CI governance step. `quality_baseline` (now `evaluation/quality_res/`) and `run_rag_quality_eval` (now `evaluation/rag_quality_res/`; refuses samples without `metadata.snapshot_hash`) write lineaged results plus one candidate registry record each; legacy unlineaged results moved to `evaluation/archive/`. R1 ruff clean, mypy clean, pytest 1253 passed / 7 skipped (worktree, OpenSearch container up); R2 governance 4/4 + eval-lineage PASS; R3 `-m replay` 87 passed under H7's `unshare -rn` (loopback up). No live runs, no spend.
 ```
 
 ```text
