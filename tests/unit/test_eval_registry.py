@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from app.agents import graph
+from app.services import llm
 from evaluation.registry import (
     RegistryError,
     new_run_id,
@@ -21,9 +24,6 @@ from evaluation.registry import (
     run_snapshot_hash,
     write_run,
 )
-
-from app.agents import graph
-from app.services import llm
 
 STRING_FIELDS = (
     "run_id",
