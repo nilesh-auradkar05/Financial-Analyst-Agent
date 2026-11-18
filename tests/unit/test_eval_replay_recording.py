@@ -88,6 +88,7 @@ def written_run(workdir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def run_gate(argv: list[str]) -> Any:
+    """Exit code of the gate: its return value, or the code of the SystemExit it raises."""
     from evaluation import eval_replay
 
     try:

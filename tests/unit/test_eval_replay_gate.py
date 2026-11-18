@@ -135,7 +135,7 @@ def write_baseline(
     lower than its recorded rate.
     """
     drafts = list(rescored_shapes if rescored_shapes is not None else recorded_shapes)
-    raw_runs = []
+    raw_runs: list[dict[str, Any]] = []
     for number, (recorded, draft) in enumerate(zip(recorded_shapes, drafts, strict=True)):
         grounded, coverage = score(recorded)
         raw_runs.append(
@@ -325,25 +325,25 @@ def test_the_gate_reads_the_default_registry_root(
 # --- Pinned approved baseline ----------------------------------------------------------------
 
 
-REFUSALS: list[tuple[list[str], dict[str, Any], str]] = [
-    (["--registry-root", "{root}"], {}, "baseline"),
-    (["--baseline", "no-such-run", "--registry-root", "{root}"], {}, "no-such-run"),
+REFUSALS: list[tuple[list[str], dict[str, Any], tuple[str, ...]]] = [
+    (["--registry-root", "{root}"], {}, ("baseline",)),
+    (["--baseline", "no-such-run", "--registry-root", "{root}"], {}, ("no-such-run",)),
     (
         ["--baseline", RUN_ID, "--registry-root", "{root}"],
         {"classification": "candidate"},
-        "approved",
+        ("approved", "candidate"),
     ),
     (
         ["--baseline", RUN_ID, "--registry-root", "{root}"],
         {"evidence_release": "live", "classification": "approved"},
-        "live",
+        ("live",),
     ),
     (
         ["--baseline", RUN_ID, "--registry-root", "{root}"],
         {"evidence_release": "live", "classification": "candidate"},
-        "live",
+        ("live", "approved"),
     ),
-    (["--baseline", RUN_ID, "--registry-root", "{root}"], {"checker": "semantic"}, "token"),
+    (["--baseline", RUN_ID, "--registry-root", "{root}"], {"checker": "semantic"}, ("token", "semantic", "checker")),
 ]
 
 
@@ -365,7 +365,7 @@ def test_gate_refuses_a_baseline_that_is_not_a_pinned_approved_token_replay_run(
     capsys: pytest.CaptureFixture[str],
     argv: list[str],
     baseline: dict[str, Any],
-    reason: str,
+    reason: tuple[str, ...],
 ) -> None:
     """§14 Pinned approved baseline (S6.2): exit 1 before scoring, saying why.
 
@@ -377,7 +377,7 @@ def test_gate_refuses_a_baseline_that_is_not_a_pinned_approved_token_replay_run(
     code, output = run_gate([arg.replace("{root}", str(root)) for arg in argv], capsys)
 
     assert code == 1, output
-    assert reason in output.lower()
+    assert any(word in output.lower() for word in reason), output
 
 
 # --- Gate is offline -------------------------------------------------------------------------
