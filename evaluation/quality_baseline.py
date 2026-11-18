@@ -194,6 +194,8 @@ def _score_final_state(
         "fatal_error": has_fatal_error(final),
         "snapshot_hash": final.get("snapshot_hash"),
         "run_ms": run_ms,
+        "recorded_memo": memo,
+        "recorded_registry": registry,
     }
 
 
@@ -292,7 +294,12 @@ async def main() -> None:
         "--evidence-release", help="Replay a frozen evidence release (<name:version>)"
     )
     parser.add_argument("--registry-root", default="artifacts/dataops")
+    parser.add_argument("--classification", choices=["candidate", "approved"], default="candidate")
     args = parser.parse_args()
+    if args.classification == "approved" and (
+        not args.evidence_release or args.checker != "token"
+    ):
+        parser.error("--classification approved requires --evidence-release and --checker token")
 
     include_filing_analysis = not args.no_filings
     include_news_sentiment = not args.no_sentiment
@@ -411,7 +418,7 @@ async def main() -> None:
                 "grounded_claim_rate": overall["grounded_claim_rate"]["mean"],
                 "citation_coverage": overall["citation_coverage_rate"]["mean"],
             },
-            "classification": "candidate",
+            "classification": args.classification,
             "result_path": str(out_path),
         }
     )
