@@ -576,7 +576,7 @@ Non-goals: any other verifier change; prompt changes.
 Tests:  U every §7 VERIFY-SCALE / VERIFY-UNITS row · E2E the nine degraded runs replayed: unsupported-claim count recorded before/after
 Regression: R1 R2 R3
 Done: all §7 rows green; existing supported claims unchanged; lands before any eval baseline is recorded.
-Result: Pending.
+Result: DONE 2026-10-23 (recorded 2026-11-18 from the tasks/todo.md ledger; code in main). VERIFY-SCALE: test-plan §7 rows 0bdbc3e; red 82c021a, guard 64c6f79 ("Years never scale"); fix d4be0cf (implicit ×1e3/×1e6 only for comma-grouped sec_filing figures, a figure's own scale word always applies, identifiers/URL/date never scaled; GROUNDING_EVAL_VERSION 3; tests unchanged since 64c6f79). VERIFY-UNITS: rows 8aa6448; red 734e3b0; fix b90e814 (scaled claim figures match by absolute amount; GROUNDING_EVAL_VERSION 4). R1 via H13 at each commit. E2E item level (VERIFY-SCALE, 216 filing-only claims from the nine degraded runs, evidence approximated by the best-overlap chunk in the cited section): 34 flip unsupported→supported, 0 regress, 0 flipped claims accept a wrong-figure control; VERIFY-UNITS: 34 flip, 0 regress. Live APP run on b90e814 (job 86255ab1…, owner-authorized 2026-10-23): degraded, grounded_claim_rate 0.746 (threshold 0.75), coverage 0.95. Open follow-ups (owner rule needed): mapping evidence matched as str(dict); bare '10K'-style figures.
 ```
 
 ```text
