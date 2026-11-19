@@ -576,7 +576,7 @@ Non-goals: any other verifier change; prompt changes.
 Tests:  U every §7 VERIFY-SCALE / VERIFY-UNITS row · E2E the nine degraded runs replayed: unsupported-claim count recorded before/after
 Regression: R1 R2 R3
 Done: all §7 rows green; existing supported claims unchanged; lands before any eval baseline is recorded.
-Result: Pending.
+Result: DONE 2026-10-23 (recorded 2026-11-18 from the tasks/todo.md ledger; code in main). VERIFY-SCALE: test-plan §7 rows 0bdbc3e; red 82c021a, guard 64c6f79 ("Years never scale"); fix d4be0cf (implicit ×1e3/×1e6 only for comma-grouped sec_filing figures, a figure's own scale word always applies, identifiers/URL/date never scaled; GROUNDING_EVAL_VERSION 3; tests unchanged since 64c6f79). VERIFY-UNITS: rows 8aa6448; red 734e3b0; fix b90e814 (scaled claim figures match by absolute amount; GROUNDING_EVAL_VERSION 4). R1 via H13 at each commit. E2E item level (VERIFY-SCALE, 216 filing-only claims from the nine degraded runs, evidence approximated by the best-overlap chunk in the cited section): 34 flip unsupported→supported, 0 regress, 0 flipped claims accept a wrong-figure control; VERIFY-UNITS: 34 flip, 0 regress. Live APP run on b90e814 (job 86255ab1…, owner-authorized 2026-10-23): degraded, grounded_claim_rate 0.746 (threshold 0.75), coverage 0.95. Open follow-ups (owner rule needed): mapping evidence matched as str(dict); bare '10K'-style figures.
 ```
 
 ```text
@@ -758,7 +758,7 @@ Feature: a PR that lowers grounding on frozen evidence beyond 2σ fails CI.
 Trace: SPEC §11.2; test-plan §14 "Regression gate"
 Tests:  I synthetic run 2.5σ below baseline fails; at baseline passes · E2E gate runs with network disabled
 Regression: R1 R2 R3 (R5 starts here)
-Done: approved baseline recorded after VERIFY-SCALE. Result: Pending.
+Done: approved baseline recorded after VERIFY-SCALE. Result: DONE 2026-11-19. Owner decisions 2026-11-18: CI re-verifies recorded drafts (no model in CI, network off); σ = pooled sample stdev; baseline recording approved. Test-plan §14 rows (Regression gate amended; Pinned approved baseline; Gate is offline; Recorded drafts) and red 99b0a55, frozen 814c7b5; feat 6f93b18 (tests unchanged since 814c7b5): `evaluation/eval_replay.py --baseline <run_id>` re-scores the pinned approved baseline's recorded drafts with `evaluate_memo_grounding` and fails a mean more than 2σ below the recorded mean; refuses missing/unknown/candidate/live/non-token/draftless baselines; `quality_baseline` records each run's scored memo and registry and takes `--classification approved` (refused without `--evidence-release` or with a non-token checker, before any model call). Approved baseline (owner-run 2026-11-19, clean tree at 6f93b18): run 20261119T041339Z-6f93b18-460d, `alpha-evidence:0.1.0`, deepseek.v3.2 at 0.3, token checker, AAPL/MSFT/NVDA × 5 = 15 runs; grounded_claim_rate 0.908 σ 0.061 (gate threshold 0.786), citation_coverage 0.909 σ 0.050 (threshold 0.809); result `evaluation/quality_res/retrieval_baseline_001_deepseek.v3.2_0.3.json` (legacy filename helper) + registry record. Zero-delta: all 15 recorded runs re-score to their recorded rates exactly. Gate under H7's `unshare -rn`: exit 0, every per-run delta +0.0000. CI job `eval-replay` (network namespace, fail-closed) pins that run id; R5 applies from here. R1 via H13 on 6f93b18; R2 governance 4/4 + eval-lineage PASS; R3 `-m replay` 87 passed. Note: S6.4 changes drafting, so its Done includes re-recording the baseline and re-pinning the job.
 ```
 
 ```text

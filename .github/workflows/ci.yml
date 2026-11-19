@@ -79,3 +79,29 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ tests/unit/ tests/integration/ -v --tb=short
+
+  # S6.2 / SPEC §11.2: re-score the pinned approved baseline's recorded drafts with the
+  # current verifier, network disabled; fails on a >2σ drop of grounded_claim_rate or
+  # citation_coverage. Changing the baseline is a reviewed edit of --baseline below.
+  eval-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen --group api --group dev
+
+      # Fail closed: an error lifting the runner's user-namespace restriction or
+      # entering the network namespace fails the job.
+      - name: Re-score the approved baseline with the network disabled
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          unshare -rn sh -c 'ip link set lo up && uv run --no-sync python -m evaluation.eval_replay --baseline 20261119T041339Z-6f93b18-460d'
