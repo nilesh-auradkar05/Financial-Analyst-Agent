@@ -104,4 +104,4 @@ jobs:
       - name: Re-score the approved baseline with the network disabled
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          unshare -rn sh -c 'ip link set lo up && uv run --no-sync python -m evaluation.eval_replay --baseline 20261119T041339Z-6f93b18-460d'
+          unshare -rn sh -c 'ip link set lo up && uv run --no-sync python -m evaluation.eval_replay --baseline 20261120T225248Z-50a99c5-0dad'
