@@ -29,10 +29,14 @@ async def test_progress_reports_each_node_running_then_finished(monkeypatch):
     last = {step["node"]: step for step in snapshots[-1]}
     order = [step["node"] for step in snapshots[-1]]
     assert set(order[:3]) == EVIDENCE_STEPS
-    assert order[3:] == NODES
+    assert order[3:6] == NODES
+    assert set(order[6:]) <= {"revise_memo"}  # SPEC 8.1: only a failed draft adds this node
     assert last["fetch_stock"]["status"] == "degraded"
     assert last["research_news"]["status"] == last["retrieve_filings"]["status"] == "completed"
-    assert all(step["ended_at"] >= step["started_at"] and step["duration_ms"] >= 0 for step in last.values())
+    assert all(
+        step["ended_at"] >= step["started_at"] and step["duration_ms"] >= 0
+        for step in last.values()
+    )
 
     first_seen = {}
     for snapshot in snapshots:
@@ -48,7 +52,13 @@ async def test_run_without_observer_returns_the_same_result(monkeypatch):
     observed, _ = await observed_run(monkeypatch)
     plain = await run_agent("AAPL")
 
-    for key in ("investment_memo", "news_articles", "stock_data", "citations", "verification_result"):
+    for key in (
+        "investment_memo",
+        "news_articles",
+        "stock_data",
+        "citations",
+        "verification_result",
+    ):
         assert plain[key] == observed[key]
 
 
@@ -68,7 +78,7 @@ async def test_usage_and_summary_come_from_the_memo_response(monkeypatch):
 
     assert reported["executive_summary"] == "Revenue grew [1]."
     assert reported["llm_usage"]["model"] == "echo-1"
-    assert reported["llm_usage"]["output_tokens"] == 12
+    assert reported["llm_usage"]["output_tokens"] == 12 * reported["draft_count"]
     assert reported["llm_usage"]["input_tokens"] > 100
 
     monkeypatch.setattr(graph, "get_llm", lambda _settings: EchoLLM())

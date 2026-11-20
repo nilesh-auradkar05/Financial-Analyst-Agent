@@ -559,7 +559,12 @@ async def _run_analysis_job(
                 formatted = _format_response(result).model_dump()
                 formatted.update(job_id=job_id, request_id=record.request_id if record else None,
                                  trace_id=record.trace_id if record else None)
-                run_store.mark_finished(job_id, status=formatted["status"], result=formatted)
+                run_store.mark_finished(
+                    job_id,
+                    status=formatted["status"],
+                    result=formatted,
+                    draft_history=result.get("draft_history") or [],
+                )
                 if run:
                     run.end(outputs={"outcome": formatted["status"], "job_id": job_id})
         except Exception:
@@ -685,6 +690,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
         missing=missing,
         filing_chunk_count=len(state.get("filing_chunks") or []),
         usage=UsageResponse(**usage) if (usage := state.get("llm_usage")) else None,
+        draft_count=state.get("draft_count"),
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         execution_time_ms=state.get("execution_time_ms"),

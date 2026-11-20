@@ -8,10 +8,12 @@ directory. The run's result file must carry each scored draft so the gate can re
 
 from __future__ import annotations
 
+import copy
 import json
+import re
 import socket
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -20,7 +22,15 @@ import pytest
 from app.agents import graph
 from app.verification.grounding import evaluate_memo_grounding
 from evaluation import quality_baseline
-from tests.replay.support import BuiltRelease, FakeChat, build_release
+from tests.replay.support import (
+    CLEAN,
+    FIRST_DRAFT_FAILS,
+    BuiltRelease,
+    FakeChat,
+    ScriptedChat,
+    Turn,
+    build_release,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -172,3 +182,191 @@ async def test_approved_is_refused_before_any_model_call_and_nothing_is_written(
     assert reason in text
     assert chat.prompts_seen == []
     assert not (workdir / "evaluation").exists()
+
+
+@pytest.fixture
+def scripted(monkeypatch: pytest.MonkeyPatch) -> Callable[[list[Turn]], ScriptedChat]:
+    """Install a provider that follows a plan; the real verifier decides pass or fail."""
+
+    def install(plan: list[Turn]) -> ScriptedChat:
+        model = ScriptedChat(plan)
+        monkeypatch.setattr(graph, "get_llm", lambda _settings: model)
+        return model
+
+    return install
+
+
+def single_ticker_argv(release: BuiltRelease) -> list[str]:
+    argv = argv_for(release, "--checker", "token")
+    at = argv.index("--tickers")
+    return [*argv[: at + 1], "AAPL", *argv[at + 3 :]]
+
+
+async def run_one_ticker_twice(
+    monkeypatch: pytest.MonkeyPatch, release: BuiltRelease, workdir: Path
+) -> dict[str, Any]:
+    monkeypatch.setattr(sys, "argv", single_ticker_argv(release))
+    await quality_baseline.main()
+    result, _record = written_run(workdir)
+    return result
+
+
+async def test_every_raw_run_carries_its_repeat_and_its_drafts(
+    monkeypatch: pytest.MonkeyPatch, workdir: Path, release: BuiltRelease, chat: FakeChat
+) -> None:
+    """§14 Recorded drafts (S6.4): each raw run carries `repeat` (0-based within its ticker),
+    `draft_count` and `draft_history`, one history entry per draft."""
+    monkeypatch.setattr(sys, "argv", argv_for(release, "--checker", "token"))
+
+    await quality_baseline.main()
+
+    result, _record = written_run(workdir)
+    assert sorted((run["ticker"], run["repeat"]) for run in result["raw_runs"]) == [
+        ("AAPL", 0),
+        ("AAPL", 1),
+        ("MSFT", 0),
+        ("MSFT", 1),
+    ]
+    for run in result["raw_runs"]:
+        assert run["draft_count"] >= 1
+        assert len(run["draft_history"]) == run["draft_count"]
+        for entry in run["draft_history"]:
+            assert isinstance(entry["grounded_claim_rate"], float)
+            assert isinstance(entry["passed"], bool)
+
+
+async def test_a_run_whose_first_draft_fails_records_two_drafts_and_the_passing_memo(
+    monkeypatch: pytest.MonkeyPatch,
+    workdir: Path,
+    release: BuiltRelease,
+    scripted: Callable[[list[Turn]], ScriptedChat],
+) -> None:
+    """§14 Recorded drafts (S6.4): the replay workflow's revise loop runs inside the baseline; a
+    run that fails draft 1 and passes the revision records 2 drafts and the passing memo, and
+    re-scoring that memo reproduces the run's rate."""
+    model = scripted([FIRST_DRAFT_FAILS, CLEAN, CLEAN])
+
+    result = await run_one_ticker_twice(monkeypatch, release, workdir)
+
+    runs = result["raw_runs"]
+    assert len(model.prompts_seen) == 3
+    assert sorted(run["repeat"] for run in runs) == [0, 1]
+    [revised] = [run for run in runs if run["draft_count"] == 2]
+    [plain] = [run for run in runs if run["draft_count"] == 1]
+
+    assert [entry["passed"] for entry in revised["draft_history"]] == [False, True]
+    first, second = (entry["grounded_claim_rate"] for entry in revised["draft_history"])
+    assert first < second == revised["grounded_claim_rate"]
+    assert revised["recorded_memo"] in model.memos
+    assert not re.search(r"\b81\d\d%", revised["recorded_memo"]), "the failed draft was recorded"
+    verdict = evaluate_memo_grounding(revised["recorded_memo"], revised["recorded_registry"])
+    assert verdict.passed is True
+    assert verdict.grounded_claim_rate == revised["grounded_claim_rate"]
+    assert verdict.citation_coverage_rate == revised["citation_coverage_rate"]
+
+    assert [entry["passed"] for entry in plain["draft_history"]] == [True]
+
+
+async def test_the_result_file_pairs_the_loop_against_draft_one(
+    monkeypatch: pytest.MonkeyPatch,
+    workdir: Path,
+    release: BuiltRelease,
+    scripted: Callable[[list[Turn]], ScriptedChat],
+) -> None:
+    """§14 Paired loop report (S6.4): a token-checked run's result file carries `paired_loop`,
+    the report over its raw runs: the revised run improves on draft 1, the run that passed on
+    draft 1 has delta 0, nothing regresses."""
+    scripted([FIRST_DRAFT_FAILS, CLEAN, CLEAN])
+
+    result = await run_one_ticker_twice(monkeypatch, release, workdir)
+
+    report = result["paired_loop"]
+    assert report == quality_baseline.paired_loop_report(result["raw_runs"])
+    assert report["revised_runs"] == 1
+    assert report["regressions"] == []
+    by_key = {(entry["ticker"], entry["repeat"]): entry for entry in report["runs"]}
+    assert len(by_key) == len(result["raw_runs"]) == 2
+    for run in result["raw_runs"]:
+        entry = by_key[(run["ticker"], run["repeat"])]
+        assert entry["draft_count"] == run["draft_count"]
+        assert entry["no_loop"] == run["draft_history"][0]["grounded_claim_rate"]
+        assert entry["loop"] == run["grounded_claim_rate"]
+        assert entry["delta"] == pytest.approx(entry["loop"] - entry["no_loop"])
+        if run["draft_count"] > 1:
+            assert entry["delta"] > 0
+        else:
+            assert entry["delta"] == 0
+
+
+def raw(ticker: str, repeat: int, rates: list[float], final: float, **extra: Any) -> dict:
+    return {
+        "ticker": ticker,
+        "repeat": repeat,
+        "draft_count": len(rates),
+        "draft_history": [
+            {"grounded_claim_rate": rate, "passed": rate >= 0.75} for rate in rates
+        ],
+        "grounded_claim_rate": final,
+        "recorded_memo": "ignored",
+        **extra,
+    }
+
+
+def paired(ticker: str, repeat: int, count: int, no_loop, loop, delta) -> dict:
+    return {
+        "ticker": ticker,
+        "repeat": repeat,
+        "draft_count": count,
+        "no_loop": no_loop,
+        "loop": loop,
+        "delta": delta,
+    }
+
+
+def test_paired_loop_report_lists_each_run_counts_revisions_and_names_regressions() -> None:
+    """§14 Paired loop report (S6.4): per run the no-loop arm (draft 1), the loop arm (final), the
+    delta and draft_count; revised_runs counts runs with more than one draft; `regressions` is
+    every run whose loop arm is below its no-loop arm; a run that passed on draft 1 has delta 0
+    and is no regression; a run without a draft history has no no-loop arm and is no regression."""
+    runs = [
+        raw("AAPL", 0, [1.0], 1.0),
+        raw("AAPL", 1, [0.5, 0.75], 0.75),
+        raw("MSFT", 0, [0.75, 0.5, 0.5], 0.5),
+        raw("MSFT", 1, [], 0.5, draft_count=1),
+    ]
+    before = copy.deepcopy(runs)
+
+    report = quality_baseline.paired_loop_report(runs)
+
+    expected = [
+        paired("AAPL", 0, 1, 1.0, 1.0, 0.0),
+        paired("AAPL", 1, 2, 0.5, 0.75, 0.25),
+        paired("MSFT", 0, 3, 0.75, 0.5, -0.25),
+        paired("MSFT", 1, 1, None, 0.5, None),
+    ]
+    assert set(report) == {"runs", "revised_runs", "regressions"}
+    assert sorted(report["runs"], key=lambda e: (e["ticker"], e["repeat"])) == expected
+    assert report["revised_runs"] == 2
+    assert report["regressions"] == [expected[2]]
+    assert runs == before
+
+
+def test_paired_loop_report_of_runs_that_never_regress_has_no_regressions() -> None:
+    """§14 Paired loop report (S6.4): `regressions` is empty when no run's loop arm is below its
+    no-loop arm; an equal arm after a revision is no regression either."""
+    runs = [raw("AAPL", 0, [0.5, 0.5], 0.5), raw("AAPL", 1, [0.25, 1.0], 1.0)]
+
+    report = quality_baseline.paired_loop_report(runs)
+
+    assert report["regressions"] == []
+    assert report["revised_runs"] == 2
+    assert {entry["repeat"]: entry["delta"] for entry in report["runs"]} == {0: 0.0, 1: 0.75}
+
+
+def test_paired_loop_report_of_no_runs_is_empty() -> None:
+    """§14 Paired loop report (S6.4): no runs, no entries, nothing revised, no regressions."""
+    assert quality_baseline.paired_loop_report([]) == {
+        "runs": [],
+        "revised_runs": 0,
+        "regressions": [],
+    }

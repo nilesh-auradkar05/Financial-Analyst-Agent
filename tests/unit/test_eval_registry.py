@@ -284,6 +284,22 @@ def test_prompt_version_changes_when_the_draft_template_is_edited(
     assert prompt_version() == original
 
 
+def test_prompt_version_changes_when_the_revise_template_is_edited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§14 prompt_version (S6.4): an edit to the revise-memo template gives a different value."""
+    original = prompt_version()
+
+    template = getattr(graph, "REVISE_PROMPT_TEMPLATE", "")
+    monkeypatch.setattr(graph, "REVISE_PROMPT_TEMPLATE", template + "\nBe terse.", raising=False)
+    edited = prompt_version()
+
+    assert HEX16.fullmatch(edited)
+    assert edited != original
+    monkeypatch.undo()
+    assert prompt_version() == original
+
+
 # --- Run snapshot hash -----------------------------------------------------------------------
 
 HASHES = [f"{n:064x}" for n in (3, 1, 2, 7)]

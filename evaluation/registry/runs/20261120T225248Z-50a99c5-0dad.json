@@ -1,0 +1,17 @@
+{
+  "run_id": "20261120T225248Z-50a99c5-0dad",
+  "git_sha": "50a99c5",
+  "branch": "task/s6-4",
+  "model": "deepseek.v3.2",
+  "temperature": 0.3,
+  "prompt_version": "cd11b22a67eb23f2",
+  "evidence_release": "alpha-evidence:0.1.0",
+  "snapshot_hash": "039bc39d896065d9b1620dfc2e63d44dfaa4b3a6a5c72ddbd1cb029c18587dd8",
+  "fixture_version": "d03fbb315a7b3168",
+  "metrics": {
+    "grounded_claim_rate": 0.9137127457112201,
+    "citation_coverage": 0.928297495311988
+  },
+  "classification": "approved",
+  "result_path": "evaluation/quality_res/retrieval_baseline_002_deepseek.v3.2_0.3.json"
+}

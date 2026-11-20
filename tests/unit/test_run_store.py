@@ -1,5 +1,7 @@
 """Tests for app.services.run_store — persistent job state."""
 
+import json
+
 import pytest
 
 from app.services.run_store import FileBackedRunStore, RunRecord
@@ -143,3 +145,83 @@ def test_concurrent_idempotency_submissions_create_one_persisted_job(tmp_store):
     assert sum(created for record, created in results) == 1
     restored = FileBackedRunStore(tmp_store.path)
     assert len(restored.list_runs()) == 1
+
+
+DRAFT_HISTORY = [
+    {
+        "draft": 1,
+        "grounded_claim_rate": 0.5,
+        "passed": False,
+        "failed_claims": [
+            {"sentence": "Revenue rose 81% [2].", "reason": "claim numbers not found"},
+            {"sentence": "Margins widened.", "reason": None},
+        ],
+        "orphan_citations": [99],
+    },
+    {
+        "draft": 2,
+        "grounded_claim_rate": 1.0,
+        "passed": True,
+        "failed_claims": [],
+        "orphan_citations": [],
+    },
+]
+
+
+def _drop_key_everywhere(node, key):
+    if isinstance(node, dict):
+        node.pop(key, None)
+        for child in node.values():
+            _drop_key_everywhere(child, key)
+    elif isinstance(node, list):
+        for child in node:
+            _drop_key_everywhere(child, key)
+
+
+# Trace: docs/test-plan.md §11 'Reviewer reasons recorded' (S6.4, OBS-R3).
+def test_draft_history_is_kept_with_the_finished_run_across_a_reload(tmp_path):
+    path = tmp_path / "runs.json"
+    store = FileBackedRunStore(path)
+    store.create_run("job-1", "AAPL")
+
+    finished = store.mark_finished(
+        "job-1", status="degraded", result={"memo": "m"}, draft_history=DRAFT_HISTORY
+    )
+
+    assert finished.draft_history == DRAFT_HISTORY
+    reloaded = FileBackedRunStore(path).get_run("job-1")
+    assert reloaded is not None
+    assert reloaded.status == "degraded"
+    assert reloaded.draft_history == DRAFT_HISTORY
+
+
+# Trace: docs/test-plan.md §11 'Reviewer reasons recorded' (empty when the run recorded none).
+def test_a_run_that_recorded_no_drafts_has_an_empty_draft_history(tmp_path):
+    path = tmp_path / "runs.json"
+    store = FileBackedRunStore(path)
+
+    created = store.create_run("job-1", "AAPL")
+    store.create_run("job-2", "MSFT")
+    finished = store.mark_finished("job-2", status="completed", result={"memo": "m"})
+
+    assert created.draft_history == []
+    assert finished.draft_history == []
+    assert FileBackedRunStore(path).get_run("job-2").draft_history == []
+
+
+# Trace: docs/test-plan.md §11 'Reviewer reasons recorded' (record written before the field).
+def test_a_record_written_before_the_field_existed_loads_with_an_empty_history(tmp_path):
+    path = tmp_path / "runs.json"
+    store = FileBackedRunStore(path)
+    store.create_run("job-1", "AAPL")
+    store.mark_finished("job-1", status="completed", result={"memo": "m"})
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    _drop_key_everywhere(stored, "draft_history")
+    path.write_text(json.dumps(stored), encoding="utf-8")
+
+    loaded = FileBackedRunStore(path).get_run("job-1")
+
+    assert loaded is not None
+    assert loaded.status == "completed"
+    assert loaded.result == {"memo": "m"}
+    assert loaded.draft_history == []
