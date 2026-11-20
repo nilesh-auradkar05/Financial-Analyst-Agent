@@ -839,3 +839,75 @@ def test_compose_persists_the_run_store():
     """Trace: docs/test-plan.md §19 (run store persistence)."""
     compose = (Path(__file__).resolve().parents[1] / "docker-compose.yml").read_text()
     assert f"runs-data:/app/{api_main.RUN_STORE_PATH.parent}" in compose
+
+
+REVIEWER_SENTENCE = "Revenue rose 8100% on the services line [2]."
+RUN_DRAFT_HISTORY = [
+    {
+        "draft": 1,
+        "grounded_claim_rate": 0.5,
+        "passed": False,
+        "failed_claims": [
+            {"sentence": REVIEWER_SENTENCE, "reason": "claim numbers not found in cited evidence"},
+            {"sentence": "Margins widened sharply.", "reason": None},
+        ],
+        "orphan_citations": [99],
+    },
+    {
+        "draft": 2,
+        "grounded_claim_rate": 1.0,
+        "passed": True,
+        "failed_claims": [],
+        "orphan_citations": [],
+    },
+]
+
+
+def _keys_anywhere(node: Any) -> set[str]:
+    if isinstance(node, dict):
+        return set(node) | set().union(*(_keys_anywhere(child) for child in node.values()))
+    if isinstance(node, list):
+        return set().union(*(_keys_anywhere(child) for child in node))
+    return set()
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        pytest.param({}, id="completed"),
+        pytest.param({"verification_result": {"passed": False}}, id="degraded"),
+        pytest.param({"filing_chunks": []}, id="evidence-missing"),
+    ],
+)
+def test_async_job_keeps_the_runs_draft_history_but_never_serves_it(
+    client: TestClient, monkeypatch, patch
+):
+    """Trace: docs/test-plan.md §11 'Reviewer reasons recorded' (S6.4, OBS-R3): the run-store
+    record keeps the run's draft_history; GET /jobs/{job_id} and GET /jobs return none of it."""
+
+    async def run(ticker, company_name, **kwargs):
+        state = await fake_run_agent(ticker, company_name)
+        return {**state, **patch, "draft_history": RUN_DRAFT_HISTORY, "draft_count": 2}
+
+    monkeypatch.setattr(api_main, "run_agent", run)
+    accepted = client.post("/analyze/async", json={"ticker": "AAPL"})
+    job_id = accepted.json()["job_id"]
+
+    record = api_main.run_store.get_run(job_id)
+    assert record is not None
+    assert record.draft_history == RUN_DRAFT_HISTORY
+
+    for response in (client.get(f"/jobs/{job_id}"), client.get("/jobs")):
+        assert response.status_code == 200
+        assert not {"draft_history", "failed_claims"} & _keys_anywhere(response.json())
+        assert REVIEWER_SENTENCE not in response.text
+
+
+def test_async_job_of_a_run_without_drafts_has_an_empty_stored_history(client: TestClient):
+    """Trace: docs/test-plan.md §11 'Reviewer reasons recorded' (empty when the run recorded
+    none)."""
+    job_id = client.post("/analyze/async", json={"ticker": "AAPL"}).json()["job_id"]
+
+    record = api_main.run_store.get_run(job_id)
+    assert record is not None and record.status == "completed"
+    assert record.draft_history == []

@@ -14,113 +14,26 @@ what the loop asked for.
 
 from __future__ import annotations
 
-import asyncio
-import re
-from dataclasses import dataclass
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from tests.replay.support import (
+    CLEAN,
+    CLEAN_MARK,
+    FIRST_DRAFT_FAILS,
+    ORPHAN_FIGURE,
+    TAGS,
+    UNCITED_MARK,
+    ScriptedChat,
+    Turn,
+)
+
 pytestmark = pytest.mark.replay
 
-TAGS = ("Alpha", "Beta", "Gamma")
-UNCITED_MARK = "Quillfeather"
-CLEAN_MARK = "Zorblax"
-ORPHAN_FIGURE = "8999"
 TIMEOUT_SECONDS = 0.2
 NODES = ["research_news", "fetch_stock", "retrieve_filings"]
 FOLLOWING_NODES = ["analyze_sentiment", "draft_memo", "verify_memo"]
-
-
-@dataclass(frozen=True)
-class Turn:
-    """What the provider does on one call.
-
-    The first `wrong` sentences carry a figure their source does not hold, the next `uncited`
-    ones lose their citation, the rest are faithful. `marked` tags each faithful sentence with a
-    word found nowhere in the evidence.
-    """
-
-    wrong: int = 0
-    uncited: int = 0
-    orphan: bool = False
-    marked: bool = False
-    outcome: str = "memo"  # "memo" | "empty" | "raise" | "hang"
-
-
-class ScriptedChat:
-    """Chat model that writes each memo from the sources in the prompt it receives.
-
-    The evidence behind a run does not change between drafts, so the sources are read from the
-    first prompt (the draft) and reused for every revision. A call beyond the plan repeats the
-    last turn; tests assert on `len(prompts_seen)`, so an extra draft shows up there.
-    """
-
-    _SOURCE = re.compile(r"^\[(\d+)\] [^\n]*\n([^\n]+)$", re.MULTILINE)
-
-    def __init__(self, plan: list[Turn], *, report_usage: bool = False) -> None:
-        self.plan = plan
-        self.report_usage = report_usage
-        self.prompts_seen: list[str] = []
-        self.memos: list[str] = []
-        self.reported: list[tuple[int, int]] = []
-        self.sources: list[tuple[int, str]] = []
-
-    async def ainvoke(self, messages: list[dict[str, str]]) -> SimpleNamespace:
-        prompt = messages[-1]["content"]
-        index = len(self.prompts_seen)
-        self.prompts_seen.append(prompt)
-        if not self.sources:
-            self.sources = self._single_sentence_sources(prompt)
-        turn = self.plan[min(index, len(self.plan) - 1)]
-        if turn.outcome == "raise":
-            raise RuntimeError("provider unavailable")
-        if turn.outcome == "hang":
-            await asyncio.Event().wait()
-        memo = "" if turn.outcome == "empty" else self._memo(turn, index)
-        self.memos.append(memo)
-        reply = SimpleNamespace(content=memo)
-        if self.report_usage:
-            counts = (len(prompt.split()), len(memo.split()))
-            self.reported.append(counts)
-            reply.usage_metadata = {"input_tokens": counts[0], "output_tokens": counts[1]}
-            reply.response_metadata = {"model_name": "echo-1"}
-        return reply
-
-    def _single_sentence_sources(self, prompt: str) -> list[tuple[int, str]]:
-        found = []
-        for number, text in self._SOURCE.findall(prompt):
-            core = text.strip().rstrip(".!? ")
-            if not re.search(r"[.!?]\s", core):
-                found.append((int(number), core))
-        assert found, "the draft prompt carried no numbered single-sentence source"
-        return found
-
-    def _memo(self, turn: Turn, index: int) -> str:
-        assert turn.wrong + turn.uncited <= len(self.sources)
-        lines = []
-        for position, (number, core) in enumerate(self.sources):
-            letter = "abcdefgh"[position]
-            if position < turn.wrong:
-                figure = 8100 + index * 10 + position
-                lines.append(f"{core} with revenue of {figure}% [{number}].")
-            elif position < turn.wrong + turn.uncited:
-                tag = TAGS[min(index, 2)]
-                lines.append(f"{core} and revenue risk keeps rising {UNCITED_MARK}{letter}{tag}.")
-            else:
-                mark = f" {CLEAN_MARK}{letter}" if turn.marked else ""
-                lines.append(f"{core}{mark} [{number}].")
-        if turn.orphan:
-            lines.append(
-                f"Revenue outlook cites an unlisted source with {ORPHAN_FIGURE}% certainty [99]."
-            )
-        body = "\n".join(lines)
-        return f"## 1. Executive Summary\n{body}\n\n## Pass {TAGS[min(index, 2)]}\n"
-
-
-CLEAN = Turn()
-FIRST_DRAFT_FAILS = Turn(wrong=2)
 
 
 @pytest.fixture
@@ -476,6 +389,106 @@ async def test_draft_history_records_every_draft_in_order(
         [count / len(model.sources) for count in grounded]
     )
     assert final["draft_count"] == len(history)
+
+
+REVISE_MARK = "Zebracorn revision clause."
+
+
+async def test_every_revision_prompt_is_formatted_from_the_revise_template(
+    release, install_chat, monkeypatch
+):
+    """14 'prompt_version' (S6.4 amendment): `graph.REVISE_PROMPT_TEMPLATE` is the template every
+    revision prompt is formatted from; text appended to it reaches each revision and no draft."""
+    from app.agents import graph
+
+    template = getattr(graph, "REVISE_PROMPT_TEMPLATE", "")
+    monkeypatch.setattr(
+        graph, "REVISE_PROMPT_TEMPLATE", template + "\n" + REVISE_MARK, raising=False
+    )
+    model = install_chat([Turn(wrong=3), Turn(wrong=2), CLEAN])
+    await replay(release)
+
+    assert len(model.prompts_seen) == 3
+    assert REVISE_MARK not in model.prompts_seen[0]
+    assert REVISE_MARK in model.prompts_seen[1]
+    assert REVISE_MARK in model.prompts_seen[2]
+
+
+def expected_reviewer_view(memo: str, registry: list[dict[str, Any]]):
+    """The verifier's verdict on one draft, reduced to what `draft_history` must record."""
+    import re
+
+    from app.verification.grounding import evaluate_memo_grounding
+
+    verdict = evaluate_memo_grounding(memo, registry)
+    failed = [
+        {"sentence": claim.sentence[:500], "reason": claim.reason}
+        for claim in verdict.claims
+        if not claim.supported
+    ]
+    valid = set(range(1, len(registry) + 1))
+    orphans = sorted({int(n) for n in re.findall(r"\[(\d+)\]", memo)} - valid)
+    return verdict, failed, orphans
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        pytest.param([CLEAN], id="passing-draft-records-nothing-failed"),
+        pytest.param([FIRST_DRAFT_FAILS, CLEAN], id="unsupported-claims"),
+        pytest.param([Turn(wrong=1, uncited=1), CLEAN], id="unsupported-and-uncited"),
+        pytest.param([Turn(orphan=True), CLEAN], id="orphan-citation"),
+        pytest.param([Turn(wrong=3), Turn(wrong=2), CLEAN], id="three-drafts"),
+        pytest.param([Turn(wrong=3), Turn(wrong=3)], id="early-stop"),
+        pytest.param([Turn(uncited=1), Turn(uncited=1)], id="uncited-never-fixed"),
+    ],
+)
+async def test_draft_history_records_each_drafts_failed_claims_and_orphans(
+    release, install_chat, plan
+):
+    """11 'Reviewer reasons recorded' (S6.4, OBS-R3): each entry carries that draft's unsupported
+    claims in memo order as {sentence, reason}, and its orphan citations; a passing draft
+    records none. Expected values come from the real verifier applied to each draft's memo."""
+    model = install_chat(plan)
+    final = await replay(release)
+
+    history = final["draft_history"]
+    registry = final["citation_evidence"]
+    assert len(history) == len(plan) == len(model.memos)
+    views = [expected_reviewer_view(memo, registry) for memo in model.memos]
+    for (_verdict, failed, orphans), turn in zip(views, plan):
+        assert len(failed) == turn.wrong + turn.uncited + int(turn.orphan), "premise"
+        assert (orphans == [99]) is turn.orphan, "premise"
+    for entry, (verdict, failed, orphans) in zip(history, views):
+        assert entry["grounded_claim_rate"] == pytest.approx(verdict.grounded_claim_rate)
+        assert entry["failed_claims"] == failed
+        assert entry["orphan_citations"] == orphans
+        if entry["passed"]:
+            assert entry["failed_claims"] == [] and entry["orphan_citations"] == []
+    recorded_uncited = [
+        claim for claim in history[0]["failed_claims"] if UNCITED_MARK in claim["sentence"]
+    ]
+    assert len(recorded_uncited) == plan[0].uncited
+    assert all(claim["reason"] for claim in recorded_uncited)
+
+
+async def test_a_failed_sentence_is_stored_cut_to_500_characters(release, install_chat):
+    """11 'Reviewer reasons recorded' (S6.4): a failed claim's sentence is cut to at most 500
+    characters; the reason is the verifier's, unchanged."""
+    from app.verification.grounding import evaluate_memo_grounding
+
+    model = install_chat([Turn(wrong=2, long=True), CLEAN])
+    final = await replay(release)
+
+    verdict = evaluate_memo_grounding(model.memos[0], final["citation_evidence"])
+    uncut = [claim for claim in verdict.claims if not claim.supported]
+    assert len(uncut) == 2
+    assert all(len(claim.sentence) > 500 for claim in uncut), "premise: the sentences are long"
+    recorded = final["draft_history"][0]["failed_claims"]
+    assert [len(claim["sentence"]) for claim in recorded] == [500, 500]
+    assert [claim["sentence"] for claim in recorded] == [c.sentence[:500] for c in uncut]
+    assert [claim["reason"] for claim in recorded] == [c.reason for c in uncut]
+    assert all(claim["reason"] for claim in recorded)
 
 
 # --- 18 Usage -----------------------------------------------------------------------------------

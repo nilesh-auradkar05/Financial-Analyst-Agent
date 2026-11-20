@@ -7,6 +7,7 @@ Expected values are always computed from the fixture inputs, never typed in as a
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -387,3 +388,102 @@ def evidence_view(state: dict[str, Any]) -> dict[str, Any]:
         ),
         "sentiment_result": dict(state.get("sentiment_result", {})),
     }
+
+
+TAGS = ("Alpha", "Beta", "Gamma")
+LONG_FILLER = "across the whole reporting period " * 25
+UNCITED_MARK = "Quillfeather"
+CLEAN_MARK = "Zorblax"
+ORPHAN_FIGURE = "8999"
+
+
+@dataclass(frozen=True)
+class Turn:
+    """What the provider does on one call.
+
+    The first `wrong` sentences carry a figure their source does not hold, the next `uncited`
+    ones lose their citation, the rest are faithful. `marked` tags each faithful sentence with a
+    word found nowhere in the evidence.
+    """
+
+    wrong: int = 0
+    uncited: int = 0
+    orphan: bool = False
+    marked: bool = False
+    long: bool = False  # each wrong sentence runs well past 500 characters
+    outcome: str = "memo"  # "memo" | "empty" | "raise" | "hang"
+
+
+class ScriptedChat:
+    """Chat model that writes each memo from the sources in the prompt it receives.
+
+    The evidence behind a run does not change between drafts, so the sources are read from the
+    first prompt (the draft) and reused for every revision. A call beyond the plan repeats the
+    last turn; tests assert on `len(prompts_seen)`, so an extra draft shows up there.
+    """
+
+    _SOURCE = re.compile(r"^\[(\d+)\] [^\n]*\n([^\n]+)$", re.MULTILINE)
+
+    def __init__(self, plan: list[Turn], *, report_usage: bool = False) -> None:
+        self.plan = plan
+        self.report_usage = report_usage
+        self.prompts_seen: list[str] = []
+        self.memos: list[str] = []
+        self.reported: list[tuple[int, int]] = []
+        self.sources: list[tuple[int, str]] = []
+
+    async def ainvoke(self, messages: list[dict[str, str]]) -> SimpleNamespace:
+        prompt = messages[-1]["content"]
+        index = len(self.prompts_seen)
+        self.prompts_seen.append(prompt)
+        if not self.sources:
+            self.sources = self._single_sentence_sources(prompt)
+        turn = self.plan[min(index, len(self.plan) - 1)]
+        if turn.outcome == "raise":
+            raise RuntimeError("provider unavailable")
+        if turn.outcome == "hang":
+            await asyncio.Event().wait()
+        memo = "" if turn.outcome == "empty" else self._memo(turn, index)
+        self.memos.append(memo)
+        reply = SimpleNamespace(content=memo)
+        if self.report_usage:
+            counts = (len(prompt.split()), len(memo.split()))
+            self.reported.append(counts)
+            reply.usage_metadata = {"input_tokens": counts[0], "output_tokens": counts[1]}
+            reply.response_metadata = {"model_name": "echo-1"}
+        return reply
+
+    def _single_sentence_sources(self, prompt: str) -> list[tuple[int, str]]:
+        found = []
+        for number, text in self._SOURCE.findall(prompt):
+            core = text.strip().rstrip(".!? ")
+            if not re.search(r"[.!?]\s", core):
+                found.append((int(number), core))
+        assert found, "the draft prompt carried no numbered single-sentence source"
+        return found
+
+    def _memo(self, turn: Turn, index: int) -> str:
+        assert turn.wrong + turn.uncited <= len(self.sources)
+        lines = []
+        for position, (number, core) in enumerate(self.sources):
+            letter = "abcdefgh"[position]
+            if position < turn.wrong:
+                figure = 8100 + index * 10 + position
+                filler = LONG_FILLER if turn.long else ""
+                lines.append(f"{core} with revenue of {figure}% {filler}[{number}].")
+            elif position < turn.wrong + turn.uncited:
+                tag = TAGS[min(index, 2)]
+                lines.append(f"{core} and revenue risk keeps rising {UNCITED_MARK}{letter}{tag}.")
+            else:
+                mark = f" {CLEAN_MARK}{letter}" if turn.marked else ""
+                lines.append(f"{core}{mark} [{number}].")
+        if turn.orphan:
+            lines.append(
+                f"Revenue outlook cites an unlisted source with {ORPHAN_FIGURE}% certainty [99]."
+            )
+        body = "\n".join(lines)
+        return f"## 1. Executive Summary\n{body}\n\n## Pass {TAGS[min(index, 2)]}\n"
+
+
+CLEAN = Turn()
+FIRST_DRAFT_FAILS = Turn(wrong=2)
