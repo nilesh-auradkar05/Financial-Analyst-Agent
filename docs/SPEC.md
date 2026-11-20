@@ -439,7 +439,7 @@ Committed and gated sequencing:
 | S3 | Qdrant backend parity / Gate B — retargeted 2026-10-23 to OpenSearch (ADR-0016; S3-T04/T05 run in CM-2, the comparison in CM-4) |
 | S4 | Backend comparison and default decision / Gate B — retired 2026-10-10 (owner decision); Gate B closes at S3 exit |
 | S5 | Retrieval quality diagnostics → hybrid/rerank / Gate C (the embedding bake-off was pulled forward to CM-5 on 2026-10-23, ADR-0016) |
-| S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS, then GEPA on holdout / Gate D |
+| S6 | Answer quality: eval registry + CI regression gate (§11.2) + bounded repair loop (§8.1), then LLM-as-judge/RAGAS / Gate D (GEPA prompt optimization removed by owner decision 2026-11-20) |
 | S7 | Service readiness: guardrails (§11.4), caching (§11.3), queue/worker + job store (DynamoDB `RunStore`, SQS `JobQueue`, DynamoDB checkpointer; local DynamoDB Local and ElasticMQ; ADR-0013 as amended by ADR-0015), provider circuit breaker, FinBERT off the API event loop (ONNX in the worker), auth + rate limit with guest and admin roles (ADR-0010). Restructured 2026-11-01 into one-feature sprints S7.1–S7.12; S7.3–S7.6, S7.8, S7.10 and S7.12 implement ADR-0017 (fenced checkpoints, effect journal, error taxonomy, three agents, execution observability) |
 | S8 | Frontend MVP |
 | S9 | Portfolio polish |
