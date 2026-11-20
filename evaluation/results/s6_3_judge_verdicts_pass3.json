@@ -1,0 +1,21 @@
+{
+  "errors": [
+    {
+      "claim_id": "8-bb3f952bb3a5",
+      "error": "AnthropicRateLimitError: Error code: 429 - {'error': {'type': 'rate_limit_error', 'code': 'RateLimitReached', 'message': 'Rate limit of 15000 per 60s exceeded for UserByModelByMinuteUncachedInputTokens. Please wait 36 seconds before retrying.', 'details': 'Rate limit of 15000 per 60s exceeded for UserByModelByMinuteUncachedInputTokens. Please wait 36 seconds before retrying.'}}"
+    },
+    {
+      "claim_id": "5-bbf2c17ff0ec",
+      "error": "AnthropicRateLimitError: Error code: 429 - {'error': {'type': 'rate_limit_error', 'code': 'RateLimitReached', 'message': 'Rate limit of 15000 per 60s exceeded for UserByModelByMinuteUncachedInputTokens. Please wait 34 seconds before retrying.', 'details': 'Rate limit of 15000 per 60s exceeded for UserByModelByMinuteUncachedInputTokens. Please wait 34 seconds before retrying.'}}"
+    }
+  ],
+  "judge_prompt_sha256": "7b7b57506fa231fcaae9bc7b5ccb8cad634e05434de02348861250e047df9cd0",
+  "temperature": 0.0,
+  "verdicts": [
+    {
+      "claim_id": "5-f28d1747f5d8",
+      "served_model": "claude-opus-4-6",
+      "verdict": "unsupported"
+    }
+  ]
+}

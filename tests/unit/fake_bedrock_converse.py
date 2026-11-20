@@ -6,7 +6,10 @@ computes the reply from the request. A request that carries `toolConfig` gets a 
 its first tool, the input filled from that tool's input schema (every string field holds the model
 id of the request, every other field its type's zero); a plain request gets the text
 `"<model id>: <prompt>"`. It never replays an answer supplied by a test. `status` makes every
-request fail with that HTTP status. No network beyond loopback.
+request fail with that HTTP status. With `verdict_replies` set, a plain request is answered with a
+claim verdict computed from its `<claim>` and `<evidence>` blocks (`tests/unit/fake_verdict.py`);
+`fail_marker` fails a request whose prompt holds the marker and `garble_marker` answers a claim
+holding it with a reply that has no verdict. No network beyond loopback.
 """
 
 from __future__ import annotations
@@ -18,6 +21,8 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import unquote, urlsplit
+
+from tests.unit.fake_verdict import verdict_text
 
 _CONVERSE_PATH = re.compile(r"^/model/(?P<model>[^/]+)/converse$")
 _ERROR_TYPES = {
@@ -64,6 +69,9 @@ class FakeBedrockConverse:
     def __init__(self) -> None:
         self.requests: list[ReceivedConverse] = []
         self.status: int | None = None
+        self.verdict_replies = False
+        self.fail_marker: str | None = None
+        self.garble_marker: str | None = None
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
@@ -89,9 +97,12 @@ class FakeBedrockConverse:
         with self._lock:
             self.requests.append(request)
             attempt = len(self.requests)
-        if self.status:
-            error = _ERROR_TYPES.get(self.status, "InternalServerException")
-            return self.status, {"message": "runtime unavailable"}, {"x-amzn-ErrorType": error}
+        failing = self.status or (
+            500 if self.fail_marker and self.fail_marker in request.prompt else None
+        )
+        if failing:
+            error = _ERROR_TYPES.get(failing, "InternalServerException")
+            return failing, {"message": "runtime unavailable"}, {"x-amzn-ErrorType": error}
         tools = request.body.get("toolConfig", {}).get("tools", [])
         if tools:
             spec = tools[0]["toolSpec"]
@@ -109,6 +120,9 @@ class FakeBedrockConverse:
                 }
             ]
             stop_reason = "tool_use"
+        elif self.verdict_replies:
+            content = [{"text": verdict_text(request.prompt, self.garble_marker)}]
+            stop_reason = "end_turn"
         else:
             content = [{"text": f"{request.model_id}: {request.prompt}"}]
             stop_reason = "end_turn"

@@ -13,6 +13,11 @@ carries `tools` gets a `tool_use` block for the first tool, its input filled fro
 input schema (every string field holds the requested model, every other field its type's zero);
 a plain request gets a text reply `"<requested model>: <prompt>"`. The reply's `model` is the served Opus id (`JUDGE_SERVED_MODEL`), as the real endpoint
 reports it, whatever deployment was requested; text replies and tool inputs name the requested model.
+
+With `verdict_replies` set (checked before `judge_replies`), a Messages request is answered as a
+claim judge: a text reply holding a verdict computed from the request's `<claim>` and `<evidence>`
+blocks (`tests/unit/fake_verdict.py`). `fail_marker` fails a Messages request whose user content
+holds the marker; `garble_marker` answers a claim holding it with a reply that has no verdict.
 """
 
 from __future__ import annotations
@@ -26,6 +31,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+
+from tests.unit.fake_verdict import verdict_text
 
 POSITIVE_WORDS = ("beat", "record", "surged", "growth", "rose")
 NEGATIVE_WORDS = ("fell", "warned", "lawsuit", "decline", "missed")
@@ -132,6 +139,9 @@ class FakeFoundry:
         self.delay = 0.0
         self.raw_reply: bytes | None = None
         self.judge_replies = False
+        self.verdict_replies = False
+        self.fail_marker: str | None = None
+        self.garble_marker: str | None = None
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self._server.daemon_threads = True
@@ -161,6 +171,12 @@ class FakeFoundry:
             time.sleep(self.delay)
         failing = self.status or (self.fail_status if attempt <= self.fail_first else None)
         if self.fail_after is not None and attempt > self.fail_after:
+            failing = self.fail_status
+        if (
+            self.fail_marker
+            and request.path == MESSAGES_PATH
+            and self.fail_marker in request.user_content
+        ):
             failing = self.fail_status
         if failing:
             return failing, {
@@ -244,7 +260,23 @@ class FakeFoundry:
             "usage": {"input_tokens": len(request.user_content.split()), "output_tokens": 1},
         }
 
+    def _verdict_messages(self, request: ReceivedRequest, attempt: int) -> dict[str, Any]:
+        return {
+            "id": f"msg_{attempt}",
+            "type": "message",
+            "role": "assistant",
+            "model": JUDGE_SERVED_MODEL,
+            "content": [
+                {"type": "text", "text": verdict_text(request.user_content, self.garble_marker)}
+            ],
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {"input_tokens": len(request.user_content.split()), "output_tokens": 1},
+        }
+
     def _messages(self, request: ReceivedRequest, attempt: int) -> dict[str, Any]:
+        if self.verdict_replies:
+            return self._verdict_messages(request, attempt)
         if self.judge_replies:
             return self._judge_messages(request, attempt)
         results = [

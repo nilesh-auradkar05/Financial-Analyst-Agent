@@ -21,54 +21,56 @@ METRICS = ("grounded_claim_rate", "citation_coverage_rate")
 SIGMA_LIMIT = 2
 
 
-class _RefusalError(Exception):
+class RefusalError(Exception):
     """The baseline cannot pin the gate; the message says why."""
 
 
-def _read_json(path: Path, what: str) -> dict[str, Any]:
+def read_json(path: Path, what: str) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise _RefusalError(f"cannot read {what} {path}: {type(exc).__name__}") from exc
+        raise RefusalError(f"cannot read {what} {path}: {type(exc).__name__}") from exc
     if not isinstance(data, dict):
-        raise _RefusalError(f"{what} {path} is not a JSON object")
+        raise RefusalError(f"{what} {path} is not a JSON object")
     return data
 
 
-def _load_baseline(run_id: str, root: Path) -> list[dict[str, Any]]:
+def load_baseline(run_id: str, root: Path) -> list[dict[str, Any]]:
     record_path = root / f"{run_id}.json"
     if record_path.parent != root or not record_path.is_file():
-        raise _RefusalError(f"baseline {run_id!r} names no registry record under {root}")
-    record = _read_json(record_path, "registry record")
+        raise RefusalError(f"baseline {run_id!r} names no registry record under {root}")
+    record = read_json(record_path, "registry record")
     if record.get("classification") != "approved":
-        raise _RefusalError(
+        raise RefusalError(
             f"baseline {run_id} is {record.get('classification')!r}; "
             "only an approved run can pin the gate, not a candidate"
         )
     if record.get("evidence_release") == "live":
-        raise _RefusalError(f"baseline {run_id} was recorded on live evidence, which cannot be pinned")
+        raise RefusalError(
+            f"baseline {run_id} was recorded on live evidence, which cannot be pinned"
+        )
     if not record.get("result_path"):
-        raise _RefusalError(f"baseline {run_id} has no result file to re-score")
-    result = _read_json(Path(record["result_path"]), "result file")
+        raise RefusalError(f"baseline {run_id} has no result file to re-score")
+    result = read_json(Path(record["result_path"]), "result file")
     if result.get("grounding_checker") != "token":
-        raise _RefusalError(
+        raise RefusalError(
             f"baseline {run_id} was scored with the {result.get('grounding_checker')!r} checker; "
             "the gate re-scores with the token checker"
         )
     try:
         runs: list[dict[str, Any]] = [
-            {key: run[key] for key in (*METRICS, "recorded_memo", "recorded_registry")}
+            {key: run[key] for key in (*METRICS, "ticker", "recorded_memo", "recorded_registry")}
             for run in result["raw_runs"]
         ]
     except (KeyError, TypeError) as exc:
-        raise _RefusalError(f"result file of baseline {run_id} holds no recorded drafts") from exc
+        raise RefusalError(f"result file of baseline {run_id} holds no recorded drafts") from exc
     if len(runs) < 2:
-        raise _RefusalError(f"baseline {run_id} has fewer than two runs, so it has no deviation")
+        raise RefusalError(f"baseline {run_id} has fewer than two runs, so it has no deviation")
     return runs
 
 
 def _gate(run_id: str, root: Path) -> bool:
-    runs = _load_baseline(run_id, root)
+    runs = load_baseline(run_id, root)
     verdicts = [evaluate_memo_grounding(r["recorded_memo"], r["recorded_registry"]) for r in runs]
     print(f"baseline {run_id}: {len(runs)} runs re-scored offline")
     failed = []
@@ -102,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         return 0 if _gate(args.baseline, args.registry_root) else 1
-    except _RefusalError as refusal:
+    except RefusalError as refusal:
         print(f"refused: {refusal}", file=sys.stderr)
         return 1
 

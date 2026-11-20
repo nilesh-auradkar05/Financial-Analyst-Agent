@@ -1,0 +1,22 @@
+{
+  "errors": [],
+  "judge_prompt_sha256": "7b7b57506fa231fcaae9bc7b5ccb8cad634e05434de02348861250e047df9cd0",
+  "temperature": 0.0,
+  "verdicts": [
+    {
+      "claim_id": "7-9f3d93efe5dc",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "6-538e84150104",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "13-d21ba496e561",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    }
+  ]
+}
