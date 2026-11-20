@@ -1,12 +1,12 @@
 {
   "errors": [],
-  "judge_prompt_sha256": "cf1fc725c20d3be92a42cdd5bf954140c62b2fd864996b234c6f4cc2c15ca414",
+  "judge_prompt_sha256": "7b7b57506fa231fcaae9bc7b5ccb8cad634e05434de02348861250e047df9cd0",
   "temperature": 0.0,
   "verdicts": [
     {
       "claim_id": "3-61291272988d",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "5-0c5551ce4332",
@@ -31,12 +31,12 @@
     {
       "claim_id": "15-a20ffe0d4a58",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "1-d373f8bc203e",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "11-0a78262fb3c6",
@@ -46,7 +46,7 @@
     {
       "claim_id": "9-b974f8cdbcad",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "3-88961e39ebed",
@@ -76,7 +76,7 @@
     {
       "claim_id": "5-f28d1747f5d8",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "5-bbf2c17ff0ec",
@@ -86,12 +86,12 @@
     {
       "claim_id": "9-83508720824f",
       "served_model": "claude-opus-4-6",
-      "verdict": "unsupported"
+      "verdict": "supported"
     },
     {
       "claim_id": "11-05781fd1641d",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "4-7cc69e107a78",
@@ -121,7 +121,7 @@
     {
       "claim_id": "1-bc499fa6d89e",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "9-e23c66d8f70a",
@@ -181,7 +181,7 @@
     {
       "claim_id": "15-2f33e5628f57",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "2-e6a0664f754a",
@@ -191,32 +191,32 @@
     {
       "claim_id": "3-17a1bdb2ff9a",
       "served_model": "claude-opus-4-6",
-      "verdict": "unsupported"
+      "verdict": "supported"
     },
     {
       "claim_id": "6-7d3bc34a0416",
       "served_model": "claude-opus-4-6",
-      "verdict": "unsupported"
+      "verdict": "supported"
     },
     {
       "claim_id": "12-0d85db98df14",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "3-d4e3e2e75f5c",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "4-07f1ccb381d3",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "1-26112c2c01ab",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "11-ec07067bd09b",
@@ -231,12 +231,12 @@
     {
       "claim_id": "2-b38d628d8887",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "8-850788ea5aee",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "2-7dd6738d3dc0",
@@ -256,12 +256,12 @@
     {
       "claim_id": "1-39711a368ff6",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "8-6e04ca069cd8",
       "served_model": "claude-opus-4-6",
-      "verdict": "unsupported"
+      "verdict": "supported"
     },
     {
       "claim_id": "4-a72fe6ba3f1f",
@@ -286,7 +286,7 @@
     {
       "claim_id": "3-e3b80e0d2cc8",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     },
     {
       "claim_id": "6-1ed4ca0bd104",
@@ -301,7 +301,7 @@
     {
       "claim_id": "3-c66222e4c1d9",
       "served_model": "claude-opus-4-6",
-      "verdict": "supported"
+      "verdict": "unsupported"
     }
   ]
 }

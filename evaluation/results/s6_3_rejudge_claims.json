@@ -1,0 +1,15 @@
+{
+  "baseline_run_id": "20261119T041339Z-6f93b18-460d",
+  "claims": [],
+  "seed": 0,
+  "strata": {
+    "supported": {
+      "N": 350,
+      "n": 30
+    },
+    "unsupported": {
+      "N": 36,
+      "n": 30
+    }
+  }
+}
