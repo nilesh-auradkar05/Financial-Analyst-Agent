@@ -68,7 +68,7 @@ def new_run_id(git_sha: str) -> str:
 
 
 def prompt_version() -> str:
-    text = llm.ANALYST_SYSTEM_PROMPT + graph.DRAFT_PROMPT_TEMPLATE
+    text = llm.ANALYST_SYSTEM_PROMPT + graph.DRAFT_PROMPT_TEMPLATE + graph.REVISE_PROMPT_TEMPLATE
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 

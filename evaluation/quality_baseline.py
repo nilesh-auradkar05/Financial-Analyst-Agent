@@ -23,8 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.agents.graph import create_agent, draft_memo_node, verify_memo_node
-from app.agents.state import AgentState, apply_update, create_initial_state, has_fatal_error
+from app.agents.graph import REPLAY_AGENT, create_agent
+from app.agents.state import AgentState, create_initial_state, has_fatal_error
 from app.config import settings
 from app.dataops.replay import state_from_evidence_records
 from app.llm.provider import MODEL_PRESETS, _model_family
@@ -141,10 +141,7 @@ async def _run_frozen_evidence(
         max_news_articles=max_news_articles,
     )
     t0 = time.perf_counter()
-    draft_update = await draft_memo_node(state)
-    merged = apply_update(state, draft_update)
-    verify_update = await verify_memo_node(merged)
-    final = apply_update(merged, verify_update)
+    final = await REPLAY_AGENT.ainvoke(state)
     run_ms = (time.perf_counter() - t0) * 1000.0
     return final, run_ms
 
@@ -193,6 +190,8 @@ def _score_final_state(
         ],
         "fatal_error": has_fatal_error(final),
         "snapshot_hash": final.get("snapshot_hash"),
+        "draft_count": int(final.get("draft_count", 0)),
+        "draft_history": final.get("draft_history", []),
         "run_ms": run_ms,
         "recorded_memo": memo,
         "recorded_registry": registry,
@@ -241,6 +240,32 @@ async def evaluate_single_run(
         checker=checker,
         min_similarity=min_similarity,
     )
+
+
+def paired_loop_report(runs: list[dict]) -> dict:
+    """Per run, the first draft's grounded rate (no loop) against the final memo's (loop)."""
+    entries = []
+    for run in runs:
+        history = run["draft_history"]
+        no_loop = history[0]["grounded_claim_rate"] if history else None
+        loop = run["grounded_claim_rate"]
+        entries.append(
+            {
+                "ticker": run["ticker"],
+                "repeat": run["repeat"],
+                "draft_count": run["draft_count"],
+                "no_loop": no_loop,
+                "loop": loop,
+                "delta": None if no_loop is None else loop - no_loop,
+            }
+        )
+    return {
+        "runs": entries,
+        "revised_runs": sum(1 for run in runs if run["draft_count"] > 1),
+        "regressions": [
+            entry for entry in entries if entry["no_loop"] is not None and entry["loop"] < entry["no_loop"]
+        ],
+    }
 
 
 def _aggregate(runs: list[dict]) -> dict:
@@ -326,6 +351,7 @@ async def main() -> None:
                     evidence_bundle.records_by_ticker if evidence_bundle else None
                 ),
             )
+            r["repeat"] = i
             runs.append(r)
             print(
                 f"  {ticker} run {i}: grounded={r['grounded_claim_rate']:.2f} "
@@ -397,6 +423,9 @@ async def main() -> None:
         "overall": overall,
         "error_steps": dict(error_steps),
         "per_ticker": {t: _aggregate([r for r in runs if r["ticker"] == t]) for t in args.tickers},
+        "paired_loop": (
+            paired_loop_report(runs) if evidence_bundle and args.checker == "token" else None
+        ),
         "raw_runs": runs,
     }
 
@@ -440,6 +469,12 @@ async def main() -> None:
     print(f"grounded_claim_rate : {g['mean']:.3f} +/- {g['stdev']:.3f}")
     print(f"citation_coverage   : {c['mean']:.3f} +/- {c['stdev']:.3f}")
     print(f"runtime error steps : {dict(error_steps) or 'none'}  (token-checker provenance)")
+    if artifact["paired_loop"]:
+        loop = artifact["paired_loop"]
+        print(
+            f"paired loop         : {loop['revised_runs']} revised runs, "
+            f"{len(loop['regressions'])} regressions"
+        )
     print(f"\nartifact: {out_path}")
 
 

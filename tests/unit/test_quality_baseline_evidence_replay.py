@@ -4,10 +4,12 @@ from datetime import datetime, timezone
 
 import pytest
 
+from app.agents import graph
 from dataops.contracts import SourceType
 from dataops.evidence_release import load_snapshot_records
 from dataops.snapshot_writer import EvidenceSnapshotWriter
 from evaluation import quality_baseline
+from tests.replay.support import FakeChat
 
 
 class LiveAgentShouldNotRun:
@@ -91,36 +93,10 @@ async def test_evaluate_single_run_replays_frozen_evidence_without_live_fetch(mo
     )
     records = load_snapshot_records(tmp_path)
 
-    async def fake_draft_memo_node(state):
-        assert state["news_articles"][0]["title"] == "Apple services revenue rises"
-        assert state["stock_data"]["current_price"] == 220.5
-        assert state["filing_chunks"][0]["section"] == "Business"
-        assert state["sentiment_result"] == {
-            "overall_sentiment": "positive",
-            "positive_count": 1,
-            "negative_count": 0,
-            "neutral_count": 0,
-        }
-        return {
-            "investment_memo": "Apple services revenue rose as subscriptions expanded [1].",
-            "citation_evidence": [
-                {
-                    "index": 1,
-                    "source_type": "news",
-                    "title": "Apple services revenue rises",
-                    "text": "Apple services revenue rose as subscriptions expanded.",
-                    "url": "https://news.example.com/aapl",
-                    "date": "2026-07-03",
-                }
-            ],
-            "errors": [],
-        }
-
-    async def fake_verify_memo_node(state):
-        return {"verification_result": {"passed": True}, "errors": state.get("errors", [])}
-
-    monkeypatch.setattr(quality_baseline, "draft_memo_node", fake_draft_memo_node)
-    monkeypatch.setattr(quality_baseline, "verify_memo_node", fake_verify_memo_node)
+    # The memo provider is the only fake (S6.4: the runner runs the app's replay workflow,
+    # draft -> verify -> revise, so the nodes themselves are real).
+    chat = FakeChat()
+    monkeypatch.setattr(graph, "get_llm", lambda _settings: chat)
 
     result = await quality_baseline.evaluate_single_run(
         LiveAgentShouldNotRun(),
@@ -134,7 +110,10 @@ async def test_evaluate_single_run_replays_frozen_evidence_without_live_fetch(mo
     )
 
     assert result["ticker"] == "AAPL"
-    assert result["evidence_count"] == 1
     assert result["news_articles"] == 1
     assert result["filing_chunks"] == 1
-    assert result["grounded_claim_rate"] == 1.0
+    first_prompt = chat.prompts_seen[0]
+    assert "Apple services revenue rises" in first_prompt
+    assert "Apple sells devices and services to customers worldwide." in first_prompt
+    assert result["evidence_count"] == len(result["recorded_registry"]) >= 2
+    assert result["draft_count"] == len(chat.prompts_seen) == len(result["draft_history"])

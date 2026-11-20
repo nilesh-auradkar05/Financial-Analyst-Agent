@@ -25,6 +25,7 @@ class RunRecord:
     request_id: Optional[str] = None
     trace_id: Optional[str] = None
     progress: list[dict[str, Any]] = field(default_factory=list)
+    draft_history: list[dict[str, Any]] = field(default_factory=list)
 
 class FileBackedRunStore:
     """
@@ -101,13 +102,20 @@ class FileBackedRunStore:
             error=None,
         )
 
-    def mark_finished(self, job_id: str, status: str, result: dict[str, Any]) -> RunRecord:
+    def mark_finished(
+        self,
+        job_id: str,
+        status: str,
+        result: dict[str, Any],
+        draft_history: list[dict[str, Any]] | None = None,
+    ) -> RunRecord:
         return self._update(
             job_id,
             status=status,
             completed_at=datetime.now(timezone.utc).isoformat(),
             result=result,
             error=None,
+            draft_history=draft_history or [],
         )
 
     def mark_failed(self, job_id: str, error: str) -> RunRecord:

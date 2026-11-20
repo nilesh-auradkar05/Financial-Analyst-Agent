@@ -559,7 +559,12 @@ async def _run_analysis_job(
                 formatted = _format_response(result).model_dump()
                 formatted.update(job_id=job_id, request_id=record.request_id if record else None,
                                  trace_id=record.trace_id if record else None)
-                run_store.mark_finished(job_id, status=formatted["status"], result=formatted)
+                run_store.mark_finished(
+                    job_id,
+                    status=formatted["status"],
+                    result=formatted,
+                    draft_history=result.get("draft_history") or [],
+                )
                 if run:
                     run.end(outputs={"outcome": formatted["status"], "job_id": job_id})
         except Exception:
