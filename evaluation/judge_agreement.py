@@ -16,9 +16,9 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, TypeAdapter
 
 from app.verification.grounding import evaluate_memo_grounding
 from evaluation.eval_replay import RefusalError, load_baseline, read_json
@@ -29,6 +29,9 @@ LABELS = ("supported", "unsupported")
 MIN_CLAIMS = 50
 KAPPA_GATE = 0.85
 TEMPERATURE = 0.0
+MAX_ASSERTIONS = 100
+MAX_ASSERTION_CHARS = 1000
+MAX_REPLY_CHARS = 4000
 # The owner labels the review file by this same rubric, so both raters answer one question.
 JUDGE_PROMPT = """\
 You are checking one claim from an equity research memo against the evidence cited for it. \
@@ -76,6 +79,21 @@ class UndefinedKappaError(ValueError):
     """Both raters used the same single label, so chance agreement is total and κ has no value."""
 
 
+_Cut = Annotated[str, AfterValidator(lambda value: value[:MAX_ASSERTION_CHARS])]
+
+
+class _Assertion(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    text: _Cut
+    quote: _Cut | None
+
+
+_ASSERTIONS: TypeAdapter[list[_Assertion]] = TypeAdapter(
+    Annotated[list[_Assertion], Field(max_length=MAX_ASSERTIONS)]
+)
+
+
 class PairAgreement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -96,6 +114,7 @@ class AgreementReport(BaseModel):
     temperature: float
     git_sha: str
     pairs: dict[str, PairAgreement]
+    judge_owner_unquoted: dict[str, list[str] | None]
     judge_adopted: bool
     heuristic_quotable_alone: bool
 
@@ -182,7 +201,7 @@ def _sample(args: argparse.Namespace) -> None:
     )
 
 
-def _parse_verdict(reply: str) -> str:
+def _parse_verdict(reply: str) -> tuple[str, list[dict[str, Any]]]:
     decoder = json.JSONDecoder()
     for start, char in enumerate(reply):
         if char != "{":
@@ -192,7 +211,8 @@ def _parse_verdict(reply: str) -> str:
         except ValueError:
             continue
         if isinstance(found, dict) and found.get("verdict") in LABELS:
-            return str(found["verdict"])
+            assertions = _ASSERTIONS.validate_python(found.get("assertions"))
+            return str(found["verdict"]), [a.model_dump() for a in assertions]
     raise ValueError("the reply holds no JSON object with a supported/unsupported verdict")
 
 
@@ -207,8 +227,8 @@ def _judge(args: argparse.Namespace) -> None:
     except ValueError as exc:
         raise RefusalError(f"judge is not configured: {exc}") from exc
     assert llm is not None  # provider "opus" always builds a model
-    verdicts: list[dict[str, str]] = []
-    errors: list[dict[str, str]] = []
+    verdicts: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
     for item in review["claims"]:
         evidence = "\n".join(
             f'<evidence citation="{entry["citation"]}">'
@@ -219,21 +239,31 @@ def _judge(args: argparse.Namespace) -> None:
         prompt = JUDGE_PROMPT.format(
             claim=f"<claim>{html.escape(item['claim'])}</claim>", evidence=evidence
         )
+        reply_text: str | None = None
         try:
             reply = llm.invoke(prompt)
+            reply_text = reply.text
             meta = reply.response_metadata
             served = meta.get("model") or meta.get("model_name")
             if not served:
                 raise ValueError("the reply names no serving model")
+            verdict, assertions = _parse_verdict(reply_text)
             verdicts.append(
                 {
                     "claim_id": item["claim_id"],
-                    "verdict": _parse_verdict(reply.text),
+                    "verdict": verdict,
                     "served_model": served,
+                    "assertions": assertions,
                 }
             )
         except Exception as exc:  # noqa: BLE001 - a failed claim is recorded as an error, never dropped
-            errors.append({"claim_id": item["claim_id"], "error": f"{type(exc).__name__}: {exc}"})
+            errors.append(
+                {
+                    "claim_id": item["claim_id"],
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "reply": None if reply_text is None else reply_text[:MAX_REPLY_CHARS],
+                }
+            )
     _write_json(
         args.out,
         {
@@ -340,6 +370,12 @@ def _report(args: argparse.Namespace) -> None:
         temperature=temperature,
         git_sha=_git_sha(),
         pairs=pairs,
+        judge_owner_unquoted={
+            i: None
+            if (assertions := verdicts[i].get("assertions")) is None
+            else [a["text"] for a in assertions if a["quote"] is None]
+            for i in pairs["judge_owner"].disagreements
+        },
         judge_adopted=adopted,
         heuristic_quotable_alone=adopted and pairs["heuristic_judge"].weighted_kappa >= KAPPA_GATE,
     )
