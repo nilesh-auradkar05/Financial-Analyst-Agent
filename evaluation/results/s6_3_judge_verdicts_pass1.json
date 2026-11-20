@@ -1,0 +1,307 @@
+{
+  "errors": [],
+  "judge_prompt_sha256": "cf1fc725c20d3be92a42cdd5bf954140c62b2fd864996b234c6f4cc2c15ca414",
+  "temperature": 0.0,
+  "verdicts": [
+    {
+      "claim_id": "3-61291272988d",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "5-0c5551ce4332",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "6-bfab0121e189",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-318c725925c3",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "14-913be42877ae",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "15-a20ffe0d4a58",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "1-d373f8bc203e",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "11-0a78262fb3c6",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "9-b974f8cdbcad",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "3-88961e39ebed",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "8-09b058493415",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-6d559a2da05b",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "14-cc38bf63fb0c",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "8-bb3f952bb3a5",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "5-f28d1747f5d8",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "5-bbf2c17ff0ec",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "9-83508720824f",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "11-05781fd1641d",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-7cc69e107a78",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "2-77731895b93f",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "6-9477eb748ca2",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-0cfec3344192",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "10-711e94805830",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "1-bc499fa6d89e",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "9-e23c66d8f70a",
+      "served_model": "claude-opus-4-6",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "5-d9d0acdf473c",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "15-4a691b77b704",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "15-71980122edc7",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-e8209ebb68dc",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-970f5e7a6eef",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "7-9f3d93efe5dc",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "6-538e84150104",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "13-d21ba496e561",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "1-67ffee169324",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "10-e1addc1e550a",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "15-2f33e5628f57",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "2-e6a0664f754a",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "3-17a1bdb2ff9a",
+      "served_model": "claude-opus-4-6",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "6-7d3bc34a0416",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "12-0d85db98df14",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "3-d4e3e2e75f5c",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "4-07f1ccb381d3",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "1-26112c2c01ab",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "11-ec07067bd09b",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "11-5fef313ec067",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "2-b38d628d8887",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "8-850788ea5aee",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "2-7dd6738d3dc0",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "6-9c9cf5fcaf6e",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "7-1990598d6898",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "1-39711a368ff6",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "8-6e04ca069cd8",
+      "served_model": "claude-opus-4-6",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "4-a72fe6ba3f1f",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "2-86d8e58f5845",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "unsupported"
+    },
+    {
+      "claim_id": "7-a5e5651af664",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "12-1507d158d4b1",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "3-e3b80e0d2cc8",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "6-1ed4ca0bd104",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "3-70c78fc2beb5",
+      "served_model": "claude-opus-4-6",
+      "verdict": "supported"
+    },
+    {
+      "claim_id": "3-c66222e4c1d9",
+      "served_model": "global.anthropic.claude-opus-4-6-v1",
+      "verdict": "supported"
+    }
+  ]
+}
