@@ -787,10 +787,11 @@ Done: §11 rows green; paired result recorded with per-case regressions listed. 
 ```text
 S6.5 — Judge-based answer-quality suite (LLM-as-judge / RAGAS)
 Feature: answer quality is measured beyond citation grounding on the frozen eval set.
-Trace: SPEC §12 S6; Gate D
-Tests:  U metric adapters with faithful fakes · Q baseline recorded with lineage
+Trace: SPEC §12 S6, §4 judge ladder (amended 2026-11-21); Gate D; ADR-0009 amendment 2026-11-21; test-plan §14 Faithfulness rows and Judge ladder row
+Method (owner 2026-11-21, `tasks/s6-decisions.md` #55–#66): DeepEval FaithfulnessMetric only (RAGAS deferred: it does not import here; relevancy metrics dropped: no labelled set), per cited claim with its full cited evidence, judged by Claude Opus 5.5 on Foundry (`opus-5-5-judge`), single judge tier enforced; validated against the 60 owner-labelled S6.3 claims.
+Tests:  U claim scoring, single-tier refusal, validation κ and refusals, baseline result and lineage, judge ladder for Opus 5.5 (all with faithful fakes) · Q two validation runs, then the faithfulness baseline on 20261120T225248Z-50a99c5-0dad
 Regression: R1 R2 R3 R5
-Done: Gate D recorded. Result: Pending.
+Done: two independent validation runs each at weighted κ ≥ 0.85 → Gate D recorded on DeepEval faithfulness plus the eval-replay grounding gate; otherwise the faithfulness baseline is recorded as an unvalidated candidate and Gate D waits for the S6.3 fresh-sample re-measure. Result: Pending.
 ```
 
 S6.6 (prompt optimization on holdout, GEPA) was removed by owner decision 2026-11-20 (`tasks/s6-decisions.md` #54).

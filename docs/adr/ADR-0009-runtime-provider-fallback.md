@@ -110,3 +110,7 @@ Consequences:
 - Live check 2026-11-15 (owner): one bounded call per tier at temperature 0; Foundry `opus-4-6-judge` answered as `claude-opus-4-6`, Bedrock `global.anthropic.claude-opus-4-6-v1` answered. No 400 on temperature from either tier.
 
 Alternatives: keep Luna (rejected: temperature 1 only, Bedrock tier not invocable); Claude Sonnet 4.6 as the judge (cheaper; not chosen by the owner); Claude Opus 5.5 or later (no temperature control; Bedrock availability for this account unconfirmed).
+
+## Amendment 2026-11-21 — Foundry judge tier is Claude Opus 5.5 (S6.5, owner decision)
+
+Owner, 2026-11-21: the judge deployment `opus-5-5-judge` (Claude Opus 5.5, 40,000 tokens per minute) replaces the deleted Opus 4.6 Foundry deployment. A probe on 2026-11-21 showed that Opus 5.5 rejects `temperature` ("deprecated for this model") and a forced `tool_choice`, and accepts JSON-schema structured output; thinking is always on. So the Foundry tier sends no `temperature`, `top_p` or `thinking`, sends explicit effort `high` and a default `max_tokens` of 16000, and the DeepEval adapter asks every tier for JSON-schema output. The Bedrock tier stays Opus 4.6 at the configured temperature. A fallback would therefore change the judge's model generation, so evaluations that need a single judge model refuse to run with both tiers configured (`tasks/s6-decisions.md` #62). Lineage records `temperature: null` for the Foundry tier. Consequence: the judge is not reproducible run to run, so S6.5 validates it twice (#63).
