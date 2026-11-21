@@ -31,7 +31,7 @@ class EvalRunRecord(BaseModel):
     git_sha: NonEmptyStr
     branch: NonEmptyStr
     model: NonEmptyStr
-    temperature: float
+    temperature: Annotated[float, Field(strict=True)] | None
     prompt_version: NonEmptyStr
     evidence_release: NonEmptyStr
     snapshot_hash: NonEmptyStr

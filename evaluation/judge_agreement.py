@@ -111,7 +111,7 @@ class AgreementReport(BaseModel):
     population: str
     judge_model: str
     judge_prompt_sha256: str
-    temperature: float
+    temperature: float | None
     git_sha: str
     pairs: dict[str, PairAgreement]
     judge_owner_unquoted: dict[str, list[str] | None]
@@ -219,11 +219,10 @@ def _parse_verdict(reply: str) -> tuple[str, list[dict[str, Any]]]:
 def _judge(args: argparse.Namespace) -> None:
     review = read_json(args.review, "review file")
     try:
-        llm = create_langchain_judge_llm(
-            judge_config_from_env(
-                provider="opus", model=None, temperature=TEMPERATURE, top_p=None, max_tokens=None
-            )
+        config = judge_config_from_env(
+            provider="opus", model=None, temperature=TEMPERATURE, top_p=None, max_tokens=None
         )
+        llm = create_langchain_judge_llm(config)
     except ValueError as exc:
         raise RefusalError(f"judge is not configured: {exc}") from exc
     assert llm is not None  # provider "opus" always builds a model
@@ -268,7 +267,7 @@ def _judge(args: argparse.Namespace) -> None:
         args.out,
         {
             "judge_prompt_sha256": hashlib.sha256(JUDGE_PROMPT.encode()).hexdigest(),
-            "temperature": TEMPERATURE,
+            "temperature": config.temperature,
             "verdicts": verdicts,
             "errors": errors,
         },

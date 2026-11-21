@@ -59,7 +59,10 @@ def load_baseline(run_id: str, root: Path) -> list[dict[str, Any]]:
         )
     try:
         runs: list[dict[str, Any]] = [
-            {key: run[key] for key in (*METRICS, "ticker", "recorded_memo", "recorded_registry")}
+            {
+                **{key: run[key] for key in (*METRICS, "ticker", "recorded_memo", "recorded_registry")},
+                "repeat": run.get("repeat"),
+            }
             for run in result["raw_runs"]
         ]
     except (KeyError, TypeError) as exc:
