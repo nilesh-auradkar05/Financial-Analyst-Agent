@@ -1,7 +1,8 @@
 """Evaluation judge ladder: docs/test-plan.md §16 "Judge ladder (Claude Opus 4.6, 2026-11-15,
-JUDGE-OPUS; supersedes the Luna row)" (ADR-0009 amendment 2026-11-15): the Foundry judge deployment
-first through the Anthropic Messages route, Bedrock Opus 4.6 through the Converse runtime as the
-fallback.
+JUDGE-OPUS; supersedes the Luna row; Foundry tier Claude Opus 5.5, amended S6.5 2026-11-21)"
+(ADR-0009 amendments 2026-11-15 and 2026-11-21): the Foundry judge deployment first through the
+Anthropic Messages route (no temperature, effort high, JSON-schema structured output), Bedrock Opus
+4.6 through the Converse runtime as the fallback.
 
 Both providers are loopback fakes that compute each reply from the request they receive, so the
 production clients build and send real requests: FakeFoundry for Foundry and FakeBedrockConverse
@@ -23,6 +24,7 @@ from pydantic import BaseModel
 
 from evaluation.judge_models_interface import (
     JudgeModelConfig,
+    JudgeProvider,
     create_deepeval_judge_model,
     create_langchain_judge_llm,
     judge_config_from_env,
@@ -31,7 +33,8 @@ from tests.embedding_arms import isolate_environment
 from tests.unit.fake_bedrock_converse import FakeBedrockConverse
 from tests.unit.fake_foundry import JUDGE_SERVED_MODEL, MESSAGES_PATH, FakeFoundry
 
-DEPLOYMENT = "opus-4-6-judge"
+DEPLOYMENT = "opus-5-5-judge"
+DEFAULT_MAX_TOKENS = 16000
 BEDROCK_ID = "global.anthropic.claude-opus-4-6-v1"
 AZURE_KEY = "dummy-azure-secret"
 BEDROCK_KEY = "dummy-bedrock-secret"
@@ -94,6 +97,16 @@ class Ladder:
         self.configure(azure=azure, bedrock=bedrock)
         return self.build(temperature=temperature, max_tokens=max_tokens)
 
+    def direct(self, temperature: float | None, *, azure: bool = True) -> Any:
+        """The judge for a config object built by hand, whose temperature is whatever it holds (a
+        Foundry tier that takes none must not send it)."""
+        self.configure(azure=azure)
+        held: dict[str, Any] = {"temperature": temperature}
+        config = JudgeModelConfig(provider=JudgeProvider.OPUS, model=DEPLOYMENT, **held)
+        judge = create_langchain_judge_llm(config)
+        assert judge is not None
+        return judge
+
     def build(self, **options: Any) -> Any:
         """The judge for the current environment (the environment is configured by the caller)."""
         judge = create_langchain_judge_llm(self.config(**options))
@@ -118,13 +131,7 @@ def ladder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Ladder]:
     bedrock.stop()
 
 
-@pytest.mark.parametrize("temperature", [0.0, 0.3])
-def test_foundry_judges_first_over_anthropic_messages(ladder: Ladder, temperature: float) -> None:
-    """Row clauses: Foundry first via {AZURE_OPENAI_ENDPOINT}/anthropic/v1/messages, AZURE_API_KEY in
-    x-api-key and no bearer header; the configured temperature, no top_p, no thinking, explicit
-    max_tokens; Bedrock is not reached."""
-    reply = ladder.judge(temperature=temperature).invoke("check")
-
+def assert_foundry_request(ladder: Ladder, reply: Any) -> None:
     assert reply.content == f"{DEPLOYMENT}: check"
     [request] = ladder.foundry.requests
     assert request.path == MESSAGES_PATH
@@ -132,24 +139,47 @@ def test_foundry_judges_first_over_anthropic_messages(ladder: Ladder, temperatur
     assert request.credential == AZURE_KEY
     assert not request.bearer
     assert request.body["model"] == DEPLOYMENT
-    assert request.body["temperature"] == temperature
+    assert "temperature" not in request.body
     assert "top_p" not in request.body
     assert "thinking" not in request.body
+    assert request.body["output_config"] == {"effort": "high"}
     assert isinstance(request.body["max_tokens"], int) and request.body["max_tokens"] > 0
     assert ladder.bedrock.requests == []
 
 
 @pytest.mark.parametrize("temperature", [0.0, 0.3])
+def test_foundry_judges_first_over_anthropic_messages_with_high_effort_and_no_temperature(
+    ladder: Ladder, temperature: float
+) -> None:
+    """Row clauses: Foundry first via {AZURE_OPENAI_ENDPOINT}/anthropic/v1/messages, AZURE_API_KEY in
+    x-api-key and no bearer header; no temperature (Claude Opus 5.5 rejects it, whatever the caller
+    asked for), no top_p, no thinking, output_config.effort = high, explicit max_tokens; Bedrock is
+    not reached."""
+    assert_foundry_request(ladder, ladder.judge(temperature=temperature).invoke("check"))
+
+
+@pytest.mark.parametrize("config_temperature", [None, 0.3])
+def test_foundry_tier_sends_no_temperature_even_for_a_config_that_holds_one(
+    ladder: Ladder, config_temperature: float | None
+) -> None:
+    """Row clause: the Foundry tier sends no `temperature`, `top_p` or `thinking` and sends
+    output_config.effort = high, for a config object that holds a temperature as for one that holds
+    none."""
+    assert_foundry_request(ladder, ladder.direct(config_temperature).invoke("check"))
+
+
+@pytest.mark.parametrize(("config_temperature", "sent"), [(None, 0.0), (0.0, 0.0), (0.3, 0.3)])
 @pytest.mark.parametrize("status", [500, 429, 401])
 def test_foundry_failure_reaches_bedrock_opus_on_the_converse_runtime(
-    ladder: Ladder, status: int, temperature: float
+    ladder: Ladder, status: int, config_temperature: float | None, sent: float
 ) -> None:
     """Row clauses: a Foundry failure reaches Bedrock Opus 4.6 through the Converse runtime with the
-    Bedrock API key; the configured temperature, no top_p, no thinking, explicit max_tokens; the
-    Foundry tier makes one attempt (no client retries)."""
+    Bedrock API key; the Bedrock tier sends the configured temperature (default 0 when the config
+    holds none), no top_p, no thinking, explicit max_tokens; the Foundry tier makes one attempt (no
+    client retries)."""
     ladder.foundry.status = status
 
-    reply = ladder.judge(temperature=temperature).invoke("check")
+    reply = ladder.direct(config_temperature).invoke("check")
 
     assert reply.content == f"{BEDROCK_ID}: check"
     assert len(ladder.foundry.requests) == 1
@@ -157,15 +187,32 @@ def test_foundry_failure_reaches_bedrock_opus_on_the_converse_runtime(
     assert request.path == f"/model/{BEDROCK_ID}/converse"
     assert request.bearer == BEDROCK_KEY
     inference = request.body["inferenceConfig"]
-    assert inference["temperature"] == temperature
+    assert inference["temperature"] == sent
     assert "topP" not in inference
     assert isinstance(inference["maxTokens"], int) and inference["maxTokens"] > 0
     assert "thinking" not in (request.body.get("additionalModelRequestFields") or {})
 
 
+@pytest.mark.parametrize("temperature", [0.0, 0.3])
+def test_bedrock_tier_alone_sends_the_configured_temperature(
+    ladder: Ladder, temperature: float
+) -> None:
+    """Row clause: the Bedrock tier sends the configured temperature (the config holds the given one
+    when the Foundry tier is unconfigured), no top_p and no thinking."""
+    reply = ladder.judge(azure=False, temperature=temperature).invoke("check")
+
+    assert reply.content == f"{BEDROCK_ID}: check"
+    assert ladder.foundry.requests == []
+    [request] = ladder.bedrock.requests
+    inference = request.body["inferenceConfig"]
+    assert inference["temperature"] == temperature
+    assert "topP" not in inference
+    assert "thinking" not in (request.body.get("additionalModelRequestFields") or {})
+
+
 @pytest.mark.parametrize("max_tokens", [None, 777])
 def test_both_tiers_send_an_explicit_max_tokens(ladder: Ladder, max_tokens: int | None) -> None:
-    """Row clause: an explicit max_tokens on both tiers (the configured one when there is one)."""
+    """Row clause: an explicit max_tokens on both tiers: the configured one, else 16000."""
     judge = ladder.judge(max_tokens=max_tokens)
     judge.invoke("first")
     ladder.foundry.status = 500
@@ -181,7 +228,7 @@ def test_both_tiers_send_an_explicit_max_tokens(ladder: Ladder, max_tokens: int 
     if max_tokens is not None:
         assert sent == [max_tokens, max_tokens]
     else:
-        assert sent[0] == sent[1]
+        assert sent == [DEFAULT_MAX_TOKENS, DEFAULT_MAX_TOKENS]
 
 
 def test_every_tier_fails_after_one_attempt_each(ladder: Ladder) -> None:
@@ -275,28 +322,79 @@ def test_answering_host_is_identifiable_from_the_reply_model_name(ladder: Ladder
     assert from_foundry != from_bedrock
 
 
-def test_deepeval_judge_gets_structured_verdicts_from_foundry(ladder: Ladder) -> None:
-    """Row clause: structured verdicts through the DeepEval adapter, Foundry answering first."""
+def test_deepeval_judge_gets_structured_verdicts_from_foundry_as_json_schema_output(
+    ladder: Ladder,
+) -> None:
+    """Row clause: structured verdicts through the DeepEval adapter, Foundry answering first, are
+    requested as JSON-schema output (`output_config.format`), never a forced tool choice."""
     result = ladder.deepeval().generate("Is the claim supported?", schema=Verdict)
 
     assert result == Verdict(verdict=DEPLOYMENT, reason=DEPLOYMENT)
     [request] = ladder.foundry.requests
-    [tool] = request.body["tools"]
-    assert set(tool["input_schema"]["properties"]) == {"verdict", "reason"}
+    assert "tools" not in request.body
+    assert "tool_choice" not in request.body
+    assert request.body["output_config"]["format"]["type"] == "json_schema"
+    assert set(request.body["output_config"]["format"]["schema"]["properties"]) == {
+        "verdict",
+        "reason",
+    }
+    assert request.body["output_config"]["effort"] == "high"
+    assert "temperature" not in request.body
     assert ladder.bedrock.requests == []
 
 
 def test_deepeval_judge_falls_back_to_bedrock_for_structured_verdicts(ladder: Ladder) -> None:
-    """Row clause: structured verdicts through the DeepEval adapter survive the fallback."""
+    """Row clause: structured verdicts through the DeepEval adapter survive the fallback: JSON-schema
+    output on both tiers, never a forced tool choice."""
     ladder.foundry.status = 500
 
     result = ladder.deepeval().generate("Is the claim supported?", schema=Verdict)
 
     assert result == Verdict(verdict=BEDROCK_ID, reason=BEDROCK_ID)
-    assert len(ladder.foundry.requests) == 1
+    [attempt] = ladder.foundry.requests
+    assert "tool_choice" not in attempt.body
+    assert attempt.body["output_config"]["format"]["type"] == "json_schema"
     [request] = ladder.bedrock.requests
-    [tool] = request.body["toolConfig"]["tools"]
-    assert set(tool["toolSpec"]["inputSchema"]["json"]["properties"]) == {"verdict", "reason"}
+    assert "toolConfig" not in request.body
+    text_format = request.body["outputConfig"]["textFormat"]
+    assert text_format["type"] == "json_schema"
+    schema = json.loads(text_format["structure"]["jsonSchema"]["schema"])
+    assert set(schema["properties"]) == {"verdict", "reason"}
+
+
+@pytest.mark.parametrize("temperature", [0.0, 0.3])
+def test_configured_temperature_is_null_when_the_foundry_tier_is_configured(
+    ladder: Ladder, temperature: float
+) -> None:
+    """Row clause: the configured temperature (the eval output's `temperature`) is null when the
+    Foundry tier is configured, whatever the caller asked for."""
+    ladder.configure()
+
+    assert ladder.config(temperature=temperature).temperature is None
+
+
+@pytest.mark.parametrize("temperature", [0.0, 0.3])
+def test_configured_temperature_is_the_given_one_when_only_bedrock_is_configured(
+    ladder: Ladder, temperature: float
+) -> None:
+    """Row clause: without the Foundry tier the configured temperature is the one given (default 0)."""
+    ladder.configure(azure=False)
+
+    assert ladder.config(temperature=temperature).temperature == temperature
+
+
+@pytest.mark.parametrize(
+    "blank", ["AZURE_OPENAI_ENDPOINT", "AZURE_API_KEY", "AZURE_FOUNDRY_JUDGE_MODEL"]
+)
+def test_configured_temperature_is_the_given_one_when_foundry_is_only_partly_configured(
+    ladder: Ladder, blank: str
+) -> None:
+    """Row clause: Foundry is configured only when endpoint, key and judge deployment are all set;
+    otherwise the Bedrock tier answers and the configured temperature is the one given."""
+    ladder.configure()
+    ladder.monkeypatch.setenv(blank, "")
+
+    assert ladder.config(temperature=0.3).temperature == 0.3
 
 
 def test_opus_config_is_the_foundry_deployment_when_foundry_is_configured(ladder: Ladder) -> None:

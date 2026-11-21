@@ -497,8 +497,10 @@ def judged_items(label: str | None = None) -> list[dict[str, Any]]:
 def test_judge_records_a_computed_verdict_with_served_model_prompt_hash_and_temperature(
     judge_env: Ladder, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """§14 Judge verdicts (S6.3): one verdict per claim from its evidence, the served model from the
-    reply, the sha256 of the prompt template and temperature 0; Foundry answers, Bedrock is not reached."""
+    """§14 Judge verdicts (S6.3; temperature amended S6.5): one verdict per claim from its evidence,
+    the served model from the reply, the sha256 of the prompt template and the temperature sent: null
+    when the Foundry tier (which takes none) is configured, and none reaches the wire; Foundry
+    answers, Bedrock is not reached."""
     result, judged = judge_run(judge_env, capsys, judged_items())
 
     assert result.code == 0, result
@@ -507,9 +509,27 @@ def test_judge_records_a_computed_verdict_with_served_model_prompt_hash_and_temp
     assert {v["served_model"] for v in judged["verdicts"]} == {JUDGE_SERVED_MODEL}
     assert judged["errors"] == []
     assert SHA256.match(judged["judge_prompt_sha256"])
-    assert judged["temperature"] == 0.0
-    assert {r.body["temperature"] for r in judge_env.foundry.requests} == {0}
+    assert judged["temperature"] is None
+    assert len(judge_env.foundry.requests) == len(JUDGED)
+    assert all("temperature" not in r.body for r in judge_env.foundry.requests)
     assert judge_env.bedrock.requests == []
+
+
+def test_judge_records_temperature_0_and_sends_it_when_only_the_bedrock_tier_is_configured(
+    judge_env: Ladder, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """§14 Judge verdicts (S6.3; temperature amended S6.5): "temperature 0 on a tier that takes one":
+    with only the Bedrock tier configured the file records 0.0 and every Converse request sends it."""
+    judge_env.configure(azure=False)
+
+    result, judged = judge_run(judge_env, capsys, judged_items())
+
+    assert result.code == 0, result
+    assert {v["claim_id"]: v["verdict"] for v in judged["verdicts"]} == EXPECTED
+    assert {v["served_model"] for v in judged["verdicts"]} == {BEDROCK_ID}
+    assert judged["temperature"] == 0.0
+    assert judge_env.foundry.requests == []
+    assert {r.body["inferenceConfig"]["temperature"] for r in judge_env.bedrock.requests} == {0.0}
 
 
 def test_judge_prompt_holds_the_claim_and_its_evidence_only(
@@ -847,6 +867,7 @@ def agreement(
     owner_flips: tuple[int, int] = (0, 0),
     judge_flips: tuple[int, int] = (0, 0),
     assertions: Callable[[int, str], list[dict[str, Any]] | None] | None = None,
+    temperature: float | None = 0.0,
 ) -> Agreement:
     """Review and judge files over the MIXED baseline (N = 90 supported, 30 unsupported).
 
@@ -885,7 +906,7 @@ def agreement(
         json.dumps(
             {
                 "judge_prompt_sha256": "a" * 64,
-                "temperature": 0.0,
+                "temperature": temperature,
                 "verdicts": [
                     {
                         "claim_id": i,
@@ -1119,6 +1140,29 @@ def test_agreement_report_schema_forbids_extra_fields(level: str) -> None:
 
     with pytest.raises(ValidationError):
         model.model_validate({**valid, "unexpected": 1})
+
+
+@pytest.mark.parametrize("temperature", [None, 0.0], ids=["foundry-tier-null", "bedrock-tier-zero"])
+def test_report_carries_the_judge_files_temperature_whether_null_or_a_number(
+    workdir: Path, capsys: pytest.CaptureFixture[str], temperature: float | None
+) -> None:
+    """§14 Agreement report (S6.3; temperature null allowed, S6.5): a judge file recorded on the
+    Foundry tier (temperature null) is reported with a null temperature, not refused; a number is kept."""
+    case = agreement(workdir, temperature=temperature)
+
+    result = run(case.argv(), capsys)
+
+    assert result.code == 0, result
+    assert ja().AgreementReport.model_validate_json(case.out.read_text()).temperature == temperature
+    assert case.load(case.out)["temperature"] == temperature
+
+
+def test_agreement_report_schema_takes_a_null_temperature_but_not_another_type() -> None:
+    """§14 Agreement report (S6.3; S6.5): `temperature` is a number or null."""
+    assert ja().AgreementReport.model_validate({**REPORT, "temperature": None}).temperature is None
+
+    with pytest.raises(ValidationError):
+        ja().AgreementReport.model_validate({**REPORT, "temperature": "warm"})
 
 
 def judge_assertions(position: int, claim_id: str) -> list[dict[str, Any]]:
