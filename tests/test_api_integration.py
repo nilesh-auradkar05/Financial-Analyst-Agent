@@ -911,3 +911,128 @@ def test_async_job_of_a_run_without_drafts_has_an_empty_stored_history(client: T
     record = api_main.run_store.get_run(job_id)
     assert record is not None and record.status == "completed"
     assert record.draft_history == []
+
+
+# Trace: docs/test-plan.md §12 S7.1 rows "Ticker schema", "Company name bounds" and "Guardrail
+# events returned". One request per test: every submission counts toward the rate limit.
+
+SUBMISSIONS = [("/analyze", 200), ("/analyze/async", 202), ("/ingest", 200)]
+PRINTABLE_ASCII_80 = ("A" + "".join(chr(code) for code in range(0x21, 0x7F)))[:80]
+
+
+@pytest.mark.parametrize(("path", "accepted"), SUBMISSIONS)
+@pytest.mark.parametrize("ticker", ["BRK.B", "ABCDEF"])
+def test_a_ticker_matching_the_schema_is_accepted_on_every_submission_route(
+    client: TestClient, path, accepted, ticker
+):
+    """12 'Ticker schema': `BRK.B` and the 6-letter `ABCDEF` are accepted."""
+    response = client.post(path, json={"ticker": ticker})
+
+    assert response.status_code == accepted
+    assert response.json()["ticker"] == ticker
+
+
+@pytest.mark.parametrize(("path", "accepted"), SUBMISSIONS)
+@pytest.mark.parametrize("ticker", ["AAPL; DROP", "ABCDEFG"])
+def test_a_ticker_outside_the_schema_is_a_422_on_every_submission_route(
+    client: TestClient, path, accepted, ticker
+):
+    """12 'Ticker schema': `AAPL; DROP` and the 7-letter `ABCDEFG` -> 422."""
+    response = client.post(path, json={"ticker": ticker})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+@pytest.mark.parametrize(
+    ("ticker", "normalized"),
+    [("BRK.B", "BRK.B"), ("brk.b", "BRK.B"), ("ABCDEF", "ABCDEF"), ("abcdef", "ABCDEF")],
+)
+def test_ingest_status_accepts_the_same_tickers(client: TestClient, ticker, normalized):
+    """12 'Ticker schema': `GET /ingest/{ticker}` accepts the same tickers, case-insensitively."""
+    response = client.get(f"/ingest/{ticker}")
+
+    assert response.status_code == 200
+    assert response.json()["ticker"] == normalized
+
+
+@pytest.mark.parametrize("ticker", ["ABCDEFG", "AAPL;DROP", "BRK.BB"])
+def test_ingest_status_rejects_tickers_outside_the_schema(client: TestClient, ticker):
+    """12 'Ticker schema': `GET /ingest/{ticker}` applies the same schema."""
+    assert client.get(f"/ingest/{ticker}").status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/analyze", "/analyze/async"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param("A" * 81, id="eighty-one-characters"),
+        pytest.param("Nestlé", id="non-ascii"),
+        pytest.param("bad\nname", id="control-character"),
+    ],
+)
+def test_a_company_name_outside_the_bounds_is_a_422(client: TestClient, path, name):
+    """12 'Company name bounds': 81 characters, a control character or non-ASCII -> 422."""
+    response = client.post(path, json={"ticker": "AAPL", "company_name": name})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+def test_an_eighty_character_printable_ascii_company_name_is_accepted(client: TestClient):
+    """12 'Company name bounds': an 80-character name of printable ASCII is accepted."""
+    response = client.post("/analyze", json={"ticker": "AAPL", "company_name": PRINTABLE_ASCII_80})
+
+    assert response.status_code == 200
+    assert response.json()["company_name"] == PRINTABLE_ASCII_80
+
+
+GUARDRAIL_EVENTS: list[dict[str, Any]] = [
+    {"code": "source_dropped", "detail": "evil.example"},
+    {"code": "untrusted_content_framed", "detail": None},
+    {"code": "price_target_removed", "detail": "a removed sentence"},
+]
+
+
+def _agent_reporting_guardrail_events(events: list[dict[str, Any]]):
+    async def run(ticker, company_name, **kwargs):
+        state = await fake_run_agent(ticker, company_name)
+        return {**state, "guardrail_events": [dict(event) for event in events]}
+
+    return run
+
+
+def test_the_sync_response_returns_the_runs_guardrail_events(client: TestClient, monkeypatch):
+    """12 'Guardrail events returned': the /analyze response lists the state's events as
+    {code, detail}, in order."""
+    monkeypatch.setattr(
+        api_main, "run_agent", _agent_reporting_guardrail_events(GUARDRAIL_EVENTS)
+    )
+
+    response = client.post("/analyze", json={"ticker": "AAPL"})
+
+    assert response.status_code == 200
+    assert response.json()["guardrail_events"] == GUARDRAIL_EVENTS
+
+
+def test_the_async_job_result_returns_the_runs_guardrail_events(client: TestClient, monkeypatch):
+    """12 'Guardrail events returned': the async job result carries them too."""
+    monkeypatch.setattr(
+        api_main, "run_agent", _agent_reporting_guardrail_events(GUARDRAIL_EVENTS)
+    )
+
+    job_id = client.post("/analyze/async", json={"ticker": "AAPL"}).json()["job_id"]
+    result = client.get(f"/jobs/{job_id}").json()["result"]
+
+    assert result["guardrail_events"] == GUARDRAIL_EVENTS
+
+
+def test_a_run_that_triggered_nothing_returns_an_empty_event_list(client: TestClient):
+    """12 'Guardrail events returned': `guardrail_events` defaults to [] (never missing, never
+    null) when the run recorded none."""
+    sync = client.post("/analyze", json={"ticker": "AAPL"}).json()
+    job_id = client.post("/analyze/async", json={"ticker": "MSFT"}).json()["job_id"]
+    polled = client.get(f"/jobs/{job_id}").json()["result"]
+
+    assert sync["guardrail_events"] == []
+    assert polled["guardrail_events"] == []

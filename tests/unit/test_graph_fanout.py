@@ -56,7 +56,7 @@ def install_fakes(
         return [
             SimpleNamespace(
                 title=f"{query} #{n}",
-                url=f"https://example.test/{n}",
+                url=f"https://www.reuters.com/news/{n}",
                 source="Wire",
                 snippet=f"{query} item {n} reports revenue growth.",
                 published_date="2026-09-01",

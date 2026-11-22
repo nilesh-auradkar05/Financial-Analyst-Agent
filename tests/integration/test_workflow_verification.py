@@ -44,7 +44,7 @@ async def fake_search_company_news(query: str, max_results: int = 5):
     return [
         SimpleNamespace(
             title="Apple launches updated product lineup",
-            url="https://example.com/apple-launch",
+            url="https://www.reuters.com/apple-launch",
             source="Example News",
             snippet="Recent coverage says Apple launched updated products and investor sentiment stayed constructive.",
             published_date="2026-03-15",

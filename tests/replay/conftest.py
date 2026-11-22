@@ -240,7 +240,7 @@ def live_world(monkeypatch: pytest.MonkeyPatch, chat: FakeChat) -> Callable[...,
             return [
                 SimpleNamespace(
                     title=f"{query} #{n}",
-                    url=f"https://example.test/live/{n}",
+                    url=f"https://www.reuters.com/live/{n}",
                     source="Wire",
                     snippet=f"{query} item {n} reports revenue growth.",
                     published_date="2026-09-01",

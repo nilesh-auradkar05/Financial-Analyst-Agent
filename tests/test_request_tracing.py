@@ -169,7 +169,7 @@ def evidence(monkeypatch):
         return [
             SimpleNamespace(
                 title=query,
-                url="https://example.test/news",
+                url="https://www.reuters.com/news",
                 source="Local evidence",
                 snippet=query + " reports software revenue growth.",
                 published_date="2026-09-01",
