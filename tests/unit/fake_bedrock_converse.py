@@ -4,7 +4,9 @@ A real HTTP server on 127.0.0.1: a production boto3 client pointed at it with
 `AWS_ENDPOINT_URL_BEDROCK_RUNTIME` builds and signs real requests; this server parses them and
 computes the reply from the request. A request that carries `toolConfig` gets a `toolUse` block for
 its first tool, the input filled from that tool's input schema (every string field holds the model
-id of the request, every other field its type's zero); a plain request gets the text
+id of the request, every other field its type's zero); a request for JSON-schema output
+(`outputConfig.textFormat`) gets a text reply holding JSON that conforms to the schema, filled the
+same way; a plain request gets the text
 `"<model id>: <prompt>"`. It never replays an answer supplied by a test. `status` makes every
 request fail with that HTTP status. With `verdict_replies` set, a plain request is answered with a
 claim verdict computed from its `<claim>` and `<evidence>` blocks (`tests/unit/fake_verdict.py`);
@@ -22,6 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
+from tests.unit.fake_schema_reply import json_reply
 from tests.unit.fake_verdict import verdict_text
 
 _CONVERSE_PATH = re.compile(r"^/model/(?P<model>[^/]+)/converse$")
@@ -104,10 +107,17 @@ class FakeBedrockConverse:
             error = _ERROR_TYPES.get(failing, "InternalServerException")
             return failing, {"message": "runtime unavailable"}, {"x-amzn-ErrorType": error}
         tools = request.body.get("toolConfig", {}).get("tools", [])
-        if tools:
+        text_format = (request.body.get("outputConfig") or {}).get("textFormat") or {}
+        json_schema = (text_format.get("structure") or {}).get("jsonSchema") or {}
+        if text_format.get("type") == "json_schema":
+            content: list[dict[str, Any]] = [
+                {"text": json_reply(json_schema.get("schema") or "{}", request.model_id)}
+            ]
+            stop_reason = "end_turn"
+        elif tools:
             spec = tools[0]["toolSpec"]
             properties = spec.get("inputSchema", {}).get("json", {}).get("properties", {})
-            content: list[dict[str, Any]] = [
+            content = [
                 {
                     "toolUse": {
                         "toolUseId": f"tooluse_{attempt}",

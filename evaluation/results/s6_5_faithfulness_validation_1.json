@@ -1,0 +1,407 @@
+{
+  "baseline_run_id": "20261119T041339Z-6f93b18-460d",
+  "claims": [
+    {
+      "claim_id": "3-61291272988d",
+      "reason": "The score is 0.20 because the actual output relies largely on claims the context does not support. It cites macro pressures on the broader tech sector, but the context only places Apple in the Technology sector and notes component price increases. It also invokes Apple's history of resilience and its cash flows, neither of which the context mentions; the context gives only share price, market cap, P/E ratio and 52-week range. Finally, it offers a positive outlook built on those unsupported points, while the context provides only valuation metrics (a P/E of 37.32 and a $308.63 share price near the $317.4 52-week high) and component price pressures lasting into 2027, with no investment outlook.",
+      "score": 0.2,
+      "supported": false
+    },
+    {
+      "claim_id": "5-0c5551ce4332",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "6-bfab0121e189",
+      "reason": "The score is 0.50 because the actual output goes beyond the retrieval context in two places. It claims Microsoft's P/E of about 23.26, its cheapest valuation in a decade, gives long-term investors a margin of safety, which the context never states. It also predicts that near-term volatility will continue, while the context only describes a large selloff and Microsoft's worst month since 2000.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "4-318c725925c3",
+      "reason": "The score is 0.50 because the actual output claims that the risks described could adversely affect Apple's business, reputation, results of operations, financial condition and stock price as a whole. The retrieval context, drawn from Apple's Risk Factors section, only ties specific risks such as COVID-19 and semiconductor shortages to adverse effects on Apple. It does not explicitly state that broader, all-encompassing impact.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "14-913be42877ae",
+      "reason": "The score is 0.00 because the actual output asserts that additional risks not presently known or currently deemed immaterial may harm NVIDIA's business, a claim the retrieval context never makes. The context only notes that NVIDIA files a Form 10-K with Item 1A Risk Factors listing specific risks, so the output's central claim is unsupported, even though nothing in the context directly contradicts it.",
+      "score": 0.0,
+      "supported": false
+    },
+    {
+      "claim_id": "15-a20ffe0d4a58",
+      "reason": "The score is 0.33 because the actual output makes claims the retrieval context cannot support. It states that NVIDIA Corporation trades under the ticker NVDA, but the context never mentions the company name or ticker. It also calls the company a leading data center-scale AI infrastructure company, while the context only places it in the Technology sector.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "1-d373f8bc203e",
+      "reason": "The score is 0.50 because the actual output goes beyond what the retrieval context supports. It frames Apple's early software updates, which the context presents only as a response to AI-driven cybersecurity concerns, as a potential catalyst for the stock or business. It also makes claims about whether the Siri upgrade and cybersecurity measures are reflected in financial results. The context only says the new Siri is expected later this year and is seen as a selling point for the next iPhone upgrade cycle.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "11-0a78262fb3c6",
+      "reason": "The score is 0.50 because the actual output claims that failing to meet evolving needs could adversely impact NVIDIA's financial results, a conclusion the retrieval context does not state. The context only notes that NVIDIA's accelerated computing platforms face rapid changes in technology, customer requirements, competitive products and industry standards, with risk factors covered in Item 1A. The claim does not directly contradict the context, but it goes beyond what is supported.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "9-b974f8cdbcad",
+      "reason": "The score is 0.25 because the actual output goes well beyond the context. It calls the P/E of about 23.26 a reasonable entry point for patient investors, which is an unsupported opinion. It describes competitive pressures and near-term headwinds that the context never mentions, since the context only cites roughly $190 billion in planned capex, a lowered price target and stock declines. It also claims further downside risk, even though Stifel's 'hold' rating with a $400 target sits above the current $390.49 price.",
+      "score": 0.25,
+      "supported": false
+    },
+    {
+      "claim_id": "3-88961e39ebed",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "8-09b058493415",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "4-6d559a2da05b",
+      "reason": "The score is 0.50 because, although the actual output correctly cites the P/E ratio of about 37.32, it goes further and claims the stock trades at a premium that may be hard to justify if growth slows. The retrieval context provides no benchmark or growth data to support that assessment, so the claim is unsupported speculation rather than a direct contradiction.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "14-cc38bf63fb0c",
+      "reason": "The score is 0.25 because the actual output goes beyond the retrieval context in several ways. First, it links Nvidia's fall below its $200 floor to a broader technology-sector slump hitting chip stocks, but the context reports these in separate items and never connects them. Second, it attributes support for the stock to AI partnerships or demand signals, while the context mentions only positive sentiment and news of another major data-center deal. Third, it describes a 'cautiously optimistic outlook' that the context never states. The context gives mixed sentiment (4 positive, 2 negative, 4 neutral articles), including negative pieces like 'How Nvidia Became a Chip Stock Loser\u2014and Why It Might Stay That Way.'",
+      "score": 0.25,
+      "supported": false
+    },
+    {
+      "claim_id": "8-bb3f952bb3a5",
+      "reason": "The score is 0.75 because the actual output overgeneralizes the $400 price target, presenting it as a view broadly held by analysts. The context attributes it to a single analyst, Stifel's Brad Reback, who lowered his target and kept a 'hold' rating.",
+      "score": 0.75,
+      "supported": false
+    },
+    {
+      "claim_id": "5-f28d1747f5d8",
+      "reason": "The score is 0.33 because the actual output goes beyond the retrieval context. It labels the P/E of about 37.3 as a 'premium' valuation without any benchmark in the context to support that. It also makes speculative claims about growth, price-induced demand destruction, and whether the valuation is justified, none of which appear in the context.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "5-bbf2c17ff0ec",
+      "reason": "The score is 0.50 because the actual output says 'analysts' view the drop in Apple stock as a likely buying opportunity, while the retrieval context credits this view to a single Barron's article by Angela Palumbo. The substance of the claim matches, but the attribution is broadened beyond what the context supports.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "9-83508720824f",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "11-05781fd1641d",
+      "reason": "The score is 0.25 because the actual output goes beyond the retrieval context with speculative claims. It labels the P/E ratio of 29.83614 a premium valuation, which the context never states. It also cites a tech sell-off and a risk of valuation compression, neither of which the context mentions. The context only shows the current price ($194.83) sitting below the 52-week high ($236.54).",
+      "score": 0.25,
+      "supported": false
+    },
+    {
+      "claim_id": "4-7cc69e107a78",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "2-77731895b93f",
+      "reason": "The score is 0.75 because the actual output describes news sentiment as 'predominantly negative', which overstates the context. The context does label overall sentiment as negative, but only 3 of 10 articles are negative, and neutral articles (5) outnumber both negative and positive ones. This is an exaggeration rather than a direct contradiction.",
+      "score": 0.75,
+      "supported": false
+    },
+    {
+      "claim_id": "6-9477eb748ca2",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "4-0cfec3344192",
+      "reason": "The score is 1.00 because there are no contradictions, so the actual output is fully consistent with the retrieval context. Nicely done!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "10-711e94805830",
+      "reason": "The score is 0.00 because the actual output attributes the $390.49 share price and the $2.90 trillion market capitalization to Microsoft, but the retrieval context never names the company. Neither attribution can be confirmed from the context.",
+      "score": 0.0,
+      "supported": false
+    },
+    {
+      "claim_id": "1-bc499fa6d89e",
+      "reason": "The score is 0.33 because the actual output claims the P/E ratio of about 37.3x is elevated relative to both historical averages and broader market multiples, yet the retrieval context provides neither historical P/E data nor market multiples for comparison, leaving these comparative claims unsupported.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "9-e23c66d8f70a",
+      "reason": "The score is 0.00 because the actual output cites a specific Microsoft headcount of approximately 228,000 full-time workers as of June 2026, which the retrieval context never provides. The context only notes that the reported layoffs could affect up to 2.5% of the workforce, described as thousands of jobs. Because that figure has no support in the context, the claim cannot be verified as faithful.",
+      "score": 0.0,
+      "supported": false
+    },
+    {
+      "claim_id": "5-d9d0acdf473c",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely done staying faithful to the source material.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "15-4a691b77b704",
+      "reason": "The score is 0.75 because the output goes beyond the context in how it frames Nvidia. The context confirms Nvidia is the dominant AI chip provider. However, the output describes its position as 'entrenched' and presents it as a 'bull case investment thesis', and neither of these appears in the retrieval context.",
+      "score": 0.75,
+      "supported": false
+    },
+    {
+      "claim_id": "15-71980122edc7",
+      "reason": "The score is 0.67 because the actual output goes beyond the retrieval context by framing Nvidia's $194.83 price, below its recent $200 floor, as an attractive entry point and recommending it as a core holding. The context supports Nvidia being the dominant AI chip provider and confirms the price, but it offers no basis for that speculative investment advice.",
+      "score": 0.6666666666666666,
+      "supported": false
+    },
+    {
+      "claim_id": "4-e8209ebb68dc",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely done, it stays faithful to the source material throughout.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "4-970f5e7a6eef",
+      "reason": "The score is 0.33 because the actual output goes beyond the retrieval context in two ways. First, it calls the iPhone Apple's most important product, which the context never states; the context only says Mac and iPad price hikes raised fears of higher iPhone prices. Second, it claims such price hikes could pressure demand or margins, while the context only mentions those fears and that Apple shares slid.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "7-9f3d93efe5dc",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely done staying faithful to the source material.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "6-538e84150104",
+      "reason": "The score is 0.50 because the actual output goes beyond the retrieval context when describing Stifel analyst Brad Reback's view. The context does confirm that he kept a 'hold' rating with a $400 price target while the stock traded below $357. However, the output says he sees 'limited upside' and calls current prices 'depressed levels', and the context never states either of these.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "13-d21ba496e561",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "1-67ffee169324",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely done!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "10-e1addc1e550a",
+      "reason": "The score is 0.75 because the actual output claims that Microsoft's AI growth and Cloud revenue counterbalance 'negative news' about the company. The context does not support this framing. It only says the market is weighing rapid growth against planned capital investment of roughly $190 billion. It mentions no negative news beyond a 3.5% stock dip and the stock trading about 34% below its 52-week high.",
+      "score": 0.75,
+      "supported": false
+    },
+    {
+      "claim_id": "15-2f33e5628f57",
+      "reason": "The score is 0.67 because the actual output went beyond the retrieval context. It correctly cited the P/E of about 29.84 and the $4.72 trillion market cap, but it also speculated about growth expectations and the stock's vulnerability to disappointment, which the context does not support.",
+      "score": 0.6666666666666666,
+      "supported": false
+    },
+    {
+      "claim_id": "2-e6a0664f754a",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output stays fully consistent with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "3-17a1bdb2ff9a",
+      "reason": "The score is 0.50 because the actual output states the Apple share drop occurred on 'June 25-26, 2026', but the context only says the shares fell more than 6% and had their worst day in over a year 'on Thursday', with the article dated June 26, 2026. The exact date is inferred rather than directly supported, which undermines the output's faithfulness.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "6-7d3bc34a0416",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "12-0d85db98df14",
+      "reason": "The score is 0.00 because the actual output claims Firmus raised $1.3 billion in April to support the Nvidia partnership initiative. The context only shows '$1.3' with the rest of the figure cut off, so 'billion' cannot be confirmed. The context also never links the funds to the Nvidia partnership.",
+      "score": 0.0,
+      "supported": false
+    },
+    {
+      "claim_id": "3-d4e3e2e75f5c",
+      "reason": "The score is 0.33 because the actual output goes beyond what the retrieval context supports. It describes the stock as expensive relative to historical averages, but the context only confirms a P/E of about 37.3x and gives no historical average P/E data. It also suggests limited upside based on earnings growth expectations, yet the context contains only valuation metrics (P/E 37.32, price $308.63, 52-week range $201.5-$317.4) and no growth outlook, so that claim is speculative.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "4-07f1ccb381d3",
+      "reason": "The score is 0.33 because the actual output goes beyond the retrieved market data and adds unsupported judgments. It labels the P/E ratio of about 37.3x as expensive or inexpensive, but the context provides only the figure and no valuation assessment. It also describes a long-term investment thesis and suitability for patient investors, which the context, limited to price, market cap, P/E, 52-week range and sector, never addresses.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "1-26112c2c01ab",
+      "reason": "The score is 0.25 because the actual output goes beyond what the retrieval context supports. It calls the 37.32 P/E ratio elevated and describes a 'recent pullback', but the context only shows the current price ($308.63) slightly below the 52-week high ($317.4), with no timing or characterization. The output also introduces an AI-driven upgrade cycle and valuation risks, which the context never mentions. The context provides only the P/E figure and the Technology sector classification.",
+      "score": 0.25,
+      "supported": false
+    },
+    {
+      "claim_id": "11-ec07067bd09b",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output is fully consistent with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "11-5fef313ec067",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "2-b38d628d8887",
+      "reason": "The score is 0.33 because the actual output goes beyond the retrieval context in interpreting the P/E ratio. The context only states a P/E of 37.319225 (about 37.3x). The output calls that ratio 'elevated' and speculates that it leaves little room for error, or that price increases could lead to volume declines. The context supports neither claim.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "8-850788ea5aee",
+      "reason": "The score is 0.80 because the actual output cites a 23.3x P/E ratio for Microsoft that the retrieval context never mentions. The context only says, per Bloomberg, that the selloff left Microsoft at its cheapest valuation in a decade. The rest of the output appears consistent with the source.",
+      "score": 0.8,
+      "supported": false
+    },
+    {
+      "claim_id": "2-7dd6738d3dc0",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "6-9c9cf5fcaf6e",
+      "reason": "The score is 1.00 because there are no contradictions; the actual output aligns fully with the retrieval context. Nicely done!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "7-1990598d6898",
+      "reason": "The score is 0.60 because the actual output attaches a specific date, June 25, 2026, to Microsoft's 2.5% stock slip after Brad Reback lowered his price target to $400. The context only says the drop happened on a Thursday and never gives that date. The core facts about the slip and the price target are supported, but the invented date reduces faithfulness.",
+      "score": 0.6,
+      "supported": false
+    },
+    {
+      "claim_id": "1-39711a368ff6",
+      "reason": "The score is 0.33 because the actual output goes beyond the retrieval context with evaluative judgments the context does not support. It calls the stock 'not cheap' even though the context only gives a P/E of about 37.3x without judging whether that is high or low. It also describes the risk-reward as 'balanced rather than compelling', which is speculative opinion, since the context only lists the price ($308.63), the 52-week range ($201.5-$317.4), and the P/E.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "8-6e04ca069cd8",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely grounded work!",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "4-a72fe6ba3f1f",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely done staying grounded in the source material.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "2-86d8e58f5845",
+      "reason": "The score is 0.00 because the actual output relies on claims the retrieval context never makes. It cites Apple's services segment and recurring revenue as a buffer against hardware volatility, and it invokes Apple's history with supply chain challenges. The context mentions only Mac and iPad price hikes and that the stock can 'weather the storm', with no supporting reasons.",
+      "score": 0.0,
+      "supported": false
+    },
+    {
+      "claim_id": "7-a5e5651af664",
+      "reason": "The score is 0.83 because the actual output says Microsoft's ticker symbol is MSFT, but the retrieval context never names the company or gives a ticker, so this claim is not supported by the context. Apart from that, the output stays well aligned with the retrieved information.",
+      "score": 0.8333333333333334,
+      "supported": false
+    },
+    {
+      "claim_id": "12-1507d158d4b1",
+      "reason": "The score is 0.33 because the actual output makes claims the retrieval context cannot back up. It says the stock trades at a premium based on its P/E ratio of about 29.84x, but the context gives no sector or market benchmark to support that comparison. It also speculates about the company's growth rates and whether its valuation is justified, which the context does not address.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "3-e3b80e0d2cc8",
+      "reason": "The score is 0.33 because the actual output makes claims that the retrieval context does not support. It says Apple has pricing power, but the context only notes that Apple stock fell sharply after bigger Mac and iPad price hikes. It praises Apple's ecosystem strength, which the context never mentions. It describes Apple as facing current headwinds, which the context does not state explicitly. It also concludes that growth will resume, but the context only calls the new Siri a selling point for the next iPhone upgrade cycle and gives a patient, hold-equivalent 2 rating.",
+      "score": 0.3333333333333333,
+      "supported": false
+    },
+    {
+      "claim_id": "6-1ed4ca0bd104",
+      "reason": "The score is 0.50 because the actual output claims that intense competition could adversely affect the company's results of operations, while the retrieval context only describes intense competition across all markets and related pressures like costs reducing operating margins, without explicitly stating an adverse effect on results of operations.",
+      "score": 0.5,
+      "supported": false
+    },
+    {
+      "claim_id": "3-70c78fc2beb5",
+      "reason": "The score is 1.00 because there are no contradictions: the actual output aligns fully with the retrieval context. Nicely done.",
+      "score": 1.0,
+      "supported": true
+    },
+    {
+      "claim_id": "3-c66222e4c1d9",
+      "reason": "The score is 0.50 because the actual output adds claims the context does not support. It calls Apple's ecosystem 'strong', but the context only mentions strong iPhone 17 sales and a Gemini-powered Siri. It cites a history of Apple navigating margin challenges, while the context only says Apple delayed price hikes and is working on rising component costs. It also frames the sell-off as a buying opportunity, whereas the context gives a hold-equivalent 2 rating with an 'own it, don't trade it', be-patient stance.",
+      "score": 0.5,
+      "supported": false
+    }
+  ],
+  "disagreements": [
+    "6-bfab0121e189",
+    "4-318c725925c3",
+    "14-913be42877ae",
+    "11-0a78262fb3c6",
+    "4-6d559a2da05b",
+    "14-cc38bf63fb0c",
+    "8-bb3f952bb3a5",
+    "5-bbf2c17ff0ec",
+    "2-77731895b93f",
+    "10-711e94805830",
+    "15-4a691b77b704",
+    "15-71980122edc7",
+    "6-538e84150104",
+    "10-e1addc1e550a",
+    "15-2f33e5628f57",
+    "4-07f1ccb381d3",
+    "1-39711a368ff6",
+    "7-a5e5651af664",
+    "12-1507d158d4b1",
+    "6-1ed4ca0bd104"
+  ],
+  "effort": "high",
+  "errors": [],
+  "git_sha": "b3dd6a2",
+  "judge_model": "opus-5-5-judge",
+  "n": 60,
+  "penalize_ambiguous_claims": true,
+  "table": [
+    [
+      171.73333333333332,
+      0.0
+    ],
+    [
+      139.13333333333335,
+      75.13333333333335
+    ]
+  ],
+  "temperature": null,
+  "unweighted_kappa": 0.3993993993993994,
+  "validated": false,
+  "weighted_kappa": 0.3245552244338944
+}

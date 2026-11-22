@@ -11,7 +11,9 @@ answer supplied by a test. No network beyond loopback.
 With `judge_replies` set, Messages requests are answered as a chat judge instead: a request that
 carries `tools` gets a `tool_use` block for the first tool, its input filled from that tool's
 input schema (every string field holds the requested model, every other field its type's zero);
-a plain request gets a text reply `"<requested model>: <prompt>"`. The reply's `model` is the served Opus id (`JUDGE_SERVED_MODEL`), as the real endpoint
+a request for JSON-schema output (`output_config.format`) gets a text reply holding JSON that conforms
+to the schema, filled the same way; a plain request gets a text reply `"<requested model>: <prompt>"`.
+The reply's `model` is the served Opus id (`JUDGE_SERVED_MODEL`), as the real endpoint
 reports it, whatever deployment was requested; text replies and tool inputs name the requested model.
 
 With `verdict_replies` set (checked before `judge_replies`), a Messages request is answered as a
@@ -32,12 +34,13 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from tests.unit.fake_schema_reply import json_reply
 from tests.unit.fake_verdict import verdict_text
 
 POSITIVE_WORDS = ("beat", "record", "surged", "growth", "rose")
 NEGATIVE_WORDS = ("fell", "warned", "lawsuit", "decline", "missed")
 SERVED_MODEL = "claude-sonnet-5-5"
-JUDGE_SERVED_MODEL = "claude-opus-4-6"
+JUDGE_SERVED_MODEL = "claude-opus-5-5"
 DEPLOYMENT = "sonnet-5-5-sentiment"
 MODEL_IDENTITY = "foundry:sonnet-5-5-sentiment:claude-sonnet-5-5"
 MESSAGES_PATH = "/anthropic/v1/messages"
@@ -231,10 +234,16 @@ class FakeFoundry:
     def _judge_messages(self, request: ReceivedRequest, attempt: int) -> dict[str, Any]:
         model = str(request.body.get("model", ""))
         tools = request.body.get("tools")
-        if tools:
+        schema_format = (request.body.get("output_config") or {}).get("format") or {}
+        if schema_format.get("type") == "json_schema":
+            content: list[dict[str, Any]] = [
+                {"type": "text", "text": json_reply(schema_format.get("schema") or {}, model)}
+            ]
+            stop_reason = "end_turn"
+        elif tools:
             tool = tools[0]
             properties = tool.get("input_schema", {}).get("properties", {})
-            content: list[dict[str, Any]] = [
+            content = [
                 {
                     "type": "tool_use",
                     "id": f"toolu_{attempt}",

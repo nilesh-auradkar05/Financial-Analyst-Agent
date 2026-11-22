@@ -80,6 +80,13 @@ def test_lineage_complete_record_is_written_under_its_run_id(tmp_path: Path) -> 
         assert stored[key] == value
 
 
+def test_lineage_null_temperature_is_accepted_and_stored_as_null(tmp_path: Path) -> None:
+    """§14 Lineage required (S6.5): a model that takes no temperature records `temperature` null."""
+    written = write_run(record(temperature=None), root=tmp_path / "runs")
+
+    assert json.loads(written.read_text())["temperature"] is None
+
+
 def test_lineage_optional_result_path_is_stored(tmp_path: Path) -> None:
     """§14 Lineage required: result_path is the one optional field and is kept when given."""
     written = write_run(record(result_path="evaluation/quality_res/x.json"), root=tmp_path / "runs")
@@ -146,12 +153,16 @@ def test_lineage_extra_field_is_refused_and_writes_no_file(tmp_path: Path) -> No
     [
         {"classification": "golden"},
         {"temperature": "warm"},
+        {"temperature": "0.3"},
+        {"temperature": True},
         {"metrics": {"grounded_claim_rate": "high"}},
         {"metrics": ["grounded_claim_rate"]},
     ],
     ids=[
         "classification-not-in-set",
         "temperature-not-a-number",
+        "temperature-a-numeric-string",
+        "temperature-a-boolean",
         "metric-not-a-number",
         "metrics-not-a-mapping",
     ],
@@ -159,8 +170,9 @@ def test_lineage_extra_field_is_refused_and_writes_no_file(tmp_path: Path) -> No
 def test_lineage_wrongly_typed_field_is_refused_and_writes_no_file(
     tmp_path: Path, bad: dict[str, Any]
 ) -> None:
-    """§14 Lineage required: SPEC §11.2 types (classification in {candidate, approved}, numeric
-    temperature and metrics) are enforced by the writer."""
+    """§14 Lineage required: SPEC §11.2 types (classification in {candidate, approved}, a temperature
+    that is a number or null (a numeric string or a boolean is neither), numeric metrics) are enforced
+    by the writer."""
     root = tmp_path / "runs"
 
     with pytest.raises(RegistryError):

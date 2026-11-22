@@ -69,7 +69,7 @@ class JudgeProvider(StrEnum):
 
     DEEPEVAL_DEFAULT = "deepeval_default"
     LANGCHAIN_ANTHROPIC = "langchain_anthropic"
-    OPUS = "opus"  # Claude Opus 4.6: Foundry Messages route, then Bedrock Converse (ADR-0009 amendment 2026-11-15)
+    OPUS = "opus"  # Claude Opus 5.5 on Foundry (Messages route), then Opus 4.6 on Bedrock (Converse) (ADR-0009 amendments 2026-11-15, 2026-11-21)
 
 
 OPUS_BEDROCK_MODEL = "global.anthropic.claude-opus-4-6-v1"
@@ -80,7 +80,7 @@ class JudgeModelConfig(BaseModel):
     provider: JudgeProvider = Field(default=JudgeProvider.DEEPEVAL_DEFAULT)
     model: str | None = None
     api_key: SecretStr | None = None
-    temperature: float = Field(default=0.0, ge=0.0, le=1.0)
+    temperature: float | None = Field(default=0.0, ge=0.0, le=1.0)
     top_p: float | None = Field(default=None, ge=0.0, le=1.0)
     max_tokens: int | None = Field(default=None, gt=0)
 
@@ -96,7 +96,7 @@ def judge_config_from_env(
     *,
     provider: str | None,
     model: str | None,
-    temperature: float,
+    temperature: float | None,
     top_p: float | None,
     max_tokens: int | None,
 ) -> JudgeModelConfig:
@@ -127,6 +127,8 @@ def judge_config_from_env(
                 "else the Bedrock Opus id); drop --judge-model / RAG_EVAL_JUDGE_MODEL / DEEPEVAL_MODEL or set it to that value"
             )
         selected_model = settings_model
+        if azure:
+            temperature = None  # the Foundry judge (Claude Opus 5.5) rejects `temperature`
 
     return JudgeModelConfig(
         provider=JudgeProvider(selected_provider),
@@ -181,10 +183,10 @@ def create_langchain_judge_llm(config: JudgeModelConfig) -> Any | None:
 
 
 def _opus_judge_llm(config: JudgeModelConfig) -> Any:
-    """Opus 4.6 on the Foundry judge deployment first (Anthropic Messages route), then on Bedrock (Converse).
+    """Opus 5.5 on the Foundry judge deployment first (Anthropic Messages route), then Opus 4.6 on Bedrock (Converse).
 
     A tier without its settings is skipped. The Foundry tier uses its deployment, the Bedrock tier
-    always the Bedrock id (ADR-0009 amendment 2026-11-15, CM-6f).
+    always the Bedrock id (ADR-0009 amendments 2026-11-15, 2026-11-21).
     """
     from langchain_anthropic import ChatAnthropic
     from langchain_aws import ChatBedrockConverse
@@ -193,8 +195,8 @@ def _opus_judge_llm(config: JudgeModelConfig) -> Any:
 
     # load_dotenv() above already put the env file into os.environ.
     llm = LLMSettings(_env_file=None)  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]
-    # ponytail: never top_p or thinking on either tier; Opus 4.6 rejects temperature with top_p.
-    max_tokens = config.max_tokens or 4096
+    # ponytail: never top_p or thinking on either tier; the Foundry tier (thinking always on) takes effort, not temperature.
+    max_tokens = config.max_tokens or 16000
 
     tiers: list[Any] = []
     if azure := llm.azure_deployment(llm.azure_foundry_judge_model):
@@ -203,7 +205,7 @@ def _opus_judge_llm(config: JudgeModelConfig) -> Any:
             "model": deployment,
             "base_url": f"{llm.azure_openai_endpoint}/anthropic",
             "api_key": key,
-            "temperature": config.temperature,
+            "output_config": {"effort": "high"},
             "max_tokens": max_tokens,
             "timeout": llm.request_timeout_seconds,
             "max_retries": 0,
@@ -215,7 +217,7 @@ def _opus_judge_llm(config: JudgeModelConfig) -> Any:
             "model": OPUS_BEDROCK_MODEL,
             "region_name": llm.aws_region,
             "bedrock_api_key": token,
-            "temperature": config.temperature,
+            "temperature": 0.0 if config.temperature is None else config.temperature,
             "max_tokens": max_tokens,
             "timeout": math.ceil(llm.request_timeout_seconds),
             "max_retries": 0,
@@ -333,7 +335,7 @@ def create_deepeval_judge_model(config: JudgeModelConfig) -> Any | str | None:
             def _generate_once() -> Any:
                 if schema is not None:
                     if hasattr(model, "with_structured_output"):
-                        structured_model = model.with_structured_output(schema)
+                        structured_model = model.with_structured_output(schema, method="json_schema")
                         return _coerce_structured_output(
                             _invoke_model(structured_model, prompt),
                             schema,
@@ -351,7 +353,7 @@ def create_deepeval_judge_model(config: JudgeModelConfig) -> Any | str | None:
             async def _generate_once() -> Any:
                 if schema is not None:
                     if hasattr(model, "with_structured_output"):
-                        structured_model = model.with_structured_output(schema)
+                        structured_model = model.with_structured_output(schema, method="json_schema")
                         response = await _ainvoke_or_thread(structured_model, prompt)
                         return _coerce_structured_output(response, schema)
 
@@ -371,7 +373,9 @@ def create_deepeval_judge_model(config: JudgeModelConfig) -> Any | str | None:
 def _ragas_model_kwargs(config: JudgeModelConfig) -> dict[str, Any]:
     """Return kwargs accepted by RAGAS llm_factory model adapters."""
 
-    kwargs: dict[str, Any] = {"temperature": config.temperature}
+    kwargs: dict[str, Any] = {}
+    if config.temperature is not None:
+        kwargs["temperature"] = config.temperature
     if config.top_p is not None:
         kwargs["top_p"] = config.top_p
     if config.max_tokens is not None:

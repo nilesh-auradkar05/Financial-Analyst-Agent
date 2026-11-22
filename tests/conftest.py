@@ -14,6 +14,10 @@ import pytest
 for _name in ("LANGSMITH_TRACING", "LANGSMITH_TRACING_V2", "LANGCHAIN_TRACING", "LANGCHAIN_TRACING_V2"):
     os.environ[_name] = "false"
 
+# DeepEval reports usage to PostHog unless told not to; tests make no network call, so opt out
+# before the first deepeval import (the answer-quality tests run the real FaithfulnessMetric).
+os.environ["DEEPEVAL_TELEMETRY_OPT_OUT"] = "YES"
+
 # Tests never call the real Microsoft Foundry endpoint either. The Azure tier is the first draft
 # attempt when fully configured (ADR-0009 amendment 2026-10-17), so blank its key and deployments
 # (the rerank deployment too: the app reranks filings once configured, test-plan §25)

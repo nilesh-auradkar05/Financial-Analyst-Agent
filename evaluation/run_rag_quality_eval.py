@@ -62,7 +62,7 @@ class RagQualityReport(BaseModel):
     git_sha: str
     branch: str
     model: str
-    temperature: float
+    temperature: float | None
     prompt_version: str
     evidence_release: str
     snapshot_hash: str

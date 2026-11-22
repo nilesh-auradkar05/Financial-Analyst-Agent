@@ -438,7 +438,7 @@ Exit = Gate B. (Superseded 2026-10-10: Gate B closes at S3 exit.)
 # HORIZON (S5–S10): restructured 2026-11-01 into one-feature sprints
 
 - **S5 — Retrieval quality diagnostics → hybrid/rerank (Gate C).** Per-query diagnostics and failure taxonomy first; optional section prior, hybrid dense+sparse, and rerank candidates evaluated on same fixture. Unchanged.
-- **S6 — Answer quality & eval hardening (Gate D). Steps 4–5.** (a) Eval registry `evaluation/registry/runs/*.json` with lineage keys (SPEC §11.2); hook H5 + CI reject unlineaged results. (b) `eval-replay` CI job on the frozen release, fails on >2σ regression of grounded_claim_rate / citation_coverage. (c) Verifier↔judge agreement on ≥50 claims; κ recorded. (d) Bounded draft→verify→revise loop (max 2), `attempts` in response, paired vs no-loop on the same snapshot/model/temperature. (e) Then LLM-as-judge/RAGAS, then GEPA on holdout. Order inside S6 is fixed: (a)→(b)→(c)→(d)→(e).
+- **S6 — Answer quality & eval hardening (Gate D). Steps 4–5.** (a) Eval registry `evaluation/registry/runs/*.json` with lineage keys (SPEC §11.2); hook H5 + CI reject unlineaged results. (b) `eval-replay` CI job on the frozen release, fails on >2σ regression of grounded_claim_rate / citation_coverage. (c) Verifier↔judge agreement on ≥50 claims; κ recorded. (d) Bounded draft→verify→revise loop (max 2), `attempts` in response, paired vs no-loop on the same snapshot/model/temperature. (e) Then LLM-as-judge/RAGAS (GEPA on holdout removed by owner decision 2026-11-20). Order inside S6 is fixed: (a)→(b)→(c)→(d)→(e).
 - **S7 — Service readiness. Steps 6–8 (local).** (a) Guardrails per SPEC §11.4 with adversarial fixture in CI. (b) API auth + rate limit + idempotency key; JWT issuer allowlist, customer-scoped authorization, `guest` (Turnstile-gated, BFF-minted token, quotas) and `admin` roles, `analyst` defined for the scale tier, per ADR-0010 and its 2026-10-11 amendment (local development issuer). (c) Caching per SPEC §11.3 (v1.4 keys, ADR-0013) with hit/miss metrics and single-flight memo generation. (d) `RunStore` protocol → DynamoDB adapter (conditional-write claim with `attempt` fencing, lazy deadline expiry); `JobQueue` protocol → SQS adapter fed by a DynamoDB Streams dispatcher; LangGraph `DynamoDBSaver` checkpointer; local stand-ins DynamoDB Local and ElasticMQ (ADR-0013 as amended by ADR-0015 on 2026-10-11; was a Postgres `SKIP LOCKED` queue, before that Redis Streams). No Postgres adapter is built; it belongs to the production scale tier. (e) FinBERT off the API event loop: ONNX inside the worker for the demo tier (ADR-0015), with recorded label parity; out-of-process service only in the scale tier; provider circuit breaker (separate from ADR-0009 fallback; Ollama development-only). (f) Fix G13. CI matrix, correlation IDs, structured logs retained from prior S7 scope.
 - **S8 — Frontend MVP.** Thin API-driven SPA against the hardened API. Unchanged.
 - **S9 — Portfolio polish.** README, measured results, honest limitations, benchmark report, demo, fresh-clone smoke. Unchanged.
@@ -448,7 +448,7 @@ Exit = Gate B. (Superseded 2026-10-10: Gate B closes at S3 exit.)
 | Earlier item | Feature sprint(s) |
 | --- | --- |
 | S5 diagnostics, hybrid dense+sparse, rerank, section prior | S5.1 diagnostics · S5.2 hybrid · S5.3 rerank (section prior folded into S5.1 as a diagnosed candidate) |
-| S6 (a) eval registry · (b) eval-replay CI · (c) verifier↔judge κ · (d) bounded repair loop · (e) judge/RAGAS, then GEPA | S6.1 · S6.2 · S6.3 · S6.4 (adds the ADR-0017 early stop) · S6.5, S6.6 |
+| S6 (a) eval registry · (b) eval-replay CI · (c) verifier↔judge κ · (d) bounded repair loop · (e) judge/RAGAS | S6.1 · S6.2 · S6.3 · S6.4 (adds the ADR-0017 early stop) · S6.5 (S6.6 GEPA removed 2026-11-20) |
 | S7 (a) guardrails · (b) auth, rate limit, guest and admin roles | S7.1 · S7.2 |
 | S7 (c) caching | S7.9 (adds the ADR-0017 T3 write policy) |
 | S7 (d) `RunStore` / `JobQueue` / `DynamoDBSaver` | S7.7 (job store and queue) · S7.8 (fenced checkpointer and journal on DynamoDB) |
@@ -560,7 +560,7 @@ Owner instruction, 2026-11-01: each sprint ships one feature, implemented and te
 
 **Done, for every card:** the card's tests by layer green; applicable R-suites green; SPEC, test-plan and ADR text match the code; `Result:` names the commit, test counts by layer and suite outputs; nothing claimed that was not run. Billable applies need the owner's approval first; live (L) results record cost and are never approved baselines.
 
-**Order.** Linear: VERIFY-SCALE → CM-1 … CM-7 → S5.1 … S5.3 → S6.1 … S6.6 → S7.1 … S7.12 → S8.1, S8.2 → S9.1, S9.2 → S10 entry evidence → S10-T01 … S10-T11. A sprint opens only when its predecessor has a `Result:`; reordering needs an owner decision recorded here. S11 (ADR-0018, proposed) sits outside this order until the owner accepts ADR-0018; it cannot open before S7.12 and Gate D.
+**Order.** Linear: VERIFY-SCALE → CM-1 … CM-7 → S5.1 … S5.3 → S6.1 … S6.5 → S7.1 … S7.12 → S8.1, S8.2 → S9.1, S9.2 → S10 entry evidence → S10-T01 … S10-T11. A sprint opens only when its predecessor has a `Result:`; reordering needs an owner decision recorded here. S11 (ADR-0018, proposed) sits outside this order until the owner accepts ADR-0018; it cannot open before S7.12 and Gate D.
 
 ## Carried over from the 2026-10-23 cloud data and model plane slice
 
@@ -787,20 +787,15 @@ Done: §11 rows green; paired result recorded with per-case regressions listed. 
 ```text
 S6.5 — Judge-based answer-quality suite (LLM-as-judge / RAGAS)
 Feature: answer quality is measured beyond citation grounding on the frozen eval set.
-Trace: SPEC §12 S6; Gate D
-Tests:  U metric adapters with faithful fakes · Q baseline recorded with lineage
+Trace: SPEC §12 S6, §4 judge ladder (amended 2026-11-21); Gate D; ADR-0009 amendment 2026-11-21; test-plan §14 Faithfulness rows and Judge ladder row
+Method (owner 2026-11-21, `tasks/s6-decisions.md` #55–#66): DeepEval FaithfulnessMetric only (RAGAS deferred: it does not import here; relevancy metrics dropped: no labelled set), per cited claim with its full cited evidence, judged by Claude Opus 5.5 on Foundry (`opus-5-5-judge`), single judge tier enforced; validated against the 60 owner-labelled S6.3 claims.
+Tests:  U claim scoring, single-tier refusal, validation κ and refusals, baseline result and lineage, judge ladder for Opus 5.5 (all with faithful fakes) · Q two validation runs, then the faithfulness baseline on 20261120T225248Z-50a99c5-0dad
 Regression: R1 R2 R3 R5
-Done: Gate D recorded. Result: Pending.
+Done: two independent validation runs each at weighted κ ≥ 0.85 → Gate D recorded on DeepEval faithfulness plus the eval-replay grounding gate; otherwise the faithfulness baseline is recorded as an unvalidated candidate and Gate D waits for the S6.3 fresh-sample re-measure. Result: Pending.
+Validation 2026-11-21 (clean tree b3dd6a2; Foundry `opus-5-5-judge`, Bedrock tier blanked, effort high, temperature null; smoke #66 first: claim 10-f394883f65aa, 101,838 evidence chars, 35,557 input + 3,729 output tokens, 31 s): NOT VALIDATED. Run 1 weighted κ 0.325 (unweighted 0.399), run 2 0.316 (0.362), 60 claims, 0 errors each (`evaluation/results/s6_5_faithfulness_validation_{1,2}.json`). The judge never supports a claim the owner rejects (weighted cell 0.0 in run 1, 1.2 in run 2) but rejects 20 / 21 owner-supported claims, 18 in both runs; 5 verdicts flip between runs. The rejections are mostly hedged valuation or framing sentences (e.g. 1-39711a368ff6 "At 37.3x earnings, the stock is not cheap", 12-1507d158d4b1 "trades at a premium") and risk-factor paraphrases (14-913be42877ae). Settings were fixed before the run (#64) and are not re-tuned on these 60 claims (#31). Per #57 Gate D waits for the S6.3 fresh-sample re-measure; the faithfulness baseline score is held for the owner (#67).
 ```
 
-```text
-S6.6 — Prompt optimization on holdout (GEPA)
-Feature: the draft prompt is optimized on a train split and accepted only on a held-out split.
-Trace: SPEC §12 S6; Gate D cleared
-Tests:  Q paired holdout comparison, prompt the only axis · U split is disjoint and frozen
-Regression: R1 R2 R3 R5
-Result: Pending.
-```
+S6.6 (prompt optimization on holdout, GEPA) was removed by owner decision 2026-11-20 (`tasks/s6-decisions.md` #54).
 
 ## S7 — Service readiness, durable execution and the three agents
 
