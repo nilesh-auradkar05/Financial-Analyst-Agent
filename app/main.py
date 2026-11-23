@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import secrets
 import time
 import uuid
 from collections import defaultdict, deque
@@ -108,7 +107,8 @@ from app.observability.metrics import (
     track_agent_run,
     track_request,
 )
-from app.services.run_store import FileBackedRunStore
+from app.services.identity import Principal, UnauthorizedError, authenticate
+from app.services.run_store import FileBackedRunStore, RunRecord
 
 RUN_STORE_PATH = Path(".runtime/run_store.json")
 run_store = FileBackedRunStore(RUN_STORE_PATH)
@@ -119,7 +119,7 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
         400: "Invalid request correlation ID",
         401: "Missing or invalid API key", 404: "Resource not found",
         405: "Method not allowed",
-        409: "Idempotency key conflict", 422: "Request validation failed",
+        403: "Role not permitted for this route", 409: "Idempotency key conflict", 422: "Request validation failed",
         429: "Submission rate limit exceeded", 500: "Internal server error",
         502: "Upstream ingestion failure", 503: "Service unavailable",
     }.items()
@@ -136,7 +136,7 @@ class SubmissionRateLimiter:
     def __init__(self) -> None:
         self._requests: dict[str, deque[float]] = defaultdict(deque)
 
-    def check(self, principal: str) -> None:
+    def check(self, customer_id: str) -> None:
         now = time.monotonic()
         cutoff = now - settings.api_rate_window_seconds
         # ponytail: single-process limiter; use shared storage before multiple workers.
@@ -144,7 +144,7 @@ class SubmissionRateLimiter:
             key: values for key, values in self._requests.items()
             if values and values[-1] > cutoff
         })
-        history = self._requests[principal]
+        history = self._requests[customer_id]
         while history and history[0] <= cutoff:
             history.popleft()
         if len(history) >= settings.api_rate_limit:
@@ -203,24 +203,36 @@ def _error_response(status_code: int, code: str, message: str, *, headers: dict[
 async def _authenticate(
     authorization: HTTPAuthorizationCredentials | None = Depends(bearer_auth),
     x_api_key: str | None = Depends(key_auth),
-) -> str:
-    configured = settings.api_key
-    if not configured:
+) -> Principal:
+    if not settings.api_key and not settings.jwt_issuers:
         raise HTTPException(status_code=503, detail={"code": "auth_unconfigured", "message": "API authorization is not configured.", "error_id": _new_error_id()})
-    bearer = authorization.credentials if authorization else None
-    supplied = x_api_key or bearer
-    if supplied is None or not secrets.compare_digest(supplied.encode(), configured.encode()):
+    try:
+        return authenticate(
+            bearer=authorization.credentials if authorization else None,
+            x_api_key=x_api_key,
+            api_key=settings.api_key,
+            issuers=settings.jwt_issuers,
+        )
+    except UnauthorizedError as exc:
         raise HTTPException(
             status_code=401,
-            detail={"code": "unauthorized", "message": "A valid API key is required.", "error_id": _new_error_id()},
+            detail={"code": "unauthorized", "message": "Valid credentials are required.", "error_id": _new_error_id()},
             headers={"WWW-Authenticate": "Bearer"},
-        )
-    return hashlib.sha256(supplied.encode()).hexdigest()
+        ) from exc
 
 
-async def _limit_submission(principal: str = Depends(_authenticate)) -> str:
-    submission_limiter.check(principal)
+async def _require_admin(principal: Principal = Depends(_authenticate)) -> None:
+    if principal.role != "admin":
+        raise HTTPException(status_code=403, detail={"code": "forbidden", "message": "This route requires the admin role.", "error_id": _new_error_id()})
+
+
+async def _limit_submission(principal: Principal = Depends(_authenticate)) -> Principal:
+    submission_limiter.check(principal.customer_id)
     return principal
+
+
+def _can_read(principal: Principal, record: RunRecord) -> bool:
+    return principal.role == "admin" or record.customer_id == principal.customer_id
 
 
 # =============================================================================
@@ -370,8 +382,8 @@ async def health():
     return JSONResponse(status_code=200 if response.status == "healthy" else 503, content=response.model_dump())
 
 
-@app.get("/metrics", tags=["Info"], response_class=Response, responses={**{code: ERROR_RESPONSES[code] for code in (401, 503)}, 200: {"content": {get_metrics_content_type(): {"schema": {"type": "string"}}}}})
-async def metrics(_principal: str = Depends(_authenticate)):
+@app.get("/metrics", tags=["Info"], dependencies=[Depends(_require_admin)], response_class=Response, responses={**{code: ERROR_RESPONSES[code] for code in (401, 403, 503)}, 200: {"content": {get_metrics_content_type(): {"schema": {"type": "string"}}}}})
+async def metrics():
     """Prometheus metrics endpoint."""
     return Response(
         content=get_metrics(),
@@ -379,8 +391,8 @@ async def metrics(_principal: str = Depends(_authenticate)):
     )
 
 
-@app.get("/stats", tags=["Info"], response_model=StatsResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 503)})
-async def stats(_principal: str = Depends(_authenticate), store: RetrievalStore = Depends(_get_store)):
+@app.get("/stats", tags=["Info"], dependencies=[Depends(_require_admin)], response_model=StatsResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 403, 503)})
+async def stats(store: RetrievalStore = Depends(_get_store)):
     """Vector store and run-store statistics."""
     return {
         "vector_store": store.get_stats(),
@@ -393,7 +405,7 @@ async def stats(_principal: str = Depends(_authenticate), store: RetrievalStore 
 
 
 @app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 429, 503)})
-async def analyze(request: AnalysisRequest, http_request: Request, _principal: str = Depends(_limit_submission)):
+async def analyze(request: AnalysisRequest, http_request: Request, _principal: Principal = Depends(_limit_submission)):
     """
     Run synchronous stock analysis.
 
@@ -434,7 +446,7 @@ async def analyze_async(
     background_tasks: BackgroundTasks,
     http_request: Request,
     response: Response,
-    principal: str = Depends(_limit_submission),
+    principal: Principal = Depends(_limit_submission),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", min_length=1, max_length=200),
 ):
     """
@@ -452,7 +464,7 @@ async def analyze_async(
             fingerprint = hashlib.sha256(json.dumps(request.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             try:
                 record, created = run_store.create_idempotent_run(
-                    job_id, ticker, principal=principal,
+                    job_id, ticker, principal=principal.customer_id,
                     idempotency_key=hashlib.sha256(idempotency_key.encode()).hexdigest(),
                     request_fingerprint=fingerprint, company_name=request.company_name,
                     request_id=http_request.state.request_id, trace_id=http_request.state.trace_id,
@@ -460,7 +472,7 @@ async def analyze_async(
             except ValueError as exc:
                 raise HTTPException(status_code=409, detail={"code": "idempotency_conflict", "message": str(exc), "error_id": _new_error_id()}) from exc
         else:
-            record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name,
+            record = run_store.create_run(job_id=job_id, ticker=ticker, company_name=request.company_name, customer_id=principal.customer_id,
                                           request_id=http_request.state.request_id, trace_id=http_request.state.trace_id)
 
         # Start background task
@@ -492,9 +504,10 @@ async def analyze_async(
 
 
 @app.get("/jobs", response_model=list[RunSummary], tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
-async def list_jobs(limit: int = Query(default=20, ge=1, le=100), _principal: str = Depends(_authenticate)):
+async def list_jobs(limit: int = Query(default=20, ge=1, le=100), principal: Principal = Depends(_authenticate)):
     """Stored runs, newest first. Lets a client show what still exists after data loss."""
-    records = sorted(run_store.list_runs(), key=lambda record: record.started_at, reverse=True)[:limit]
+    visible = [record for record in run_store.list_runs() if _can_read(principal, record)]
+    records = sorted(visible, key=lambda record: record.started_at, reverse=True)[:limit]
     summaries = []
     for record in records:
         result = record.result or {}
@@ -510,10 +523,10 @@ async def list_jobs(limit: int = Query(default=20, ge=1, le=100), _principal: st
 
 
 @app.get("/jobs/{job_id}", response_model=JobPollResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
-async def get_job_status(job_id: uuid.UUID, _principal: str = Depends(_authenticate)):
+async def get_job_status(job_id: uuid.UUID, principal: Principal = Depends(_authenticate)):
     """Get async job status and return completed result when available."""
     record = run_store.get_run(str(job_id))
-    if record is None:
+    if record is None or not _can_read(principal, record):
         raise HTTPException(status_code=404, detail={"code": "job_not_found", "message": "Job not found.", "error_id": _new_error_id()})
 
     result = AnalysisResponse.model_validate(record.result) if record.result else None
@@ -730,8 +743,8 @@ def _normalize_sections_processed(value: object) -> list[str]:
 # =============================================================================
 
 
-@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], responses={code: ERROR_RESPONSES[code] for code in (401, 404, 422, 429, 502, 503)})
-async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_limit_submission)):
+@app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"], dependencies=[Depends(_require_admin)], responses={code: ERROR_RESPONSES[code] for code in (401, 403, 404, 422, 429, 502, 503)})
+async def ingest_filing(request: IngestionRequest, _principal: Principal = Depends(_limit_submission)):
     """Ingest SEC filing for a ticker."""
     ticker = request.ticker.upper()
     logger.info(f"Ingesting 10-K for {ticker}")
@@ -774,10 +787,9 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
             raise HTTPException(status_code=502, detail={"code": "ingestion_failed", "message": "Filing ingestion failed.", "error_id": error_id})
 
 
-@app.get("/ingest/{ticker}", tags=["Ingestion"], response_model=IngestionStatusResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
+@app.get("/ingest/{ticker}", tags=["Ingestion"], dependencies=[Depends(_require_admin)], response_model=IngestionStatusResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 403, 422, 503)})
 async def check_ingestion(
     ticker: Annotated[str, ApiPath(pattern=r"^[A-Za-z]{1,6}(?:\.[A-Za-z])?$")],
-    _principal: str = Depends(_authenticate),
     store: RetrievalStore = Depends(_get_store),
 ):
     """Check if a ticker has been ingested."""
