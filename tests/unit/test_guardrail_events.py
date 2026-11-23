@@ -240,6 +240,109 @@ async def test_dropped_articles_reach_neither_sentiment_nor_the_citation_registr
     assert FRAMED in final["guardrail_events"]
 
 
+# --- PII in live news -------------------------------------------------------------------------------
+
+EMAIL = "ir@apple-ir.com"
+PHONE = "415-555-0132"
+SSN = "123-45-6789"
+NEWS_PII = {"code": "pii_redacted", "detail": "news"}
+
+
+def pii_article(url: str, *, title: str, snippet: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        title=title, url=url, source="Wire", snippet=snippet, published_date="2026-09-01"
+    )
+
+
+async def test_the_news_node_redacts_pii_in_kept_snippets_and_titles_and_records_each_value(
+    monkeypatch,
+):
+    """12 'Output policy: PII' (live news, owner 2026-11-22): an email, phone or SSN in a kept
+    article's snippet or title is replaced with [redacted] at fetch; one pii_redacted event with
+    detail `news` per value; no value is left anywhere in the node's update."""
+    install_news(
+        monkeypatch,
+        pii_article(
+            "https://www.reuters.com/a",
+            title=f"Apple investor line {PHONE}",
+            snippet=f"Apple revenue rose; contact {EMAIL} or ref {SSN}.",
+        ),
+        pii_article(
+            "https://www.reuters.com/b",
+            title="Apple posts results",
+            snippet="Apple revenue rose in Europe.",
+        ),
+    )
+
+    update = await graph.research_news_node(create_initial_state("AAPL", "Apple Inc."))
+
+    first, second = update["news_articles"]
+    assert first["title"] == "Apple investor line [redacted]"
+    assert first["snippet"] == "Apple revenue rose; contact [redacted] or ref [redacted]."
+    assert second["title"] == "Apple posts results"
+    assert second["snippet"] == "Apple revenue rose in Europe."
+    assert [e for e in update["guardrail_events"] if e["code"] == "pii_redacted"] == [NEWS_PII] * 3
+    for value in (EMAIL, PHONE, SSN):
+        assert value not in repr(update)
+
+
+async def test_an_off_list_article_is_dropped_not_redacted(monkeypatch):
+    """12 'Output policy: PII' (live news) after 'Source allow-list': redaction applies to kept
+    articles; a dropped article records only source_dropped and nothing carries its value."""
+    install_news(
+        monkeypatch,
+        pii_article(
+            "https://evil.example/a", title="Apple tip line", snippet=f"Apple revenue; {EMAIL}."
+        ),
+    )
+
+    update = await graph.research_news_node(create_initial_state("AAPL", "Apple Inc."))
+
+    assert update["news_articles"] == []
+    assert [e["code"] for e in update["guardrail_events"]] == ["source_dropped"]
+    assert EMAIL not in repr(update)
+
+
+async def test_news_pii_reaches_neither_sentiment_the_registry_nor_the_prompts(monkeypatch):
+    """12 'Output policy: PII' (live news): redacted before sentiment, the citation registry,
+    the prompts and the final state, in a real run."""
+    install_fakes(monkeypatch)
+    install_news(
+        monkeypatch,
+        pii_article(
+            "https://www.reuters.com/a",
+            title=f"Apple desk {PHONE}",
+            snippet=f"Apple revenue rose, says {EMAIL} (SSN {SSN}).",
+        ),
+    )
+    scored: list[str] = []
+
+    def sentiment(texts):
+        scored.extend(texts)
+        return [SimpleNamespace(label="neutral") for _ in texts]
+
+    model = CapturingLLM()
+    monkeypatch.setattr(graph, "analyze_sentiment_batch", sentiment)
+    monkeypatch.setattr(graph, "get_llm", lambda _settings: model)
+
+    final = await run_agent("AAPL")
+
+    assert scored, "premise: the article was scored"
+    surfaces = {
+        "sentiment input": "\n".join(scored),
+        "citation registry": json.dumps(final["citation_evidence"]),
+        "prompts": "\n".join(model.prompts),
+        "news articles": json.dumps(final["news_articles"]),
+        "memo": final["investment_memo"],
+    }
+    assert model.prompts, "premise: the memo was drafted"
+    for name, text in surfaces.items():
+        for value in (EMAIL, PHONE, SSN):
+            assert value not in text, f"{value} leaked into the {name}"
+    news_events = [e for e in final["guardrail_events"] if e["detail"] == "news"]
+    assert news_events == [NEWS_PII] * 3
+
+
 # --- the drafting node ----------------------------------------------------------------------------
 
 

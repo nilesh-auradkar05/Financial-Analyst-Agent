@@ -457,7 +457,6 @@ def test_a_clean_memo_comes_back_byte_for_byte_with_no_events():
 def test_the_screen_is_deterministic():
     """12 intro: the same memo in gives the same memo and events out."""
     from app.guardrails.output import screen_memo
-
     from tests.unit.guardrail_support import verifier_flags
 
     memo = memo_of(
@@ -519,3 +518,46 @@ def test_adding_the_disclaimer_twice_changes_nothing():
 
     assert twice == once
     assert twice.count(DISCLAIMER) == 1
+
+
+# --- Output policy: PII in live news (redact_pii) --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected", "count"),
+    [
+        pytest.param(
+            "Write to ir@apple-ir.com today.", "Write to [redacted] today.", 1, id="email"
+        ),
+        pytest.param(
+            "Call (415) 555-0132 for details.",
+            "Call [redacted] for details.",
+            1,
+            id="phone-parenthesised",
+        ),
+        pytest.param("Call 415-555-0132 now.", "Call [redacted] now.", 1, id="phone-dashes"),
+        pytest.param("Call 415.555.0132 now.", "Call [redacted] now.", 1, id="phone-dots"),
+        pytest.param(
+            "Applicant SSN 123-45-6789 on file.", "Applicant SSN [redacted] on file.", 1, id="ssn"
+        ),
+        pytest.param(
+            "Mail ir@apple-ir.com or call 415-555-0132, ref 123-45-6789.",
+            "Mail [redacted] or call [redacted], ref [redacted].",
+            3,
+            id="three-values",
+        ),
+        pytest.param(
+            "Apple reported revenue of $394 billion on 2024-10-31 (10-K, Item 7).",
+            "Apple reported revenue of $394 billion on 2024-10-31 (10-K, Item 7).",
+            0,
+            id="none",
+        ),
+        pytest.param("", "", 0, id="empty"),
+    ],
+)
+def test_redact_pii_replaces_each_value_and_counts_them(text, expected, count):
+    """12 'Output policy: PII' (live news, owner 2026-11-22): each email, US phone or US SSN
+    becomes [redacted]; the count is the number of values replaced; other text is untouched."""
+    from app.guardrails.output import redact_pii
+
+    assert redact_pii(text) == (expected, count)

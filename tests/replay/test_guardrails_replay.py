@@ -85,7 +85,6 @@ async def replay(release, **kwargs):
 
 def graded(memo: str, registry: list[dict[str, Any]]) -> dict[str, Any]:
     from app.guardrails.output import DISCLAIMER
-
     from app.verification.grounding import evaluate_memo_grounding
 
     return evaluate_memo_grounding(memo.removesuffix(DISCLAIMER).rstrip(), registry).to_dict()
@@ -133,7 +132,6 @@ async def test_the_disclaimer_is_not_graded_as_a_claim(release, install_chat):
     returned verification equals the real verifier's verdict on the memo without it, and a
     clean memo still passes."""
     from app.guardrails.output import DISCLAIMER
-
     from app.verification.grounding import evaluate_memo_grounding
 
     install_chat(ScriptedChat([CLEAN]))
@@ -218,6 +216,38 @@ async def test_a_frozen_release_is_replayed_as_recorded_and_never_refiltered(
     assert "untrusted_content_framed" in codes
 
 
+async def test_a_frozen_release_is_not_redacted_again(tmp_path, install_chat, monkeypatch):
+    """12 'Output policy: PII' (live news, owner 2026-11-22): frozen releases are replayed as
+    recorded. A release whose news holds an email and a phone number replays them unchanged, and
+    no pii_redacted event with detail `news` is recorded."""
+    import dataclasses
+
+    from tests.replay import support
+
+    email, phone = "ir@apple-ir.com", "415-555-0132"
+    original = support.build_specs
+
+    def specs_with_pii(*args, **kwargs):
+        specs = original(*args, **kwargs)
+        index = next(i for i, s in enumerate(specs) if s.source_type == "news_article")
+        payload = dict(specs[index].payload)
+        payload["title"] = f"Apple services revenue rises {phone}"
+        payload["snippet"] = f"Apple services revenue rose as subscriptions expanded, says {email}"
+        specs[index] = dataclasses.replace(specs[index], payload=payload)
+        return specs
+
+    monkeypatch.setattr(support, "build_specs", specs_with_pii)
+    release = support.build_release(tmp_path / "pii-release")
+    recorded = str(release.expected_news("AAPL"))
+    assert email in recorded and phone in recorded, "premise: the release holds the values"
+    install_chat(ScriptedChat([CLEAN]))
+
+    final = await replay(release)
+
+    assert evidence_view(final)["news_articles"] == release.expected_news("AAPL")
+    assert not [e for e in final["guardrail_events"] if e["detail"] == "news"]
+
+
 # --- Untrusted-content framing: the revise prompt --------------------------------------------------
 
 
@@ -269,7 +299,6 @@ async def test_the_quality_runner_grades_the_memo_without_the_disclaimer(release
     block: its counts equal the real verifier's on the recorded memo minus the disclaimer, and a
     clean memo passes."""
     from app.guardrails.output import DISCLAIMER
-
     from app.verification.grounding import evaluate_memo_grounding
     from dataops.evidence_release import load_snapshot_records
     from evaluation import quality_baseline
