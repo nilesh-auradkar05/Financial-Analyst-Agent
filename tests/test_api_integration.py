@@ -171,6 +171,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, embedding_arm_config
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
     monkeypatch.setattr(api_main.settings, "api_key", "test-secret")
+    # The developer's env file may set JWT_ISSUERS; every test starts from an empty allowlist.
+    monkeypatch.setattr(api_main.settings, "jwt_issuers", [])
     monkeypatch.setattr(api_main, "submission_limiter", api_main.SubmissionRateLimiter())
 
     with TestClient(api_main.app) as test_client:
@@ -1005,9 +1007,7 @@ def _agent_reporting_guardrail_events(events: list[dict[str, Any]]):
 def test_the_sync_response_returns_the_runs_guardrail_events(client: TestClient, monkeypatch):
     """12 'Guardrail events returned': the /analyze response lists the state's events as
     {code, detail}, in order."""
-    monkeypatch.setattr(
-        api_main, "run_agent", _agent_reporting_guardrail_events(GUARDRAIL_EVENTS)
-    )
+    monkeypatch.setattr(api_main, "run_agent", _agent_reporting_guardrail_events(GUARDRAIL_EVENTS))
 
     response = client.post("/analyze", json={"ticker": "AAPL"})
 
@@ -1017,9 +1017,7 @@ def test_the_sync_response_returns_the_runs_guardrail_events(client: TestClient,
 
 def test_the_async_job_result_returns_the_runs_guardrail_events(client: TestClient, monkeypatch):
     """12 'Guardrail events returned': the async job result carries them too."""
-    monkeypatch.setattr(
-        api_main, "run_agent", _agent_reporting_guardrail_events(GUARDRAIL_EVENTS)
-    )
+    monkeypatch.setattr(api_main, "run_agent", _agent_reporting_guardrail_events(GUARDRAIL_EVENTS))
 
     job_id = client.post("/analyze/async", json={"ticker": "AAPL"}).json()["job_id"]
     result = client.get(f"/jobs/{job_id}").json()["result"]
