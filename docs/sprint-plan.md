@@ -539,6 +539,13 @@ Result: Pending.
 
 Owner instruction, 2026-11-01: each sprint ships one feature, implemented and tested (unit, integration, regression and the other layers it touches). This replaces the one-line HORIZON for S5–S10 and the post-CM-7 order of the 2026-10-23 note. Architecture inputs: SPEC v1.5, ADR-0017 (Researcher / Analyst / Reviewer agents, three-tier memory, crash resume), ADR-0013 to ADR-0016.
 
+### Authorized filings latency slice (FILINGS-LATENCY, 2026-11-23)
+
+Owner decision, 2026-11-23, after live runs took 285–383 s, of which the filings step was 260–350 s. A measured filings step for an indexed ticker spent 147 of 197 s waiting on the rerank pacer, which reused the embedding deployment's limits. The slice runs before S7.3 and changes nothing else in the order.
+Trace: ADR-0011 amendment 2026-11-23; SPEC §8.1 (sentiment waits only for news); test-plan §10 Sentiment follows news only, §13 Filing result cache, §25 Rerank reorders candidates and Rerank pacing (amended), §6 `dense_rerank_15` method; retrieval-benchmark §7d.
+Scope: (1) rerank paced in its own window at 45 requests and 45,000 tokens per minute (deployment: 50 and 50,000); (2) the filings step reranks 15 candidates per query, the benchmark methods keep 50; (3) per-process filing result cache, 1 h TTL, cleared on ingest of the ticker, hit/miss counters; (4) `analyze_sentiment` runs after `research_news` only, and a `freeze_snapshot` join precedes `draft_memo`; (5) the §7d run, `dense_rerank_15` vs `dense_rerank`.
+Result: Pending.
+
 ## Sprint contract
 
 **One feature.** A feature is one capability a user, operator or evaluator can observe, with one acceptance oracle (its test-plan rows). If a card needs two oracles, it is two sprints. Refactors ride inside the feature that needs them; they are not sprints.

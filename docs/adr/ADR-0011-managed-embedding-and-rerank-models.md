@@ -115,6 +115,13 @@ Recorded before the CM-6e confirmation run.
 - **Latency (now measured):** per-request embedding latency p50 527 ms, p95 965 ms (HTTP, no 429). The runner's per-case warm latency (p50-paired mean 5,220 ms vs Qwen3 292 ms) is dominated by the client's own pacing: each case issues several queries back to back and waits 60/18 s between them (607 s of pacing over the run). It measures the 20 RPM quota, not the model.
 - **Cost:** run 2 0.883 OCU-h (search 2 OCU 17:43–18:01Z, indexing 1 OCU 17:44–17:58Z) ≈ $0.21 plus ≈ 80k billed tokens ≈ $0.01; the failed first build 0.483 OCU-h ≈ $0.12. Total ≈ $0.34. Both pools 0 by 18:02Z.
 
+## Amendment 2026-11-23 (FILINGS-LATENCY) — rerank quota, candidate pool and filing cache (owner decision)
+
+- **Measured cause:** a live filings step for an indexed ticker (NVDA, 198 chunks) took 197 s, of which 147 s was the client waiting on the rerank pacer: each of the four filing queries reranked 50 candidates (about 10,000 estimated tokens), and the rerank pacer reused the embedding deployment's limits (18 requests, 18,000 tokens per minute), so only one rerank call fitted in each 61 s window. OpenSearch answered a 50-candidate search in about 1 s.
+- **Quota:** the rerank deployment `cohere-rerank-v5-fast` now allows 50 requests and 50,000 tokens per minute (owner, 2026-11-23). Rerank is paced in its own window at no more than 45 requests and 45,000 estimated tokens per minute (the same ~10% headroom as the embedding arm); the embedding pacing above is unchanged.
+- **Candidate pool:** the app's filings step reranks the top 15 dense candidates per query instead of 50. The declared benchmark methods `dense_rerank` and `hybrid_rerank` (retrieval-benchmark §7c) keep 50, so committed results stay reproducible; the single-axis run in retrieval-benchmark §7d records what 15 costs in quality.
+- **Filing result cache:** per process, keyed by ticker, company name and retrieval configuration, 1 h TTL, cleared when the ticker is ingested in the process; empty and dense-fallback results are not cached (test-plan §13). It is an early in-process slice of the SPEC §11.3 RetrievalCache; S7.9 moves it to the shared cache store with index-release keys.
+
 ## Verify before implementation
 
 - Bedrock batch support for Cohere Embed v4; Foundry deployment of Cohere Embed v4 at 1024 dimensions.
