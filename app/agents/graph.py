@@ -25,7 +25,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, Optional, TypedDict, cast
 
 from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -42,8 +42,11 @@ from app.agents.state import (
     get_data_availability,
     has_fatal_error,
 )
+from app.cache import filing_results
+from app.components.retrieval.embeddings import embedding_identifier
 from app.components.retrieval.ingestion import ingest_10k_for_ticker
 from app.components.retrieval.reranked_hybrid_retrieve import (
+    FoundryCohereReranker,
     RerankedHybridSearchUnavailableError,
     search_reranked,
 )
@@ -65,6 +68,7 @@ from app.guardrails.content import (
 from app.guardrails.output import redact_pii, screen_memo, with_disclaimer, without_sentences
 from app.llm.provider import fallback_count, get_llm, model_metadata
 from app.observability.langsmith import app_traceable, mark_trace_failed
+from app.observability.metrics import record_cache_event
 from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
@@ -260,7 +264,12 @@ def _search_filing_chunks(
     if rerank:
         try:
             result = search_reranked(
-                store, query=query, ticker=ticker, top_k=n_results, candidates="dense"
+                store,
+                query=query,
+                ticker=ticker,
+                top_k=n_results,
+                candidates="dense",
+                candidate_pool=_FILING_CANDIDATE_POOL,
             )
         except RerankedHybridSearchUnavailableError as error:
             fallback_reason = str(error)
@@ -279,6 +288,12 @@ def _search_filing_chunks(
 # ponytail: a fixed bound on one ingest-on-miss (the former local embedding timeout). Give it
 # its own setting once a real 10-K ingestion has been timed.
 INGEST_TIMEOUT_SECONDS: float = 600.0
+
+
+# Each topic query reranks the store's top 15 candidates and keeps the best 3 (ADR-0011 amendment
+# 2026-11-23): 50 candidates per query waited on the rerank quota for minutes.
+_FILING_CANDIDATE_POOL = 15
+_FILING_RESULTS_PER_QUERY = 3
 
 
 def _filing_error(code: str, message: str) -> dict:
@@ -316,7 +331,7 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
             store,
             query,
             ticker,
-            3,
+            _FILING_RESULTS_PER_QUERY,
             rerank=fallback_reason is None,
             fallback_reason=fallback_reason,
         )
@@ -328,7 +343,12 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
             result
             if "rerank_fallback_reason" in _rerank_marker(result)
             else await asyncio.to_thread(
-                _search_filing_chunks, store, query, ticker, 3, fallback_reason=fallback_reason
+                _search_filing_chunks,
+                store,
+                query,
+                ticker,
+                _FILING_RESULTS_PER_QUERY,
+                fallback_reason=fallback_reason,
             )
             for query, result in zip(queries, results)
         ]
@@ -398,20 +418,35 @@ async def retrieve_sec_filings_node(state: AgentState) -> dict:
         }
 
     try:
-        store = get_vector_store()
         company_name = state.get("company_name", "")
-        top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
+        cache_config = (
+            _FILING_CANDIDATE_POOL,
+            _FILING_RESULTS_PER_QUERY,
+            MAX_FILING_CHUNKS,
+            FoundryCohereReranker().identity,
+            embedding_identifier(),
+        )
+        cached = filing_results.FILING_CACHE.get(ticker, company_name, cache_config)
+        record_cache_event("filings", "miss" if cached is None else "hit")
 
         failure = "filing_not_found"
-        if (
-            not top_chunks
-            and await asyncio.to_thread(store.count_documents, SearchFilters(ticker=ticker)) == 0
-        ):
-            ingest_error = await _ingest_on_miss(ticker)
-            if ingest_error:
-                failure = ingest_error
-            else:
-                top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
+        if cached is not None:
+            top_chunks = cached
+        else:
+            store = get_vector_store()
+            top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
+            if (
+                not top_chunks
+                and await asyncio.to_thread(store.count_documents, SearchFilters(ticker=ticker))
+                == 0
+            ):
+                ingest_error = await _ingest_on_miss(ticker)
+                if ingest_error:
+                    failure = ingest_error
+                else:
+                    top_chunks = await _retrieve_filing_chunks(store, ticker, company_name)
+            if top_chunks and not any("rerank_fallback_reason" in c.metadata for c in top_chunks):
+                filing_results.FILING_CACHE.put(ticker, company_name, cache_config, top_chunks)
 
         filing_chunks = [
             {
@@ -515,10 +550,9 @@ async def analyze_sentiment_node(state: AgentState) -> dict:
         return add_error(state, "analyze_sentiment", "Workflow step failed.")
 
 
-async def join_evidence_node(state: AgentState) -> dict:
-    """Score sentiment, then freeze the joined evidence into the run's lineage (SPEC 7.x, 7.y)."""
-    update = await analyze_sentiment_node(state)
-    return {**update, **freeze_evidence({**state, **update})}
+async def freeze_snapshot_node(state: AgentState) -> dict:
+    """Freeze the joined evidence into the run's lineage (SPEC 7.x, 7.y)."""
+    return dict(freeze_evidence(state))
 
 
 def _humanize_money(value: object) -> str:
@@ -1226,6 +1260,32 @@ def _add_draft_verify_loop(workflow: StateGraph) -> None:
     workflow.add_edge("screen_output", END)
 
 
+class _NewsBranchOutput(TypedDict, total=False):
+    """What the news branch hands to the parent: the keys its two nodes write, so the parent's
+    reducers never re-add the rest of the state the branch was given."""
+
+    news_articles: list[dict]
+    sentiment_result: dict
+    errors: list[dict]
+    guardrail_events: list[dict]
+    evidence_fetched_at: dict[str, str]
+    current_step: str
+
+
+def _create_news_branch() -> Runnable[AgentState, _NewsBranchOutput]:
+    """Sentiment needs only the news, so it runs right after it, beside the slower branches.
+
+    A node starts in the superstep after the one that triggered it, so a sibling edge in the
+    parent graph would wait for the slowest evidence node; a subgraph has supersteps of its own.
+    """
+    branch = StateGraph(AgentState, output_schema=_NewsBranchOutput)
+    branch.add_node("research_news", research_news_node)
+    branch.add_node("analyze_sentiment", analyze_sentiment_node)
+    branch.add_edge(START, "research_news")
+    branch.add_edge("research_news", "analyze_sentiment")
+    return branch.compile()
+
+
 def create_agent() -> Runnable[AgentState, AgentState]:
     """
     Create the LangGraph agent workflow.
@@ -1239,18 +1299,18 @@ def create_agent() -> Runnable[AgentState, AgentState]:
     workflow = StateGraph(AgentState)
 
     # Add nodes
-    workflow.add_node("research_news", research_news_node)
+    workflow.add_node("news_branch", _create_news_branch())
     workflow.add_node("fetch_stock", fetch_stock_node)
     workflow.add_node("retrieve_filings", retrieve_sec_filings_node)
-    workflow.add_node("analyze_sentiment", join_evidence_node)
+    workflow.add_node("freeze_snapshot", freeze_snapshot_node)
     _add_draft_verify_loop(workflow)
 
-    # Evidence nodes are independent: run them in parallel, join before sentiment.
-    evidence_nodes = ["research_news", "fetch_stock", "retrieve_filings"]
+    # Evidence branches are independent: run them in parallel, join before the snapshot is frozen.
+    evidence_nodes = ["news_branch", "fetch_stock", "retrieve_filings"]
     for node in evidence_nodes:
         workflow.add_edge(START, node)
-    workflow.add_edge(evidence_nodes, "analyze_sentiment")
-    workflow.add_edge("analyze_sentiment", "draft_memo")
+    workflow.add_edge(evidence_nodes, "freeze_snapshot")
+    workflow.add_edge("freeze_snapshot", "draft_memo")
 
     # Compile the graph
     agent = workflow.compile()
@@ -1266,6 +1326,9 @@ def create_replay_agent() -> Runnable[AgentState, AgentState]:
     workflow.add_edge(START, "draft_memo")
     return workflow.compile()
 
+
+# Graph nodes that are not steps the frontend shows (SPEC 18).
+_UNREPORTED_STEPS = ("news_branch", "freeze_snapshot", "screen_output")
 
 # Compiled once per process; the graph holds no per-request state.
 AGENT = create_agent()
@@ -1352,12 +1415,15 @@ async def run_agent(
     sink = progress_sink.get()
     steps: dict[str, dict] = {}
     final_state: AgentState = state
-    async for event in agent.astream(state, config=config, stream_mode=["tasks", "values"]):
-        mode, chunk = cast(tuple[str, Any], event)
+    async for event in agent.astream(
+        state, config=config, stream_mode=["tasks", "values"], subgraphs=True
+    ):
+        namespace, mode, chunk = cast(tuple[tuple[str, ...], str, Any], event)
         if mode == "values":
-            final_state = chunk
+            if not namespace:  # the news branch's own state is not the run's
+                final_state = chunk
             continue
-        if sink is None or chunk["name"] == "screen_output":  # not a reported step (SPEC 18)
+        if sink is None or chunk["name"] in _UNREPORTED_STEPS:
             continue
         now = datetime.now(timezone.utc)
         if "input" in chunk:

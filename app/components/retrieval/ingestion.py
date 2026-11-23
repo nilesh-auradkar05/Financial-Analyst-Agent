@@ -33,6 +33,7 @@ from typing import Any, Optional
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from loguru import logger
 
+from app.cache import filing_results
 from app.components.retrieval.sections import (
     DEFAULT_SECTIONS,
     CanonicalSection,
@@ -385,12 +386,15 @@ async def ingest_10k_for_ticker(
                 error_code="filing_not_found",
             )
         # Embedding and store writes are blocking; keep them off the event loop.
-        return await asyncio.to_thread(
+        result = await asyncio.to_thread(
             ingest_filing,
             filing=filing,
             sections=sections,
             replace_existing=replace_existing,
         )
+        if result.success:
+            filing_results.FILING_CACHE.invalidate(normalized_ticker)
+        return result
     except Exception:
         logger.error(f"Failed to ingest 10-K for {normalized_ticker}")
         mark_trace_failed("ingestion_failed")
