@@ -805,7 +805,7 @@ Feature: untrusted content cannot steer the memo, and output policy holds on eve
 Trace: SPEC §11.4; test-plan §12 S7.1 rows (owner decisions 2026-11-22: no guardrails package; 6-letter tickers; strictly printable ASCII company names; temporary news-domain allow-list)
 Tests:  U input schema, framing, allow-list, output screen (price target, guaranteed return, MNPI, uncited numeric, PII, disclaimer) · E2E adversarial fixture in CI
 Regression: R1 R2 R3 R5
-Result: Pending.
+Result: DONE (2026-11-23), branch `task/s7-1`. Deterministic guardrails in `app/guardrails/` (no package, no model call): tickers 1–6 letters, printable-ASCII company names; DATA-framed prompts with delimiters neutralized in every untrusted field (`prompt_version()` changes); 27-domain news allow-list (`TAVILY_ALLOWED_DOMAINS`, fails closed, live fetches only); PII in live news redacted at fetch (owner 2026-11-22); terminal `screen_output` node (price target only when unsupported, guaranteed return, MNPI, uncited numbers with the recommendation sentence exempt, PII), re-grade, fixed disclaimer; `guardrail_events` in state and response. Oracle 19b36f1 (PII row amended 2026-11-22); red 5d15656 plus the PII amendment. Verification: full pytest 1641 passed, 7 skipped; replay (no network) 138 passed; ruff clean; mypy clean on tracked files; governance 5/5. Baselines recorded before S7.1 no longer match the live prompt: the next paired quality comparison needs a new owner-run baseline. Follow-up: a provider-supplied `company_name` sits outside the DATA block.
 ```
 
 ```text
