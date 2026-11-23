@@ -1,7 +1,7 @@
 """Rerank a dense or hybrid candidate pool with hosted Cohere Rerank on Microsoft Foundry.
 
-Two-stage retrieval: the store's top 50 under the ticker and filing-type filters (dense `search`
-or fused `search_hybrid`), scored in one rerank call, best K kept. Fails closed: if the reranker
+Two-stage retrieval: the store's top `candidate_pool` (50 by default) under the ticker and
+filing-type filters (dense `search` or fused `search_hybrid`), scored in one rerank call, best K kept. Fails closed: if the reranker
 cannot run, it raises instead of returning unreranked chunks, because a silent fallback is how
 mislabeled result files happen.
 """
@@ -24,9 +24,9 @@ _RERANK_TIMEOUT_SECONDS = 30.0
 _RERANK_ATTEMPTS = 3
 _RERANK_BACKOFF_SECONDS = 0.1
 
-# The deployment allows 20 requests and 20,000 tokens per minute, the same quota as embeddings, in
-# a window of its own.
-_rerank_pacer = RequestPacer()
+# The rerank deployment allows 50 requests and 50,000 tokens per minute (owner, 2026-11-23); stay
+# under both, in a window of its own.
+_rerank_pacer = RequestPacer(min_interval_seconds=60 / 45, tokens_per_minute=45_000)
 
 
 class RerankerLike(Protocol):
@@ -136,8 +136,9 @@ def search_reranked(
     top_k: int = 10,
     candidates: Literal["dense", "hybrid"] = "dense",
     reranker: Optional[RerankerLike] = None,
+    candidate_pool: int = RERANK_CANDIDATE_POOL,
 ) -> SearchResult:
-    """Rerank the store's top 50 dense or hybrid candidates and return the best `top_k`.
+    """Rerank the store's top `candidate_pool` dense or hybrid candidates and return the best `top_k`.
 
     Equal scores keep candidate order. Raises `RerankedHybridSearchUnavailableError` when the
     reranker is unconfigured or fails; no unreranked result is ever returned.
@@ -148,7 +149,7 @@ def search_reranked(
     pool: list[RetrievedChunk] = search(
         query,
         filters=SearchFilters(ticker=ticker, filing_type=filing_type),
-        n_results=RERANK_CANDIDATE_POOL,
+        n_results=candidate_pool,
     ).chunks
 
     chunks: list[RetrievedChunk] = []

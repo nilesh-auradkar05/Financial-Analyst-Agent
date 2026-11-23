@@ -11,7 +11,12 @@ import pytest
 # Tests never upload traces to the real LangSmith service, whatever the developer's
 # environment enables. Set before any app import so settings and langsmith both see it;
 # tests that exercise tracing install their own in-memory collector.
-for _name in ("LANGSMITH_TRACING", "LANGSMITH_TRACING_V2", "LANGCHAIN_TRACING", "LANGCHAIN_TRACING_V2"):
+for _name in (
+    "LANGSMITH_TRACING",
+    "LANGSMITH_TRACING_V2",
+    "LANGCHAIN_TRACING",
+    "LANGCHAIN_TRACING_V2",
+):
     os.environ[_name] = "false"
 
 # DeepEval reports usage to PostHog unless told not to; tests make no network call, so opt out
@@ -33,9 +38,12 @@ for _name in (
 
 # ── CLI options & markers ───────────────────────────────────────────────
 
+
 def pytest_addoption(parser):
     parser.addoption("--run-slow", action="store_true", default=False, help="Run slow tests")
-    parser.addoption("--run-integration", action="store_true", default=False, help="Run integration tests")
+    parser.addoption(
+        "--run-integration", action="store_true", default=False, help="Run integration tests"
+    )
 
 
 def pytest_configure(config):
@@ -57,6 +65,16 @@ def pytest_collection_modifyitems(config, items):
 
 
 # ── Shared fixtures ─────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def fresh_filing_cache(monkeypatch):
+    """Every test gets an empty filing result cache: the process-wide one would otherwise carry a
+    filings step's result from one test to the next (test-plan §13, Filing result cache)."""
+    from app.cache import filing_results
+
+    monkeypatch.setattr(filing_results, "FILING_CACHE", filing_results.FilingResultCache())
+
 
 @pytest.fixture
 def sample_ticker():
@@ -142,8 +160,11 @@ def sample_sentiment_result():
 
 @pytest.fixture
 def sample_agent_state(
-    sample_ticker, sample_stock_data, sample_news_articles,
-    sample_filing_chunks, sample_sentiment_result,
+    sample_ticker,
+    sample_stock_data,
+    sample_news_articles,
+    sample_filing_chunks,
+    sample_sentiment_result,
 ):
     """A fully-populated agent state for testing downstream consumers."""
     return {
@@ -156,7 +177,12 @@ def sample_agent_state(
         "investment_memo": "# Memo\n\n## Executive Summary\nStrong [1] performance [2].",
         "executive_summary": "Strong performance across segments.",
         "citations": [
-            {"index": 1, "source_type": "news", "title": "Apple Q4 Earnings", "url": "https://example.com"},
+            {
+                "index": 1,
+                "source_type": "news",
+                "title": "Apple Q4 Earnings",
+                "url": "https://example.com",
+            },
             {"index": 2, "source_type": "sec_filing", "title": "Risk Factors — 10-K"},
         ],
         "errors": [],
@@ -170,6 +196,7 @@ def sample_agent_state(
 @pytest.fixture
 def mock_embedding_vector():
     import random
+
     random.seed(42)
     return [random.random() for _ in range(1024)]
 
