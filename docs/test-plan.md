@@ -283,7 +283,7 @@ Observed through `run_agent` on a frozen evidence release; no live network.
 
 | Case | Expected behavior |
 | --- | --- |
-| Sentiment follows news only (FILINGS-LATENCY, 2026-11-23) | `analyze_sentiment` starts when `research_news` finishes, without waiting for `fetch_stock` or `retrieve_filings`: with a slow filings fake, the sentiment step is reported finished before the filings step; `draft_memo` starts only after sentiment, market data and filings have all finished, and the run's `snapshot_hash` covers all of them |
+| Sentiment follows news only (FILINGS-LATENCY, 2026-11-23) | `analyze_sentiment` starts when `research_news` finishes, without waiting for `fetch_stock` or `retrieve_filings`: with a slow filings fake, the sentiment step is reported finished before the filings step; `draft_memo` starts only after sentiment, market data and filings have all finished, and the run's `snapshot_hash` covers all of them; the `freeze_snapshot` join is not a reported progress step, so `progress` still names only the six steps the frontend shows |
 | Independent nodes fan out | With each of `research_news`, `fetch_stock`, `retrieve_filings` stubbed to sleep 1 s (faithful fakes, not baked answers), evidence phase wall-time < 1.6 s |
 | One branch fails | Failure in `fetch_stock` yields `stock_data={}` and one error entry; the other two branches' outputs are present |
 | Errors accumulate under fan-out | Two branches each adding an error produce exactly two entries — no lost or duplicated errors (G12) |
