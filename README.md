@@ -212,7 +212,16 @@ Apply code/config changes with `docker compose up -d --build --no-deps api` once
 
 For Sonnet 5.5 through Bedrock Converse in `us-east-1`, AWS documents the global inference profile `global.anthropic.claude-sonnet-5-5`; set that explicitly when using global routing. See the [AWS model card](https://docs.aws.amazon.com/us_en/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-5-5.html). Sonnet 5 models use adaptive thinking and do not accept non-default sampling temperatures; the factory omits temperature for them.
 
-Set `API_KEY` in the frontend server environment to the same shared key as the API. The server forwards it to protected backend routes; never expose it through a `NEXT_PUBLIC_` variable.
+The frontend no longer holds `API_KEY`. A visitor passes a Cloudflare Turnstile challenge, the frontend server seals a 24-hour guest session in an HttpOnly cookie and calls the API with a 15-minute ES256 guest token minted from it (ADR-0010); the browser never sees a token. Generate the guest signing key pair and the two secrets once:
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out guest-private.pem
+openssl ec -in guest-private.pem -pubout -out guest-public.pem
+openssl rand -base64 32          # SESSION_SECRET
+openssl rand -base64 32          # GUEST_IP_SALT
+```
+
+Put the private key in `GUEST_SIGNING_KEY` as a double-quoted value with `\n` for line breaks, and register the public key with the API in `JWT_ISSUERS`, a JSON list whose `issuer` and `audience` equal the frontend's `GUEST_ISSUER` and `GUEST_AUDIENCE`: `[{"issuer": "https://alpha.example/guest", "audience": "alpha-api", "public_key_pem": "<contents of guest-public.pem>"}]`. Keep both PEM files out of the repository. `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` default to Cloudflare's always-pass test keys for local development; set real keys for any deployment.
 
 ### 3. Start the local services
 

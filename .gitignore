@@ -280,3 +280,5 @@ graphify-out/
 tfplan
 # Archify working folders (candidates, receipts, captures); delivered diagrams live under docs/
 .archify/
+# Guest-session signing keys (README, S7.2): never commit key material
+*.pem

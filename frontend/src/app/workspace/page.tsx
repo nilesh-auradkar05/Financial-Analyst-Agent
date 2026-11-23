@@ -14,7 +14,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
     <>
       <AppHeader active="workspace">
         <div className="flex items-center gap-[30px]">
-          <SearchNew />
+          <SearchNew siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} />
           <Avatar />
         </div>
       </AppHeader>
