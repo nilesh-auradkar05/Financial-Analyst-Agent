@@ -118,8 +118,6 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, embedding_arm_config
     monkeypatch.setattr(api_main, "ingest_10k_for_ticker", fake_ingest_10k_for_ticker)
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
     monkeypatch.setattr(api_main.settings, "api_key", API_KEY)
-    # The developer's env file may set JWT_ISSUERS; every test starts from an empty allowlist.
-    monkeypatch.setattr(api_main.settings, "jwt_issuers", [])
     monkeypatch.setattr(api_main, "submission_limiter", api_main.SubmissionRateLimiter())
     monkeypatch.setattr(api_main, "guest_quotas", api_main.GuestQuotas())
     with TestClient(api_main.app) as test_client:

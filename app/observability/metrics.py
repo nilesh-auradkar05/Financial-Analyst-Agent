@@ -97,13 +97,6 @@ if PROMETHEUS_AVAILABLE:
         ["component"],
     )
 
-    # Result caches
-    CACHE_EVENTS = Counter(
-        "cache_events_total",
-        "Result cache lookups",
-        ["stage", "outcome"],
-    )
-
 
 # =============================================================================
 # TRACKING CONTEXT MANAGERS
@@ -156,12 +149,6 @@ def record_error(component: str):
     """Record an error."""
     if PROMETHEUS_AVAILABLE:
         ERRORS.labels(component=component).inc()
-
-
-def record_cache_event(stage: str, outcome: str) -> None:
-    """Record a result cache lookup; `outcome` is "hit" or "miss"."""
-    if PROMETHEUS_AVAILABLE:
-        CACHE_EVENTS.labels(stage=stage, outcome=outcome).inc()
 
 
 # =============================================================================

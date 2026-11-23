@@ -1,5 +1,4 @@
-"""Trace: docs/test-plan.md §25, "Rerank reorders candidates (amended S5.3, 2026-11-15; pool amended
-FILINGS-LATENCY 2026-11-23)" and
+"""Trace: docs/test-plan.md §25, "Rerank reorders candidates (amended S5.3, 2026-11-15)" and
 "Fails closed when unconfigured" (amended S5.3).
 
 `search_reranked` takes the store's top 50 (dense `search()` or `search_hybrid()`) under the ticker
@@ -237,45 +236,6 @@ def test_hybrid_candidates_are_the_stores_hybrid_top_fifty(foundry_rerank) -> No
     assert result.chunks[0].id == "dense-rank-51"
     (request,) = foundry_rerank.requests
     assert len(request.body["documents"]) == POOL
-
-
-@pytest.mark.parametrize("source", SOURCES)
-@pytest.mark.parametrize("pool", [15, 30])
-def test_candidate_pool_sets_how_many_candidates_are_asked_for_and_scored(
-    foundry_rerank, source: str, pool: int
-) -> None:
-    """test-plan §25: Rerank reorders candidates (amended FILINGS-LATENCY 2026-11-23): the top
-    `candidate_pool` of the store's dense or hybrid search go to the reranker in one call, so a
-    pool of 15 never scores the chunk at candidate rank 16, and each returned chunk's
-    `candidate_rank` is its place inside that pool."""
-    store = _crowded_store()
-    candidates = (store.search if source == "dense" else store.search_hybrid)(
-        QUERY, filters=FILTERS, n_results=pool
-    ).chunks
-    assert len(candidates) == pool
-
-    result = _search(store, top_k=3, candidates=source, candidate_pool=pool)
-
-    (request,) = foundry_rerank.requests
-    assert sorted(request.body["documents"]) == sorted(chunk.text for chunk in candidates)
-    assert [chunk.id for chunk in result.chunks] == _expected_ids(candidates, 3)
-    assert all(chunk.metadata["candidate_rank"] <= pool for chunk in result.chunks)
-
-
-def test_a_pool_of_fifteen_does_not_see_the_dense_rank_fifty_match(foundry_rerank) -> None:
-    """test-plan §25: Rerank reorders candidates (amended FILINGS-LATENCY 2026-11-23): with
-    `candidate_pool` = 15 the half match at dense rank 50 is not a candidate; with the default pool
-    it is, and wins."""
-    store = _crowded_store()
-
-    narrow = _search(store, top_k=3, candidate_pool=15)
-    wide = _search(store, top_k=3)
-
-    assert "dense-rank-50" not in [chunk.id for chunk in narrow.chunks]
-    assert wide.chunks[0].id == "dense-rank-50"
-    narrow_request, wide_request = foundry_rerank.requests
-    assert len(narrow_request.body["documents"]) == 15
-    assert len(wide_request.body["documents"]) == POOL
 
 
 @pytest.mark.parametrize("source", SOURCES)

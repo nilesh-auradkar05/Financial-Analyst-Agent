@@ -217,12 +217,6 @@ A diagnostic report over one result file. It explains misses; it is not a metric
 - **Cost:** Foundry bills rerank by input tokens (probe 2026-11-15: `billed_units.input_tokens`). Declared price ≤ $0.02 per 1M tokens (Microsoft's v5 announcement), with $2 per 1,000 searches (the v4 Fast price list) as the upper bound behind the $0.002 budget. Cost per query is estimated from the request size (ceil(chars/4) tokens; 50 chunks of 1,000 characters ≈ 12,500 tokens).
 - **Throughput:** the deployment allows 20 requests and 20,000 tokens per minute (probe 2026-11-15), so the client paces rerank calls to ≤ 18 per minute and ≤ 18,000 estimated tokens per minute; a 75-case run takes about 100 minutes. Latency is reported but measures the embedding and rerank pacers, so no search-latency claim is made.
 
-## 7d. Rerank candidate pool (FILINGS-LATENCY, declared 2026-11-23 before any run)
-
-- **Method:** `dense_rerank_15`, identical to `dense_rerank` (§7c) except that it reranks the store's top 15 dense candidates instead of 50. Same fixture, index, embedding, reranker deployment and K as §7c.
-- **Comparison:** `dense_rerank_15` vs `dense_rerank`, paired per §8 (bootstrap seed 13, 10,000 samples). The only axis is the candidate pool.
-- **Use:** recorded, not a gate; the owner adopted 15 for the app's filings step on latency grounds (ADR-0011 amendment 2026-11-23). If the 95% CI upper bound of the paired `recall@10` delta is below 0, the owner revisits the pool size.
-
 ## 8. Paired comparison policy
 
 File: `evaluation/compare_retrieval_results.py`. This is where the prior invalid-comparison lesson is enforced.

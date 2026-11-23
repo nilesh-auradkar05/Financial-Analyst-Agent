@@ -302,13 +302,12 @@ The workflow must:
 8.1 Graph topology:
 
 ```text
-START → [research_news → analyze_sentiment ‖ fetch_stock ‖ retrieve_filings]  (parallel fan-out, LangGraph Send/branch;
-      sentiment waits only for news, FILINGS-LATENCY 2026-11-23)
-      → freeze_snapshot (join) → guard_inputs → draft_memo → verify_memo
+START → [research_news ‖ fetch_stock ‖ retrieve_filings]  (parallel fan-out, LangGraph Send/branch)
+      → analyze_sentiment → guard_inputs → draft_memo → verify_memo
       → (passed | attempts ≥ 2) ? guard_output → END : revise_memo → verify_memo
 ```
 
-8.1b Three agents from S7.6 (ADR-0017 §2, recorded here 2026-11-02): the graph splits into Researcher (`research_news → analyze_sentiment ‖ fetch_stock ‖ retrieve_filings → freeze_snapshot`), Analyst (`guard_inputs → draft_memo`, or `revise_memo` on a returned envelope) and Reviewer (`verify_memo → decide → guard_output`), each a subgraph with its own retry policy and failure domain, running inside one graph execution. No agent starts until the handoff envelope before it is durably committed.
+8.1b Three agents from S7.6 (ADR-0017 §2, recorded here 2026-11-02): the graph splits into Researcher (`research_news ‖ fetch_stock ‖ retrieve_filings → analyze_sentiment → freeze_snapshot`), Analyst (`guard_inputs → draft_memo`, or `revise_memo` on a returned envelope) and Reviewer (`verify_memo → decide → guard_output`), each a subgraph with its own retry policy and failure domain, running inside one graph execution. No agent starts until the handoff envelope before it is durably committed.
 
 8.1a Supervisor topology from S11 (ADR-0018; refines 8.1b by splitting the Researcher into `market`, `news` and `filings`; default only after Gate F, until then behind a flag):
 

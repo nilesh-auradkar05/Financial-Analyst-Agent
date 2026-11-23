@@ -50,13 +50,7 @@ _FOUNDRY_COHERE_MAX_RETRY_WAIT_SECONDS = 60.0
 class RequestPacer:
     """Paces the requests of one Foundry deployment: its own window, shared by every caller in the process."""
 
-    def __init__(
-        self,
-        min_interval_seconds: float = FOUNDRY_COHERE_MIN_INTERVAL_SECONDS,
-        tokens_per_minute: int = FOUNDRY_COHERE_TOKENS_PER_MINUTE,
-    ) -> None:
-        self._min_interval_seconds = min_interval_seconds
-        self._tokens_per_minute = tokens_per_minute
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._recent_starts: deque[tuple[float, int]] = deque()  # (start time, estimated tokens)
 
@@ -71,10 +65,10 @@ class RequestPacer:
             self._drop_expired_starts(now)
             wait = 0.0
             if self._recent_starts:
-                wait = self._recent_starts[-1][0] + self._min_interval_seconds - now
+                wait = self._recent_starts[-1][0] + FOUNDRY_COHERE_MIN_INTERVAL_SECONDS - now
                 in_window = sum(started_tokens for _, started_tokens in self._recent_starts)
                 for started, started_tokens in self._recent_starts:
-                    if in_window + tokens <= self._tokens_per_minute:
+                    if in_window + tokens <= FOUNDRY_COHERE_TOKENS_PER_MINUTE:
                         break
                     in_window -= started_tokens
                     wait = max(wait, started + _FOUNDRY_COHERE_WINDOW_SECONDS - now)
