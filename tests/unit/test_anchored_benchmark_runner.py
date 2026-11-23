@@ -342,15 +342,17 @@ def test_dense_search_is_scoped_to_ticker_and_filing_type_only() -> None:
 
 
 def test_method_constants() -> None:
-    """test-plan §6 Benchmark runner: Method/mode labels."""
+    """test-plan §6 Benchmark runner: Method/mode labels; `dense_rerank_15` method
+    (FILINGS-LATENCY, 2026-11-23) - the runner accepts it."""
     assert set(RETRIEVAL_METHODS) == {
         "dense",
         "section_aware",
         "hybrid",
         "dense_rerank",
         "hybrid_rerank",
+        "dense_rerank_15",
     }
-    assert len(RETRIEVAL_METHODS) == 5
+    assert len(RETRIEVAL_METHODS) == 6
     assert tuple(BENCHMARK_KS) == (5, 10)
 
 
@@ -364,7 +366,19 @@ def test_result_carries_method_and_mode_labels(method: str) -> None:
 
 @pytest.mark.parametrize(
     "method",
-    ["bm25", "", "Dense", "Hybrid", "hybrid ", "rerank", "Dense_Rerank", "hybrid_rerank "],
+    [
+        "bm25",
+        "",
+        "Dense",
+        "Hybrid",
+        "hybrid ",
+        "rerank",
+        "Dense_Rerank",
+        "hybrid_rerank ",
+        "dense_rerank_15 ",
+        "dense_rerank_16",
+        "hybrid_rerank_15",
+    ],
 )
 def test_unknown_retrieval_method_is_rejected(method: str) -> None:
     """test-plan §6 Benchmark runner: Method/mode labels (validated)."""
@@ -438,6 +452,7 @@ def test_cli_usage_error_names_the_rerank_methods(
     message = capsys.readouterr().err
     assert "dense_rerank" in message
     assert "hybrid_rerank" in message
+    assert "dense_rerank_15" in message  # FILINGS-LATENCY, 2026-11-23
     assert not (tmp_path / "result.json").exists()
 
 
@@ -629,8 +644,9 @@ def test_run_provenance_is_recorded(
 # test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3)
 # --------------------------------------------------------------------------
 
-RERANK_METHODS = {"dense_rerank": "dense", "hybrid_rerank": "hybrid"}
+RERANK_METHODS = {"dense_rerank": "dense", "hybrid_rerank": "hybrid", "dense_rerank_15": "dense"}
 RERANK_POOL = 50
+POOL_OF = {"dense_rerank": 50, "hybrid_rerank": 50, "dense_rerank_15": 15}
 
 
 class PseudoEmbeddingStore(InMemoryStore):
@@ -664,14 +680,17 @@ class PseudoEmbeddingStore(InMemoryStore):
         return self._ranked("hybrid", query, filters, n_results)
 
 
-def _expected_reranked_ids(store: InMemoryStore, case: AnchoredCase, source: str) -> list[str]:
-    """The store's top 50 under the case's ticker and 10-K filters, ordered by the endpoint's
-    relevance (stable: equal scores keep candidate order), cut to K = 10."""
+def _expected_reranked_ids(
+    store: InMemoryStore, case: AnchoredCase, source: str, pool: int = RERANK_POOL
+) -> list[str]:
+    """The store's top `pool` (50; 15 for `dense_rerank_15`) under the case's ticker and 10-K
+    filters, ordered by the endpoint's relevance (stable: equal scores keep candidate order), cut
+    to K = 10."""
     search = store.search if source == "dense" else store.search_hybrid
     candidates = search(
         case.query,
         filters=SearchFilters(ticker=case.ticker, filing_type="10-K"),
-        n_results=RERANK_POOL,
+        n_results=pool,
     ).chunks
     ranked = sorted(candidates, key=lambda chunk: -relevance(case.query, chunk.text))
     return [chunk.id for chunk in ranked[: max(BENCHMARK_KS)]]
@@ -681,9 +700,10 @@ def _expected_reranked_ids(store: InMemoryStore, case: AnchoredCase, source: str
 def test_rerank_methods_retrieve_each_case_through_search_reranked_in_the_reranked_order(
     foundry_rerank, method: str, source: str
 ) -> None:
-    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - each case
-    is retrieved through the store's dense or hybrid candidates under the case's ticker and
-    filing-type filters, K = 10, in the reranked order."""
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) and
+    `dense_rerank_15` (FILINGS-LATENCY, 2026-11-23) - each case is retrieved through the store's
+    dense or hybrid candidates under the case's ticker and filing-type filters, K = 10, in the
+    reranked order."""
     store = PseudoEmbeddingStore(_hybrid_corpus())
     fixture = _fixture()
 
@@ -693,7 +713,9 @@ def test_rerank_methods_retrieve_each_case_through_search_reranked_in_the_rerank
 
     for case in fixture.cases:
         got = result[case.case_id]["retrieved"]
-        assert [r["chunk_id"] for r in got] == _expected_reranked_ids(store, case, source)
+        assert [r["chunk_id"] for r in got] == _expected_reranked_ids(
+            store, case, source, POOL_OF[method]
+        )
         assert [r["rank"] for r in got] == list(range(1, len(got) + 1))
     risk = result["aapl-risk-001"]["retrieved"]
     assert len(risk) == max(BENCHMARK_KS)
@@ -723,11 +745,93 @@ def test_the_rerank_arms_reorder_what_the_store_returned() -> None:
         assert differing, source
 
 
+def _crowded_corpus() -> list[tuple[str, str, dict[str, Any]]]:
+    """Sixty AAPL 10-K chunks, each holding a hash-chosen subset of the words of both AAPL case
+    queries (so the endpoint's relevance varies widely across them), plus other filings that must
+    never be candidates."""
+    fixture = _fixture()
+    words = sorted(
+        {w for case in fixture.cases if case.ticker == "AAPL" for w in case.query.split()}
+    )
+    rows = []
+    for index in range(60):
+        chosen = [
+            word for word in words if hashlib.sha256(f"{index}|{word}".encode()).digest()[0] < 96
+        ]
+        section = "risk_factors" if index % 2 else "md&a"
+        rows.append(
+            _row(
+                f"{AAPL_ACC}_{section}_{index:03d}",
+                f"note {index} " + " ".join(chosen),
+                "AAPL",
+                AAPL_ACC,
+                section,
+            )
+        )
+    rows.append(
+        _row(
+            f"{AAPL_10Q_ACC}_risk_factors_000",
+            RISK_ANCHOR,
+            "AAPL",
+            AAPL_10Q_ACC,
+            "risk_factors",
+            "10-Q",
+        )
+    )
+    rows.append(_row(f"{MSFT_ACC}_risk_factors_000", RISK_ANCHOR, "MSFT", MSFT_ACC, "risk_factors"))
+    return rows
+
+
+@pytest.mark.parametrize("method", list(RERANK_METHODS))
+def test_rerank_methods_rerank_exactly_their_candidate_pool_on_a_crowded_store(
+    foundry_rerank, method: str
+) -> None:
+    """test-plan §6 Benchmark runner: `dense_rerank_15` method (FILINGS-LATENCY, 2026-11-23) - on a
+    store with 60 candidates per case, `dense_rerank_15` reranks the store's top 15 and
+    `dense_rerank` / `hybrid_rerank` keep a pool of 50: every rerank request carries exactly that
+    many documents and the retrieved ids are the reranked top K of that pool."""
+    store = PseudoEmbeddingStore(_crowded_corpus())
+    fixture = _fixture()
+    pool = POOL_OF[method]
+    source = RERANK_METHODS[method]
+
+    result = _by_id(
+        run_anchored_benchmark(fixture, store, backend="qdrant", retrieval_method=method)
+    )
+
+    aapl_queries = {case.query for case in fixture.cases if case.ticker == "AAPL"}
+    aapl_requests = [r for r in foundry_rerank.requests if r.body["query"] in aapl_queries]
+    assert aapl_requests
+    assert {len(request.body["documents"]) for request in aapl_requests} == {pool}
+    for case in fixture.cases:
+        if case.ticker != "AAPL":
+            continue
+        got = [r["chunk_id"] for r in result[case.case_id]["retrieved"]]
+        assert got == _expected_reranked_ids(store, case, source, pool)
+
+
+def test_the_fifteen_pool_changes_what_the_crowded_store_returns() -> None:
+    """Guards the test above against passing vacuously: on the crowded store the reranked top K of
+    a 15-candidate pool differs from that of a 50-candidate pool for some case."""
+    store = PseudoEmbeddingStore(_crowded_corpus())
+
+    differing = [
+        case.case_id
+        for case in _fixture().cases
+        if case.ticker == "AAPL"
+        and _expected_reranked_ids(store, case, "dense", 15)
+        != _expected_reranked_ids(store, case, "dense", 50)
+    ]
+
+    assert differing
+
+
 @pytest.mark.parametrize("method", list(RERANK_METHODS))
 def test_rerank_methods_carry_their_label_and_record_the_reranker_identity(
     foundry_rerank, method: str
 ) -> None:
-    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3) - the
+    """test-plan §6 Benchmark runner: `dense_rerank` and `hybrid_rerank` methods (S5.3), and
+    `dense_rerank_15` (FILINGS-LATENCY, 2026-11-23) - the
     result's `retrieval_method` and `mode` are the method name and its provenance records the
     reranker identity, next to the provenance the caller supplied."""
     result = run_anchored_benchmark(
