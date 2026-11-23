@@ -4,6 +4,10 @@ Trace: docs/test-plan.md §20 rows "Issuer allowlist", "Customer isolation", "Gu
 side); §12 S7.2 rows "API auth", "Rate limit", "Idempotency" where the identity model changes them.
 Everything is exercised through HTTP routes; tokens are minted here with throwaway EC P-256 keys.
 
+S7.2 slice (c) changes: guest tokens now carry an `ip_hash` claim (a fresh one per token, so no
+two tokens share an IP quota) and the `client` fixture installs fresh guest quota state, the way
+it already installs a fresh `submission_limiter` (test-plan §20 Guest quotas).
+
 Fixture split: `client` needs no new symbol (development issuer only); `allowlisted` imports
 `JwtIssuer` from `app.config` and installs the allowlist, so every token test goes red on the
 missing public symbol until it exists.
@@ -73,6 +77,7 @@ def _claims(**overrides: Any) -> dict[str, Any]:
         "aud": AUDIENCE_A,
         "sub": "guest:" + str(uuid.uuid4()),
         "role": "guest",
+        "ip_hash": uuid.uuid4().hex + uuid.uuid4().hex,
         "iat": now,
         "exp": now + 900,
         "jti": str(uuid.uuid4()),
@@ -114,6 +119,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, embedding_arm_config
     monkeypatch.setattr(api_main, "run_agent", fake_run_agent)
     monkeypatch.setattr(api_main.settings, "api_key", API_KEY)
     monkeypatch.setattr(api_main, "submission_limiter", api_main.SubmissionRateLimiter())
+    monkeypatch.setattr(api_main, "guest_quotas", api_main.GuestQuotas())
     with TestClient(api_main.app) as test_client:
         yield test_client
 
