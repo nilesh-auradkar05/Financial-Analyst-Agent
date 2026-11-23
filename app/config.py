@@ -175,6 +175,7 @@ class TavilySettings(BaseSettings):
 
     Environment Variables:
            TAVILY_API_KEY: API KEY FOR TAVILY SEARCH API
+           TAVILY_ALLOWED_DOMAINS: JSON list of news domains kept (subdomains included)
     """
 
     model_config = SettingsConfigDict(
@@ -210,6 +211,20 @@ class TavilySettings(BaseSettings):
     min_content_chars: int = Field(
         default=80,
         description="Drop results whose cleaned content is shorter than this",
+    )
+
+    # Temporary list the owner edits; an empty list drops every article (SPEC 11.4).
+    allowed_domains: list[str] = Field(
+        default=[
+            "reuters.com", "bloomberg.com", "wsj.com", "ft.com", "cnbc.com",
+            "marketwatch.com", "barrons.com", "finance.yahoo.com", "investors.com",
+            "seekingalpha.com", "fool.com", "forbes.com", "benzinga.com",
+            "morningstar.com", "nasdaq.com", "apnews.com", "businesswire.com",
+            "prnewswire.com", "globenewswire.com", "sec.gov", "trefis.com",
+            "tradingview.com", "marketbeat.com", "macrumors.com", "investopedia.com",
+            "gurufocus.com", "247wallst.com",
+        ],
+        description="News domains kept after a search; the search is limited to them too",
     )
 
 

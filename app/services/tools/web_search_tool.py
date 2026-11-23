@@ -153,6 +153,7 @@ async def search_company_news(
             "max_results": max_results,
             "topic": settings.tavily.topic,
             "search_depth": settings.tavily.search_depth,
+            "include_domains": settings.tavily.allowed_domains,
         }
         if settings.tavily.topic == "news":
             search_kwargs["days"] = settings.tavily.news_recency_days

@@ -113,9 +113,10 @@ class AgentState(TypedDict, total=False):
     revision_failed: bool
 
     # Metadata Fields
-    # Reducers: the evidence nodes run in parallel and all write these two keys.
+    # Reducers: the evidence nodes run in parallel and all write these keys.
     current_step: Annotated[str, _last_write]
     errors: Annotated[list[dict], operator.add]
+    guardrail_events: Annotated[list[dict], operator.add]
     started_at: str
     completed_at: str
     execution_time_ms: float
@@ -154,6 +155,7 @@ def create_initial_state(
         drafts=[],
         current_step=AgentStep.RESEARCH_NEWS.value,
         errors=[],
+        guardrail_events=[],
         started_at=datetime.now(timezone.utc).isoformat(),
     )
 

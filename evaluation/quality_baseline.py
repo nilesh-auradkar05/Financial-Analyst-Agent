@@ -27,6 +27,7 @@ from app.agents.graph import REPLAY_AGENT, create_agent
 from app.agents.state import AgentState, create_initial_state, has_fatal_error
 from app.config import settings
 from app.dataops.replay import state_from_evidence_records
+from app.guardrails.output import DISCLAIMER
 from app.llm.provider import MODEL_PRESETS, _model_family
 from app.verification.grounding import GROUNDING_EVAL_VERSION, evaluate_memo_grounding
 from dataops.evidence_release import SnapshotRecord
@@ -154,7 +155,7 @@ def _score_final_state(
     checker: str,
     min_similarity: float,
 ) -> dict:
-    memo = final.get("investment_memo", "") or ""
+    memo = (final.get("investment_memo", "") or "").removesuffix("\n\n" + DISCLAIMER)
     registry = final.get("citation_evidence", []) or []
     errors = final.get("errors", []) or []
 

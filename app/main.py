@@ -75,6 +75,7 @@ from app.models import (
     CitationResponse,
     ErrorDetail,
     ErrorResponse,
+    GuardrailEventResponse,
     HealthResponse,
     InfoResponse,
     IngestionRequest,
@@ -686,6 +687,7 @@ def _format_response(state: AgentState) -> AnalysisResponse:
                 for claim in verification.get("claims", [])
             ],
         ) if verification else None,
+        guardrail_events=[GuardrailEventResponse(**event) for event in state.get("guardrail_events", [])],
         errors=errors,
         missing=missing,
         filing_chunk_count=len(state.get("filing_chunks") or []),
@@ -774,7 +776,7 @@ async def ingest_filing(request: IngestionRequest, _principal: str = Depends(_li
 
 @app.get("/ingest/{ticker}", tags=["Ingestion"], response_model=IngestionStatusResponse, responses={code: ERROR_RESPONSES[code] for code in (401, 422, 503)})
 async def check_ingestion(
-    ticker: Annotated[str, ApiPath(pattern=r"^[A-Za-z]{1,5}(?:\.[A-Za-z])?$")],
+    ticker: Annotated[str, ApiPath(pattern=r"^[A-Za-z]{1,6}(?:\.[A-Za-z])?$")],
     _principal: str = Depends(_authenticate),
     store: RetrievalStore = Depends(_get_store),
 ):

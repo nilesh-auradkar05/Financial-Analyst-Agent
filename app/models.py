@@ -9,7 +9,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-TICKER_PATTERN = r"^[A-Z]{1,5}(?:\.[A-Z])?$"
+TICKER_PATTERN = r"^[A-Z]{1,6}(?:\.[A-Z])?$"
 
 # ENUMS
 
@@ -57,7 +57,7 @@ class AnalysisRequest(BaseModel):
     ticker: str = Field(
         ...,
         min_length=1,
-        max_length=6,
+        max_length=8,
         pattern=TICKER_PATTERN,
         description="Stock ticker symbol (eg: 'AAPL', 'TSLA')",
         examples=["AAPL", "TSLA"],
@@ -90,9 +90,9 @@ class AnalysisRequest(BaseModel):
 
     @field_validator("company_name")
     @classmethod
-    def reject_control_characters(cls, value: Optional[str]) -> Optional[str]:
-        if value is not None and any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value):
-            raise ValueError("company_name must not contain control characters")
+    def require_printable_ascii(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and any(not 0x20 <= ord(char) <= 0x7E for char in value):
+            raise ValueError("company_name must be printable ASCII")
         return value
 
 class IngestionRequest(BaseModel):
@@ -106,7 +106,7 @@ class IngestionRequest(BaseModel):
     ticker: str = Field(
         ...,
         min_length=1,
-        max_length=6,
+        max_length=8,
         pattern=TICKER_PATTERN,
         description="Stock ticker symbol",
     )
@@ -184,6 +184,14 @@ class VerificationClaimResponse(BaseModel):
     missing_citation: bool = False
     reason: Optional[str] = None
 
+class GuardrailEventResponse(BaseModel):
+    """One guardrail decision; never carries the removed or redacted text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    detail: Optional[str] = None
+
 class VerificationResponse(BaseModel):
     """Memo grounding and citation coverage summary."""
 
@@ -257,6 +265,7 @@ class AnalysisResponse(BaseModel):
     news_articles: list[NewsArticleResponse] = Field(default_factory=list)
     citations: list[CitationResponse] = Field(default_factory=list)
     verification: Optional[VerificationResponse] = None
+    guardrail_events: list[GuardrailEventResponse] = Field(default_factory=list)
 
     # Errors (for partial failures)
     errors: list[ErrorDetail] = Field(default_factory=list)
