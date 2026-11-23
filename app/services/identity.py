@@ -21,6 +21,7 @@ class UnauthorizedError(Exception):
 class Principal:
     customer_id: str
     role: str
+    ip_hash: str | None = None
 
 
 def authenticate(
@@ -65,4 +66,8 @@ def _verify_token(token: str, issuers: list[JwtIssuer]) -> Principal:
         or role not in ROLES
     ):
         raise UnauthorizedError
-    return Principal(customer_id=subject, role=role)
+    # The guest quota key: the salted IP hash the BFF signs in (ADR-0010 amendment).
+    ip_hash = claims.get("ip_hash") if role == "guest" else None
+    if role == "guest" and (not isinstance(ip_hash, str) or not ip_hash):
+        raise UnauthorizedError
+    return Principal(customer_id=subject, role=role, ip_hash=ip_hash)

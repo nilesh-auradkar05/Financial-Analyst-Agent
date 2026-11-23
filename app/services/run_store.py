@@ -93,6 +93,10 @@ class FileBackedRunStore:
             self._write_all(data)
             return record, True
 
+    def find_idempotent_run(self, principal: str, idempotency_key: str) -> Optional[RunRecord]:
+        identity = f"{principal}:{idempotency_key}"
+        return next((run for run in self.list_runs() if run.idempotency_identity == identity), None)
+
     def mark_running(self, job_id: str) -> RunRecord:
         return self._update(job_id, status="running")
 

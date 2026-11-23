@@ -35,11 +35,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Any, NoReturn, Optional
 
@@ -130,6 +131,10 @@ key_auth = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 
+GUEST_IP_DAILY_CAP = 3
+GUEST_GLOBAL_DAILY_CAP = 20
+
+
 class SubmissionRateLimiter:
     """Single-process sliding-window submission limiter with stale-key cleanup."""
 
@@ -159,6 +164,43 @@ class SubmissionRateLimiter:
 
 
 submission_limiter = SubmissionRateLimiter()
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class GuestQuotas:
+    """Guest caps (ADR-0010 amendment §2): one live job per session, per-IP-hash and global jobs per UTC day."""
+
+    def __init__(self) -> None:
+        self._day: date | None = None
+        self._per_ip: Counter[str | None] = Counter()
+        self._global = 0
+
+    def admit(self, principal: Principal, runs: list[RunRecord], now: datetime) -> None:
+        """Refuse with 429 if any cap is full; otherwise count the job. Never awaits, so it is atomic per process."""
+        # ponytail: in-process counters, one process only; they move to DynamoDB atomic counters in S7.7 (ADR-0015).
+        if now.date() != self._day:
+            self._day, self._per_ip, self._global = now.date(), Counter(), 0
+        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        if any(run.customer_id == principal.customer_id and run.status in ("pending", "running") for run in runs):
+            self._refuse(60)
+        if self._per_ip[principal.ip_hash] >= GUEST_IP_DAILY_CAP or self._global >= GUEST_GLOBAL_DAILY_CAP:
+            self._refuse(math.ceil((next_midnight - now).total_seconds()))
+        self._per_ip[principal.ip_hash] += 1
+        self._global += 1
+
+    @staticmethod
+    def _refuse(retry_after: int) -> NoReturn:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "quota_exceeded", "message": "Guest quota exceeded. Try again later.", "error_id": _new_error_id()},
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+guest_quotas = GuestQuotas()
 
 def _get_store() -> RetrievalStore:
     """FastAPI dependency. Override in tests via app.dependency_overrides"""
@@ -229,6 +271,11 @@ async def _require_admin(principal: Principal = Depends(_authenticate)) -> None:
 async def _limit_submission(principal: Principal = Depends(_authenticate)) -> Principal:
     submission_limiter.check(principal.customer_id)
     return principal
+
+
+def _admit_guest(principal: Principal) -> None:
+    if principal.role == "guest":
+        guest_quotas.admit(principal, run_store.list_runs(), utc_now())
 
 
 def _can_read(principal: Principal, record: RunRecord) -> bool:
@@ -405,12 +452,13 @@ async def stats(store: RetrievalStore = Depends(_get_store)):
 
 
 @app.post("/analyze", response_model=AnalysisResponse, tags=["Analysis"], responses={code: ERROR_RESPONSES[code] for code in (401, 422, 429, 503)})
-async def analyze(request: AnalysisRequest, http_request: Request, _principal: Principal = Depends(_limit_submission)):
+async def analyze(request: AnalysisRequest, http_request: Request, principal: Principal = Depends(_limit_submission)):
     """
     Run synchronous stock analysis.
 
     Blocks until analysis is complete.
     """
+    _admit_guest(principal)
     ticker = request.ticker.upper()
     logger.info(f"Starting sync analysis for {ticker}")
 
@@ -455,17 +503,20 @@ async def analyze_async(
     Returns immediately with job_id. Poll /jobs/{job_id} for status.
     """
     with track_request("POST", "/analyze/async"):
+        key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest() if idempotency_key else None
+        if not (key_hash and run_store.find_idempotent_run(principal.customer_id, key_hash)):
+            _admit_guest(principal)
         ticker = request.ticker.upper()
         job_id = str(uuid.uuid4())
 
         # Create job
         created = True
-        if idempotency_key:
+        if key_hash:
             fingerprint = hashlib.sha256(json.dumps(request.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             try:
                 record, created = run_store.create_idempotent_run(
                     job_id, ticker, principal=principal.customer_id,
-                    idempotency_key=hashlib.sha256(idempotency_key.encode()).hexdigest(),
+                    idempotency_key=key_hash,
                     request_fingerprint=fingerprint, company_name=request.company_name,
                     request_id=http_request.state.request_id, trace_id=http_request.state.trace_id,
                 )

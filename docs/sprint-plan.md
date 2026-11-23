@@ -815,7 +815,7 @@ Trace: ADR-0010 (+ 2026-10-11 amendment); test-plan §12 S7.2 rows (API auth, Ra
 Scope (owner 2026-11-23): slices in order, each with its own red/feat commits — (a) API identity: issuer allowlist (PyJWT, ES256), roles, `customer_id` on runs, per-customer reads, admin-only routes; (b) BFF guest session: Turnstile, encrypted session cookie, ES256 guest token, the browser never holds a token; (c) guest quotas. Warm-up moves to S7.9; stream and cancel isolation lands with S7.7.
 Tests:  U token validation · I development issuer + BFF session; every listed §20 row (local)
 Regression: R1 R2 R3 R5
-Result: Pending.
+Result: DONE (2026-11-23), branch `task/s7-2`. (a) API identity f3500ac: issuer allowlist (PyJWT, ES256 only; iss, aud, exp, sub, role required), `API_KEY` as the development issuer (admin), admin-only `/stats`, `/metrics`, `POST /ingest`, `GET /ingest/{ticker}`, jobs, runs list, idempotency and rate limit per customer, pre-S7.2 runs admin-only. (b) BFF guest session 37e37ff: Turnstile (fails closed), AES-256-GCM session cookie (24 h), 15-minute ES256 guest token minted server-side, the browser never holds a token and the BFF never sends `API_KEY`; the alpha_jobs cookie retired. (c) guest quotas: one live job per session (Retry-After 60 s), 3 per IP hash and 20 across guests per UTC day (Retry-After to the next UTC midnight), refusals and idempotent replays spend nothing, a guest token without `ip_hash` is 401; in-process counters until S7.7. Moved by owner decision: Warm-up and the example-memo clause to S7.9, stream/cancel isolation to S7.7. Not exercised in a real browser.
 ```
 
 ```text
