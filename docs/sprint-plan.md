@@ -791,7 +791,7 @@ Trace: SPEC §12 S6, §4 judge ladder (amended 2026-11-21); Gate D; ADR-0009 ame
 Method (owner 2026-11-21, `tasks/s6-decisions.md` #55–#66): DeepEval FaithfulnessMetric only (RAGAS deferred: it does not import here; relevancy metrics dropped: no labelled set), per cited claim with its full cited evidence, judged by Claude Opus 5.5 on Foundry (`opus-5-5-judge`), single judge tier enforced; validated against the 60 owner-labelled S6.3 claims.
 Tests:  U claim scoring, single-tier refusal, validation κ and refusals, baseline result and lineage, judge ladder for Opus 5.5 (all with faithful fakes) · Q two validation runs, then the faithfulness baseline on 20261120T225248Z-50a99c5-0dad
 Regression: R1 R2 R3 R5
-Done: two independent validation runs each at weighted κ ≥ 0.85 → Gate D recorded on DeepEval faithfulness plus the eval-replay grounding gate; otherwise the faithfulness baseline is recorded as an unvalidated candidate and Gate D waits for the S6.3 fresh-sample re-measure. Result: Pending.
+Done: two independent validation runs each at weighted κ ≥ 0.85 → Gate D recorded on DeepEval faithfulness plus the eval-replay grounding gate; otherwise the faithfulness baseline is recorded as an unvalidated candidate and Gate D waits for the S6.3 fresh-sample re-measure. Result: NOT VALIDATED (2026-11-21, weighted κ 0.325 / 0.316; see Validation below). The faithfulness baseline `score` on the 347 baseline claims is held by owner decision 2026-11-22 (`tasks/s6-decisions.md` #68); Gate D waits for the S6.3 fresh-sample re-measure. S7.1 opens.
 Validation 2026-11-21 (clean tree b3dd6a2; Foundry `opus-5-5-judge`, Bedrock tier blanked, effort high, temperature null; smoke #66 first: claim 10-f394883f65aa, 101,838 evidence chars, 35,557 input + 3,729 output tokens, 31 s): NOT VALIDATED. Run 1 weighted κ 0.325 (unweighted 0.399), run 2 0.316 (0.362), 60 claims, 0 errors each (`evaluation/results/s6_5_faithfulness_validation_{1,2}.json`). The judge never supports a claim the owner rejects (weighted cell 0.0 in run 1, 1.2 in run 2) but rejects 20 / 21 owner-supported claims, 18 in both runs; 5 verdicts flip between runs. The rejections are mostly hedged valuation or framing sentences (e.g. 1-39711a368ff6 "At 37.3x earnings, the stock is not cheap", 12-1507d158d4b1 "trades at a premium") and risk-factor paraphrases (14-913be42877ae). Settings were fixed before the run (#64) and are not re-tuned on these 60 claims (#31). Per #57 Gate D waits for the S6.3 fresh-sample re-measure; the faithfulness baseline score is held for the owner (#67).
 ```
 
@@ -802,16 +802,16 @@ S6.6 (prompt optimization on holdout, GEPA) was removed by owner decision 2026-1
 ```text
 S7.1 — Guardrails
 Feature: untrusted content cannot steer the memo, and output policy holds on every returned memo.
-Trace: SPEC §11.4; test-plan §12
-Tests:  U input schema, framing, output screen · E2E adversarial fixture in CI (injection, price target, guaranteed return)
+Trace: SPEC §11.4; test-plan §12 S7.1 rows (owner decisions 2026-11-22: no guardrails package; 6-letter tickers; strictly printable ASCII company names; temporary news-domain allow-list)
+Tests:  U input schema, framing, allow-list, output screen (price target, guaranteed return, MNPI, uncited numeric, PII, disclaimer) · E2E adversarial fixture in CI
 Regression: R1 R2 R3 R5
-Result: Pending.
+Result: DONE (2026-11-23), branch `task/s7-1`. Deterministic guardrails in `app/guardrails/` (no package, no model call): tickers 1–6 letters, printable-ASCII company names; DATA-framed prompts with delimiters neutralized in every untrusted field (`prompt_version()` changes); 27-domain news allow-list (`TAVILY_ALLOWED_DOMAINS`, fails closed, live fetches only); PII in live news redacted at fetch (owner 2026-11-22); terminal `screen_output` node (price target only when unsupported, guaranteed return, MNPI, uncited numbers with the recommendation sentence exempt, PII), re-grade, fixed disclaimer; `guardrail_events` in state and response. Oracle 19b36f1 (PII row amended 2026-11-22); red 5d15656 plus the PII amendment. Verification: full pytest 1641 passed, 7 skipped; replay (no network) 138 passed; ruff clean; mypy clean on tracked files; governance 5/5. Baselines recorded before S7.1 no longer match the live prompt: the next paired quality comparison needs a new owner-run baseline. Follow-up: a provider-supplied `company_name` sits outside the DATA block.
 ```
 
 ```text
 S7.2 — Identity, roles and guest quotas
 Feature: guests and the admin are authenticated and isolated; quotas hold at admission.
-Trace: ADR-0010 (+ 2026-10-11 amendment); test-plan §20 Issuer allowlist, Customer isolation, Guest access, Guest quotas, Warm-up
+Trace: ADR-0010 (+ 2026-10-11 amendment); test-plan §12 S7.2 rows (API auth, Rate limit, Idempotency); test-plan §20 Issuer allowlist, Customer isolation, Guest access, Guest quotas, Warm-up
 Tests:  U token validation · I development issuer + BFF session; every listed §20 row (local)
 Regression: R1 R2 R3 R5
 Result: Pending.
