@@ -71,12 +71,8 @@ def pytest_collection_modifyitems(config, items):
 def fresh_filing_cache(monkeypatch):
     """Every test gets an empty filing result cache: the process-wide one would otherwise carry a
     filings step's result from one test to the next (test-plan §13, Filing result cache)."""
-    try:
-        from app.cache import filing_results
-    except ModuleNotFoundError:
-        # Red phase only (FILINGS-LATENCY): the module does not exist yet, so only the tests that
-        # import it fail. Reduce this to the plain import once the module lands.
-        return
+    from app.cache import filing_results
+
     monkeypatch.setattr(filing_results, "FILING_CACHE", filing_results.FilingResultCache())
 
 
