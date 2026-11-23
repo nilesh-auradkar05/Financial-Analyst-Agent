@@ -5,13 +5,43 @@ import { useRouter } from "next/navigation";
 import { isTicker, normalizeTicker } from "@/lib/validate";
 import type { JobAcceptedResponse } from "@/lib/api-types";
 
-/** Header search + "New analysis": validates a ticker, POSTs /api/analyze, opens /workspace?job=<id>. */
-export function SearchNew() {
+const TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+type TurnstileApi = {
+  render(container: HTMLElement, options: { sitekey: string; appearance: "interaction-only"; callback(token: string): void; "error-callback"(): void }): string;
+  remove(widgetId: string): void;
+};
+
+/** Resolves with Cloudflare's Turnstile API; the script is added from our own nonced bundle, which `strict-dynamic` trusts. */
+function loadTurnstile(): Promise<TurnstileApi> {
+  const ready = () => (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+  return new Promise((resolve, reject) => {
+    const api = ready();
+    if (api) return resolve(api);
+    const script = document.createElement("script");
+    script.src = TURNSTILE_SCRIPT;
+    script.async = true;
+    script.onload = () => {
+      const loaded = ready();
+      return loaded ? resolve(loaded) : reject(new Error("turnstile unavailable"));
+    };
+    script.onerror = () => reject(new Error("turnstile unavailable"));
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Header search + "New analysis": validates a ticker, POSTs /api/analyze, opens /workspace?job=<id>.
+ * A visitor without a session (401) first passes a Turnstile challenge, which `/api/session` turns into the session cookie.
+ */
+export function SearchNew({ siteKey }: { siteKey: string | undefined }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState(false);
+  const challengeRef = useRef<HTMLDivElement>(null);
   const errId = useId();
 
   useEffect(() => {
@@ -25,6 +55,46 @@ export function SearchNew() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    const container = challengeRef.current;
+    if (!challenge || !container || !siteKey) return;
+    let widgetId: string | undefined;
+    let cancelled = false;
+    const fail = () => {
+      setChallenge(false);
+      setBusy(false);
+      setError("Could not verify your browser. Try again.");
+    };
+    loadTurnstile()
+      .then((turnstile) => {
+        if (cancelled) return;
+        widgetId = turnstile.render(container, {
+          sitekey: siteKey,
+          appearance: "interaction-only",
+          callback: (token) => {
+            fetch("/api/session", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ turnstile_token: token }),
+            })
+              .then((res) => {
+                if (!res.ok) return fail();
+                setChallenge(false);
+                void submit();
+              })
+              .catch(fail);
+          },
+          "error-callback": fail,
+        });
+      })
+      .catch(fail);
+    return () => {
+      cancelled = true;
+      if (widgetId) (window as unknown as { turnstile: TurnstileApi }).turnstile.remove(widgetId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- submit is re-created each render; only a new challenge should re-run this.
+  }, [challenge, siteKey]);
 
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -45,6 +115,10 @@ export function SearchNew() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ticker: normalizeTicker(value) }),
       });
+      if (res.status === 401 && siteKey && !challenge) {
+        setChallenge(true);
+        return;
+      }
       if (res.status === 400) {
         setError("That ticker was rejected as invalid.");
       } else if (!res.ok) {
@@ -91,6 +165,7 @@ export function SearchNew() {
         </svg>
         New analysis
       </button>
+      {challenge && <div ref={challengeRef} className="absolute right-0 top-full z-40 mt-2" />}
       {error && (
         <p
           id={errId}

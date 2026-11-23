@@ -26,15 +26,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const requested = Array.isArray(raw) ? raw[0] : raw;
   const status = STATUSES.find((s) => s === requested) ?? "";
 
-  // This browser's runs that still exist, else the server's remaining runs, else the design sample.
-  const { runs, own } = await availableRuns();
+  // This guest's runs that still exist (the API scopes them), else the design sample.
+  const { runs } = await availableRuns();
   const mine = runs.map(toRunRow);
   const sample = mine.length === 0;
   const all = sample ? RUNS : mine;
   const rows = status ? all.filter((r) => r.status === status) : all;
   const summary = sample
     ? { ...SUMMARY, outcomes: OUTCOMES, bars: GROUNDED_BARS, gateTop: 4 }
-    : { ...summarize(mine, own), gateTop: 50 * (1 - GATE) };
+    : { ...summarize(mine), gateTop: 50 * (1 - GATE) };
   const totalW = summary.outcomes.reduce((a, o) => a + o.weight, 0);
 
   return (
@@ -52,11 +52,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                   Sample data · runs you start from this browser will appear here
                 </span>
               ) : (
-                own ? (
                 "Analyses started from this browser."
-              ) : (
-                "None of your runs are stored on this server, so these are its most recent runs."
-              )
               )}
             </p>
           </div>

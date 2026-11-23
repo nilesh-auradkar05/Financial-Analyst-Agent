@@ -19,6 +19,8 @@ services:
       API_KEY: ${API_KEY:?Set a non-empty API_KEY in .env}
       VECTOR_BACKEND: ${VECTOR_BACKEND:-opensearch}
       OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      # JSON list of {issuer, audience, public_key_pem}; the guest entry holds the public half of GUEST_SIGNING_KEY.
+      JWT_ISSUERS: ${JWT_ISSUERS:?Set JWT_ISSUERS in .env (see README, guest sessions)}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       SEC_USER_AGENT: ${SEC_USER_AGENT:?Set a real SEC_USER_AGENT with your contact details}
       LANGSMITH_TRACING:
@@ -80,7 +82,14 @@ services:
       - "127.0.0.1:3001:3000"
     environment:
       ALPHA_API_URL: http://api:8000
-      API_KEY: ${API_KEY:?Set a non-empty API_KEY in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env (base64 of 32 random bytes)}
+      GUEST_SIGNING_KEY: ${GUEST_SIGNING_KEY:?Set GUEST_SIGNING_KEY in .env (P-256 private key, PKCS#8 PEM)}
+      GUEST_ISSUER: ${GUEST_ISSUER:?Set GUEST_ISSUER in .env}
+      GUEST_AUDIENCE: ${GUEST_AUDIENCE:?Set GUEST_AUDIENCE in .env}
+      GUEST_IP_SALT: ${GUEST_IP_SALT:?Set GUEST_IP_SALT in .env}
+      # Defaults are Cloudflare's documented always-pass TEST keys: local development only, never a real deployment.
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
     init: true
     security_opt:
       - no-new-privileges:true

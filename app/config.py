@@ -5,7 +5,15 @@ This file contains the configuration for the Financial Analyst Agent.
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 """ PATHS CONFIGURATION """
@@ -308,6 +316,16 @@ class RetrySettings(BaseSettings):
     )
 
 
+class JwtIssuer(BaseModel):
+    """An allow-listed token issuer: tokens are verified with its key and audience only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    issuer: str
+    audience: str
+    public_key_pem: str
+
+
 """ MAIN Settings Class"""
 
 
@@ -359,6 +377,10 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="API_KEY",
         description="Shared API key required by protected HTTP routes.",
+    )
+    jwt_issuers: list[JwtIssuer] = Field(
+        default_factory=list,
+        description="Allow-listed JWT issuers (JSON list); empty refuses every token.",
     )
     api_rate_limit: int = Field(default=10, ge=1, description="Mutating requests per window.")
     api_rate_window_seconds: int = Field(default=60, ge=1)

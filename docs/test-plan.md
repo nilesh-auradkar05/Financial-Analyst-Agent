@@ -470,7 +470,7 @@ Traces to SPEC "Run telemetry contract — 2026-10-07" (`GET /jobs`).
 |---|---|
 | List runs | `GET /jobs` returns summaries newest first with grounding rates and latency, honours `limit`, rejects out-of-range `limit`, requires auth, and never includes memo text |
 | Own runs that still exist | When some of this browser's remembered runs still exist, exactly those are shown, newest first; remembered runs the server lost are dropped |
-| Nothing of mine survives | When none of the browser's runs exist (or it has none), the server's available runs are shown and marked as not the viewer's own |
+| Nothing of mine survives | When none of the browser's runs exist (or it has none): an `admin` is shown the server's available runs, marked as not the viewer's own; a guest is shown sample data, because a guest's `GET /jobs` returns only that guest's runs (ADR-0010 amendment; owner decision 2026-11-23, S7.2) |
 | Nothing exists anywhere | No available runs → sample data, never an error |
 | Run store persistence | Compose mounts a named volume at the run-store directory |
 
@@ -490,7 +490,7 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | Cache versioning (*local*) | Changing embedding fingerprint, index release, retrieval config, prompt, model or verifier policy each misses the cache; query-embedding reuse is exact only |
 | Single-flight (*local*) | N concurrent requests with the same snapshot produce one generation; all jobs link the same artifact hash |
 | Cache bypass (*local*) | With cache reads and writes failing, jobs complete cold and quotas still hold |
-| Customer isolation (*local*) | A caller cannot read, stream, cancel or reuse an idempotency key of another customer's job; `analyst` sees only own runs in `GET /jobs`; `admin` sees all |
+| Customer isolation (*local*) | A caller cannot read, stream, cancel or reuse an idempotency key of another customer's job; `analyst` sees only own runs in `GET /jobs`; `admin` sees all. S7.2 covers the routes that exist (job read, `GET /jobs`, idempotency keys); runs stored before S7.2 carry no customer and are visible to `admin` only. The stream and cancel routes must meet this row when S7.7 builds them (owner decision 2026-11-23) |
 | Issuer allowlist (*local*) | Tokens from an issuer outside the allowlist, with a wrong audience or expired, are refused; the browser never receives an access token |
 | LLM fallback (amended 2026-10-17) | With the Foundry breaker forced open, a new draft attempt runs on Bedrock DeepSeek V3.2; partial drafts are never spliced; no qualified model before the deadline ends in `failed` (`provider_unavailable`) |
 | LLM fallback quality (amended 2026-10-17) | On the frozen eval set, Bedrock DeepSeek V3.2 drafts stay within the paired tolerance of Foundry DeepSeek-V4-Flash before V3.2 is trusted as the draft fallback; Claude Opus 4.6 on Bedrock stays within the paired tolerance of Opus 4.6 on Foundry before the judge fallback is trusted (judge Opus 4.6 since 2026-11-15, JUDGE-OPUS) |
@@ -505,8 +505,8 @@ Traces to SPEC v1.4 §§3, 4, 11.1 (Gate E), 11.3 and the listed ADRs. Cases mar
 | OpenSearch store contract (*local*) | `OpenSearchVectorStore` passes the shared `RetrievalStore` contract suite against a local OpenSearch container; no client object escapes the retrieval boundary (ADR-0014) |
 | Awake cap (*local*) | With today's ledger at the cap, a job needing retrieval is refused with 429, `Retry-After` at the next UTC day and reason `search_awake_cap`; an exact memo-cache hit is still served; admitted jobs finish |
 | Guest access (*local*) | A Turnstile-verified visitor gets a guest session; a guest token cannot read, stream or cancel another guest's job and is refused on admin routes; a token from an issuer outside the allowlist is refused |
-| Guest quotas (*local*) | The second live job in one guest session, the fourth from one IP hash in a UTC day and the 21st across all guests are refused with 429 and `Retry-After`; example-memo replays still succeed |
-| Warm-up (*local*) | `POST /warm` extends the wake ledger, is refused once the cap or the IP warm-up quota is reached, and never starts a job |
+| Guest quotas (*local*) | The second live job in one guest session, the fourth from one IP hash in a UTC day and the 21st across all guests are refused with 429 and `Retry-After` (the next UTC midnight for the daily caps); example-memo replays still succeed (that clause is tested in S7.9 with the memo cache); a guest token without an `ip_hash` claim (the salted IP hash the BFF signs in) is refused with 401 |
+| Warm-up (*local*, S7.9: built with the wake ledger, owner decision 2026-11-23) | `POST /warm` extends the wake ledger, is refused once the cap or the IP warm-up quota is reached, and never starts a job |
 | Stream segment (*local*) | An event stream ends after 5 minutes or on client disconnect; reconnecting with `Last-Event-ID` resumes without loss or duplicates |
 | Signed edge | A request to the function URL without a valid SigV4 signature is refused before the function runs; the Worker's CPU time per request stays under 10 ms |
 | Concurrency ceiling | With the worker at its reserved concurrency, extra jobs wait in the queue and complete later; none fail for throttling |

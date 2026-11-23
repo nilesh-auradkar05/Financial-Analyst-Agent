@@ -1,5 +1,6 @@
 import "server-only";
 import type { JobAcceptedResponse, JobPollResponse, RunSummary } from "./api-types";
+import { currentSession, mintGuestToken } from "./session.server";
 
 const BASE = (process.env.ALPHA_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 const TIMEOUT_MS = 15_000;
@@ -18,8 +19,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     const headers = new Headers(init?.headers);
-    const apiKey = process.env.API_KEY?.trim();
-    if (apiKey) headers.set("Authorization", `Bearer ${apiKey}`);
+    const session = await currentSession();
+    const { GUEST_SIGNING_KEY: privateKeyPem, GUEST_ISSUER: issuer, GUEST_AUDIENCE: audience } = process.env;
+    if (session && privateKeyPem && issuer && audience) {
+      headers.set("Authorization", `Bearer ${mintGuestToken(session, { privateKeyPem, issuer, audience })}`);
+    }
     res = await fetch(`${BASE}${path}`, {
       ...init,
       headers,

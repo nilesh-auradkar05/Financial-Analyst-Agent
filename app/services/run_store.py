@@ -20,6 +20,7 @@ class RunRecord:
     company_name: Optional[str] = None
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+    customer_id: Optional[str] = None
     idempotency_identity: Optional[str] = None
     request_fingerprint: Optional[str] = None
     request_id: Optional[str] = None
@@ -38,12 +39,13 @@ class FileBackedRunStore:
         if not self.path.exists():
             self._write_all({})
 
-    def create_run(self, job_id: str, ticker: str, company_name: Optional[str] = None, *, request_id: str | None = None, trace_id: str | None = None) -> RunRecord:
+    def create_run(self, job_id: str, ticker: str, company_name: Optional[str] = None, *, customer_id: str | None = None, request_id: str | None = None, trace_id: str | None = None) -> RunRecord:
         now = datetime.now(timezone.utc).isoformat()
         record = RunRecord(
             job_id=job_id,
             ticker=ticker.upper(),
             company_name=company_name,
+            customer_id=customer_id,
             request_id=request_id, trace_id=trace_id,
             status="pending",
             started_at=now,
@@ -83,12 +85,17 @@ class FileBackedRunStore:
             request_id=request_id, trace_id=trace_id,
                 status="pending",
                 started_at=datetime.now(timezone.utc).isoformat(),
+                customer_id=principal,
                 idempotency_identity=identity,
                 request_fingerprint=request_fingerprint,
             )
             data[job_id] = asdict(record)
             self._write_all(data)
             return record, True
+
+    def find_idempotent_run(self, principal: str, idempotency_key: str) -> Optional[RunRecord]:
+        identity = f"{principal}:{idempotency_key}"
+        return next((run for run in self.list_runs() if run.idempotency_identity == identity), None)
 
     def mark_running(self, job_id: str) -> RunRecord:
         return self._update(job_id, status="running")

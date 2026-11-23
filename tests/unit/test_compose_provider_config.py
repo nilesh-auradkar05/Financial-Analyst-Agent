@@ -39,6 +39,13 @@ def test_compose_preserves_provider_settings(tmp_path, values):
         "API_KEY": "dummy-key",
         "SEC_USER_AGENT": "Dummy dummy@example.invalid",
         "GRAFANA_ADMIN_PASSWORD": "dummy-grafana",
+        # Guest-session settings (S7.2, ADR-0010 amendment); dummy, non-secret values.
+        "JWT_ISSUERS": "[]",
+        "SESSION_SECRET": "dummy-session-secret",
+        "GUEST_SIGNING_KEY": "dummy-signing-key",
+        "GUEST_ISSUER": "https://example.invalid/guest",
+        "GUEST_AUDIENCE": "dummy-audience",
+        "GUEST_IP_SALT": "dummy-salt",
     }
     env_file.write_text(
         "".join(f"{key}={value}\n" for key, value in {**required, **values}.items())

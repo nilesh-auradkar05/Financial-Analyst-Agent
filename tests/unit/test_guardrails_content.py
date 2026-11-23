@@ -182,7 +182,6 @@ def test_the_framing_is_part_of_the_templates_so_the_prompt_version_changes():
     """12 'Untrusted-content framing': the framing text is part of both prompt templates, so
     prompt_version() differs from its value before S7.1 (cd11b22a67eb23f2 at 19b36f1)."""
     from app.guardrails.content import DATA_CLOSE, DATA_OPEN, UNTRUSTED_FRAMING
-
     from evaluation.registry import prompt_version
 
     for template in (graph.DRAFT_PROMPT_TEMPLATE, graph.REVISE_PROMPT_TEMPLATE):

@@ -48,12 +48,12 @@ function meanSd(xs: number[]): { value: string; pm: string } {
 }
 
 /** Summary tiles computed from real rows (newest first). Bars are oldest → newest, 50px tall at 1.0. */
-export function summarize(rows: readonly RunRow[], own = true) {
+export function summarize(rows: readonly RunRow[]) {
   const nums = (k: "grounded" | "coverage") => rows.flatMap((r) => (r[k] == null ? [] : [r[k]]));
   return {
     groundedClaimRate: meanSd(nums("grounded")),
     citationCoverage: meanSd(nums("coverage")),
-    tag: `${rows.length} run${rows.length === 1 ? "" : "s"} · ${own ? "this browser" : "this server"}`,
+    tag: `${rows.length} run${rows.length === 1 ? "" : "s"} · this browser`,
     outcomes: Object.entries(COLOR)
       .map(([status, color]) => ({ status, color, weight: rows.filter((r) => r.status === status).length }))
       .filter((o) => o.weight > 0),
