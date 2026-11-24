@@ -148,9 +148,7 @@ def test_the_template_constant_is_what_the_report_is_built_from() -> None:
     assert getattr(graph, "FILING_TOPIC_QUERIES") == TEMPLATES
 
 
-def test_each_ticker_and_topic_has_a_case_with_the_apps_query(
-    store: FakeRetrievalStore
-) -> None:
+def test_each_ticker_and_topic_has_a_case_with_the_apps_query(store: FakeRetrievalStore) -> None:
     """test-plan §25: App filings workload report (the app's four topic queries for each given
     ticker, company name resolved as the app does: the indexed name of the ticker's top dense hit,
     else the ticker)."""
@@ -171,7 +169,7 @@ def test_each_ticker_and_topic_has_a_case_with_the_apps_query(
 
 
 def test_each_pool_reports_its_top_three_with_section_and_rerank_score(
-    store: FakeRetrievalStore
+    store: FakeRetrievalStore,
 ) -> None:
     """test-plan §25: App filings workload report (per pool, the top 3: chunk id, section, rerank
     score, from `search_reranked(candidates="dense", top_k=3)` at pool 15 and pool 50)."""
@@ -197,9 +195,7 @@ def test_each_pool_reports_its_top_three_with_section_and_rerank_score(
     ), "precondition: the two pools disagree somewhere"
 
 
-def test_each_pool_carries_the_trace_of_its_search(
-    store: FakeRetrievalStore
-) -> None:
+def test_each_pool_carries_the_trace_of_its_search(store: FakeRetrievalStore) -> None:
     """test-plan §25: App filings workload report (both pools' traces: the candidates at that
     pool, and the pool requested)."""
     report = _workload().run_app_filings_workload(
@@ -216,9 +212,7 @@ def test_each_pool_carries_the_trace_of_its_search(
     assert len(aapl["50"]["trace"]["candidates"]) == 23
 
 
-def test_top3_agreement_is_the_shared_chunk_ids_over_three(
-    store: FakeRetrievalStore
-) -> None:
+def test_top3_agreement_is_the_shared_chunk_ids_over_three(store: FakeRetrievalStore) -> None:
     """test-plan §25: App filings workload report (top-3 agreement = shared chunk ids / 3)."""
     report = _workload().run_app_filings_workload(
         store, TICKERS, reranker=OverlapReranker(), collection=COLLECTION
@@ -231,7 +225,7 @@ def test_top3_agreement_is_the_shared_chunk_ids_over_three(
 
 
 def test_the_summary_gives_the_mean_agreement_and_the_section_hit_rate_per_pool(
-    store: FakeRetrievalStore
+    store: FakeRetrievalStore,
 ) -> None:
     """test-plan §25: App filings workload report (the summary: mean agreement; per pool the share
     of top-3 chunks in the topic's declared section: overview and competition -> business, risk ->
@@ -255,9 +249,7 @@ def test_the_summary_gives_the_mean_agreement_and_the_section_hit_rate_per_pool(
     assert summary["section_hit_rate"]["50"] == pytest.approx(hit_rate["50"])
 
 
-def test_the_provenance_records_the_index_embedding_and_reranker(
-    store: FakeRetrievalStore
-) -> None:
+def test_the_provenance_records_the_index_embedding_and_reranker(store: FakeRetrievalStore) -> None:
     """test-plan §25: App filings workload report (records the index, embedding and reranker
     identity)."""
     report = _workload().run_app_filings_workload(
@@ -273,9 +265,7 @@ def test_the_provenance_records_the_index_embedding_and_reranker(
     )
 
 
-def test_the_report_is_json_without_chunk_text(
-    store: FakeRetrievalStore
-) -> None:
+def test_the_report_is_json_without_chunk_text(store: FakeRetrievalStore) -> None:
     """test-plan §25: App filings workload report (chunk ids, sections, scores and traces; no
     chunk text)."""
     report = _workload().run_app_filings_workload(
@@ -284,7 +274,9 @@ def test_the_report_is_json_without_chunk_text(
 
     text = json.dumps(report)
     assert report["cases"]
-    assert not any(point.text in text for point in store.points)
+    # The deep passages equal the app's topic queries, which the row requires in the report.
+    queries = {case["query"] for case in report["cases"]}
+    assert not any(point.text in text for point in store.points if point.text not in queries)
 
 
 def test_without_a_reranker_the_foundry_deployment_scores_and_is_recorded(
