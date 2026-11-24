@@ -544,7 +544,54 @@ Owner instruction, 2026-11-01: each sprint ships one feature, implemented and te
 Owner decision, 2026-11-23, after live runs took 285–383 s, of which the filings step was 260–350 s. A measured filings step for an indexed ticker spent 147 of 197 s waiting on the rerank pacer, which reused the embedding deployment's limits. The slice runs before S7.3 and changes nothing else in the order.
 Trace: ADR-0011 amendment 2026-11-23; SPEC §8.1 (sentiment waits only for news); test-plan §10 Sentiment follows news only, §13 Filing result cache, §25 Rerank reorders candidates and Rerank pacing (amended), §6 `dense_rerank_15` method; retrieval-benchmark §7d.
 Scope: (1) rerank paced in its own window at 45 requests and 45,000 tokens per minute (deployment: 50 and 50,000); (2) the filings step reranks 15 candidates per query, the benchmark methods keep 50; (3) per-process filing result cache, 1 h TTL, cleared on ingest of the ticker, hit/miss counters; (4) `analyze_sentiment` runs after `research_news` only, and a `freeze_snapshot` join precedes `draft_memo`; (5) the §7d run, `dense_rerank_15` vs `dense_rerank`.
-Result: (1)–(4) DONE 2026-11-23, branch `task/filings-latency`. Oracle b61900d, 16daf1e, 37cd671; red c3eff15; feat b356703 (tests unchanged since red); fixture cleanup c582cbf. The news branch is a LangGraph subgraph (`research_news → analyze_sentiment`, output limited to its own keys), because a sibling edge would wait for the slowest node of the superstep; `run_agent` streams subgraphs and does not report `news_branch` or `freeze_snapshot`. Verification: full pytest green via H13 (tests/unit 1440 passed); ruff clean; mypy clean on tracked files; governance 5/5. Live, rebuilt API, NVDA indexed: first run 78.9 s (filings 36.7 s, sentiment done 28 s before filings; was 285 s with filings 260 s), repeat 24.3 s (filings 0.03 s, cache hit); `cache_events_total{stage="filings"}` miss 1, hit 1. (5) Pending: owner-run on the AOSS collection. Follow-up: `evaluation/latency_baseline.py` attributes per-node time from root updates, so it now sees `news_branch` instead of `research_news` and `analyze_sentiment`.
+Result: (1)–(4) DONE 2026-11-23, branch `task/filings-latency`. Oracle b61900d, 16daf1e, 37cd671; red c3eff15; feat b356703 (tests unchanged since red); fixture cleanup c582cbf. The news branch is a LangGraph subgraph (`research_news → analyze_sentiment`, output limited to its own keys), because a sibling edge would wait for the slowest node of the superstep; `run_agent` streams subgraphs and does not report `news_branch` or `freeze_snapshot`. Verification: full pytest green via H13 (tests/unit 1440 passed); ruff clean; mypy clean on tracked files; governance 5/5. Live, rebuilt API, NVDA indexed: first run 78.9 s (filings 36.7 s, sentiment done 28 s before filings; was 285 s with filings 260 s), repeat 24.3 s (filings 0.03 s, cache hit); `cache_events_total{stage="filings"}` miss 1, hit 1. (5) DONE 2026-11-23 (retrieval-benchmark §7d): `recall@10` 0.9511 → 0.8889, paired delta −0.0622, 95% CI [−0.1178, −0.0156]; owner keeps 15 and orders the FILINGS-RECALL slices below. Follow-up: `evaluation/latency_baseline.py` attributes per-node time from root updates, so it now sees `news_branch` instead of `research_news` and `analyze_sentiment`.
+
+### Authorized filings recall slices (FILINGS-RECALL, 2026-11-24)
+
+Owner decision, 2026-11-24: keep the 15-candidate pool (§7d) and recover the recall it lost, one fix per slice, each compared against the current state and the current observability. The slices run in order before S7.3 and change nothing else in the order.
+
+Why: the §7d trace (retrieval-benchmark §7d) rules out chunk boundaries and the fact's position inside a chunk; the misses are paraphrase. The queries reword the filing, query–gold token overlap is 0.00–0.27, and dense scores are flat (rank 1 vs rank 10 differ by 0.015–0.06), so a reworded gold lands past rank 15. One case also never reaches its section.
+
+Workload gap, read before every result: the fixture asks reworded user questions, but the app's filings step sends four fixed topic queries per company (`"{company} business description overview"`, `"… risk factors challenges"`, `"… financial performance revenue"`, `"… competition market position"`). A fixture gain is not an app gain until the app-workload comparison below shows it too.
+
+```text
+FR.0 — Retrieval trace and baselines (observability first; no retrieval result changes)
+Feature: an operator can see, per filings query, which candidates dense search found, how the reranker reordered them, and how flat the scores were.
+Trace: retrieval-benchmark §7a, §7d; ADR-0011; test-plan §25 (new rows: Retrieval trace, Retrieval trace metrics), §13; SPEC §5 (the trace is built inside the retrieval boundary; no client object leaves it).
+Scope: (a) one `RetrievalTrace` per query: query, filters, pool size, and per candidate chunk_id, section, dense rank and score, rerank rank and score; derived: dense score gap (rank 1 − rank 15), sections in the pool, dense rank of each kept chunk. Attached to the existing LangSmith `retrieve_filings` retriever run; logged without chunk text.
+       (b) Prometheus histograms `retrieval_dense_score_gap` and `retrieval_kept_dense_rank` (label `stage`), and a panel in the existing Grafana dashboard.
+       (c) benchmark result files carry the same trace per case, so a fixture run and a live run are reviewed with the same fields; §7a diagnostics read it instead of a separate pool file.
+       (d) baselines, live, owner-authorized: B-fixture = `dense_rerank_15` re-run with traces; the exact dense rank (50 deep) of every gold in the 8 §7d lost cases; B-app = the 3 benchmark tickers × 4 topic queries at pool 15 and pool 50: top-3 agreement between the pools and the section of each top-3 chunk.
+Tests:  U trace fields and derived values · C trace on the OpenSearch store (tests/rag) · I LangSmith metadata and /metrics through the API · R3 replay memo unchanged
+Done: one live NVDA run shows the trace in LangSmith and Grafana; baselines committed. Result: Pending.
+
+FR.1 — Section routing (no model call, no re-index)
+Feature: candidates come from the sections the query is about, so a section dense search never reaches is still in the pool.
+Scope: app — each topic query searches its own section (overview and competition → business, risk → risk_factors, financial performance → md&a) instead of the whole filing. Fixture — method `dense_rerank_15_section_mix`: the 15 candidates are taken round-robin across sections in dense-rank order, then reranked.
+Not the S5 boost: `section_aware` lost because an inferred-intent boost displaced dense hits (§7a, §7b). Here the app uses the query's known topic, and the fixture method only adds sections; it never reorders chunks within a section.
+Declared in retrieval-benchmark §7e before any run.
+
+FR.2 — Contextual chunk text (index change)
+Feature: each chunk is embedded with a short header (company, form, fiscal year, section title, and the nearest sub-heading when the parser has one), so a chunk that never names its topic still embeds near it.
+Scope: deterministic header, no model call; only the embedded text changes. The stored text, citations and chunk IDs stay as they are, so the gold labels stay valid. Needs a new benchmark index (same corpus and model, 532 chunks re-embedded), a declared "index text" axis in retrieval-benchmark §8 with an ADR-0011 amendment, and on adoption an index-release bump with re-ingest of indexed tickers.
+Declared in retrieval-benchmark §7f before any run.
+
+FR.3 — Query expansion (one model call per query)
+Feature: the query is restated in filing vocabulary before dense search.
+Scope: two declared methods, each compared to the current state on its own: `hyde` (the model writes a short 10-K-style passage that is embedded in place of the query) and `rewrite` (the model restates the query in 10-K terms). Temperature 0; the generated text is recorded in the result file and cached by (model, prompt_version, query), so a rerun replays it; the model never sees gold. App: generated once per (company, topic query) and cached with the filing result cache. At most one variant is adopted.
+Declared in retrieval-benchmark §7g before any run.
+```
+
+Comparative analysis, the same for every slice (declared 2026-11-24, before any run):
+
+- **Baseline:** the state adopted before the slice (FR.0 baselines for FR.1, the FR.1 outcome for FR.2, and so on). One axis per comparison, clean tree.
+- **Fixture (Q):** paired per §8 with `--strict-case-ids` against the baseline. Adopt iff the 95% CI lower bound of the paired delta is > 0 for `recall@10` and ≥ −0.03 for `section_recall@10`. The 50-pool `dense_rerank` (0.9511) is reported as the reference ceiling. Item level: each of the 8 §7d lost cases, with the gold's dense rank and pass@10 before and after; an aggregate alone never proves a fix.
+- **App workload:** the 12 topic queries (3 tickers × 4). Report the section hit rate of the top 3, the top-3 agreement with the pool-50 reference, and the FR.0 trace distributions (score gap, kept dense rank). The owner judges these; no labels exist for them.
+- **Live (L):** one cold NVDA run. Report the filings step time and total time against FILINGS-LATENCY (filings 36.7 s, total 78.9 s), and the cost per filings step from token counts. Budget: the filings step grows by at most 5 s.
+- **Observability:** the slice's trace fields and Grafana panels before and after, from the same NVDA run.
+- **Regression:** R1 R2 R3 R5; R4 shows zero deltas outside the slice's axis.
+- **Failure:** a slice that misses its rule is recorded and not adopted, and the next slice compares against the unchanged state. After FR.3 the owner reviews the pool size again.
+- **Spend:** every live run is owner-authorized: a fixture run costs about $0.1, the FR.2 re-embed a few cents, and FR.3 adds 75 model calls per method.
 
 ## Sprint contract
 
