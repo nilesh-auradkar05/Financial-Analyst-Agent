@@ -1,0 +1,36 @@
+Baseline:  evaluation/results/s7d_foundry-cohere-embed-v5-fast_opensearch_dense_rerank_retrieval_anchored_benchmark_v1.json
+Candidate: evaluation/results/s7d_foundry-cohere-embed-v5-fast_opensearch_dense_rerank_15_retrieval_anchored_benchmark_v1.json
+Fixture:   retrieval_anchored_benchmark_v1
+Axis:      retrieval_method
+
+Quality metrics at K=5, paired by case_id
+metric | baseline | candidate | paired_delta | relative_delta | wins/ties/losses | 95% CI | n
+-------|----------|-----------|--------------|----------------|------------------|--------|---
+pass | 0.9733 | 0.9067 | -0.0667 | -6.85% | 0/70/5 | [-0.1200, -0.0133] | 75
+recall | 0.9244 | 0.8622 | -0.0622 | -6.73% | 1/66/8 | [-0.1178, -0.0156] | 75
+precision | 0.2533 | 0.2320 | -0.0213 | -8.42% | 1/66/8 | [-0.0400, -0.0053] | 75
+mrr | 0.8711 | 0.8289 | -0.0422 | -4.85% | 1/69/5 | [-0.0933, +0.0000] | 75
+ndcg | 0.7583 | 0.7097 | -0.0487 | -6.42% | 3/64/8 | [-0.0938, -0.0102] | 75
+section_recall | 0.9867 | 0.9867 | +0.0000 | +0.00% | 1/73/1 | [-0.0400, +0.0400] | 75
+keyword_hit_rate | 0.9800 | 0.9267 | -0.0533 | -5.44% | 0/70/5 | [-0.1067, -0.0133] | 75
+miss_rate | 0.0267 | 0.0933 | +0.0667 | +250.00% | 0/70/5 | [+0.0133, +0.1200] | 75
+
+Quality metrics at K=10, paired by case_id
+metric | baseline | candidate | paired_delta | relative_delta | wins/ties/losses | 95% CI | n
+-------|----------|-----------|--------------|----------------|------------------|--------|---
+pass | 1.0000 | 0.9333 | -0.0667 | -6.67% | 0/70/5 | [-0.1200, -0.0133] | 75
+recall | 0.9511 | 0.8889 | -0.0622 | -6.54% | 1/66/8 | [-0.1178, -0.0156] | 75
+precision | 0.1307 | 0.1200 | -0.0107 | -8.16% | 1/66/8 | [-0.0200, -0.0027] | 75
+mrr | 0.8747 | 0.8328 | -0.0419 | -4.79% | 2/68/5 | [-0.0933, +0.0007] | 75
+ndcg | 0.7652 | 0.7178 | -0.0474 | -6.20% | 4/63/8 | [-0.0928, -0.0087] | 75
+section_recall | 1.0000 | 0.9867 | -0.0133 | -1.33% | 0/74/1 | [-0.0400, +0.0000] | 75
+keyword_hit_rate | 0.9867 | 0.9467 | -0.0400 | -4.05% | 1/70/4 | [-0.0933, +0.0000] | 75
+miss_rate | 0.0000 | 0.0667 | +0.0667 | n/a | 0/70/5 | [+0.0133, +0.1200] | 75
+
+Latency (ms), paired by case_id
+metric | baseline | candidate | paired_delta | relative_delta | wins/ties/losses | 95% CI | n
+-------|----------|-----------|--------------|----------------|------------------|--------|---
+latency_cold_ms | 25407.9256 | 4288.5529 | -21119.3727 | -83.12% | 69/0/6 | [-25630.7951, -16752.9059] | 75
+latency_warm_ms | 4840.6380 | 4299.5240 | -541.1140 | -11.18% | 44/0/31 | [-1330.1949, +248.7417] | 75
+
+shared=75 baseline_only=0 candidate_only=0
