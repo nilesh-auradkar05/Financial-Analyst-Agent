@@ -95,6 +95,42 @@
         "fieldConfig": {
           "defaults": {"unit": "s"}
         }
+      },
+      {
+        "id": 7,
+        "title": "Filings dense score gap",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum by (le) (rate(retrieval_dense_score_gap_bucket{stage=\"filings\"}[1h])))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(retrieval_dense_score_gap_bucket{stage=\"filings\"}[1h])))",
+            "legendFormat": "p95",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Filings kept dense rank",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum by (le) (rate(retrieval_kept_dense_rank_bucket{stage=\"filings\"}[1h])))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(retrieval_kept_dense_rank_bucket{stage=\"filings\"}[1h])))",
+            "legendFormat": "p95",
+            "refId": "B"
+          }
+        ]
       }
     ],
     "schemaVersion": 38,

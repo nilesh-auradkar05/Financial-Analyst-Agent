@@ -4,7 +4,10 @@ FINANCIAL ANALYST AGENT SYSTEM - PROMETHEUS METRICS
 
 import time
 from contextlib import contextmanager
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from app.components.retrieval.reranked_hybrid_retrieve import RetrievalTrace
 
 
 def _try_import_prometheus() -> tuple[bool, Any, Any, Any, Any, Any]:
@@ -104,6 +107,21 @@ if PROMETHEUS_AVAILABLE:
         ["stage", "outcome"],
     )
 
+    # Retrieval trace: how flat the dense scores are and how deep the kept chunks sat
+    RETRIEVAL_DENSE_SCORE_GAP = Histogram(
+        "retrieval_dense_score_gap",
+        "Dense score at rank 1 minus at rank 15 of a reranked search",
+        ["stage"],
+        buckets=[0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1, 0.15, 0.2],
+    )
+
+    RETRIEVAL_KEPT_DENSE_RANK = Histogram(
+        "retrieval_kept_dense_rank",
+        "Dense rank of each chunk a reranked search kept",
+        ["stage"],
+        buckets=[1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30, 50],
+    )
+
 
 # =============================================================================
 # TRACKING CONTEXT MANAGERS
@@ -162,6 +180,16 @@ def record_cache_event(stage: str, outcome: str) -> None:
     """Record a result cache lookup; `outcome` is "hit" or "miss"."""
     if PROMETHEUS_AVAILABLE:
         CACHE_EVENTS.labels(stage=stage, outcome=outcome).inc()
+
+
+def record_retrieval_trace(stage: str, trace: "RetrievalTrace") -> None:
+    """Observe a reranked search's dense score gap and the dense rank of each chunk it kept."""
+    if not PROMETHEUS_AVAILABLE:
+        return
+    if trace.dense_score_gap is not None:
+        RETRIEVAL_DENSE_SCORE_GAP.labels(stage=stage).observe(trace.dense_score_gap)
+    for rank in trace.kept_dense_ranks:
+        RETRIEVAL_KEPT_DENSE_RANK.labels(stage=stage).observe(rank)
 
 
 # =============================================================================

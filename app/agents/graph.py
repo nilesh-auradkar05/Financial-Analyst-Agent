@@ -68,7 +68,7 @@ from app.guardrails.content import (
 from app.guardrails.output import redact_pii, screen_memo, with_disclaimer, without_sentences
 from app.llm.provider import fallback_count, get_llm, model_metadata
 from app.observability.langsmith import app_traceable, mark_trace_failed
-from app.observability.metrics import record_cache_event
+from app.observability.metrics import record_cache_event, record_retrieval_trace
 from app.services.llm import ANALYST_SYSTEM_PROMPT
 from app.services.sentiment import analyze_sentiment_batch
 from app.services.tools.stock_data_tool import get_stock_data
@@ -295,6 +295,13 @@ INGEST_TIMEOUT_SECONDS: float = 600.0
 _FILING_CANDIDATE_POOL = 15
 _FILING_RESULTS_PER_QUERY = 3
 
+FILING_TOPIC_QUERIES: tuple[str, ...] = (
+    "{company} business description overview",
+    "{company} risk factors challenges",
+    "{company} financial performance revenue",
+    "{company} competition market position",
+)
+
 
 def _filing_error(code: str, message: str) -> dict:
     return {
@@ -316,12 +323,7 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
         company_name = next((str(name) for name in names if name), ticker)
 
     # Multiple queries for comprehensive retrieval
-    queries = [
-        f"{company_name} business description overview",
-        f"{company_name} risk factors challenges",
-        f"{company_name} financial performance revenue",
-        f"{company_name} competition market position",
-    ]
+    queries = [template.format(company=company_name) for template in FILING_TOPIC_QUERIES]
 
     results: list[SearchResult] = []
     fallback_reason: str | None = None
@@ -352,6 +354,21 @@ async def _retrieve_filing_chunks(store: RetrievalStore, ticker: str, company_na
             )
             for query, result in zip(queries, results)
         ]
+
+    # A fallback puts every query on the dense path, which records no trace.
+    traces = [result.trace for result in results if not fallback_reason and result.trace]
+    if run := get_current_run_tree():
+        run.metadata["retrieval_traces"] = [trace.model_dump() for trace in traces]
+    for trace in traces:
+        logger.info(
+            "[retrieve_filings] trace query={!r} pool={} gap={} kept_dense_ranks={} sections={}",
+            trace.query,
+            trace.candidate_pool,
+            trace.dense_score_gap,
+            trace.kept_dense_ranks,
+            trace.pool_sections,
+        )
+        record_retrieval_trace("filings", trace)
 
     all_chunks = []
     seen_texts: set[str] = set()
