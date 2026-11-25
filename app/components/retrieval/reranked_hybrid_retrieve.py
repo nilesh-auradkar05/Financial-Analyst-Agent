@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import math
 import time
+from collections import Counter
 from typing import Any, Literal, Optional, Protocol
 
 import httpx
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.components.retrieval.embeddings import RequestPacer, estimate_tokens
 from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
@@ -23,6 +25,7 @@ _MAX_DOCUMENT_CHARS = 4_000
 _RERANK_TIMEOUT_SECONDS = 30.0
 _RERANK_ATTEMPTS = 3
 _RERANK_BACKOFF_SECONDS = 0.1
+_GAP_RANK = 15
 
 # The rerank deployment allows 50 requests and 50,000 tokens per minute (owner, 2026-11-23); stay
 # under both, in a window of its own.
@@ -40,6 +43,46 @@ class RerankerLike(Protocol):
 
 class RerankedHybridSearchUnavailableError(RuntimeError):
     """Raised when reranked search cannot be executed."""
+
+
+class TraceCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_id: str
+    section_key: str | None
+    dense_rank: int
+    dense_score: float
+    rerank_rank: int
+    rerank_score: float
+
+
+class RetrievalTrace(BaseModel):
+    """What one reranked search saw: its candidate pool in store order, rerank positions and
+    the dense ranks it kept. Holds no chunk text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    ticker: str
+    filing_type: str | None
+    candidate_source: Literal["dense", "hybrid"]
+    candidate_pool: int
+    candidates: list[TraceCandidate]
+    kept_dense_ranks: list[int]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def dense_score_gap(self) -> float | None:
+        """Dense score at rank 1 minus at rank min(15, n); None below two candidates."""
+        if len(self.candidates) < 2:
+            return None
+        reads = min(_GAP_RANK, len(self.candidates))
+        return self.candidates[0].dense_score - self.candidates[reads - 1].dense_score
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def pool_sections(self) -> dict[str, int]:
+        return dict(Counter(c.section_key or "unknown_section" for c in self.candidates))
 
 
 def _is_number(value: Any) -> bool:
@@ -153,6 +196,8 @@ def search_reranked(
     ).chunks
 
     chunks: list[RetrievedChunk] = []
+    scored: list[tuple[int, tuple[RetrievedChunk, float]]] = []
+    ranked: list[tuple[int, tuple[RetrievedChunk, float]]] = []
     if pool:
         reranker = reranker or FoundryCohereReranker()
         scores = [float(score) for score in reranker.score(query, [c.text[:_MAX_DOCUMENT_CHARS] for c in pool])]
@@ -160,7 +205,8 @@ def search_reranked(
             raise RerankedHybridSearchUnavailableError(
                 "Reranker returned a different number of scores than candidates."
             )
-        ranked = sorted(enumerate(zip(pool, scores), start=1), key=lambda item: -item[1][1])
+        scored = list(enumerate(zip(pool, scores), start=1))
+        ranked = sorted(scored, key=lambda item: -item[1][1])
         chunks = [
             RetrievedChunk(
                 id=chunk.id,
@@ -177,6 +223,26 @@ def search_reranked(
             for rank, (chunk, score) in ranked[:top_k]
         ]
 
+    rerank_rank = {rank: place for place, (rank, _) in enumerate(ranked, start=1)}
+    trace = RetrievalTrace(
+        query=query,
+        ticker=ticker,
+        filing_type=filing_type,
+        candidate_source=candidates,
+        candidate_pool=candidate_pool,
+        candidates=[
+            TraceCandidate(
+                chunk_id=chunk.id,
+                section_key=chunk.metadata.get("section_key"),
+                dense_rank=rank,
+                dense_score=chunk.relevance_score,
+                rerank_rank=rerank_rank[rank],
+                rerank_score=score,
+            )
+            for rank, (chunk, score) in scored
+        ],
+        kept_dense_ranks=[chunk.metadata["candidate_rank"] for chunk in chunks],
+    )
     return SearchResult(
         query=query,
         chunks=chunks,
@@ -187,4 +253,5 @@ def search_reranked(
             "ticker": ticker.upper(),
             "filing_type": filing_type,
         },
+        trace=trace,
     )

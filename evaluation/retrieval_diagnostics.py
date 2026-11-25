@@ -234,6 +234,16 @@ def build_diagnostics_report(
 ) -> DiagnosticsReport:
     cases = {case.case_id: case for case in fixture.cases}
     pools = dense_pool or {}
+    depth = DENSE_POOL_DEPTH
+    traces = {c["case_id"]: c["trace"] for c in result["cases"] if "trace" in c}
+    if dense_pool is None and traces:
+        pools = {
+            case_id: [
+                c["chunk_id"] for c in sorted(trace["candidates"], key=lambda c: c["dense_rank"])
+            ]
+            for case_id, trace in traces.items()
+        }
+        depth = max(trace["candidate_pool"] for trace in traces.values())
     misses: list[AnchorMiss] = []
     for result_case in result["cases"]:
         case_id = result_case["case_id"]
@@ -245,7 +255,7 @@ def build_diagnostics_report(
         evidence_release=provenance["evidence_release"],
         embedding_model=provenance["embedding_model"],
         overlap_threshold=OVERLAP_THRESHOLD,
-        dense_pool_depth=DENSE_POOL_DEPTH,
+        dense_pool_depth=depth,
         n_cases_with_misses=len({m.case_id for m in misses}),
         n_misses=len(misses),
         class_counts={name: sum(m.miss_class == name for m in misses) for name in MISS_CLASSES},

@@ -30,7 +30,7 @@ from app.components.retrieval.reranked_hybrid_retrieve import (
     search_reranked,
 )
 from app.components.retrieval.section_aware_search import search_section_aware
-from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters
+from app.components.retrieval.vector_store import RetrievedChunk, SearchFilters, SearchResult
 from dataops.git_state import current_code_version
 from evaluation.validate_retrieval_fixture import (
     AnchoredCase,
@@ -203,23 +203,24 @@ def score_retrieval(
     }
 
 
-def _search(store: Any, case: AnchoredCase, method: str) -> list[RetrievedChunk]:
+def _search(store: Any, case: AnchoredCase, method: str) -> SearchResult:
     top_k = max(BENCHMARK_KS)
     filing_type = case.filters.get("filing_type")
     if method == "dense":
-        result = store.search(
+        result: SearchResult = store.search(
             case.query,
             filters=SearchFilters(ticker=case.ticker, filing_type=filing_type),
             n_results=top_k,
         )
-        return sorted(result.chunks, key=lambda c: (-c.relevance_score, c.id))
+        result.chunks = sorted(result.chunks, key=lambda c: (-c.relevance_score, c.id))
+        return result
     if method == "hybrid":
-        hybrid = store.search_hybrid(
+        hybrid: SearchResult = store.search_hybrid(
             case.query,
             filters=SearchFilters(ticker=case.ticker, filing_type=filing_type),
             n_results=top_k,
         )
-        return list(hybrid.chunks)
+        return hybrid
     if method in _RERANK_ARMS:
         candidates, candidate_pool = _RERANK_ARMS[method]
         return search_reranked(
@@ -230,18 +231,18 @@ def _search(store: Any, case: AnchoredCase, method: str) -> list[RetrievedChunk]
             top_k=top_k,
             candidates=candidates,
             candidate_pool=candidate_pool,
-        ).chunks
+        )
     return search_section_aware(
         store, query=case.query, ticker=case.ticker, filing_type=filing_type, top_k=top_k
-    ).chunks
+    )
 
 
 def _timed_search(
     store: Any, case: AnchoredCase, method: str
-) -> tuple[list[RetrievedChunk], float]:
+) -> tuple[SearchResult, float]:
     started = time.perf_counter()
-    chunks = _search(store, case, method)
-    return chunks, (time.perf_counter() - started) * 1000
+    result = _search(store, case, method)
+    return result, (time.perf_counter() - started) * 1000
 
 
 def _mean(values: list[float]) -> float | None:
@@ -268,7 +269,8 @@ def run_anchored_benchmark(
 
     cases: list[dict[str, Any]] = []
     for case in fixture.cases:
-        chunks, cold_ms = _timed_search(store, case, retrieval_method)
+        cold, cold_ms = _timed_search(store, case, retrieval_method)
+        chunks = cold.chunks
         _, warm_ms = _timed_search(store, case, retrieval_method)
         metrics = {str(k): score_retrieval(case, chunks, k) for k in BENCHMARK_KS}
         cases.append(
@@ -290,6 +292,7 @@ def run_anchored_benchmark(
                 ],
                 "metrics": metrics,
                 "latency_ms": {"cold": cold_ms, "warm": warm_ms},
+                **({"trace": cold.trace.model_dump()} if cold.trace else {}),
             }
         )
 

@@ -180,6 +180,7 @@ Rules:
 - `first_relevant_rank` emitted as `null` on miss.
 - Cold and warm latency captured separately.
 - Determinism per §4.
+- Rerank methods record per case `trace` (FR.0, 2026-11-24): the cold search's candidate pool with each candidate's dense rank and score, rerank rank and score, and the derived dense score gap (rank 1 minus rank min(15, n)), pool sections and kept dense ranks. No chunk text.
 
 ---
 
@@ -197,6 +198,7 @@ A diagnostic report over one result file. It explains misses; it is not a metric
 - **Dense rank:** the anchor chunk's rank in a dense top-50 search under the case's ticker and filing-type filters, from a pool file collected once and committed with the report. It shows whether the chunk is reachable by a larger candidate pool; it is not the section-aware rank.
 - **Candidates**, counted by misses addressed: section prior / intent routing ← `section_miss`; hybrid dense + BM25 (S5.2) ← `ranking`; rerank (S5.3) ← any non-`boundary_split` miss with a dense rank ≤ 50; chunking ← `boundary_split`; query rewriting ← `vocabulary_gap` (outside S5, listed for completeness). A miss can count for several candidates.
 - The overlap threshold 0.5 and the pool depth 50 were declared before the first report was generated.
+- **Pool from the trace (FR.0, 2026-11-24):** when no pool file is given and the result's cases carry `trace` (§7), the dense rank is read from the trace's candidates and the report records the trace's candidate pool as `dense_pool_depth`, so a pool-15 result reports ranks only to 15. A pool file still takes precedence; results without traces need one as before.
 
 ## 7b. Hybrid dense + BM25 (S5.2, declared 2026-11-15 before any run)
 

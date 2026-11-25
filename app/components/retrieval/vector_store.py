@@ -28,13 +28,16 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, Protocol, cast
 
 from app.components.retrieval.evidence import EvidencePacket
 from app.components.retrieval.sections import (  # noqa: F401  re-exported for importers
     canonical_section_display_name,
     canonical_section_key,
 )
+
+if TYPE_CHECKING:
+    from app.components.retrieval.reranked_hybrid_retrieve import RetrievalTrace
 
 # DATA MODELS
 
@@ -149,6 +152,7 @@ class SearchResult:
         total_results: Number of results returned
         search_time_ms: Time taken for search
         filter_used: Metadata filter that was applied
+        trace: What a reranked search saw; set by `search_reranked` only
     """
 
     query: str
@@ -156,6 +160,7 @@ class SearchResult:
     total_results: int = 0
     search_time_ms: float = 0.0
     filter_used: Optional[dict[str, Any]] = None
+    trace: Optional[RetrievalTrace] = None
 
     @property
     def has_results(self) -> bool:
