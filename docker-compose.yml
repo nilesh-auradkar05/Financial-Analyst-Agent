@@ -10,6 +10,9 @@ x-default-logging: &default-logging
 services:
   api:
     container_name: financial-analyst-agent-system-api
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     build:
       context: .
       dockerfile: Dockerfile
